@@ -90,7 +90,7 @@ const CHAINS = [
   { src: "/Logomark Blue BG.svg", label: "Linea" },
   { src: "/logotypy/AkeHh5LriDwrNIvVvUQ66wSHU.webp", label: "Celo" },
   { src: "/icons/eth.svg", label: "Ethereum" },
-  { src: "/logotypy/logo-symbol.svg", label: "World Chain" },
+  { src: "/logotypy/world-symbol-dark.svg", label: "World Chain" },
 ];
 
 function AnimCounter({ target, suffix = "" }: { target: number; suffix?: string }) {

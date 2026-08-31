@@ -42,7 +42,7 @@ export default function ReferralGuideModal({ isOpen, onClose }: ReferralGuideMod
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100]"
+            className="fixed inset-0 bg-soft-ink/40 z-[100]"
           />
 
           {/* Modal */}
@@ -50,111 +50,103 @@ export default function ReferralGuideModal({ isOpen, onClose }: ReferralGuideMod
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed inset-4 md:inset-8 lg:inset-12 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl z-[101] overflow-hidden flex flex-col"
+            className="fixed inset-3 md:inset-8 lg:inset-12 bg-soft-surface rounded-card shadow-float z-[101] overflow-hidden flex flex-col"
           >
             {/* Header */}
-            <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-6 text-white">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-white/20 rounded-lg">
-                    <FiBook className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-bold">Referral System Guide</h2>
-                    <p className="text-sm opacity-90">Everything you need to know about BaseChat referrals</p>
-                  </div>
-                </div>
-                <button
-                  onClick={onClose}
-                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-                >
-                  <FiX className="w-6 h-6" />
-                </button>
+            <div className="flex items-start justify-between gap-3 border-b border-soft-line px-4 py-4 sm:px-6">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wide text-soft-ink-faint">Guide</p>
+                <h2 className="mt-0.5 font-soft-display text-xl font-bold leading-tight text-soft-ink sm:text-2xl">
+                  How referrals work
+                </h2>
               </div>
+              <button
+                onClick={onClose}
+                aria-label="Close guide"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-soft-sunken text-soft-ink-muted transition-transform [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-line hover:text-soft-ink active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+              >
+                <FiX className="h-5 w-5" />
+              </button>
             </div>
 
-            <div className="flex flex-1 overflow-hidden">
-              {/* Sidebar */}
-              <div className="w-64 bg-gray-50 dark:bg-gray-800 p-4 overflow-y-auto hidden md:block">
-                <nav className="space-y-1">
+            <div className="flex flex-1 flex-col overflow-hidden md:flex-row">
+              {/* Nawigacja. Wczesniej byla `hidden md:block` - na telefonie NIE DALO
+                  SIE przelaczyc sekcji, widac bylo tylko "Quick Start". Teraz ten sam
+                  zestaw przyciskow jest paskiem przewijanym w poziomie na mobile
+                  i kolumna od md w gore. */}
+              <div className="shrink-0 border-b border-soft-line bg-soft-bg px-3 py-2 md:w-60 md:overflow-y-auto md:border-b-0 md:border-r md:px-4 md:py-4">
+                <nav className="flex gap-1.5 overflow-x-auto md:flex-col md:gap-1 md:overflow-x-visible">
                   {sections.map(section => {
                     const Icon = section.icon;
                     return (
                       <button
                         key={section.id}
                         onClick={() => setActiveSection(section.id)}
-                        className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-all ${
+                        aria-current={activeSection === section.id ? 'true' : undefined}
+                        className={`flex shrink-0 items-center gap-2 rounded-pill px-3 py-2 transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary md:w-full ${
                           activeSection === section.id
-                            ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
-                            : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                            ? 'bg-soft-primary text-white shadow-chip'
+                            : 'text-soft-ink-muted hover:bg-soft-sunken hover:text-soft-ink'
                         }`}
                       >
-                        <Icon className="w-4 h-4" />
-                        <span className="text-sm font-medium">{section.label}</span>
+                        <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                        <span className="whitespace-nowrap text-sm font-semibold">{section.label}</span>
                       </button>
                     );
                   })}
                 </nav>
 
                 {/* Quick Stats */}
-                <div className="mt-6 p-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl text-white">
-                  <h4 className="font-semibold mb-3">Quick Stats</h4>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="opacity-90">Base Reward</span>
-                      <span className="font-bold">100 pts</span>
+                <div className="mt-4 hidden rounded-card bg-soft-surface p-4 shadow-chip md:block">
+                  <h4 className="font-soft-display text-sm font-bold text-soft-ink">Quick stats</h4>
+                  <dl className="mt-3 space-y-2 font-soft text-sm">
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-soft-ink-muted">Base reward</dt>
+                      <dd className="font-soft-display font-bold tabular-nums text-soft-accent-deep">100 pts</dd>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="opacity-90">First Post</span>
-                      <span className="font-bold">+50 pts</span>
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-soft-ink-muted">First post</dt>
+                      <dd className="font-soft-display font-bold tabular-nums text-soft-accent-deep">+50 pts</dd>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="opacity-90">Max Milestone</span>
-                      <span className="font-bold">5,000 pts</span>
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-soft-ink-muted">Max milestone</dt>
+                      <dd className="font-soft-display font-bold tabular-nums text-soft-accent-deep">5,000 pts</dd>
                     </div>
-                  </div>
+                  </dl>
                 </div>
               </div>
 
               {/* Content */}
-              <div className="flex-1 p-6 overflow-y-auto">
+              <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6">
                 {activeSection === 'quick-start' && (
                   <div className="space-y-6">
                     <div>
-                      <h3 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
-                        🚀 Quick Start
+                      <h3 className="font-soft-display text-lg font-bold text-soft-ink">
+                        Quick start
                       </h3>
-                      <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-6">
-                        <ol className="space-y-4">
-                          <li className="flex items-start">
-                            <span className="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold mr-3">1</span>
-                            <div>
-                              <p className="font-semibold text-gray-900 dark:text-white">Open Your Profile</p>
-                              <p className="text-sm text-gray-600 dark:text-gray-400">Navigate to your profile in BaseChat</p>
+                      <ol className="mt-4 space-y-4">
+                        {[
+                          { title: 'Open your profile', body: 'Navigate to your profile in BaseChat.' },
+                          { title: 'Click "Referral System"', body: 'The purple button sits below your profile stats.' },
+                          { title: 'Copy your link', body: 'Your unique link is ready to share.' }
+                        ].map((step, i) => (
+                          <li key={step.title} className="flex items-start gap-3">
+                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-soft-primary font-soft-display text-sm font-bold tabular-nums text-white">
+                              {i + 1}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="font-soft-display text-sm font-bold text-soft-ink">{step.title}</p>
+                              <p className="mt-0.5 font-soft text-sm text-soft-ink-muted">{step.body}</p>
                             </div>
                           </li>
-                          <li className="flex items-start">
-                            <span className="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold mr-3">2</span>
-                            <div>
-                              <p className="font-semibold text-gray-900 dark:text-white">Click "Referral System"</p>
-                              <p className="text-sm text-gray-600 dark:text-gray-400">Find the green button below your profile stats</p>
-                            </div>
-                          </li>
-                          <li className="flex items-start">
-                            <span className="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold mr-3">3</span>
-                            <div>
-                              <p className="font-semibold text-gray-900 dark:text-white">Copy Your Link</p>
-                              <p className="text-sm text-gray-600 dark:text-gray-400">Your unique link is ready to share!</p>
-                            </div>
-                          </li>
-                        </ol>
-                      </div>
+                        ))}
+                      </ol>
                     </div>
 
                     <div>
-                      <h4 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">Your Referral Link Format</h4>
-                      <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4">
-                        <code className="text-sm text-blue-600 dark:text-blue-400">
+                      <h4 className="font-soft-display text-sm font-bold text-soft-ink">Link format</h4>
+                      <div className="mt-2 overflow-x-auto rounded-card bg-soft-sunken p-4">
+                        <code className="whitespace-nowrap font-mono text-sm text-soft-primary-deep">
                           https://mysphere.fun/join?ref=YOUR_CODE
                         </code>
                       </div>
@@ -163,243 +155,238 @@ export default function ReferralGuideModal({ isOpen, onClose }: ReferralGuideMod
                 )}
 
                 {activeSection === 'how-it-works' && (
-                  <div className="space-y-6">
-                    <h3 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
-                      📖 How It Works
+                  <div className="space-y-5">
+                    <h3 className="font-soft-display text-lg font-bold text-soft-ink">
+                      How it works
                     </h3>
-                    
+
                     <div className="space-y-4">
-                      <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-xl p-6">
-                        <h4 className="font-semibold text-lg mb-3 text-gray-900 dark:text-white">For Referrers</h4>
-                        <ul className="space-y-2 text-gray-700 dark:text-gray-300">
-                          <li className="flex items-start">
-                            <FiShare2 className="w-5 h-5 text-blue-500 mr-2 mt-0.5" />
+                      <div className="rounded-card border border-soft-line p-4 sm:p-5">
+                        <h4 className="font-soft-display text-sm font-bold text-soft-ink">For referrers</h4>
+                        <ul className="mt-3 space-y-2.5 font-soft text-sm text-soft-ink-muted">
+                          <li className="flex items-start gap-2.5">
+                            <FiShare2 className="mt-0.5 h-4 w-4 shrink-0 text-soft-primary" aria-hidden="true" />
                             <span>Share your unique referral link with friends</span>
                           </li>
-                          <li className="flex items-start">
-                            <FiUsers className="w-5 h-5 text-blue-500 mr-2 mt-0.5" />
+                          <li className="flex items-start gap-2.5">
+                            <FiUsers className="mt-0.5 h-4 w-4 shrink-0 text-soft-primary" aria-hidden="true" />
                             <span>They join BaseChat using your link</span>
                           </li>
-                          <li className="flex items-start">
-                            <FiGift className="w-5 h-5 text-blue-500 mr-2 mt-0.5" />
-                            <span>You earn 100 points instantly</span>
+                          <li className="flex items-start gap-2.5">
+                            <FiGift className="mt-0.5 h-4 w-4 shrink-0 text-soft-primary" aria-hidden="true" />
+                            <span>You earn <strong className="font-soft-display tabular-nums text-soft-accent-deep">100 points</strong> instantly</span>
                           </li>
-                          <li className="flex items-start">
-                            <FiTrendingUp className="w-5 h-5 text-blue-500 mr-2 mt-0.5" />
-                            <span>Get +50 bonus when they create their first post</span>
+                          <li className="flex items-start gap-2.5">
+                            <FiTrendingUp className="mt-0.5 h-4 w-4 shrink-0 text-soft-primary" aria-hidden="true" />
+                            <span>Get <strong className="font-soft-display tabular-nums text-soft-accent-deep">+50</strong> when they publish their first post</span>
                           </li>
                         </ul>
                       </div>
 
-                      <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl p-6">
-                        <h4 className="font-semibold text-lg mb-3 text-gray-900 dark:text-white">For New Users</h4>
-                        <ul className="space-y-2 text-gray-700 dark:text-gray-300">
-                          <li className="flex items-start">
-                            <span className="text-green-500 mr-2">1.</span>
-                            <span>Click on a referral link from a friend</span>
-                          </li>
-                          <li className="flex items-start">
-                            <span className="text-green-500 mr-2">2.</span>
-                            <span>Connect your wallet on the welcome page</span>
-                          </li>
-                          <li className="flex items-start">
-                            <span className="text-green-500 mr-2">3.</span>
-                            <span>You're automatically registered!</span>
-                          </li>
-                          <li className="flex items-start">
-                            <span className="text-green-500 mr-2">4.</span>
-                            <span>Start using BaseChat and get your own referral link</span>
-                          </li>
-                        </ul>
+                      <div className="rounded-card border border-soft-line p-4 sm:p-5">
+                        <h4 className="font-soft-display text-sm font-bold text-soft-ink">For new users</h4>
+                        <ol className="mt-3 space-y-2.5 font-soft text-sm text-soft-ink-muted">
+                          {[
+                            'Click a referral link from a friend',
+                            'Connect your wallet on the welcome page',
+                            "You're registered automatically",
+                            'Start using BaseChat and get your own referral link'
+                          ].map((step, i) => (
+                            <li key={step} className="flex items-start gap-2.5">
+                              <span className="font-soft-display font-bold tabular-nums text-soft-primary-deep">{i + 1}.</span>
+                              <span>{step}</span>
+                            </li>
+                          ))}
+                        </ol>
                       </div>
                     </div>
                   </div>
                 )}
 
                 {activeSection === 'rewards' && (
-                  <div className="space-y-6">
-                    <h3 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
-                      💎 Rewards Structure
+                  <div className="space-y-5">
+                    <h3 className="font-soft-display text-lg font-bold text-soft-ink">
+                      Rewards
                     </h3>
 
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-6">
-                        <h4 className="font-semibold text-green-800 dark:text-green-400 mb-3">Base Rewards</h4>
-                        <div className="space-y-3">
-                          <div className="flex justify-between items-center">
-                            <span className="text-gray-700 dark:text-gray-300">Successful Referral</span>
-                            <span className="font-bold text-green-600 dark:text-green-400">100 pts</span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-gray-700 dark:text-gray-300">First Post Bonus</span>
-                            <span className="font-bold text-green-600 dark:text-green-400">+50 pts</span>
-                          </div>
-                        </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="rounded-card border border-soft-line p-4 sm:p-5">
+                        <h4 className="font-soft-display text-sm font-bold text-soft-ink">Base rewards</h4>
+                        <dl className="mt-3 space-y-2.5 font-soft text-sm">
+                          {[
+                            ['Successful referral', '100 pts'],
+                            ['First post bonus', '+50 pts']
+                          ].map(([label, value]) => (
+                            <div key={label} className="flex items-center justify-between gap-3">
+                              <dt className="text-soft-ink-muted">{label}</dt>
+                              <dd className="font-soft-display font-bold tabular-nums text-soft-accent-deep">{value}</dd>
+                            </div>
+                          ))}
+                        </dl>
                       </div>
 
-                      <div className="bg-purple-50 dark:bg-purple-900/20 rounded-xl p-6">
-                        <h4 className="font-semibold text-purple-800 dark:text-purple-400 mb-3">Milestones</h4>
-                        <div className="space-y-2 text-sm">
-                          <div className="flex justify-between">
-                            <span className="text-gray-700 dark:text-gray-300">5 referrals</span>
-                            <span className="font-bold text-purple-600 dark:text-purple-400">+250 pts</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-700 dark:text-gray-300">10 referrals</span>
-                            <span className="font-bold text-purple-600 dark:text-purple-400">+500 pts</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-700 dark:text-gray-300">25 referrals</span>
-                            <span className="font-bold text-purple-600 dark:text-purple-400">+1,500 pts</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-700 dark:text-gray-300">50 referrals</span>
-                            <span className="font-bold text-purple-600 dark:text-purple-400">+5,000 pts</span>
-                          </div>
-                        </div>
+                      <div className="rounded-card border border-soft-line p-4 sm:p-5">
+                        <h4 className="font-soft-display text-sm font-bold text-soft-ink">Milestones</h4>
+                        <dl className="mt-3 space-y-2.5 font-soft text-sm">
+                          {[
+                            ['5 referrals', '+250 pts'],
+                            ['10 referrals', '+500 pts'],
+                            ['25 referrals', '+1,500 pts'],
+                            ['50 referrals', '+5,000 pts']
+                          ].map(([label, value]) => (
+                            <div key={label} className="flex items-center justify-between gap-3">
+                              <dt className="tabular-nums text-soft-ink-muted">{label}</dt>
+                              <dd className="font-soft-display font-bold tabular-nums text-soft-accent-deep">{value}</dd>
+                            </div>
+                          ))}
+                        </dl>
                       </div>
                     </div>
 
-                    <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-xl p-6">
-                      <h4 className="font-semibold text-yellow-800 dark:text-yellow-400 mb-3">Example Calculation</h4>
-                      <p className="text-gray-700 dark:text-gray-300 mb-3">If you refer 10 friends who all create posts:</p>
-                      <ul className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
-                        <li>• Base rewards: 10 × 100 = 1,000 points</li>
-                        <li>• First post bonuses: 10 × 50 = 500 points</li>
-                        <li>• Milestone bonuses: 250 + 500 = 750 points</li>
-                        <li className="font-bold text-yellow-800 dark:text-yellow-400">• Total: 2,250 points!</li>
+                    <div className="rounded-card bg-soft-sunken p-4 sm:p-5">
+                      <h4 className="font-soft-display text-sm font-bold text-soft-ink">Example</h4>
+                      <p className="mt-1 font-soft text-sm text-soft-ink-muted">
+                        Ten friends join and all publish a post:
+                      </p>
+                      <ul className="mt-3 space-y-1.5 font-soft text-sm tabular-nums text-soft-ink-muted">
+                        <li>Base rewards: 10 × 100 = 1,000</li>
+                        <li>First post bonuses: 10 × 50 = 500</li>
+                        <li>Milestone bonuses: 250 + 500 = 750</li>
                       </ul>
+                      <p className="mt-3 border-t border-soft-line pt-3 font-soft-display text-lg font-bold tabular-nums text-soft-accent-deep">
+                        2,250 points
+                      </p>
                     </div>
                   </div>
                 )}
 
                 {activeSection === 'dashboard' && (
-                  <div className="space-y-6">
-                    <h3 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
-                      📊 Using Your Dashboard
+                  <div className="space-y-5">
+                    <h3 className="font-soft-display text-lg font-bold text-soft-ink">
+                      Your dashboard
                     </h3>
 
                     <div className="space-y-4">
-                      <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-6">
-                        <h4 className="font-semibold text-lg mb-3 text-gray-900 dark:text-white">Overview Tab</h4>
-                        <ul className="space-y-2 text-gray-700 dark:text-gray-300">
-                          <li>• Your unique referral link with copy button</li>
-                          <li>• QR code for easy sharing</li>
-                          <li>• Total statistics and current rewards</li>
-                          <li>• Progress to next milestone</li>
-                        </ul>
-                      </div>
-
-                      <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-6">
-                        <h4 className="font-semibold text-lg mb-3 text-gray-900 dark:text-white">My Referrals Tab</h4>
-                        <ul className="space-y-2 text-gray-700 dark:text-gray-300">
-                          <li>• List of all your referrals</li>
-                          <li>• Status indicators (Pending/Active/Rewarded)</li>
-                          <li>• Join dates and wallet addresses</li>
-                          <li>• Real-time updates every 30 seconds</li>
-                        </ul>
-                      </div>
-
-                      <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-6">
-                        <h4 className="font-semibold text-lg mb-3 text-gray-900 dark:text-white">Rewards Tab</h4>
-                        <ul className="space-y-2 text-gray-700 dark:text-gray-300">
-                          <li>• Milestone achievements</li>
-                          <li>• Total points earned</li>
-                          <li>• Reward history breakdown</li>
-                          <li>• Visual progress indicators</li>
-                        </ul>
-                      </div>
+                      {[
+                        {
+                          title: 'Overview',
+                          items: [
+                            'Your referral link with a copy button',
+                            'QR code for sharing in person',
+                            'Progress to the next milestone',
+                            'What each referral is worth'
+                          ]
+                        },
+                        {
+                          title: 'Invites',
+                          items: [
+                            'Everyone who joined through your link',
+                            'Status of each one: Pending, Active or Rewarded',
+                            'Join date and shortened wallet address',
+                            'Refreshes every 30 seconds'
+                          ]
+                        },
+                        {
+                          title: 'Rewards',
+                          items: [
+                            'Total points earned',
+                            'Which milestones you have reached',
+                            'How much each remaining milestone pays'
+                          ]
+                        }
+                      ].map(tab => (
+                        <div key={tab.title} className="rounded-card border border-soft-line p-4 sm:p-5">
+                          <h4 className="font-soft-display text-sm font-bold text-soft-ink">{tab.title} tab</h4>
+                          <ul className="mt-3 space-y-2 font-soft text-sm text-soft-ink-muted">
+                            {tab.items.map(item => (
+                              <li key={item} className="flex items-start gap-2.5">
+                                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-soft-line-strong" aria-hidden="true" />
+                                <span>{item}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
 
                 {activeSection === 'leaderboard' && (
-                  <div className="space-y-6">
-                    <h3 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
-                      🏆 Leaderboard
+                  <div className="space-y-5">
+                    <h3 className="font-soft-display text-lg font-bold text-soft-ink">
+                      Leaderboard
                     </h3>
 
-                    <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-xl p-6">
-                      <h4 className="font-semibold text-lg mb-3 text-gray-900 dark:text-white">Top Referrers</h4>
-                      <p className="text-gray-700 dark:text-gray-300 mb-4">
-                        The leaderboard showcases our community's top contributors. Compete for the top spots!
+                    <div className="rounded-card border border-soft-line p-4 sm:p-5">
+                      <h4 className="font-soft-display text-sm font-bold text-soft-ink">Top referrers</h4>
+                      <p className="mt-1 font-soft text-sm text-soft-ink-muted">
+                        Ranked by successful referrals first, then by points earned.
                       </p>
-                      <ul className="space-y-2 text-gray-700 dark:text-gray-300">
-                        <li className="flex items-center">
-                          <span className="text-2xl mr-2">🥇</span>
-                          <span>Gold Medal - Top referrer</span>
-                        </li>
-                        <li className="flex items-center">
-                          <span className="text-2xl mr-2">🥈</span>
-                          <span>Silver Medal - 2nd place</span>
-                        </li>
-                        <li className="flex items-center">
-                          <span className="text-2xl mr-2">🥉</span>
-                          <span>Bronze Medal - 3rd place</span>
-                        </li>
+                      <ul className="mt-3 space-y-2 font-soft text-sm text-soft-ink-muted">
+                        {[
+                          ['1', 'Most referrals - highlighted at the top'],
+                          ['2', 'Runner-up'],
+                          ['3', 'Third place']
+                        ].map(([rank, label]) => (
+                          <li key={rank} className="flex items-center gap-2.5">
+                            <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full font-soft-display text-xs font-bold tabular-nums ${
+                              rank === '1' ? 'bg-soft-primary text-white' : 'bg-soft-primary/15 text-soft-primary-deep'
+                            }`}>
+                              {rank}
+                            </span>
+                            <span>{label}</span>
+                          </li>
+                        ))}
                       </ul>
                     </div>
 
-                    <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-6">
-                      <h4 className="font-semibold text-lg mb-3 text-gray-900 dark:text-white">Where to Find</h4>
-                      <p className="text-gray-700 dark:text-gray-300">
-                        The leaderboard is located in the left panel of BaseChat, below your 3D profile card and above the Kaito YapScan integration.
+                    <div className="rounded-card bg-soft-sunken p-4 sm:p-5">
+                      <h4 className="font-soft-display text-sm font-bold text-soft-ink">Where to find it</h4>
+                      <p className="mt-1 font-soft text-sm text-soft-ink-muted">
+                        In the left panel of BaseChat, below your profile card. &quot;View all&quot; opens the full list.
                       </p>
                     </div>
                   </div>
                 )}
 
                 {activeSection === 'faq' && (
-                  <div className="space-y-6">
-                    <h3 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
-                      ❓ Frequently Asked Questions
+                  <div className="space-y-5">
+                    <h3 className="font-soft-display text-lg font-bold text-soft-ink">
+                      Questions
                     </h3>
 
-                    <div className="space-y-4">
-                      <div className="border-l-4 border-blue-500 pl-4">
-                        <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
-                          Can I refer myself?
-                        </h4>
-                        <p className="text-gray-700 dark:text-gray-300">
-                          No, the system automatically prevents self-referrals.
-                        </p>
-                      </div>
-
-                      <div className="border-l-4 border-blue-500 pl-4">
-                        <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
-                          Can someone be referred by multiple people?
-                        </h4>
-                        <p className="text-gray-700 dark:text-gray-300">
-                          No, each user can only be referred once - by the first person whose link they use.
-                        </p>
-                      </div>
-
-                      <div className="border-l-4 border-blue-500 pl-4">
-                        <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
-                          When do I receive my rewards?
-                        </h4>
-                        <p className="text-gray-700 dark:text-gray-300">
-                          Base reward (100 points) is instant when someone joins. The bonus (50 points) comes when they create their first post.
-                        </p>
-                      </div>
-
-                      <div className="border-l-4 border-blue-500 pl-4">
-                        <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
-                          Do referral links expire?
-                        </h4>
-                        <p className="text-gray-700 dark:text-gray-300">
-                          No, your referral link is permanent and never expires.
-                        </p>
-                      </div>
-
-                      <div className="border-l-4 border-blue-500 pl-4">
-                        <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
-                          Is there a limit to referrals?
-                        </h4>
-                        <p className="text-gray-700 dark:text-gray-300">
-                          No limit! Refer as many people as you want.
-                        </p>
-                      </div>
+                    <div className="divide-y divide-soft-line border-y border-soft-line">
+                      {[
+                        {
+                          q: 'Can I refer myself?',
+                          a: 'No - the system blocks self-referrals automatically.'
+                        },
+                        {
+                          q: 'Can someone be referred by several people?',
+                          a: 'No. Each user is referred once, by the first link they use.'
+                        },
+                        {
+                          q: 'When do rewards arrive?',
+                          a: 'The base 100 points land as soon as someone joins. The 50-point bonus follows their first post.'
+                        },
+                        {
+                          q: 'Do referral links expire?',
+                          a: 'No. Your link is permanent.'
+                        },
+                        {
+                          q: 'Is there a limit on referrals?',
+                          a: 'No limit - refer as many people as you like.'
+                        }
+                      ].map(item => (
+                        <div key={item.q} className="py-4">
+                          <h4 className="font-soft-display text-sm font-bold text-soft-ink">
+                            {item.q}
+                          </h4>
+                          <p className="mt-1 font-soft text-sm text-soft-ink-muted">
+                            {item.a}
+                          </p>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}

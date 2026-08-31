@@ -1,0 +1,10 @@
+{
+  "chainId": 8453,
+  "address": "0xD5f65Cfbe6A1AA1B6f82CBE0A336DDFCD39a5340",
+  "txHash": "0xef01d6ae1dbdd2efdfdbc166c2cbc43d05f31bb25c38db5b44732e6312376255",
+  "block": 49635587,
+  "gasUsed": "922219",
+  "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+  "feeRecipient": "0xD4885A5aa53446843CABcDE1F35DE9b4E906030e",
+  "feeBps": 250
+}

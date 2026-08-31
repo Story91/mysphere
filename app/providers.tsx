@@ -1,12 +1,20 @@
 // @ts-nocheck
 'use client';
 
-import { base } from 'viem/chains';
-import { OnchainKitProvider } from '@coinbase/onchainkit';
+import { base, baseSepolia } from 'viem/chains';
+import { arcTestnet } from './startpad/arcChain';
 import { createContext, useContext, useState, useMemo } from 'react';
-import { createConfig, http } from 'wagmi';
+import { createConfig, http, fallback, webSocket, cookieStorage, createStorage } from 'wagmi';
 import { WagmiConfig } from 'wagmi';
-import { injected, walletConnect, coinbaseWallet, metaMask, safe } from 'wagmi/connectors';
+import {
+  injected,
+  walletConnect,
+  baseAccount,
+  coinbaseWallet,
+  gemini,
+  metaMask,
+  safe,
+} from 'wagmi/connectors';
 import { farcasterMiniApp } from '@farcaster/miniapp-wagmi-connector';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FarcasterFrameProvider } from './components/FarcasterFrameProvider/FarcasterFrameProvider';
@@ -18,6 +26,7 @@ import { lineaChain } from './basechat/Linea/config/LineaNetworkConfig';
 import { celoChain } from './basechat/Celo/config/CeloNetworkConfig';
 import { ethereumChain } from './basechat/ETH/config/EthereumNetworkConfig';
 import { worldChain } from './basechat/World/config/WorldChainNetworkConfig';
+import { robinhoodChain, ROBINHOOD_RPC_URLS } from './basechat/Robinhood/config/RobinhoodNetworkConfig';
 
 type ThemeMode = 'auto' | 'light' | 'dark';
 type ThemeStyle = 'default' | 'base' | 'cyberpunk' | 'hacker';
@@ -57,14 +66,57 @@ const queryClient = new QueryClient({
  * Wagmi Configuration (bez Base Sepolia)
  * PL: Przygotowane dwie gałęzie konfiguracji, aby uniknąć błędu typów dla 484
  */
-const CHAINS_BASE = [base, baseCampChain, lineaChain, celoChain, ethereumChain, worldChain] as const;
+const CHAINS_BASE = [base, baseSepolia, baseCampChain, lineaChain, celoChain, ethereumChain, worldChain, robinhoodChain, arcTestnet] as const;
 const TRANSPORTS_BASE = {
-  [base.id]: http('https://mainnet.base.org'),
+  // Base MAINNET: publiczny mainnet.base.org jest rate-limited (429/-32016) i
+  // tnie getLogs na 2000 blokach, a startpad odpala do 90 okien getLogs na load.
+  // Pod produkcje ustaw NEXT_PUBLIC_CDP_RPC_URL na WLASNY CDP Node RPC (masz
+  // platne CDP - klucz "Client API Key" z portalu CDP, sekcja Node/RPC): CDP
+  // obsluguje getLogs do ~50k blokow i ma wysokie limity (zmierzone). Ten sam
+  // env wlacza tez cdpApi.ts (statystyki portfela). base.org zostaje jako
+  // fallback - publicnode NIE nadaje sie, bo blokuje getLogs bez wlasnego tokenu.
+  // WebSocket idzie PRZED HTTP, gdy jest skonfigurowany: wtedy podglad na zywo
+  // (tasma, cena, rezerwa, lista transakcji) dostaje push zamiast pytania co
+  // kilka sekund. viem sam to rozpoznaje - przy transporcie `fallback`, ktorego
+  // pierwszym wpisem jest WebSocket, `watchEvent` przechodzi na subskrypcje.
+  // Brak zmiennej = wszystko jak dotad, czyli polling po HTTP.
+  [base.id]: fallback([
+    ...(process.env.NEXT_PUBLIC_BASE_WS_URL ? [webSocket(process.env.NEXT_PUBLIC_BASE_WS_URL)] : []),
+    http(process.env.NEXT_PUBLIC_BASE_RPC_URL || process.env.NEXT_PUBLIC_CDP_RPC_URL || 'https://mainnet.base.org'),
+    http('https://mainnet.base.org'),
+  ]),
+  [baseSepolia.id]: http(process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org'),
   [baseCampChain.id]: http('https://rpc.basecamp.t.raas.gelato.cloud'),
   [lineaChain.id]: http('https://linea-rpc.publicnode.com'),
   [celoChain.id]: http('https://forno.celo.org'),
-  [ethereumChain.id]: http('https://eth.llamarpc.com'),
+  // Ethereum: eth.llamarpc.com PRZESTAL wysylac naglowki CORS - w konsoli
+  // produkcyjnej dawalo to kilkadziesiat bledow "blocked by CORS policy" pod
+  // rzad i kazdy odczyt z mainnetu (m.in. rozwiazywanie ENS) konczyl sie
+  // porazka. Zweryfikowane 5 sierpnia 2026: publicnode odpowiada 200 z
+  // `access-control-allow-origin: *`, llamarpc nie odpowiada na preflight.
+  //
+  // fallback() zamiast pojedynczego http(): gdy pierwszy endpoint padnie, viem
+  // przechodzi do nastepnego zamiast zwracac blad. Jeden publiczny RPC to
+  // pojedynczy punkt awarii dla calego lancucha.
+  [ethereumChain.id]: fallback([
+    http('https://ethereum-rpc.publicnode.com'),
+    http('https://rpc.ankr.com/eth'),
+  ]),
   [worldChain.id]: http('https://worldchain-mainnet.g.alchemy.com/public'),
+  // Robinhood Chain: publiczny RPC jest rate-limited i "not recommended for
+  // production" - pod produkcje ustaw NEXT_PUBLIC_ROBINHOOD_RPC_URL na wlasny
+  // endpoint (Alchemy/QuickNode). ROBINHOOD_RPC_URLS[0] bierze env, a jak go
+  // brak - publiczny fallback.
+  [robinhoodChain.id]: http(ROBINHOOD_RPC_URLS[0]),
+  /**
+   * Arc testnet. Blockdaemon, a NIE oficjalny rpc.testnet.arc.io, i to jest
+   * pomiar, nie preferencja: z pieciu publicznych endpointow Arc tylko ten
+   * przyjmuje eth_getLogs na oknie 50 000 blokow, reszta tnie na 10 000.
+   * Arc robi blok co 0,51 s, czyli ~169 tys. blokow na dobe - przy oknie 10 tys.
+   * tablica startpada nie zdazylaby odtworzyc nawet jednego dnia rynku.
+   * Uzasadnienie i pelny pomiar: app/startpad/arcChain.ts.
+   */
+  [arcTestnet.id]: http(process.env.NEXT_PUBLIC_ARC_TESTNET_RPC_URL || 'https://rpc.blockdaemon.testnet.arc.io'),
 } as const;
 
 const CHAINS_WITH_CAMP_MAINNET = [
@@ -94,13 +146,24 @@ const COMMON_CONNECTORS = [
       iconUrl: `${APP_ORIGIN}/android-chrome-192x192.png`,
     },
   }),
+  // Dedykowany connector Base Account. Zastapil coinbaseWallet({preference:
+  // 'smartWalletOnly'}) - Base wydzielilo Base Account z konektora Coinbase
+  // Wallet, a wariant smartWalletOnly jest sciezka wygaszana.
+  baseAccount({
+    appName: 'MySphere',
+    appLogoUrl: `${APP_ORIGIN}/android-chrome-192x192.png`,
+  }),
+  // Coinbase Wallet - rozlaczny przypadek wobec baseAccount. Base Account to
+  // smart wallet zakladany passkeyem; ten connector obsluguje ludzi, ktorzy maja
+  // rozszerzenie albo aplikacje Coinbase Wallet z wlasnym kluczem. Bez niego
+  // odsylalismy ich do "Browser wallet", gdzie czesto laduje inny portfel.
   coinbaseWallet({
     appName: 'MySphere',
-    appLogoUrl: '/android-chrome-192x192.png',
-    // Force Base network for smart wallet
-    preference: 'smartWalletOnly',
-    version: '4'
+    appLogoUrl: `${APP_ORIGIN}/android-chrome-192x192.png`,
   }),
+  // Gemini Wallet - dostarczany przez @wagmi/connectors, wiec kosztuje nas
+  // jedna linie, a komus zamyka droge do zalogowania.
+  gemini(),
   walletConnect({
     projectId: process.env.NEXT_PUBLIC_WC_PROJECT_ID || '',
     metadata: {
@@ -113,19 +176,44 @@ const COMMON_CONNECTORS = [
   safe(),
 ] as const;
 
+// Stan wagmi trzymany w COOKIE, nie w localStorage, oraz ssr: true.
+//
+// CELOWO BEZ cookieToInitialState w root layoucie. Odczyt naglowkow/cookie
+// w root layoucie opt-outuje z prerenderu KAZDA trase w aplikacji - zmierzone:
+// 46 stron statycznych spadlo do 2, a nawet whitepaper (czysty tekst)
+// uruchamialby funkcje serwerowa przy kazdym zadaniu. Na Next 14 nie da sie
+// miec obu naraz; rozwiazalby to PPR z Next 15.
+//
+// Co zostaje: cookieStorage daje trwalosc stanu miedzy przeladowaniami,
+// a ssr: true chroni przed rozjazdem hydracji. Czego nie ma: serwer nie zna
+// adresu przy renderze, wiec pierwszy paint jest "niezalogowany".
+const SSR_STORAGE = {
+  ssr: true,
+  storage: createStorage({ storage: cookieStorage }),
+} as const;
+
 export const wagmiConfig = ENABLE_CAMP_MAINNET
   ? createConfig({
+      ...SSR_STORAGE,
       chains: CHAINS_WITH_CAMP_MAINNET,
       transports: TRANSPORTS_WITH_CAMP_MAINNET,
       connectors: COMMON_CONNECTORS as unknown as any,
     })
   : createConfig({
+      ...SSR_STORAGE,
       chains: CHAINS_BASE,
       transports: TRANSPORTS_BASE,
       connectors: COMMON_CONNECTORS as unknown as any,
     });
 
-export function Providers({ children }: { children: React.ReactNode }) {
+export function Providers({
+  children,
+  initialState,
+}: {
+  children: React.ReactNode;
+  /** Stan wagmi odczytany z cookie po stronie serwera (cookieToInitialState). */
+  initialState?: any;
+}) {
   const [mode, setMode] = useState<ThemeMode>('auto');
   const [style, setStyle] = useState<ThemeStyle>('base');
 
@@ -139,33 +227,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ThemeContext.Provider value={themeValue}>
       <QueryClientProvider client={queryClient}>
-        <WagmiConfig config={wagmiConfig}>
+        <WagmiConfig config={wagmiConfig} initialState={initialState}>
           <FarcasterFrameProvider>
-            <OnchainKitProvider
-              apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
-              chain={base}
-              config={{
-                appearance: {
-                  name: 'MySphere',
-                  logo: '/android-chrome-192x192.png',
-                  mode: 'auto',
-                  theme: 'base',
-                },
-                wallet: {
-                  display: 'modal',
-                  termsUrl: 'https://mysphere.fun/docs',
-                  privacyUrl: 'https://mysphere.fun/docs',
-                  supportedWallets: {
-                    rabby: true,
-                    trust: true,
-                    frame: true,
-                  },
-                }
-              }}
-              projectId={process.env.NEXT_PUBLIC_CDP_PROJECT_ID}
-            >
-              {children}
-            </OnchainKitProvider>
+            {children}
           </FarcasterFrameProvider>
         </WagmiConfig>
       </QueryClientProvider>

@@ -1,12 +1,14 @@
 // React hooks dla systemu referali
 import { useState, useEffect, useCallback } from 'react';
-import { 
-  getUserReferralStats, 
+import {
+  getUserReferralStats,
   getUserReferrals,
   getUserReferralRewards,
   initializeReferralStats,
   registerReferral,
-  checkIfUserWasReferred
+  normalizeReferralCode,
+  checkIfUserWasReferred,
+  type ReferralRegistrationOutcome
 } from './referralService';
 import { ReferralStats, Referral, ReferralReward } from './types';
 
@@ -131,41 +133,147 @@ export const useReferralRewards = (userId: string | null, limit: number = 50) =>
   };
 };
 
-// Hook do obsługi procesu rejestracji z linku referalowego
+/**
+ * Zapamiętany kod z linku referalowego.
+ *
+ * Kod musi przeżyć DROGĘ PRZEZ PORTFEL: kliknięcie „Connect" potrafi przerzucić
+ * człowieka do aplikacji portfela, do okna keys.coinbase.com albo do skanowania
+ * QR telefonem. Gdyby kod żył wyłącznie w adresie URL, każdy taki przeskok
+ * gubiłby polecenie - link zadziałałby tylko dla tych, którzy mają portfel
+ * gotowy w tej samej karcie.
+ *
+ * Adres URL ma pierwszeństwo nad magazynem: świeżo kliknięte zaproszenie
+ * nadpisuje starsze.
+ */
+const PENDING_REFERRAL_KEY = 'mysphere.referral.pending';
+
+/**
+ * Po tym czasie zapamiętany kod przestaje obowiązywać. Zaproszenie sprzed
+ * miesięcy nie ma prawa doczepić się po cichu do konta zakładanego dziś.
+ */
+const PENDING_REFERRAL_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+export interface PendingReferralCode {
+  /** Kod z linku albo z magazynu. `null`, gdy nie ma żadnego. */
+  code: string | null;
+  /** Skąd pochodzi - rozróżnia „przyszedłeś z linku" od „wracasz". */
+  source: 'link' | 'storage' | null;
+  /** Czy odczyt (który dzieje się po zamontowaniu) już się odbył. */
+  ready: boolean;
+  /** Kasuje zapamiętany kod - po rozliczeniu polecenia albo na życzenie. */
+  clear: () => void;
+}
+
+export const usePendingReferralCode = (): PendingReferralCode => {
+  const [code, setCode] = useState<string | null>(null);
+  const [source, setSource] = useState<'link' | 'storage' | null>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    // Czytamy `window.location`, a nie `useSearchParams()` - ten drugi wymusza
+    // na stronie granicę <Suspense> przy prerenderze. Tutaj i tak wszystko
+    // dzieje się po zamontowaniu.
+    const fromLink = normalizeReferralCode(
+      new URLSearchParams(window.location.search).get('ref') || ''
+    );
+
+    if (fromLink) {
+      setCode(fromLink);
+      setSource('link');
+      setReady(true);
+      try {
+        window.localStorage.setItem(
+          PENDING_REFERRAL_KEY,
+          JSON.stringify({ code: fromLink, savedAt: Date.now() })
+        );
+      } catch {
+        // Tryb prywatny bez magazynu. Kod nadal działa w tej karcie - traci
+        // tylko odporność na przeskok do aplikacji portfela.
+      }
+      return;
+    }
+
+    try {
+      const raw = window.localStorage.getItem(PENDING_REFERRAL_KEY);
+      if (raw) {
+        const saved = JSON.parse(raw) as { code?: unknown; savedAt?: unknown };
+        const savedAt = typeof saved.savedAt === 'number' ? saved.savedAt : 0;
+        const savedCode = typeof saved.code === 'string' ? normalizeReferralCode(saved.code) : '';
+
+        if (savedCode && Date.now() - savedAt < PENDING_REFERRAL_TTL_MS) {
+          setCode(savedCode);
+          setSource('storage');
+        } else {
+          window.localStorage.removeItem(PENDING_REFERRAL_KEY);
+        }
+      }
+    } catch {
+      // Uszkodzony wpis albo brak magazynu - zostajemy bez kodu.
+    }
+
+    setReady(true);
+  }, []);
+
+  const clear = useCallback(() => {
+    setCode(null);
+    setSource(null);
+    try {
+      window.localStorage.removeItem(PENDING_REFERRAL_KEY);
+    } catch {
+      // nic - i tak wygaśnie po TTL
+    }
+  }, []);
+
+  return { code, source, ready, clear };
+};
+
+/**
+ * Hook do obsługi procesu rejestracji z linku referalowego.
+ *
+ * Zwraca PEŁNY wynik z `registerReferral`, a nie `boolean` - patrz komentarz
+ * przy `ReferralRegistrationOutcome`. Strona /join pokazuje inny ekran dla
+ * nieznanego kodu, innego dla „już masz polecającego" i inny dla awarii bazy;
+ * z jednego `false` nie dało się tego złożyć.
+ */
 export const useReferralRegistration = () => {
   const [processing, setProcessing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [outcome, setOutcome] = useState<ReferralRegistrationOutcome | null>(null);
 
   const registerWithReferral = useCallback(async (
     referralCode: string,
     newUserAddress: string,
-    metadata?: any
-  ): Promise<boolean> => {
+    metadata?: Partial<Referral['metadata']>
+  ): Promise<ReferralRegistrationOutcome> => {
     setProcessing(true);
-    setError(null);
 
     try {
-      const success = await registerReferral(referralCode, newUserAddress, metadata);
-      
-      if (!success) {
-        setError('Failed to register referral');
-        return false;
-      }
-
-      return true;
+      const result = await registerReferral(referralCode, newUserAddress, metadata);
+      setOutcome(result);
+      return result;
     } catch (err) {
+      // registerReferral łapie swoje błędy sam, ale gdyby coś przeciekło,
+      // nie zostawiamy strony w stanie „trwa" na zawsze.
       console.error('Error registering referral:', err);
-      setError('An error occurred during registration');
-      return false;
+      const failure: ReferralRegistrationOutcome = {
+        status: 'failed',
+        message: 'We could not save your invite right now. Nothing was lost - you can try again.'
+      };
+      setOutcome(failure);
+      return failure;
     } finally {
       setProcessing(false);
     }
   }, []);
 
+  const resetOutcome = useCallback(() => setOutcome(null), []);
+
   return {
     registerWithReferral,
     processing,
-    error
+    outcome,
+    resetOutcome,
+    /** Komunikat wyłącznie dla awarii - pozostałe wyniki nie są błędami. */
+    error: outcome?.status === 'failed' ? outcome.message : null
   };
 };
 

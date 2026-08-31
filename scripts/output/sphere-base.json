@@ -1,0 +1,32 @@
+{
+  "chainId": 8453,
+  "network": "base",
+  "rehearsal": false,
+  "deployer": "0xD4885A5aa53446843CABcDE1F35DE9b4E906030e",
+  "launchpad": "0xCF541A7EcE881945833ff1680dFc067C5Dd4cE2D",
+  "safe": "0x83E2DE974FC6B866FDb78AEFa5596d58fDc4142F",
+  "sphereRewards": "0x9030e53E7AC1bc81Cf28b196BA336E5544ce4A47",
+  "sphereTokenVesting": "0xB5dE95224F2bEDee2e7Ca7170F5B6a02641255AD",
+  "sphereCreatorEscrow": "0xe984986f4F1E067f697b548D5fe942813d03Da37",
+  "consumer": "0x83E2DE974FC6B866FDb78AEFa5596d58fDc4142F",
+  "beneficiary": "0x83E2DE974FC6B866FDb78AEFa5596d58fDc4142F",
+  "pot": "0x83E2DE974FC6B866FDb78AEFa5596d58fDc4142F",
+  "ops": "0x83E2DE974FC6B866FDb78AEFa5596d58fDc4142F",
+  "ethPotBps": 5000,
+  "buybackBps": "5000",
+  "receiverSharesBps": [
+    6000,
+    4000
+  ],
+  "vanitySalt": "0x0000000000000000000000000000000000000000000000000000000000041ade",
+  "predictedToken": "0xB200000000000000000000BA5eDb84c678432476",
+  "token": null,
+  "devBuyEth": "0.05",
+  "windowCap": "62532833020637898686679174",
+  "vesting": {
+    "start": "1788752564",
+    "cliff": "2592000",
+    "duration": "31536000"
+  },
+  "deployedAt": "2026-08-31T01:43:00.340Z"
+}

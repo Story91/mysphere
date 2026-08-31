@@ -28,10 +28,52 @@ const isValidUrl = (urlString: string) => {
   try {
     new URL(urlString);
     return true;
-  } catch (e) {
+  } catch {
     return false;
   }
 };
+
+// Cache na poziomie MODULU: feed montuje i odmontowuje karty przy scrollu,
+// wiec ten sam URL potrafil trafic do /api/link-preview kilka razy w jednej
+// sesji. Wynik trzymamy per URL, a zapytania w locie deduplikujemy przez
+// wspoldzielona obietnice - drugi mount czeka na pierwszy fetch zamiast
+// odpalac wlasny.
+const previewCache = new Map<string, LinkPreview>();
+const inflightPreviews = new Map<string, Promise<LinkPreview | null>>();
+
+function loadPreview(link: string): Promise<LinkPreview | null> {
+  const cached = previewCache.get(link);
+  if (cached) return Promise.resolve(cached);
+
+  const inflight = inflightPreviews.get(link);
+  if (inflight) return inflight;
+
+  const request = (async () => {
+    try {
+      const response = await fetch(`/api/link-preview?url=${encodeURIComponent(link)}`, {
+        // Timeout, zeby wiszacy host nie blokowal miejsca w partii
+        signal: AbortSignal.timeout(6000)
+      });
+      const data = await response.json();
+      if (data && data.title) {
+        // Trasa oznacza fallbacki bledow flaga `degraded` (timeout, blad HTTP,
+        // nie-HTML) - pokazujemy je, ale NIE utrwalamy w cache'u modulu, zeby
+        // chwilowa czkawka celu nie zamrazala zepsutego podgladu na cala sesje.
+        if (!data.degraded) previewCache.set(link, data);
+        return data as LinkPreview;
+      }
+      return null;
+    } catch {
+      // Bledu nie cache'ujemy - kolejny mount ma prawo sprobowac jeszcze raz
+      return null;
+    } finally {
+      inflightPreviews.delete(link);
+    }
+  })();
+
+  inflightPreviews.set(link, request);
+  return request;
+}
 
 export default function LinkPreview({ content, media }: LinkPreviewProps) {
   const [links, setLinks] = useState<string[]>([]);
@@ -46,60 +88,61 @@ export default function LinkPreview({ content, media }: LinkPreviewProps) {
     const uniqueLinks = Array.from(new Set(foundLinks.map((link: LinkifyMatch) => link.value)));
     
     // Filtruj tylko prawidłowe URL przed ustawieniem
-    const validLinks = uniqueLinks.filter(link => {
-      try {
-        new URL(link);
-        return true;
-      } catch {
-        return false;
-      }
-    });
-    
-    setLinks(validLinks);
+    // (isValidUrl bylo zadeklarowane wyzej i nieuzywane - ta sama logika stala tu inline)
+    setLinks(uniqueLinks.filter(isValidUrl));
   }, [content]);
 
   useEffect(() => {
+    if (links.length === 0) return;
+
+    // Podglad dla starej tresci nie moze dojechac po zmianie posta ani po
+    // odmontowaniu - wczesniej setPreviews leciał bezwarunkowo.
+    let cancelled = false;
+
     // Pobierz metadane dla każdego linku
     const fetchPreviews = async () => {
-      const newPreviews: {[key: string]: LinkPreview} = {};
-      
       // Ograniczamy liczbę równoczesnych zapytań do API
       const MAX_CONCURRENT_REQUESTS = 3;
       const chunks = [];
-      
+
       // Dzielimy linki na mniejsze grupy, aby uniknąć zbyt wielu równoczesnych żądań
       for (let i = 0; i < links.length; i += MAX_CONCURRENT_REQUESTS) {
         chunks.push(links.slice(i, i + MAX_CONCURRENT_REQUESTS));
       }
-      
+
       // Przetwarzaj każdą grupę linków sekwencyjnie
       for (const chunk of chunks) {
+        if (cancelled) return;
+
         // Ale linki w grupie przetwarzaj równolegle
         await Promise.all(chunk.map(async (link) => {
           try {
+            // Trafiony cache pomija placeholder - dane sa juz kompletne
+            const cached = previewCache.get(link);
+            if (cached) {
+              if (!cancelled) setPreviews(prev => ({...prev, [link]: cached}));
+              return;
+            }
+
+            const hostname = new URL(link).hostname;
+
             // Ustaw podstawowe domyślne wartości
             const defaultPreview = {
-              title: new URL(link).hostname,
+              title: hostname,
               description: 'Loading preview...',
               image: '',
-              siteName: new URL(link).hostname
+              siteName: hostname
             };
-            
+
             // Na początku ustaw domyślne wartości, aby użytkownik widział coś od razu
-            newPreviews[link] = defaultPreview;
+            if (cancelled) return;
             setPreviews(prev => ({...prev, [link]: defaultPreview}));
-            
-            // Pobierz metadane z API
-            const response = await fetch(`/api/link-preview?url=${encodeURIComponent(link)}`, {
-              // Dodaj timeout do fetch
-              signal: AbortSignal.timeout(6000)
-            });
-            
-            const data = await response.json();
-            
+
+            // Pobierz metadane z API (przez cache i dedup na poziomie modulu)
+            const data = await loadPreview(link);
+
             // Aktualizuj podgląd tylko jeśli dostaliśmy sensowne dane
-            if (data && data.title) {
-              newPreviews[link] = data;
+            if (data && !cancelled) {
               setPreviews(prev => ({...prev, [link]: data}));
             }
           } catch {
@@ -109,9 +152,9 @@ export default function LinkPreview({ content, media }: LinkPreviewProps) {
       }
     };
 
-    if (links.length > 0) {
-      fetchPreviews();
-    }
+    fetchPreviews();
+
+    return () => { cancelled = true; };
   }, [links]);
 
   // Funkcja do zawijania długich linków
@@ -139,8 +182,10 @@ export default function LinkPreview({ content, media }: LinkPreviewProps) {
       {media && (
         <div className="mb-4">
           {media.type === 'image' ? (
-            <div 
-              className="relative cursor-pointer group"
+            <button
+              type="button"
+              aria-label="Enlarge image"
+              className="relative cursor-pointer group block w-full"
               onClick={() => handleImageClick(media.url)}
             >
               <img
@@ -156,7 +201,7 @@ export default function LinkPreview({ content, media }: LinkPreviewProps) {
               <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm opacity-0 group-hover:opacity-100 transition-opacity">
                 Click to enlarge
               </div>
-            </div>
+            </button>
           ) : (
             <video
               src={media.url}
@@ -174,7 +219,7 @@ export default function LinkPreview({ content, media }: LinkPreviewProps) {
 
       {/* Wyświetl podglądy linków */}
       <div className="space-y-4">
-        {links.map((link, index) => {
+        {links.map((link) => {
           let hostname = '';
           try {
             hostname = new URL(link).hostname;
@@ -189,11 +234,11 @@ export default function LinkPreview({ content, media }: LinkPreviewProps) {
 
           return (
             <a
-              key={index}
+              key={link}
               href={link}
               target="_blank"
               rel="noopener noreferrer"
-              className="block bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1"
+              className="block bg-soft-surface border border-soft-line rounded-lg overflow-hidden hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1"
             >
               <div className="flex flex-col md:flex-row">
                 {preview.image && !hasFailedImage ? (
@@ -212,7 +257,7 @@ export default function LinkPreview({ content, media }: LinkPreviewProps) {
                   </div>
                 ) : null}
                 <div className="flex-1 p-4">
-                  <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mb-2">
+                  <div className="flex items-center text-xs text-soft-ink-soft mb-2">
                     <div className="flex items-center">
                       <img 
                         src={`https://www.google.com/s2/favicons?domain=${hostname}`}
@@ -226,11 +271,11 @@ export default function LinkPreview({ content, media }: LinkPreviewProps) {
                       {hostname}
                     </div>
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 line-clamp-2">
+                  <h3 className="text-lg font-semibold text-soft-ink mb-2 line-clamp-2">
                     {preview.title || formatLink(link)}
                   </h3>
                   {preview.description && (
-                    <p className="text-gray-600 dark:text-gray-300 text-sm line-clamp-3 mb-2">
+                    <p className="text-soft-ink-muted text-sm line-clamp-3 mb-2">
                       {preview.description}
                     </p>
                   )}
@@ -254,6 +299,7 @@ export default function LinkPreview({ content, media }: LinkPreviewProps) {
               className="max-w-full max-h-[90vh] object-contain"
             />
             <button
+              aria-label="Close image"
               className="absolute top-4 right-4 text-white bg-black bg-opacity-50 rounded-full p-2 hover:bg-opacity-70"
               onClick={() => setShowFullImage(false)}
             >

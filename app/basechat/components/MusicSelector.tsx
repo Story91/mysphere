@@ -1,7 +1,24 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { useAccount } from 'wagmi';
+import { spotifyFailureKind } from './spotifyState';
+
+/**
+ * ssr:false jest WYMOGIEM, nie optymalizacja: CampProvider i hooki SDK wolaja
+ * useContext/useState warunkowo (`typeof window !== 'undefined' ? useHook() : ...`),
+ * wiec przy renderze serwerowym liczba hookow rozjezdza sie z hydracja.
+ * Ten sam import z tym samym zastrzezeniem stoi w BuilderProfile.
+ */
+const CampSocialsCard = dynamic(() => import('../../utils/socials/CampSocialsCard'), {
+  ssr: false,
+  loading: () => (
+    <div className="rounded-card border border-soft-line bg-soft-surface p-4">
+      <div className="h-4 w-40 animate-pulse rounded bg-soft-sunken" />
+    </div>
+  ),
+});
 import SpotifyTrackCard, { SpotifyTrackData } from './SpotifyTrackCard';
 
 interface MusicSelectorProps {
@@ -30,16 +47,44 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
   const [activeTab, setActiveTab] = useState<'recent' | 'saved' | 'albums' | 'playlists'>('recent');
   const [error, setError] = useState<string | null>(null);
 
+  // Dane naleza do konkretnego portfela. Bez tego po zmianie konta warunek
+  // `!spotifyData` blokowal pobranie i modal pokazywal muzyke poprzedniego adresu.
+  useEffect(() => {
+    setSpotifyData(null);
+    setError(null);
+  }, [address]);
+
+  // Modal przykrywal cala strone, a jedynym wyjsciem byl krzyzyk w rogu -
+  // klawiatura nie miala jak go zamknac.
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.stopPropagation();
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   // Pobierz dane Spotify gdy modal się otwiera
   useEffect(() => {
-    if (isOpen && address && !spotifyData) {
-      fetchSpotifyData();
-    }
+    if (!isOpen || !address || spotifyData) return;
+
+    let cancelled = false;
+    fetchSpotifyData(() => cancelled);
+
+    return () => { cancelled = true; };
+    // spotifyData celowo poza deps - jest tylko straza "juz mamy dane".
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, address]);
 
-  const fetchSpotifyData = async () => {
+  const fetchSpotifyData = async (isCancelled: () => boolean = () => false) => {
     if (!address) return;
-    
+
     // Check cache first (30 minutes)
     const cacheKey = `spotify_music_data_${address}`;
     const cachedData = localStorage.getItem(cacheKey);
@@ -52,7 +97,7 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
         
         if (cacheAge < CACHE_DURATION) {
           console.log('🎵 Using cached Spotify data');
-          setSpotifyData(data);
+          if (!isCancelled()) setSpotifyData(data);
           return;
         }
       } catch (e) {
@@ -67,30 +112,43 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
       console.log('🎵 Fetching fresh Spotify data for music selector...');
       const response = await fetch(`/api/camp/spotify?address=${address}&type=full`);
       const data = await response.json();
-      
+      // Odpowiedz dla poprzedniego adresu (albo po zamknieciu) nie moze wygrac.
+      if (isCancelled()) return;
+
       if (data.success) {
         setSpotifyData(data.data);
-        
+
         // Cache the data
         localStorage.setItem(cacheKey, JSON.stringify({
           data: data.data,
           timestamp: Date.now()
         }));
-        
+
         console.log('✅ Spotify data loaded and cached:', {
           recentTracks: data.data.profile?.playedTracks?.length || 0,
           savedTracks: data.data.profile?.savedTracks?.length || 0,
           savedAlbums: data.data.profile?.savedAlbums?.length || 0,
           savedPlaylists: data.data.profile?.savedPlaylists?.length || 0
         });
+      } else if (spotifyFailureKind(data) === 'not-connected') {
+        // BRAK PODLACZONEGO KONTA TO NIE AWARIA. Wczesniej ladowalo to w tym
+        // samym `error`, co niedostepny Camp Network, wiec ktos bez Spotify
+        // widzial czerwone "❌" i przycisk Try Again - ponawianie czegos, czego
+        // nie da sie ponowic. Zostawiamy `error` puste; nizej wchodzi wtedy
+        // konektor, ktorym da sie konto podpiac bez wychodzenia z posta.
+        setError(null);
+        setSpotifyData(null);
       } else {
-        setError(data.message || 'Failed to fetch Spotify data');
+        // Tu zostaja PRAWDZIWE odmowy: Camp nie odpowiedzial, zly adres, limit.
+        // Przy nich ponowienie ma sens, wiec przycisk Try Again zostaje.
+        setError(data.error || 'Failed to fetch Spotify data');
       }
     } catch (err) {
+      if (isCancelled()) return;
       console.error('❌ Error fetching Spotify data:', err);
       setError('Network error while fetching Spotify data');
     } finally {
-      setLoading(false);
+      if (!isCancelled()) setLoading(false);
     }
   };
 
@@ -122,30 +180,32 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-4xl w-full max-h-[80vh] overflow-hidden">
+    <div className="fixed inset-0 bg-soft-ink/30 z-50 flex items-center justify-center p-4">
+      <div className="bg-soft-surface rounded-card shadow-float max-w-4xl w-full max-h-[80vh] overflow-hidden">
         {/* Header */}
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+        <div className="p-6 border-b border-soft-line">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+            <h2 className="text-xl font-soft-display font-bold text-soft-ink">
               🎵 Select Track from Spotify
             </h2>
             <div className="flex items-center space-x-2">
               <button
                 onClick={handleRefreshData}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                className="p-2 hover:bg-soft-sunken rounded-pill transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                 title="Refresh Spotify data"
+                aria-label="Refresh Spotify data"
                 disabled={loading}
               >
-                <svg className={`w-5 h-5 text-gray-500 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className={`w-5 h-5 text-soft-ink-soft ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
               </button>
               <button
                 onClick={onClose}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                className="p-2 hover:bg-soft-sunken rounded-pill transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                aria-label="Close track selector"
               >
-                <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-soft-ink-soft" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
@@ -153,43 +213,43 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
           </div>
 
           {/* Tabs */}
-          <div className="flex space-x-1 mt-4 bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+          <div className="flex space-x-1 mt-4 bg-soft-sunken rounded-pill p-1">
             <button
               onClick={() => setActiveTab('recent')}
-              className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+              className={`flex-1 px-3 py-2 text-sm font-semibold rounded-pill transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
                 activeTab === 'recent'
-                  ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow'
-                  : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                  ? 'bg-soft-surface text-soft-primary-deep shadow-chip'
+                  : 'text-soft-ink-muted hover:text-soft-ink'
               }`}
             >
               Recently Played
             </button>
             <button
               onClick={() => setActiveTab('saved')}
-              className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+              className={`flex-1 px-3 py-2 text-sm font-semibold rounded-pill transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
                 activeTab === 'saved'
-                  ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow'
-                  : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                  ? 'bg-soft-surface text-soft-primary-deep shadow-chip'
+                  : 'text-soft-ink-muted hover:text-soft-ink'
               }`}
             >
               Saved Tracks
             </button>
             <button
               onClick={() => setActiveTab('albums')}
-              className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+              className={`flex-1 px-3 py-2 text-sm font-semibold rounded-pill transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
                 activeTab === 'albums'
-                  ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow'
-                  : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                  ? 'bg-soft-surface text-soft-primary-deep shadow-chip'
+                  : 'text-soft-ink-muted hover:text-soft-ink'
               }`}
             >
               Albums
             </button>
             <button
               onClick={() => setActiveTab('playlists')}
-              className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+              className={`flex-1 px-3 py-2 text-sm font-semibold rounded-pill transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
                 activeTab === 'playlists'
-                  ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow'
-                  : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                  ? 'bg-soft-surface text-soft-primary-deep shadow-chip'
+                  : 'text-soft-ink-muted hover:text-soft-ink'
               }`}
             >
               Playlists
@@ -201,22 +261,51 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
         <div className="p-6 overflow-y-auto max-h-[calc(80vh-140px)]">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="animate-spin w-8 h-8 border-4 border-green-400 border-t-transparent rounded-full"></div>
-              <span className="ml-3 text-gray-600 dark:text-gray-300">Loading Spotify data...</span>
+              <div className="animate-spin w-8 h-8 border-4 border-soft-primary border-t-transparent rounded-full"></div>
+              <span className="ml-3 text-soft-ink-muted">Loading Spotify data...</span>
             </div>
           ) : error ? (
             <div className="text-center py-12">
-              <div className="text-red-500 mb-4">❌ {error}</div>
+              <div className="text-soft-accent-deep mb-4">❌ {error}</div>
               <button
-                onClick={fetchSpotifyData}
-                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+                onClick={() => { void fetchSpotifyData(); }}
+                className="px-4 py-2 bg-soft-primary text-white font-semibold rounded-pill shadow-chip hover:bg-soft-primary-deep transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
               >
                 Try Again
               </button>
             </div>
           ) : !spotifyData ? (
-            <div className="text-center py-12 text-gray-600 dark:text-gray-300">
-              No Spotify data found for this user
+            /* ===== SLEPY ZAULEK MIAL DROGE WYJSCIA, TYLKO JEJ NIE POKAZYWAL =====
+               Stalo tu samo "No Spotify data found for this user" - zdanie
+               prawdziwe i bezuzyteczne. Nie mowilo DLACZEGO (konto nie jest
+               podlaczone) ani CO Z TYM ZROBIC, a podlaczyc da sie wylacznie
+               na /mycamp. Czlowiek klikal zielony przycisk w kompozytorze,
+               dostawal te linijke i zamykal okno.
+
+               Rozdzielamy tez dwa rozne "pusto", ktore wygladaly tak samo:
+               brak podlaczonego konta to co innego niz podlaczone konto bez
+               historii sluchania. Pierwsze naprawia sie klikiem, drugie
+               sluchaniem muzyki - i tylko przy pierwszym ma sens odnosnik. */
+            /* ===== KONEKTOR STOI TU, A NIE ZA ODNOSNIKIEM =====
+               Stalo tu samo "No Spotify data found for this user" - zdanie
+               prawdziwe i bezuzyteczne. Nie mowilo DLACZEGO (konto nie jest
+               podpiete) ani CO Z TYM ZROBIC.
+
+               Pierwsza poprawka dawala przycisk prowadzacy na /mycamp. To bylo
+               gorsze rozwiazanie tego samego problemu: czlowiek jest w polowie
+               pisania posta, a my wysylamy go na inna strone i kazemy wrocic.
+               Konektor nosi wlasny CampProvider i wlasny CampModal, a logowanie
+               Origin wraca na BIEZACY adres - wiec da sie go postawic dokladnie
+               tutaj i nie ruszac nikogo z miejsca.
+
+               Ten sam komponent stoi na wlasnym profilu. Jeden mechanizm, dwa
+               miejsca - bo w obu ta sama czynnosc blokuje robote. */
+            <div className="py-6">
+              <p className="mx-auto mb-4 max-w-[300px] text-center text-[13px] leading-[1.5] text-soft-ink-muted">
+                No Spotify tracks for this wallet yet. Link Spotify below and your recent listening
+                shows up here.
+              </p>
+              {address && <CampSocialsCard address={address} />}
             </div>
           ) : (
             <div className="space-y-3">
@@ -227,7 +316,7 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
                     spotifyData.profile.playedTracks.slice(0, 20).map((trackData, index) => (
                       <div
                         key={`recent-${index}`}
-                        className="relative hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                        className="relative bg-soft-surface border border-soft-line shadow-chip hover:bg-soft-sunken rounded-card transition-colors [transition-duration:var(--dur-press)] ease-out-strong"
                       >
                         <SpotifyTrackCard
                           trackData={trackData}
@@ -241,18 +330,38 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
                             e.stopPropagation();
                             handleSelectTrack(trackData);
                           }}
-                          className="absolute top-3 right-3 w-8 h-8 bg-green-500 hover:bg-green-600 text-white rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-110 border-2 border-white/20 z-10"
+                          className="absolute top-3 right-3 w-8 h-8 bg-soft-primary hover:bg-soft-primary-deep text-white rounded-full flex items-center justify-center shadow-chip transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:scale-110 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary border-2 border-soft-surface z-10"
                           title="Add track to post"
+                          aria-label="Add track to post"
                         >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3} aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                           </svg>
                         </button>
                       </div>
                     ))
                   ) : (
-                    <div className="text-center py-8 text-gray-500">
-                      No recently played tracks found
+                    /* ===== "PUSTO" MA POWIEDZIEC, CZYJA TO SPRAWA =====
+                       Stalo tu samo "No recently played tracks found". Zdanie
+                       prawdziwe i mylace: brzmi jak "nie sluchales muzyki albo
+                       cos u nas nie gra", wiec wlasciciel poszedl podpinac
+                       konto drugi raz. Nie pomoglo i nie mialo prawa pomoc.
+
+                       Sprawdzone 14 sierpnia 2026 na zywym API Campa: konto
+                       JEST podpiete (rozwiazuje sie z portfela, ma nazwe i
+                       identyfikator), a `lastSynced` jest PUSTE od grudnia -
+                       Camp ani razu nie zaciagnal z niego historii. Trzy z
+                       czterech zbiorow oddaja pusta tablice, czwarty odmawia
+                       401. Naszego kodu to nie dotyczy, wiec interfejs nie ma
+                       prawa sugerowac, ze da sie to naprawic po naszej
+                       stronie. */
+                    <div className="mx-auto max-w-[320px] py-8 text-center text-[13px] leading-[1.5] text-soft-ink-soft">
+                      {spotifyData.user?.display_name
+                        ? `Linked as ${spotifyData.user.display_name}, but Camp has not sent any listening history for this account yet.`
+                        : 'Camp has not sent any listening history for this account yet.'}
+                      <span className="mt-2 block text-soft-ink-faint">
+                        Linking again does not change it. The history has to arrive from Camp.
+                      </span>
                     </div>
                   )}
                 </>
@@ -265,7 +374,7 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
                     spotifyData.profile.savedTracks.slice(0, 20).map((trackData, index) => (
                       <div
                         key={`saved-${index}`}
-                        className="relative hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                        className="relative bg-soft-surface border border-soft-line shadow-chip hover:bg-soft-sunken rounded-card transition-colors [transition-duration:var(--dur-press)] ease-out-strong"
                       >
                         <SpotifyTrackCard
                           trackData={trackData}
@@ -279,17 +388,18 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
                             e.stopPropagation();
                             handleSelectTrack(trackData);
                           }}
-                          className="absolute top-3 right-3 w-8 h-8 bg-green-500 hover:bg-green-600 text-white rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-110 border-2 border-white/20 z-10"
+                          className="absolute top-3 right-3 w-8 h-8 bg-soft-primary hover:bg-soft-primary-deep text-white rounded-full flex items-center justify-center shadow-chip transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:scale-110 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary border-2 border-soft-surface z-10"
                           title="Add track to post"
+                          aria-label="Add track to post"
                         >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3} aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                           </svg>
                         </button>
                       </div>
                     ))
                   ) : (
-                    <div className="text-center py-8 text-gray-500">
+                    <div className="text-center py-8 text-soft-ink-soft">
                       No saved tracks found
                     </div>
                   )}
@@ -298,7 +408,7 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
 
               {/* Albums & Playlists - coming soon */}
               {(activeTab === 'albums' || activeTab === 'playlists') && (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-8 text-soft-ink-soft">
                   This feature will be available soon...
                 </div>
               )}
@@ -307,9 +417,12 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-          <div className="text-sm text-gray-600 dark:text-gray-400 text-center space-y-1">
-            <div>💡 Click on a track to add it to your post</div>
+        <div className="p-4 border-t border-soft-line bg-soft-sunken">
+          <div className="text-sm text-soft-ink-muted text-center space-y-1">
+            {/* Karta utworu nie jest klikalna (SpotifyTrackCard nie przyjmuje
+                zadnego handlera wyboru) - dodaje wylacznie przycisk ➕. Stara
+                tresc obiecywala cos, czego nie da sie zrobic. */}
+            <div>💡 Click ➕ on a track to add it to your post</div>
             <div className="text-xs opacity-75">
               📊 Data cached for 30 minutes • Use refresh button for latest tracks
             </div>

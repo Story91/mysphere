@@ -1,0 +1,53 @@
+{
+  "ranAt": "2026-08-10T21:04:30.876Z",
+  "launchpad": "0x712E93401b455d226284BbA873cE13CC1492B22f",
+  "token": "0x552d547E418b41726E539e838f4D4fD5722cEe1d",
+  "costEth": "0.000036339057632001",
+  "checks": [
+    {
+      "name": "FEE_RECIPIENT zgodny z zapisem wdrozenia",
+      "ok": true,
+      "detail": "0x83C68Dbf0E79f934FcCCd3Ca015103A768C21E83"
+    },
+    {
+      "name": "launch na mainnecie",
+      "ok": true,
+      "detail": "token 0x552d547E418b41726E539e838f4D4fD5722cEe1d, gas 888726"
+    },
+    {
+      "name": "kupno",
+      "ok": true,
+      "detail": "659564.687306377790658165 SMOKE, gas 175910"
+    },
+    {
+      "name": "sprzedaz calosci",
+      "ok": true,
+      "detail": "~0.000490049999999999 ETH, gas 84912"
+    },
+    {
+      "name": "oplata tworcy naliczona (70%)",
+      "ok": true,
+      "detail": "0.000006965 ETH"
+    },
+    {
+      "name": "oplata protokolu naliczona (30%) na FEE_RECIPIENT",
+      "ok": true,
+      "detail": "0.000002985 ETH"
+    },
+    {
+      "name": "proporcja tworca/protokol ~70/30",
+      "ok": true,
+      "detail": "0.000006965 vs 0.000002985"
+    },
+    {
+      "name": "claim tworcy wyplaca",
+      "ok": true,
+      "detail": "gas 37965"
+    },
+    {
+      "name": "kontrakt trzyma rezerwe + nieodebrane oplaty protokolu",
+      "ok": true,
+      "detail": "saldo 0.000002985000000001, ethReserve 0.000000000000000001, protokol 0.000002985"
+    }
+  ]
+}

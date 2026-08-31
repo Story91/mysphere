@@ -129,6 +129,9 @@ export const followUser = async (
     // Commit all changes
     await batch.commit();
 
+    // Zbior obserwowanych w cache'u modulu wlasnie sie zdezaktualizowal.
+    invalidateFollowingIdSet(followerId);
+
     // 5. Send notification (asynchronously)
     setTimeout(async () => {
       try {
@@ -222,6 +225,9 @@ export const unfollowUser = async (
 
     await batch.commit();
 
+    // Zbior obserwowanych w cache'u modulu wlasnie sie zdezaktualizowal.
+    invalidateFollowingIdSet(followerId);
+
     console.log(`❌ Unfollow: ${followerId} -x-> ${followingId}`);
     return { success: true };
 
@@ -262,9 +268,16 @@ export const checkIfFollowing = async (
 
 /**
  * Pobierz statystyki obserwowania użytkownika
+ *
+ * @returns `null` znaczy AWARIE ODCZYTU, nigdy "nikt go nie obserwuje".
+ *
+ * Liczba obserwujacych to slad wlasnej aktywnosci czlowieka. Zero wpisane po
+ * nieudanym `getDoc` czytalo sie jak fakt o nim samym - i tak wlasnie
+ * renderowal sie profil, bez ani jednego znaku, ze cokolwiek padlo.
  */
-export const getUserFollowStats = async (userId: string): Promise<FollowStats> => {
+export const getUserFollowStats = async (userId: string): Promise<FollowStats | null> => {
   try {
+    // Adres nie do przyjecia to nie awaria odczytu - nie bylo o kogo zapytac.
     if (!isValidEthereumAddress(userId)) {
       return { followers: 0, following: 0, mutualFollows: 0 };
     }
@@ -286,12 +299,18 @@ export const getUserFollowStats = async (userId: string): Promise<FollowStats> =
     return { followers: 0, following: 0, mutualFollows: 0 };
   } catch (error) {
     console.error('Błąd pobierania statystyk obserwowania:', error);
-    return { followers: 0, following: 0, mutualFollows: 0 };
+    return null;
   }
 };
 
 /**
  * Pobierz listę obserwowanych użytkowników
+ *
+ * @throws gdy odczyt sie nie powiedzie - wolajacy MUSI to odroznic od pustki.
+ *
+ * `[]` znaczy "nikogo nie obserwuje" i tak wlasnie renderuje sie ekran
+ * ("Not following anyone yet"). Po nieudanym zapytaniu jest to zdanie
+ * falszywe - patrz `failedSections` w app/basechat/friendsystem/hooks.ts.
  */
 export const getFollowing = async (
   userId: string, 
@@ -351,7 +370,7 @@ export const getFollowing = async (
 
   } catch (error) {
     console.error('Błąd pobierania listy obserwowanych:', error);
-    return [];
+    throw error;
   }
 };
 
@@ -380,19 +399,41 @@ const fetchUsersByIds = async (ids: string[]): Promise<Map<string, any>> => {
  *
  * Czyta wylacznie ID dokumentow z subkolekcji - bez laczenia z profilami.
  * getFollowing() dla tego samego celu kosztowalby dodatkowe N odczytow userow.
+ *
+ * Cache na poziomie MODULU, nie hooka: feed montuje dwie instancje PostList
+ * (glowna + przypiete), a kazda miala wlasny cache w useRef - czyli to samo
+ * zapytanie o max 1000 dokumentow szlo dwa razy przy kazdym wejsciu. Wpis
+ * trzyma PROMISE, wiec rownoczesne wywolania dostaja jedno zapytanie w locie.
+ * follow/unfollow uniewaznia wpis - zmiana obserwacji jest widoczna od razu.
  */
+const FOLLOWING_SET_TTL_MS = 2 * 60 * 1000;
+const followingSetCache = new Map<string, { at: number; promise: Promise<Set<string>> }>();
+
+export const invalidateFollowingIdSet = (userId: string): void => {
+  followingSetCache.delete(userId);
+};
+
 export const fetchFollowingIdSet = async (userId: string): Promise<Set<string>> => {
-  const snap = await getDocs(
+  const hit = followingSetCache.get(userId);
+  if (hit && Date.now() - hit.at < FOLLOWING_SET_TTL_MS) return hit.promise;
+
+  const promise = getDocs(
     query(
       collection(db, `${COLLECTIONS.USERS}/${userId}/${COLLECTIONS.USER_FOLLOWING}`),
       limit(SOCIAL_CONFIG.MAX_FOLLOWERS_FETCH)
     )
-  );
-  return new Set(snap.docs.map(d => d.id));
+  ).then((snap) => new Set(snap.docs.map((d) => d.id)));
+  // Padniete zapytanie nie moze zostac w cache'u jako wieczna porazka.
+  promise.catch(() => followingSetCache.delete(userId));
+  followingSetCache.set(userId, { at: Date.now(), promise });
+  return promise;
 };
 
 /**
  * Pobierz listę obserwujących użytkowników
+ *
+ * @throws gdy odczyt sie nie powiedzie - "No followers yet" po padnietym
+ * zapytaniu to zdanie o czlowieku, ktore wypowiadamy bez pokrycia.
  */
 export const getFollowers = async (
   userId: string, 
@@ -446,7 +487,7 @@ export const getFollowers = async (
 
   } catch (error) {
     console.error('Błąd pobierania listy obserwujących:', error);
-    return [];
+    throw error;
   }
 };
 

@@ -51,8 +51,6 @@ export default function SpotifyDashboard() {
   const [nftMinting, setNftMinting] = useState(false);
   const [nftPreview, setNftPreview] = useState<any>(null);
   const [showNftModal, setShowNftModal] = useState(false);
-  const [debugData, setDebugData] = useState<any>(null);
-  const [debugLoading, setDebugLoading] = useState(false);
 
   const isSpotifyConnected = (socialsData as any)?.spotify;
 
@@ -182,30 +180,6 @@ export default function SpotifyDashboard() {
       case 'rare': return 'text-blue-400';
       case 'uncommon': return 'text-green-400';
       default: return 'text-gray-400';
-    }
-  };
-
-  const runDebugTest = async () => {
-    if (!address) return;
-    
-    setDebugLoading(true);
-    setDebugData(null);
-    
-    try {
-      console.log('🔍 Running Origin SDK debug test...');
-      const response = await fetch(`/api/camp/spotify/debug?address=${address}`);
-      const data = await response.json();
-      
-      setDebugData(data);
-      console.log('🧪 Debug test completed:', data);
-    } catch (err) {
-      console.error('❌ Debug test failed:', err);
-      setDebugData({
-        success: false,
-        error: err instanceof Error ? err.message : 'Unknown error'
-      });
-    } finally {
-      setDebugLoading(false);
     }
   };
 
@@ -695,115 +669,7 @@ export default function SpotifyDashboard() {
                          '🎨 Mint Music NFT'
            )}
         </button>
-        {process.env.NODE_ENV === 'development' && (
-          <button
-            onClick={runDebugTest}
-            disabled={debugLoading}
-            className={`px-6 py-3 rounded-lg transition-colors font-medium ${
-              debugLoading 
-                ? 'bg-gray-500/20 text-gray-400 cursor-not-allowed'
-                : 'bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300'
-            }`}
-          >
-            {debugLoading ? (
-              <>
-                <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-400 mr-2"></div>
-                Testing...
-              </>
-            ) : (
-              '🔍 Test Origin SDK'
-            )}
-          </button>
-        )}
       </div>
-
-      {/* Debug Results Modal */}
-      {debugData && process.env.NODE_ENV === 'development' && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-gradient-to-br from-yellow-900/90 to-orange-900/90 backdrop-blur-sm border border-yellow-500/30 rounded-2xl p-6 max-w-4xl w-full mx-4 max-h-[80vh] overflow-y-auto"
-          >
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-2xl font-bold text-yellow-200">🔍 Origin SDK Debug Results</h3>
-              <button
-                onClick={() => setDebugData(null)}
-                className="text-yellow-300 hover:text-yellow-200 text-2xl"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              {debugData.success ? (
-                <>
-                  <div className="bg-black/40 rounded-lg p-4">
-                    <h4 className="text-yellow-300 font-bold mb-2">✅ User Data Found</h4>
-                    <div className="text-sm text-yellow-200/70">
-                      <div>Spotify ID: {debugData.debugResults.spotifyId}</div>
-                      <div>User: {debugData.debugResults.userData?.data?.spotifyUser?.display_name || 'N/A'}</div>
-                    </div>
-                  </div>
-
-                  <div className="bg-black/40 rounded-lg p-4">
-                    <h4 className="text-yellow-300 font-bold mb-2">🧪 Method Test Results</h4>
-                    <div className="space-y-2">
-                      {Object.entries(debugData.debugResults.methodTests || {}).map(([method, result]: [string, any]) => (
-                        <div key={method} className="flex items-center justify-between p-2 bg-black/20 rounded">
-                          <span className="text-yellow-200">{method}</span>
-                          <div className="text-right">
-                            {result.success ? (
-                              <div className="text-green-400 text-sm">
-                                ✅ {result.dataLength === 'not array' ? 'No data' : `${result.dataLength} items`}
-                                {result.isError && <span className="text-red-400"> (API Error)</span>}
-                              </div>
-                            ) : (
-                              <div className="text-red-400 text-sm">❌ {result.error}</div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {debugData.debugResults.availableMethods && (
-                    <div className="bg-black/40 rounded-lg p-4">
-                      <h4 className="text-yellow-300 font-bold mb-2">📋 Available Methods</h4>
-                      <div className="text-sm text-yellow-200/70">
-                        {debugData.debugResults.availableMethods.join(', ')}
-                      </div>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="bg-red-500/20 rounded-lg p-4">
-                  <h4 className="text-red-300 font-bold mb-2">❌ Debug Test Failed</h4>
-                  <div className="text-red-200/70 text-sm">{debugData.error || debugData.message}</div>
-                </div>
-              )}
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => setDebugData(null)}
-                className="flex-1 px-4 py-2 bg-gray-500/20 hover:bg-gray-500/30 text-gray-300 rounded-lg transition-colors"
-              >
-                Close
-              </button>
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(JSON.stringify(debugData, null, 2));
-                  alert('Debug data copied to clipboard!');
-                }}
-                className="flex-1 px-4 py-2 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 rounded-lg transition-colors"
-              >
-                📋 Copy Debug Data
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
 
       {/* NFT Preview Modal */}
       {showNftModal && nftPreview && (

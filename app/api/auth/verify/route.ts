@@ -25,6 +25,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createPublicClient, http } from 'viem';
 import { base } from 'viem/chains';
+import { mintFirebaseToken } from '../../../utils/auth/firebaseAdmin';
 import {
   NONCE_COOKIE,
   SESSION_COOKIE,
@@ -144,7 +145,23 @@ export async function POST(request: NextRequest) {
 
     const token = createSession(payload);
 
-    const response = NextResponse.json({ address: payload.address, expiresAt });
+    // Token logujacy do Firebase. Dopiero on sprawia, ze request.auth.uid
+    // w regulach Firestore JEST adresem portfela - bez tego reguly nie wiedza,
+    // kto pisze, i musza zostac otwarte. Mintowany WYLACZNIE tutaj, czyli po
+    // udanej weryfikacji podpisu on-chain. Brak konta uslugowego zwraca null
+    // i degraduje zachowanie do dzisiejszego, zamiast wywalac logowanie.
+    const firebaseToken = await mintFirebaseToken(payload.address);
+
+    const response = NextResponse.json(
+      {
+        address: payload.address,
+        expiresAt,
+        firebaseToken,
+      },
+      // Odpowiedz niesie poswiadczenie Firebase konkretnego czlowieka - nie
+      // moze wyladowac w zadnym cache po drodze.
+      { headers: { 'Cache-Control': 'no-store, private' } }
+    );
 
     // Nonce jest jednorazowy - po udanym uzyciu znika.
     response.cookies.set({

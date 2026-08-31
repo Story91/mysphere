@@ -1,18 +1,19 @@
 // Główny serwis obsługi systemu referali
-import { 
-  doc, 
-  setDoc, 
-  getDoc, 
-  updateDoc, 
-  collection, 
-  query, 
-  where, 
+import {
+  doc,
+  setDoc,
+  getDoc,
+  updateDoc,
+  collection,
+  query,
+  where,
   getDocs,
   serverTimestamp,
   increment,
   Timestamp,
   orderBy,
-  limit
+  limit,
+  writeBatch
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { 
@@ -50,12 +51,23 @@ export const generateReferralCode = (address: string): string => {
   return `${prefix}${suffix}`;
 };
 
-// Generowanie pełnego linku referalowego
+/**
+ * Generowanie pełnego linku referalowego.
+ *
+ * `/join` MUSI istnieć jako trasa (app/join/page.tsx). Przez długi czas nie
+ * istniała, więc każdy skopiowany i wysłany dalej link referalowy lądował na
+ * stronie „nie znaleziono" - polecający tracił osobę, którą właśnie przyprowadził.
+ * Zmieniając tę ścieżkę, zmień też stronę.
+ */
 export const generateReferralLink = (referralCode: string): string => {
   // Always use production domain for referral links
   const baseUrl = 'https://mysphere.fun'; // Production domain
-  return `${baseUrl}/join?ref=${referralCode}`;
+  return `${baseUrl}/join?ref=${encodeURIComponent(referralCode)}`;
 };
+
+/** Kody generujemy wielkimi literami - porównanie musi to znosić z obu stron. */
+export const normalizeReferralCode = (referralCode: string): string =>
+  referralCode.trim().toUpperCase();
 
 // Inicjalizacja statystyk referalowych dla użytkownika
 export const initializeReferralStats = async (userId: string): Promise<ReferralStats> => {
@@ -124,61 +136,104 @@ export const getUserReferralStats = async (userId: string): Promise<ReferralStat
   }
 };
 
-// Znajdowanie użytkownika po kodzie referalowym
+/**
+ * Znajdowanie użytkownika po kodzie referalowym.
+ *
+ * `null` znaczy WYŁĄCZNIE „takiego kodu nie ma". Awaria zapytania leci dalej
+ * jako wyjątek i musi zostać obsłużona osobno: „nie znam tego kodu" i „nie
+ * udało mi się sprawdzić" to dwie różne wiadomości dla człowieka, który właśnie
+ * kliknął czyjeś zaproszenie. Wcześniej oba przypadki zwracały tu `null`.
+ */
 export const findUserByReferralCode = async (referralCode: string): Promise<string | null> => {
-  try {
-    const statsQuery = query(
-      collection(db, 'referralStats'),
-      where('referralCode', '==', referralCode)
-    );
-    
-    const snapshot = await getDocs(statsQuery);
-    
-    if (!snapshot.empty) {
-      return snapshot.docs[0].data().userId;
-    }
-    
-    return null;
-  } catch (error) {
-    console.error('Error finding user by referral code:', error);
-    return null;
+  const statsQuery = query(
+    collection(db, 'referralStats'),
+    where('referralCode', '==', normalizeReferralCode(referralCode))
+  );
+
+  const snapshot = await getDocs(statsQuery);
+
+  if (!snapshot.empty) {
+    return snapshot.docs[0].data().userId;
   }
+
+  return null;
 };
+
+/**
+ * Wynik rejestracji polecenia.
+ *
+ * Zamiast `boolean`, bo `false` mieszało pięć zupełnie różnych sytuacji w jedną:
+ * kod nie istnieje, ktoś użył własnego linku, ten portfel już kogoś ma, baza nie
+ * odpowiedziała. Człowiek, który właśnie kliknął cudze zaproszenie, dostaje na
+ * każdą z nich inną wiadomość - i tylko przy jednej ma sens przycisk „spróbuj
+ * ponownie".
+ */
+export type ReferralRegistrationOutcome =
+  | { status: 'registered'; referrerId: string }
+  | { status: 'unknown_code' }
+  | { status: 'self_referral' }
+  | { status: 'already_referred' }
+  | { status: 'failed'; message: string };
 
 // Rejestracja nowego referala
 export const registerReferral = async (
   referralCode: string,
   newUserAddress: string,
   metadata?: Partial<Referral['metadata']>
-): Promise<boolean> => {
+): Promise<ReferralRegistrationOutcome> => {
+  const code = normalizeReferralCode(referralCode);
+
+  if (!code) {
+    return { status: 'unknown_code' };
+  }
+
   try {
     // Znajdź referera po kodzie
-    const referrerId = await findUserByReferralCode(referralCode);
-    
+    const referrerId = await findUserByReferralCode(code);
+
     if (!referrerId) {
-      console.error('User not found with this referral code');
-      return false;
+      return { status: 'unknown_code' };
     }
-    
+
+    // Własny link. Bez tego warunku wystarczyło otworzyć swoje zaproszenie,
+    // żeby policzyć sobie polecenie samego siebie.
+    if (referrerId.toLowerCase() === newUserAddress.toLowerCase()) {
+      return { status: 'self_referral' };
+    }
+
     // Sprawdź czy użytkownik już nie był polecony
     const existingReferralQuery = query(
       collection(db, 'referrals'),
       where('referredAddress', '==', newUserAddress)
     );
-    
+
     const existingSnapshot = await getDocs(existingReferralQuery);
-    
+
     if (!existingSnapshot.empty) {
-      console.log('User has already been referred');
-      return false;
+      return { status: 'already_referred' };
     }
-    
-    // Utwórz nowy dokument referala
+
+    /**
+     * TRZY ZAPISY JEDNYM BATCHEM - wszystkie albo żaden.
+     *
+     * Wcześniej szły osobno, jeden po drugim, i każdy mógł paść w środku. Dwa
+     * z tego były realne, nie teoretyczne:
+     *  - `updateDoc` na profilu użytkownika RZUCA, gdy dokumentu nie ma - a nie
+     *    ma go dokładnie u kogoś, kto właśnie przyszedł z linku i nie napisał
+     *    jeszcze ani jednego posta. Czyli u całej grupy docelowej tej funkcji.
+     *    Dokument polecenia i licznik polecającego były już wtedy zapisane, a
+     *    funkcja i tak zwracała `false`,
+     *  - odwrotnie: licznik mógł urosnąć bez powiązania w profilu.
+     * Batch zdejmuje całą tę klasę rozjazdów. `set` z `merge` zakłada profil,
+     * jeśli go nie ma, zamiast wywracać się na jego braku.
+     */
+    const batch = writeBatch(db);
+
     const referralRef = doc(collection(db, 'referrals'));
     const newReferral: Referral = {
       referrerId,
       referredAddress: newUserAddress,
-      referralCode,
+      referralCode: code,
       timestamp: serverTimestamp() as Timestamp,
       status: 'pending',
       rewardsClaimed: false,
@@ -187,31 +242,38 @@ export const registerReferral = async (
         ...metadata
       }
     };
-    
-    await setDoc(referralRef, newReferral);
-    
-    // Zaktualizuj statystyki referera
-    const statsRef = doc(db, 'referralStats', referrerId);
-    await updateDoc(statsRef, {
+    batch.set(referralRef, newReferral);
+
+    // Informacja o refererze w profilu nowego użytkownika.
+    batch.set(
+      doc(db, 'users', newUserAddress),
+      {
+        walletAddress: newUserAddress,
+        referredBy: referrerId,
+        referralCode: code,
+        joinedViaReferral: true,
+        referralTimestamp: serverTimestamp()
+      },
+      { merge: true }
+    );
+
+    // Statystyki referera. Dokument istnieje - właśnie po nim znaleźliśmy kod.
+    batch.update(doc(db, 'referralStats', referrerId), {
       totalReferrals: increment(1),
       pendingReferrals: increment(1),
       lastUpdated: serverTimestamp()
     });
-    
-    // Dodaj informację o refererze do profilu nowego użytkownika
-    const userRef = doc(db, 'users', newUserAddress);
-    await updateDoc(userRef, {
-      referredBy: referrerId,
-      referralCode: referralCode,
-      joinedViaReferral: true,
-      referralTimestamp: serverTimestamp()
-    });
-    
+
+    await batch.commit();
+
     console.log(`✅ New referral registered: ${newUserAddress} referred by ${referrerId}`);
-    return true;
+    return { status: 'registered', referrerId };
   } catch (error) {
     console.error('Error registering referral:', error);
-    return false;
+    return {
+      status: 'failed',
+      message: 'We could not save your invite right now. Nothing was lost - you can try again.'
+    };
   }
 };
 

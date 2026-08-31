@@ -7,10 +7,11 @@ import { WORLD_CHAIN_ID } from '../World/config/WorldChainNetworkConfig';
 import { LINEA_CHAIN_ID } from '../Linea/config/LineaNetworkConfig';
 import { BASECAMP_CHAIN_ID } from '../../contracts/BaseCampPostContract';
 import { ETHEREUM_CHAIN_ID } from '../ETH/config/EthereumNetworkConfig';
+import { ROBINHOOD_CHAIN_ID } from '../Robinhood/config/RobinhoodNetworkConfig';
 
 // ===== TOKEN TYPES =====
 export type TipToken = 'ETH' | 'USDC' | 'CELO' | 'WLD' | 'LINEA' | 'CAMP';
-export type TipNetwork = 'base' | 'ethereum' | 'celo' | 'world' | 'linea' | 'camp';
+export type TipNetwork = 'base' | 'ethereum' | 'celo' | 'world' | 'linea' | 'camp' | 'robinhood';
 
 // ===== TOKEN CONFIG =====
 export interface TokenConfig {
@@ -190,6 +191,25 @@ export const NETWORKS: Record<TipNetwork, NetworkConfig> = {
       TOKENS.LINEA,
     ],
   },
+  // Robinhood Chain - tipy to zwykle transfery natywnego ETH, wiec dzialaja
+  // od razu, niezaleznie od tego czy kontrakt postow jest juz wdrozony.
+  robinhood: {
+    id: 'robinhood',
+    chainId: ROBINHOOD_CHAIN_ID,
+    name: 'Robinhood Chain',
+    shortName: 'Robinhood',
+    icon: '🟢',
+    // Oficjalne logo Robinhooda (limonkowe tlo wpisane w obrazek).
+    iconUrl: '/robin.webp',
+    color: '#00C805', // Firmowa zielen Robinhooda
+    explorerUrl: 'https://robinhoodchain.blockscout.com',
+    explorerTxPath: '/tx/',
+    nativeToken: 'ETH',
+    tokens: [
+      // ETH jest juz zdefiniowany w TOKENS - reuzywamy zamiast duplikowac
+      TOKENS.ETH,
+    ],
+  },
   camp: {
     id: 'camp',
     chainId: BASECAMP_CHAIN_ID,
@@ -259,6 +279,77 @@ export const getDefaultTokenForNetwork = (networkId: TipNetwork): TokenConfig =>
 export const getExplorerTxLink = (networkId: TipNetwork, txHash: string): string => {
   const network = NETWORKS[networkId];
   return `${network.explorerUrl}${network.explorerTxPath}${txHash}`;
+};
+
+/**
+ * Link do DOWODU platnosci - tolerancyjny na to, czym jest zapisany
+ * identyfikator.
+ *
+ * === PO CO OSOBNA FUNKCJA ===
+ * Nie kazdy identyfikator zapisany w polu `txHash` jest hashem transakcji.
+ * Platnosci przez Base Pay zapisuja to, co zwraca `pay()`, a wlasna
+ * dokumentacja SDK opisuje te wartosc jako "Transaction ID (userOp hash)"
+ * (node_modules/@base-org/account/.../payment/types.d.ts). userOp to zlecenie
+ * ERC-4337, nie transakcja - lezy w jakiejs transakcji, ale ma wlasny hash.
+ *
+ * ZMIERZONE, nie zgadniete: 17 z 17 identyfikatorow o poprawnym formacie
+ * z produkcyjnej kolekcji `tips` zwraca `null` z eth_getTransactionByHash na
+ * Base mainnet. Sprawdzone takze na Base Sepolia, Ethereum, Optimism i
+ * Arbitrum - nigdzie ich nie ma. Czyli KAZDY link "verify onchain" na stronie
+ * Paid prowadzil do pustej strony w eksploratorze. To najgorszy mozliwy stan
+ * dla strony, ktorej cala teza brzmi "kazda pozycja ma dowod, ktory mozesz
+ * sprawdzic".
+ *
+ * === DLACZEGO WYSZUKIWARKA, A NIE /op/ ===
+ * Nie da sie z samego hasha rozpoznac, czy to transakcja czy userOp - obie
+ * wartosci to 32 bajty. Wyszukiwarka eksploratora przyjmuje jedno i drugie
+ * i sama kieruje na wlasciwy widok, wiec dziala niezaleznie od tego, ktory
+ * rodzaj identyfikatora zapisalismy. Twarde /tx/ dziala tylko dla jednego.
+ *
+ * Sieci spoza rodziny Etherscan (Blockscout) maja wlasna sciezke szukania;
+ * gdy jej nie znamy, zostaje dotychczasowy /tx/ - nie pogarszamy niczego.
+ */
+const EXPLORER_SEARCH_PATH: Partial<Record<TipNetwork, string>> = {
+  base: '/search?f=0&q=',
+  linea: '/search?f=0&q=',
+  celo: '/search?f=0&q=',
+  ethereum: '/search?f=0&q=',
+  world: '/search?f=0&q=',
+};
+
+/**
+ * Tlumaczy nazwe sieci ZAPISANA W BAZIE na nazwe z tej konfiguracji.
+ *
+ * W systemie zyja dwa slowniki naraz: TipNetworkType (pole `network` w
+ * kolekcji `tips`) dopuszcza 'basecamp', posty zapisuja 'worldchain', a
+ * NETWORKS ponizej zna tylko 'camp' i 'world'.
+ *
+ * To nie byla drobnostka kosmetyczna. `getExplorerTxLink('worldchain' as
+ * TipNetwork, ...)` siegalo po `NETWORKS['worldchain']`, dostawalo `undefined`
+ * i wywracalo sie na `.explorerUrl` - w komponencie SERWEROWYM, czyli calym
+ * bledem 500 zamiast strony. Rzutowanie `as TipNetwork` uciszalo TypeScript
+ * dokladnie tam, gdzie ostrzegal slusznie.
+ */
+const NETWORK_ALIASES: Record<string, TipNetwork> = {
+  base: 'base',
+  ethereum: 'ethereum',
+  celo: 'celo',
+  linea: 'linea',
+  robinhood: 'robinhood',
+  world: 'world',
+  worldchain: 'world',
+  camp: 'camp',
+  basecamp: 'camp',
+};
+
+export const resolveTipNetwork = (name: string | null | undefined): TipNetwork =>
+  (name && NETWORK_ALIASES[name]) || 'base';
+
+export const getProofLink = (networkId: TipNetwork, hash: string): string => {
+  const network = NETWORKS[networkId];
+  const searchPath = EXPLORER_SEARCH_PATH[networkId];
+  if (!searchPath) return getExplorerTxLink(networkId, hash);
+  return `${network.explorerUrl}${searchPath}${hash}`;
 };
 
 /**

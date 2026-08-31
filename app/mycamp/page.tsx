@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -40,6 +40,23 @@ import { ToastProvider } from './components/Toast';
 import UltraModernSocialCard from './components/UltraModernSocialCard';
 import HolographicStats from './components/HolographicStats';
 import FloatingNavigation from './components/FloatingNavigation';
+import { isRouteDisabled } from '@/config/routeStatus';
+
+/**
+ * Czy marketplace jest dzis wlaczony.
+ *
+ * DLACZEGO WARUNEK, A NIE USUNIECIE PRZYCISKOW: `/marketplace` siedzi
+ * w DISABLED_ROUTES, wiec klikniecie konczylo sie przekierowaniem na
+ * /basechat - przycisk nie tyle nie dzialal, co po cichu wyrzucal czlowieka
+ * z MyCamp na zupelnie inna strone. Dopoki ta trasa byla wylaczona razem
+ * z /mycamp, nikt tego nie widzial; po przywroceniu MyCamp stalo sie to
+ * dwoma zywymi pulapkami.
+ *
+ * Warunek czyta TE SAMA liste co nawigacja, wiec przyciski wroca same
+ * w chwili, gdy `/marketplace` zniknie z DISABLED_ROUTES. Zero pracy
+ * do zapamietania na pozniej i zero skasowanego kodu.
+ */
+const MARKETPLACE_LIVE = !isRouteDisabled('/marketplace');
 // Removed API imports - these should only be used in backend
 
 const CAMP_NFT_CONTRACT = '0x57CC99c9E1942a34a0cfF7FCC27c227455f14587';
@@ -143,10 +160,9 @@ const STATIC_MYSPHERE_DATA = {
   ]
 };
 
-export default function MyCampPage() {
+function MyCampPageContent() {
   const { address, isConnected } = useAccount();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [activeTab, setActiveTab] = useState('home');
   const [walletStats, setWalletStats] = useState<any>(null);
@@ -183,47 +199,54 @@ export default function MyCampPage() {
 
   // Environment variables
   const CLIENT_ID = process.env.NEXT_PUBLIC_CAMP_CLIENT_ID!;
-  const API_KEY = process.env.NEXT_PUBLIC_CAMP_API_KEY!;
+  // === NIE MA TU JUZ `NEXT_PUBLIC_CAMP_API_KEY` ===
+  // Prefiks NEXT_PUBLIC_ wpisuje wartosc DOSLOWNIE w chunk JS, ktory kazdy
+  // moze pobrac - klucz z .env.local dalo sie znalezc w
+  // .next/static/chunks/app/mycamp/page-*.js. Przekierowanie /mycamp na
+  // /basechat tego nie zaslania: chunk i tak jest serwowany.
+  //
+  // Ta zmienna nie robila przy tym NIC poza logowaniem do konsoli - jej
+  // jedynymi uzyciami byly dwa console.log ponizej. Zadne zapytanie jej nie
+  // niosło; klucz Campa uzywaja wylacznie trasy serwerowe w app/api/camp/**,
+  // ktore czytaja CAMP_API_KEY (bez prefiksu). Usuniecie niczego nie psuje.
+  //
+  // KLUCZ, KTORY TU BYL, NALEZY UZNAC ZA SPALONY I ZROTOWAC - byl publiczny
+  // w kazdym zbudowanym wydaniu tej strony.
   const FAUCET_URL = process.env.NEXT_PUBLIC_CAMP_FAUCET_URL!;
   const EXPLORER_URL = process.env.NEXT_PUBLIC_CAMP_EXPLORER_URL!
 
-  // Handle return from social auth
-  useEffect(() => {
-    const authSuccess = searchParams.get('auth_success');
-    const socialPlatform = searchParams.get('platform');
-    
-    if (authSuccess === 'true' && socialPlatform) {
-      setShowSuccessMessage(true);
-      console.log(`🎉 Successfully connected ${socialPlatform}!`);
-      
-      // Refresh social data
-      if (refetchSocials) {
-        refetchSocials();
-      }
-      
-      // Clear URL parameters
-      const url = new URL(window.location.href);
-      url.searchParams.delete('auth_success');
-      url.searchParams.delete('platform');
-      router.replace(url.pathname, { scroll: false });
-      
-      // Hide success message after 5 seconds
-      setTimeout(() => {
-        setShowSuccessMessage(false);
-      }, 5000);
+  // Handle return from social auth.
+  // Sam odczyt ?auth_success/?platform siedzi w <MyCampSearchParams/> nizej -
+  // tutaj zostala juz tylko reakcja na zdarzenie.
+  const handleAuthSuccess = useCallback((socialPlatform: string) => {
+    setShowSuccessMessage(true);
+    console.log(`🎉 Successfully connected ${socialPlatform}!`);
+
+    // Refresh social data
+    if (refetchSocials) {
+      refetchSocials();
     }
-  }, [searchParams, router, refetchSocials]);
+
+    // Clear URL parameters
+    const url = new URL(window.location.href);
+    url.searchParams.delete('auth_success');
+    url.searchParams.delete('platform');
+    router.replace(url.pathname, { scroll: false });
+
+    // Hide success message after 5 seconds
+    setTimeout(() => {
+      setShowSuccessMessage(false);
+    }, 5000);
+  }, [router, refetchSocials]);
 
   // Debug environment variables
   useEffect(() => {
     console.log('🌍 Environment Variables Check:', {
       CLIENT_ID: CLIENT_ID ? '✅ Loaded' : '❌ Missing',
-      API_KEY: API_KEY ? '✅ Loaded' : '❌ Missing',
       FAUCET_URL: FAUCET_URL ? '✅ Loaded' : '❌ Missing',
       EXPLORER_URL: EXPLORER_URL ? '✅ Loaded' : '❌ Missing',
       actualValues: {
         CLIENT_ID: CLIENT_ID?.substring(0, 8) + '...',
-        API_KEY: API_KEY?.substring(0, 8) + '...',
         FAUCET_URL,
         EXPLORER_URL
       }
@@ -490,7 +513,6 @@ export default function MyCampPage() {
       loading,
       address,
       clientId: CLIENT_ID,
-      hasApiKey: !!API_KEY,
       socialsData,
       socialsError,
       socialsLoading,
@@ -500,7 +522,7 @@ export default function MyCampPage() {
       connectedSocialsCount,
       spotifyFeaturesEnabled: SPOTIFY_FEATURES_ENABLED
     });
-  }, [authenticated, loading, address, socialsData, socialsError, socialsLoading, CLIENT_ID, API_KEY, connectedSocialsCount]);
+  }, [authenticated, loading, address, socialsData, socialsError, socialsLoading, CLIENT_ID, connectedSocialsCount]);
 
   // Auto-load stats from cache on component mount (only if valid)
   useEffect(() => {
@@ -633,6 +655,12 @@ export default function MyCampPage() {
   return (
     <ToastProvider>
       <div className="min-h-screen overflow-x-hidden relative">
+      {/* Jedyny konsument useSearchParams() na tej stronie. Nic nie rysuje, wiec
+          Suspense z fallbackiem null jest niewidoczny - a bailout z prerenderu
+          zostaje zamkniety w tym jednym wezle zamiast obejmowac cala strone. */}
+      <Suspense fallback={null}>
+        <MyCampSearchParams onAuthSuccess={handleAuthSuccess} />
+      </Suspense>
       {/* Camp Mainnet banner removed on request */}
       {/* Background Image */}
       <div 
@@ -1042,7 +1070,8 @@ export default function MyCampPage() {
               )}
             </motion.button>
 
-            {/* IP Market V3 Button */}
+            {/* IP Market V3 Button - tylko gdy trasa jest wlaczona, patrz MARKETPLACE_LIVE */}
+            {MARKETPLACE_LIVE && (
             <Link href="/marketplace" className="block h-full">
               <motion.button
                 initial={{ opacity: 0, y: 20 }}
@@ -1074,6 +1103,7 @@ export default function MyCampPage() {
                 </div>
               </motion.button>
             </Link>
+            )}
 
             {/* Social Media Dropdown Button - REMOVED */}
           </div>
@@ -1850,13 +1880,15 @@ export default function MyCampPage() {
                     >{t.toUpperCase()}</button>
                   ))}
                 </div>
-                <Link
-                  href="/marketplace"
-                  className="bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold py-2 px-4 rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all shadow-lg shadow-purple-500/25 flex items-center gap-2"
-                >
-                  <span>🛒</span>
-                  <span>Marketplace</span>
-                </Link>
+                {MARKETPLACE_LIVE && (
+                  <Link
+                    href="/marketplace"
+                    className="bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold py-2 px-4 rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all shadow-lg shadow-purple-500/25 flex items-center gap-2"
+                  >
+                    <span>🛒</span>
+                    <span>Marketplace</span>
+                  </Link>
+                )}
               </div>
               
               {!isConnected ? (
@@ -2061,4 +2093,40 @@ export default function MyCampPage() {
     </div>
     </ToastProvider>
   );
+}
+
+/**
+ * Odczyt query stringa wydzielony z MyCampPageContent.
+ *
+ * useSearchParams() wywala render ze statycznego prerenderu az do najblizszej
+ * granicy Suspense. Dopoki hook siedzial na gorze MyCampPageContent, ta granica
+ * musiala obejmowac cala strone - do HTML-a szlo wtedy samo tlo, a tresc
+ * doklejala sie dopiero po hydracji. Tutaj bailout dotyczy wezla, ktory zwraca
+ * null, wiec reszta strony renderuje sie normalnie.
+ *
+ * Parametry ?auth_success=true&platform=... ustawia powrot z OAuth social media
+ * (Twitter/Spotify/TikTok). Sluza wylacznie do pokazania toasta i odswiezenia
+ * listy socials - nie wplywaja na to, co strona rysuje.
+ */
+function MyCampSearchParams({
+  onAuthSuccess,
+}: {
+  onAuthSuccess: (platform: string) => void;
+}) {
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const authSuccess = searchParams.get('auth_success');
+    const socialPlatform = searchParams.get('platform');
+
+    if (authSuccess === 'true' && socialPlatform) {
+      onAuthSuccess(socialPlatform);
+    }
+  }, [searchParams, onAuthSuccess]);
+
+  return null;
+}
+
+export default function MyCampPage() {
+  return <MyCampPageContent />;
 }

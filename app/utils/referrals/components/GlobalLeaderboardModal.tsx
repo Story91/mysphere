@@ -12,7 +12,7 @@ import {
   DocumentSnapshot
 } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { FiX, FiAward, FiTrendingUp, FiSearch, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
+import { FiX, FiSearch, FiChevronRight } from 'react-icons/fi';
 
 interface LeaderboardEntry {
   userId: string;
@@ -139,22 +139,12 @@ export default function GlobalLeaderboardModal({ isOpen, onClose }: GlobalLeader
     entry.userId.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const getMedalColor = (rank: number) => {
-    switch(rank) {
-      case 1: return 'from-yellow-400 to-yellow-600'; // Gold
-      case 2: return 'from-gray-300 to-gray-500'; // Silver
-      case 3: return 'from-orange-400 to-orange-600'; // Bronze
-      default: return 'from-blue-400 to-blue-600';
-    }
-  };
-
-  const getMedalEmoji = (rank: number) => {
-    switch(rank) {
-      case 1: return '🥇';
-      case 2: return '🥈';
-      case 3: return '🥉';
-      default: return '🏆';
-    }
+  // Ranga to numer, nie tecza gradientow. Pierwsza trojka rozni sie sila
+  // wypelnienia, reszta zostaje neutralna.
+  const getRankStyle = (rank: number) => {
+    if (rank === 1) return 'bg-soft-primary text-white';
+    if (rank <= 3) return 'bg-soft-primary/15 text-soft-primary-deep';
+    return 'bg-soft-sunken text-soft-ink-soft';
   };
 
   return (
@@ -167,7 +157,7 @@ export default function GlobalLeaderboardModal({ isOpen, onClose }: GlobalLeader
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100]"
+            className="fixed inset-0 bg-soft-ink/40 z-[100]"
           />
 
           {/* Modal */}
@@ -175,95 +165,87 @@ export default function GlobalLeaderboardModal({ isOpen, onClose }: GlobalLeader
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed inset-4 md:inset-8 lg:inset-16 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl z-[101] overflow-hidden flex flex-col max-w-4xl mx-auto"
+            className="fixed inset-3 md:inset-8 lg:inset-16 bg-soft-surface rounded-card shadow-float z-[101] overflow-hidden flex flex-col max-w-4xl mx-auto"
           >
             {/* Header */}
-            <div className="bg-gradient-to-r from-purple-500 to-pink-600 p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-white/20 rounded-lg">
-                    <FiAward className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-bold text-white">Global Referral Leaderboard</h2>
-                    <p className="text-sm text-white/80">Top referrers in the BaseChat community</p>
-                  </div>
+            <div className="border-b border-soft-line px-4 pt-4 pb-3 sm:px-6 sm:pt-5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-soft-ink-faint">Leaderboard</p>
+                  <h2 className="mt-0.5 font-soft-display text-xl font-bold leading-tight text-soft-ink sm:text-2xl">
+                    Top referrers
+                  </h2>
                 </div>
                 <button
                   onClick={onClose}
-                  className="p-2 hover:bg-white/20 rounded-lg transition-colors text-white"
+                  aria-label="Close leaderboard"
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-soft-sunken text-soft-ink-muted transition-transform [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-line hover:text-soft-ink active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                 >
-                  <FiX className="w-6 h-6" />
+                  <FiX className="h-5 w-5" />
                 </button>
               </div>
 
               {/* Search */}
-              <div className="mt-4 relative">
-                <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/70 w-4 h-4" />
+              <div className="relative mt-3">
+                <FiSearch className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-soft-ink-faint" />
                 <input
                   type="text"
-                  placeholder="Search by username or address..."
+                  placeholder="Search by username or address"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-white/20 text-white placeholder-white/70 rounded-lg border border-white/30 focus:border-white/50 focus:outline-none"
+                  aria-label="Search the leaderboard"
+                  className="w-full rounded-pill bg-soft-sunken py-2 pl-10 pr-4 font-soft text-sm text-soft-ink placeholder:text-soft-ink-faint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                 />
               </div>
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
               {loading && leaderboard.length === 0 ? (
-                <div className="flex items-center justify-center h-64">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
+                <div className="space-y-2">
+                  {[...Array(6)].map((_, i) => (
+                    <div key={i} className="h-[4.5rem] animate-pulse rounded-card bg-soft-sunken"></div>
+                  ))}
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {filteredLeaderboard.map((entry, index) => (
                     <motion.div
                       key={entry.userId}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.05 }}
-                      className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                      className="rounded-card border border-soft-line p-3 transition-colors [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken"
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4">
-                          {/* Rank Badge */}
-                          <div className={`w-12 h-12 rounded-full bg-gradient-to-r ${getMedalColor(entry.rank)} flex items-center justify-center text-white font-bold shadow-lg`}>
-                            <span className="text-lg">{entry.rank <= 3 ? getMedalEmoji(entry.rank) : entry.rank}</span>
-                          </div>
-
-                          {/* User Info */}
-                          <div>
-                            <h4 className="font-semibold text-gray-900 dark:text-white">
-                              {entry.userName}
-                            </h4>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                              {entry.userId.slice(0, 6)}...{entry.userId.slice(-4)}
-                            </p>
-                          </div>
+                      <div className="flex items-center gap-3">
+                        {/* Rank Badge */}
+                        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full font-soft-display text-base font-bold tabular-nums ${getRankStyle(entry.rank)}`}>
+                          {entry.rank}
                         </div>
 
-                        {/* Stats */}
-                        <div className="flex items-center space-x-6 text-sm">
-                          <div className="text-center">
-                            <p className="font-bold text-green-600 dark:text-green-400">
-                              {entry.successfulReferrals}
-                            </p>
-                            <p className="text-gray-500 dark:text-gray-400">Successful</p>
-                          </div>
-                          <div className="text-center">
-                            <p className="font-bold text-blue-600 dark:text-blue-400">
-                              {entry.totalReferrals}
-                            </p>
-                            <p className="text-gray-500 dark:text-gray-400">Total</p>
-                          </div>
-                          <div className="text-center">
-                            <p className="font-bold text-purple-600 dark:text-purple-400">
-                              {entry.totalRewards}
-                            </p>
-                            <p className="text-gray-500 dark:text-gray-400">Points</p>
-                          </div>
+                        {/* User Info */}
+                        <div className="min-w-0 flex-1">
+                          <h4 className="truncate font-soft-display text-sm font-bold text-soft-ink">
+                            {entry.userName}
+                          </h4>
+                          <p className="truncate font-soft text-xs tabular-nums text-soft-ink-faint">
+                            {entry.userId.slice(0, 6)}...{entry.userId.slice(-4)}
+                          </p>
+                          <p className="mt-1 font-soft text-xs tabular-nums text-soft-ink-muted">
+                            {entry.successfulReferrals} active
+                            <span className="mx-1.5 text-soft-ink-faint">·</span>
+                            {entry.totalReferrals} invited
+                          </p>
+                        </div>
+
+                        {/* Punkty - jedyna wartosc w kolorze pieniedzy */}
+                        <div className="shrink-0 text-right">
+                          <p className="font-soft-display text-xl font-bold leading-none tabular-nums text-soft-accent-deep">
+                            {entry.totalRewards}
+                          </p>
+                          <p className="mt-1 font-soft text-[0.625rem] uppercase tracking-wide text-soft-ink-faint">
+                            points
+                          </p>
                         </div>
                       </div>
                     </motion.div>
@@ -271,21 +253,21 @@ export default function GlobalLeaderboardModal({ isOpen, onClose }: GlobalLeader
 
                   {/* Load More Button */}
                   {hasMore && !searchTerm && (
-                    <div className="flex justify-center mt-6">
+                    <div className="flex justify-center pt-3">
                       <button
                         onClick={loadNextPage}
                         disabled={loading}
-                        className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-lg font-medium hover:from-purple-600 hover:to-pink-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                        className="inline-flex items-center gap-1.5 rounded-pill bg-soft-sunken px-5 py-2.5 text-sm font-semibold text-soft-primary-deep transition-transform [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-line active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                       >
                         {loading ? (
                           <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                            <span>Loading...</span>
+                            <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-soft-line border-t-soft-primary"></div>
+                            <span>Loading</span>
                           </>
                         ) : (
                           <>
-                            <FiChevronRight className="w-4 h-4" />
-                            <span>Load More</span>
+                            <span>Load more</span>
+                            <FiChevronRight className="h-4 w-4" />
                           </>
                         )}
                       </button>
@@ -293,15 +275,15 @@ export default function GlobalLeaderboardModal({ isOpen, onClose }: GlobalLeader
                   )}
 
                   {filteredLeaderboard.length === 0 && !loading && (
-                    <div className="text-center py-12">
-                      <div className="text-gray-400 dark:text-gray-500 mb-2">
-                        <FiSearch className="w-12 h-12 mx-auto mb-4" />
-                      </div>
-                      <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                        No results found
+                    <div className="py-12 text-center">
+                      <FiSearch className="mx-auto mb-3 h-8 w-8 text-soft-ink-faint" />
+                      <h3 className="font-soft-display text-base font-bold text-soft-ink">
+                        {searchTerm ? 'Nothing matches that search' : 'Nothing to rank yet'}
                       </h3>
-                      <p className="text-gray-500 dark:text-gray-400">
-                        Try adjusting your search terms
+                      <p className="mx-auto mt-1 max-w-sm font-soft text-sm text-soft-ink-soft">
+                        {searchTerm
+                          ? 'Search only covers the entries loaded so far - try loading more, or a shorter phrase.'
+                          : "Either nobody has referred anyone so far, or the list didn't load."}
                       </p>
                     </div>
                   )}
@@ -309,12 +291,12 @@ export default function GlobalLeaderboardModal({ isOpen, onClose }: GlobalLeader
               )}
             </div>
 
-            {/* Footer */}
-            <div className="border-t border-gray-200 dark:border-gray-700 p-4 bg-gray-50 dark:bg-gray-800">
-              <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
-                <p>Showing {filteredLeaderboard.length} entries</p>
-                <p>Updated in real-time</p>
-              </div>
+            {/* Footer - bez obietnicy "updated in real-time": dane sa pobierane
+                przy otwarciu modala i przy "Load more", nie na zywo. */}
+            <div className="border-t border-soft-line px-4 py-3 sm:px-6">
+              <p className="font-soft text-xs tabular-nums text-soft-ink-soft">
+                Showing {filteredLeaderboard.length} {filteredLeaderboard.length === 1 ? 'entry' : 'entries'}
+              </p>
             </div>
           </motion.div>
         </>

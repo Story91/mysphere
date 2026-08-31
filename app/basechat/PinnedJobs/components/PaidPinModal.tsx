@@ -1,23 +1,48 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useAccount, useBalance, useSwitchChain } from 'wagmi';
 import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseEther } from 'viem';
 import { toast } from 'react-hot-toast';
-import { X, Clock, DollarSign, Zap, Crown } from 'lucide-react';
-import { getAllDurations, calculateTotalCost, formatTimeLeft, calculateExpirationTime } from '../utils/pinPricing';
+import { X, Crown } from 'lucide-react';
+import { describeWalletError } from '../../../components/useTxFeedback';
+import { getAllDurations, calculateTotalCost, calculateExpirationTime } from '../utils/pinPricing';
 import { createPaidPin, canPinPost, PinDuration } from '../../../utils/firebase';
 // Base Pay imports
 import { pay, getPaymentStatus } from '@base-org/account';
 import { BasePayButton } from '@base-org/account-ui/react';
 
 // Smart Contract Integration
-import { PAID_PIN_CONTRACT_CONFIG, PAID_PIN_CONTRACT_ABI, ContractPinDuration } from '../config/contractConfig';
+import { PAID_PIN_CONTRACT_CONFIG, PAID_PIN_CONTRACT_ABI, toContractDuration } from '../config/contractConfig';
 
-// MySphere wallet address for Base Pay payments
+/**
+ * ODBIORCA PIENIEDZY za przypiete posty (Base Pay). To NIE jest brama
+ * uprawnien i celowo NIE jest tym samym co ADMIN_ADDRESS.
+ *
+ * Do 6 sierpnia 2026 obie wartosci byly identyczne. Uprawnienia admina
+ * przeniesiono wtedy na 0xD4885A...030e, a ten adres zostal - bo "kto moze
+ * moderowac" i "na jakie konto wplywaja platnosci" to dwie osobne decyzje
+ * i wlasciciel podjal tylko pierwsza.
+ *
+ * NIE ZMIENIAJ tego "dla spojnosci" z ADMIN_ADDRESS. Zmiana tej stalej
+ * przekierowuje prawdziwe pieniadze na inny portfel i wymaga osobnej decyzji.
+ */
 const MYSPHERE_ADDRESS = '0xF1fa20027b6202bc18e4454149C85CB01dC91Dfd';
+
+// Pin jest kupowany i rozliczany wylacznie na Base Mainnet.
+const PIN_CHAIN_ID = PAID_PIN_CONTRACT_CONFIG.chainId;
+
+// Base Pay potrafi wisiec w 'pending'. Bez limitu odpytywalismy w nieskonczonosc.
+const BASE_PAY_POLL_INTERVAL_MS = 2000;
+const BASE_PAY_POLL_TIMEOUT_MS = 5 * 60 * 1000;
+
+/** Co uzytkownik faktycznie kupil - zamrozone w chwili platnosci. */
+interface PinOrder {
+  duration: PinDuration;
+  amount: string;
+}
 
 
 interface PaidPinModalProps {
@@ -39,128 +64,294 @@ export default function PaidPinModal({
 }: PaidPinModalProps) {
   const { address, chain } = useAccount();
   const { data: balance } = useBalance({ address });
-  const { switchChain } = useSwitchChain();
-  
+  const { switchChainAsync } = useSwitchChain();
+
   const [selectedDuration, setSelectedDuration] = useState<PinDuration>('HOURS_24');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [currentEthPrice, setCurrentEthPrice] = useState(2500); // Mock
-  
-  const { data: hash, writeContract, isPending, error: contractError } = useWriteContract();
 
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ 
-    hash, 
+  const { data: hash, writeContractAsync } = useWriteContract();
+
+  // Paragon czytamy zawsze z Base - inaczej po recznej zmianie sieci w portfelu
+  // czekalibysmy na potwierdzenie na lancuchu, na ktorym transakcji nie ma.
+  //
+  // UWAGA: `isSuccess` z tego hooka znaczy "udalo sie POBRAC paragon", a nie
+  // "transakcja sie powiodla". Cofnieta transakcja tez ma paragon, tylko ze
+  // `status: 'reverted'` - i wlasnie dlatego pin byl zapisywany po transakcji,
+  // ktora nic nie zaplacila. O sukcesie decyduje `receipt.status`.
+  const {
+    data: receipt,
+    isLoading: isConfirming,
+    isError: isReceiptError,
+    error: receiptError,
+  } = useWaitForTransactionReceipt({
+    hash,
+    chainId: PIN_CHAIN_ID,
   });
 
+  // Zamowienie zamrozone w chwili wyslania platnosci. Bez tego zmiana wyboru
+  // w trakcie potwierdzania zapisywala do Firestore inny czas niz oplacony.
+  const paidOrderRef = useRef<PinOrder | null>(null);
+  // Jedna transakcja = jeden zapis pinu, nawet gdy hook przeliczy paragon ponownie.
+  const recordedHashRef = useRef<string | null>(null);
+  const isMountedRef = useRef(true);
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
-    if (isConfirming) {
+    return () => {
+      isMountedRef.current = false;
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (hash && isConfirming) {
       toast.loading('Processing transaction... Please wait.', { id: hash });
     }
-    if (isConfirmed) {
-      toast.success('Transaction successful! Your post will be pinned in ~5 minutes.', { id: hash, duration: 6000 });
-      // The actual pin creation logic will now be triggered here
-      handleFirebasePinning();
-    }
-    if (contractError) {
-      toast.error(contractError.message || 'Transaction failed.', { id: hash });
+  }, [hash, isConfirming]);
+
+  useEffect(() => {
+    if (!hash || !receipt) return;
+    if (recordedHashRef.current === hash) return;
+    recordedHashRef.current = hash;
+
+    if (receipt.status !== 'success') {
+      // Transakcja weszla na lancuch i sie cofnela - nic nie zostalo zaplacone,
+      // wiec nic nie zapisujemy.
+      paidOrderRef.current = null;
+      toast.error(
+        `Transaction reverted on-chain - the post was not pinned and nothing was charged. Transaction: ${hash}`,
+        { id: hash, duration: 10000 }
+      );
       setIsProcessing(false);
+      return;
     }
-  }, [isConfirming, isConfirmed, contractError, hash]);
-  
-  const handleFirebasePinning = async () => {
-    if (!hash || !address || !chain) return;
-    
+
+    toast.success('Transaction successful! Your post will be pinned in ~5 minutes.', { id: hash, duration: 6000 });
+    void recordPaidPin(hash, paidOrderRef.current);
+    // recordPaidPin czyta wylacznie zamrozone zamowienie i propsy, wiec nie
+    // potrzebuje byc zaleznoscia efektu.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hash, receipt]);
+
+  /**
+   * Paragonu nie da sie pobrac (padl RPC, uzytkownik stracil siec). Bez tego
+   * `isProcessing` zostawalo prawda na zawsze, a przycisk pokazywal
+   * "Processing..." do przeladowania strony - mimo ze transakcja mogla sie
+   * juz dawno potwierdzic.
+   */
+  useEffect(() => {
+    if (!hash || !isReceiptError) return;
+    if (recordedHashRef.current === hash) return;
+    recordedHashRef.current = hash;
+
+    console.error('Failed to read pin transaction receipt:', receiptError);
+    toast.error(
+      `We lost track of your transaction before it was confirmed. Check it in the explorer and keep the hash: ${hash}`,
+      { id: hash, duration: 10000 }
+    );
+    setIsProcessing(false);
+  }, [hash, isReceiptError, receiptError]);
+
+  /** Zapis pinu po potwierdzonej platnosci. Uzywa zamrozonego zamowienia. */
+  const recordPaidPin = async (txHash: string, order: PinOrder | null) => {
+    if (!address || !order) {
+      // Pieniadze juz poszly - uzytkownik musi dostac dowod, a nie ciszę.
+      toast.error(
+        `Payment confirmed but the pin could not be saved. Keep this transaction: ${txHash}`,
+        { id: txHash, duration: 10000 }
+      );
+      setIsProcessing(false);
+      return;
+    }
+
     const success = await createPaidPin(
       postId,
       address,
-      selectedDuration,
-      hash,
-      selectedPrice.ethAmount,
-      chain.id
+      order.duration,
+      txHash,
+      order.amount,
+      PIN_CHAIN_ID
     );
 
     if (success) {
-      toast.success('Post pinned successfully!', { id: hash });
-      if (onPinSuccess) {
-        onPinSuccess(hash, selectedDuration);
-      }
-    } else {
-      toast.error('Failed to save pin data to Firebase.', { id: hash });
+      toast.success('Post pinned successfully!', { id: txHash });
+      onPinSuccess?.(txHash, order.duration);
+      setIsProcessing(false);
+      onClose();
+      return;
     }
+
+    toast.error(
+      `Payment confirmed but saving the pin failed. Keep this transaction: ${txHash}`,
+      { id: txHash, duration: 10000 }
+    );
     setIsProcessing(false);
-    onClose();
   };
 
   // Function to ensure we're on Base network before transaction
-  const ensureBaseNetwork = async () => {
-    const BASE_CHAIN_ID = 8453;
-    if (chain?.id !== BASE_CHAIN_ID) {
-      try {
-        console.log('🔄 Switching to Base network...');
-        await switchChain({ chainId: BASE_CHAIN_ID });
-        console.log('✅ Switched to Base network');
-        return true;
-      } catch (error) {
-        console.error('❌ Failed to switch to Base network:', error);
-        toast.error('Please switch to Base network manually');
-        return false;
-      }
+  const ensureBaseNetwork = async (): Promise<boolean> => {
+    if (chain?.id === PIN_CHAIN_ID) return true;
+
+    try {
+      // switchChainAsync, nie switchChain: wariant synchroniczny nie odrzuca
+      // obietnicy, wiec odmowa w portfelu przechodzila jako sukces i platnosc
+      // szla na zla siec.
+      await switchChainAsync({ chainId: PIN_CHAIN_ID });
+      return true;
+    } catch (error) {
+      console.error('Failed to switch to Base network:', error);
+      toast.error('Please switch to Base network manually');
+      return false;
     }
-    return true;
   };
 
   const handlePayAndPin = async () => {
     if (!address || !canPin || !hasEnoughBalance || isProcessing) return;
-    
+
+    setIsProcessing(true);
+
     try {
-      setIsProcessing(true);
-      
       // Ensure we're on Base network first
       const switched = await ensureBaseNetwork();
       if (!switched) {
         setIsProcessing(false);
         return;
       }
-      
+
       const canPostBePinned = await canPinPost(postId);
       if (!canPostBePinned) {
         toast.error('This post is already pinned or cannot be pinned');
         setIsProcessing(false);
         return;
       }
-      
-      console.log("🚀 Calling smart contract...");
-      writeContract({
+
+      const order: PinOrder = { duration: selectedDuration, amount: selectedPrice.ethAmount };
+      paidOrderRef.current = order;
+      recordedHashRef.current = null;
+
+      await writeContractAsync({
         address: PAID_PIN_CONTRACT_CONFIG.address as `0x${string}`,
         abi: PAID_PIN_CONTRACT_ABI,
         functionName: 'pinPost',
-        args: [postId, getContractDuration(selectedDuration)],
-        value: parseEther(selectedPrice.ethAmount)
+        args: [postId, toContractDuration(order.duration)],
+        value: parseEther(order.amount),
+        // Wymus lancuch takze na poziomie wagmi - portfel mogl przelaczyc siec
+        // miedzy sprawdzeniem a podpisem.
+        chainId: PIN_CHAIN_ID,
       });
-      // Logic continues in the useEffect hook watching for transaction status
-      
+      // Dalszy ciag w efekcie obserwujacym potwierdzenie transakcji.
+
     } catch (error) {
+      paidOrderRef.current = null;
       console.error('Error initiating pin transaction:', error);
-      toast.error('Failed to start transaction. Please try again.');
+      // Surowy `error.message` z viem to kilkanascie linii z docs URL i pelnymi
+      // argumentami wywolania. Odmowa podpisu nie jest awaria - nie pokazujemy
+      // jej na czerwono.
+      const info = describeWalletError(error, { network: 'Base', gasSymbol: 'ETH' });
+      if (info.isFailure) {
+        toast.error(info.message || 'Failed to start transaction. Please try again.');
+      } else {
+        toast(info.message);
+      }
       setIsProcessing(false);
     }
   };
-  
-  // Map internal duration to contract enum
-  const getContractDuration = (duration: PinDuration): number => {
-    const mapping: Record<PinDuration, number> = {
-      'HOUR_1': ContractPinDuration.HOUR_1,
-      'HOURS_6': ContractPinDuration.HOURS_6, 
-      'HOURS_24': ContractPinDuration.HOURS_24,
-      'DAYS_7': ContractPinDuration.DAYS_7
-    };
-    return mapping[duration];
+
+  /** Odpytuje Base Pay o status platnosci do skutku albo do limitu czasu. */
+  const waitForBasePayment = async (paymentId: string): Promise<void> => {
+    const deadline = Date.now() + BASE_PAY_POLL_TIMEOUT_MS;
+
+    while (Date.now() < deadline) {
+      await new Promise<void>(resolve => {
+        pollTimerRef.current = setTimeout(resolve, BASE_PAY_POLL_INTERVAL_MS);
+      });
+      if (!isMountedRef.current) return;
+
+      // `status` czytamy w try (blad sieci nie moze przerwac pilnowania
+      // oplaconej platnosci), ale decyzje podejmujemy JUZ POZA nim. Wczesniej
+      // `throw new Error('Payment failed')` stalo w srodku try i wpadalo we
+      // wlasny catch: odrzucona platnosc byla odpytywana dalej przez pelne
+      // piec minut i konczyla sie komunikatem "confirmation timed out",
+      // czyli nie ta przyczyna.
+      let status: string | undefined;
+      try {
+        ({ status } = await getPaymentStatus({ id: paymentId, testnet: false }));
+      } catch (error) {
+        console.error('Error checking payment status:', error);
+      }
+
+      if (!isMountedRef.current) return;
+      if (status === 'completed') return;
+      if (status === 'failed') throw new Error('Payment was rejected by Base Pay');
+    }
+
+    throw new Error('Payment confirmation timed out');
   };
-  
+
+  const handleBasePayAndPin = async () => {
+    if (!address || !canPin || isProcessing) return;
+
+    setIsProcessing(true);
+
+    try {
+      const switched = await ensureBaseNetwork();
+      if (!switched) {
+        setIsProcessing(false);
+        return;
+      }
+
+      const canPostBePinned = await canPinPost(postId);
+      if (!canPostBePinned) {
+        toast.error('This post is already pinned or cannot be pinned');
+        setIsProcessing(false);
+        return;
+      }
+
+      const order: PinOrder = { duration: selectedDuration, amount: selectedPrice.usdcAmount.toString() };
+
+      const paymentResult = await pay({
+        amount: order.amount,
+        to: MYSPHERE_ADDRESS,
+        testnet: false
+      });
+
+      // Bezpieczne wydobycie ID z różnych możliwych struktur PaymentResult
+      const paymentId = String(
+        (paymentResult as any)?.id ||
+        (paymentResult as any)?.paymentId ||
+        (paymentResult as any)?.transactionId ||
+        paymentResult
+      );
+
+      await waitForBasePayment(paymentId);
+      if (!isMountedRef.current) return;
+
+      const success = await createPaidPin(postId, address, order.duration, paymentId, order.amount, PIN_CHAIN_ID);
+      if (!isMountedRef.current) return;
+
+      if (success) {
+        toast.success(`Post pinned for $${selectedPrice.usdcAmount.toFixed(2)} USDC via Base Pay! 🎉`);
+        onPinSuccess?.(paymentId, order.duration);
+        setIsProcessing(false);
+        onClose();
+        return;
+      }
+
+      toast.error(`Payment confirmed but saving the pin failed. Keep this payment id: ${paymentId}`, { duration: 10000 });
+      setIsProcessing(false);
+    } catch (error) {
+      if (!isMountedRef.current) return;
+      console.error('Base Pay error:', error);
+      toast.error(`Base Pay failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setIsProcessing(false);
+    }
+  };
+
   const durations = getAllDurations();
-  const selectedPrice = calculateTotalCost(selectedDuration, currentEthPrice);
+  const selectedPrice = calculateTotalCost(selectedDuration);
   const expirationTime = calculateExpirationTime(selectedDuration);
-  
-  const isCorrectNetwork = chain?.id === PAID_PIN_CONTRACT_CONFIG.chainId;
+
+  const isCorrectNetwork = chain?.id === PIN_CHAIN_ID;
   const hasEnoughBalance = balance && parseFloat(balance.formatted) >= parseFloat(selectedPrice.ethAmount);
   const canPin = address && address.toLowerCase() === authorAddress.toLowerCase();
   
@@ -193,11 +384,22 @@ export default function PaidPinModal({
     };
   }, [isOpen]);
 
+  // Escape zamyka okno. Dotad jedynym wyjsciem bylo klikniecie myszka w tlo albo
+  // w krzyzyk - klawiatura zostawala uwieziona w oknie proszacym o pieniadze.
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return createPortal(
     <div 
-      className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-start sm:items-center justify-center z-[99999] p-2 sm:p-4 pt-4 sm:pt-4"
+      className="fixed inset-0 bg-soft-ink/50 backdrop-blur-sm flex items-start sm:items-center justify-center z-[99999] p-2 sm:p-4 pt-4 sm:pt-4"
       onClick={onClose}
       style={{ 
         isolation: 'isolate',
@@ -209,8 +411,11 @@ export default function PaidPinModal({
         bottom: 0
       }}
     >
-      <div 
-        className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-[92vw] sm:max-w-md max-h-[92vh] sm:max-h-[85vh] overflow-hidden flex flex-col"
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Pin your post"
+        className="bg-soft-surface rounded-card shadow-float font-soft w-full max-w-[92vw] sm:max-w-md max-h-[92vh] sm:max-h-[85vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
         style={{ 
           zIndex: 99999,
@@ -218,23 +423,24 @@ export default function PaidPinModal({
         }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-soft-line">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center">
-              <Crown className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 bg-soft-accent rounded-pill flex items-center justify-center">
+              <Crown className="w-5 h-5 text-soft-ink" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+              <h3 className="font-soft-display text-lg font-bold text-soft-ink">
                 Pin Your Post
               </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+              <p className="text-sm text-soft-ink-muted">
                 Get premium visibility
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            aria-label="Close pin dialog"
+            className="rounded-pill p-1 text-soft-ink-soft transition-[color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:text-soft-ink active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
           >
             <X className="w-6 h-6" />
           </button>
@@ -243,10 +449,10 @@ export default function PaidPinModal({
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto">
           {/* Post Preview */}
-          <div className="p-3 sm:p-6 border-b border-gray-200 dark:border-gray-700">
-            <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3 sm:p-4">
-              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">Post to pin:</p>
-              <p className="text-sm sm:text-base text-gray-900 dark:text-white line-clamp-2 sm:line-clamp-3">
+          <div className="p-3 sm:p-6 border-b border-soft-line">
+            <div className="bg-soft-sunken rounded-card p-3 sm:p-4">
+              <p className="text-xs sm:text-sm text-soft-ink-muted mb-2">Post to pin:</p>
+              <p className="text-sm sm:text-base text-soft-ink line-clamp-2 sm:line-clamp-3">
                 {postContent}
               </p>
             </div>
@@ -256,50 +462,56 @@ export default function PaidPinModal({
 
           {/* Duration Selection */}
           <div className="p-3 sm:p-6">
-                      <h4 className="text-sm sm:text-md font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4">
+                      <h4 className="font-soft-display text-sm sm:text-md font-semibold text-soft-ink mb-3 sm:mb-4">
               Choose Duration
             </h4>
             
-            <div className="space-y-2 sm:space-y-3">
+            <div className="space-y-2 sm:space-y-3" role="radiogroup" aria-label="Pin duration">
             {durations.map((duration) => {
-              const cost = calculateTotalCost(duration.duration, currentEthPrice);
+              const cost = calculateTotalCost(duration.duration);
               const isSelected = selectedDuration === duration.duration;
-              
+
               return (
-                <div
+                <button
                   key={duration.duration}
-                  className={`relative border-2 rounded-lg sm:rounded-xl p-3 sm:p-4 cursor-pointer transition-all ${
+                  type="button"
+                  role="radio"
+                  aria-checked={isSelected}
+                  // Wybor jest zamrazany przy platnosci, ale blokada w trakcie
+                  // przetwarzania oszczedza uzytkownikowi mylacego widoku.
+                  disabled={isProcessing}
+                  className={`relative w-full text-left border-2 rounded-card p-3 sm:p-4 cursor-pointer transition-[background-color,border-color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.98] disabled:cursor-not-allowed disabled:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 ${
                     isSelected
-                      ? 'border-yellow-400 bg-yellow-50 dark:bg-yellow-900/20'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                      ? 'border-soft-accent bg-soft-accent-soft'
+                      : 'border-soft-line hover:border-soft-line-strong'
                   }`}
                   onClick={() => setSelectedDuration(duration.duration)}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       <div className={`w-4 h-4 rounded-full border-2 ${
-                        isSelected 
-                          ? 'border-yellow-400 bg-yellow-400' 
-                          : 'border-gray-300 dark:border-gray-600'
+                        isSelected
+                          ? 'border-soft-accent-deep bg-soft-accent-deep'
+                          : 'border-soft-line-strong'
                       }`}>
                         {isSelected && (
                           <div className="w-full h-full rounded-full bg-white scale-50"></div>
                         )}
                       </div>
                       <div>
-                        <p className="text-sm sm:text-base font-medium text-gray-900 dark:text-white">
+                        <p className="font-soft-display text-sm sm:text-base font-semibold text-soft-ink">
                           {duration.label}
                         </p>
-                        <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                        <p className="text-xs sm:text-sm text-soft-ink-muted">
                           {duration.description}
                         </p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm sm:text-base font-bold text-gray-900 dark:text-white">
+                      <p className="font-soft-display text-sm sm:text-base font-bold tabular-nums text-soft-ink">
                         {cost.ethAmount} ETH
                       </p>
-                      <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                      <p className="font-soft-display text-xs sm:text-sm tabular-nums text-soft-ink-muted">
                         ~${cost.usdAmount.toFixed(2)}
                       </p>
                     </div>
@@ -307,36 +519,36 @@ export default function PaidPinModal({
                   
                   {/* Popular badge dla 24h */}
                   {duration.duration === 'HOURS_24' && (
-                    <div className="absolute -top-2 -right-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white text-xs font-bold px-2 py-1 rounded-full">
+                    <div className="absolute -top-2 -right-2 bg-soft-primary text-white font-soft-display text-xs font-bold px-2.5 py-1 rounded-pill">
                       POPULAR
                     </div>
                   )}
-                </div>
+                </button>
               );
             })}
           </div>
 
           {/* Summary */}
-          <div className="mt-6 bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+          <div className="mt-6 bg-soft-sunken rounded-card p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Duration:</span>
-              <span className="font-medium text-gray-900 dark:text-white">
+              <span className="text-sm text-soft-ink-muted">Duration:</span>
+              <span className="font-soft-display font-semibold text-soft-ink">
                 {durations.find(d => d.duration === selectedDuration)?.label}
               </span>
             </div>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Expires at:</span>
-              <span className="font-medium text-gray-900 dark:text-white">
+              <span className="text-sm text-soft-ink-muted">Expires at:</span>
+              <span className="font-soft-display font-semibold tabular-nums text-soft-ink">
                 {new Date(expirationTime).toLocaleString()}
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Total cost:</span>
+              <span className="text-sm text-soft-ink-muted">Total cost:</span>
               <div className="text-right">
-                <span className="font-bold text-gray-900 dark:text-white">
+                <span className="font-soft-display font-bold tabular-nums text-soft-ink">
                   {selectedPrice.ethAmount} ETH
                 </span>
-                <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">
+                <span className="font-soft-display text-sm tabular-nums text-soft-ink-muted ml-2">
                   (~${selectedPrice.usdAmount.toFixed(2)})
                 </span>
               </div>
@@ -346,11 +558,11 @@ export default function PaidPinModal({
           {/* Balance Check */}
           {balance && (
             <div className="mt-4 flex items-center justify-between text-sm">
-              <span className="text-gray-600 dark:text-gray-400">Your balance:</span>
-              <span className={`font-medium ${
-                hasEnoughBalance 
-                  ? 'text-green-600 dark:text-green-400' 
-                  : 'text-red-600 dark:text-red-400'
+              <span className="text-soft-ink-muted">Your balance:</span>
+              <span className={`font-soft-display font-semibold tabular-nums ${
+                hasEnoughBalance
+                  ? 'text-soft-ink'
+                  : 'text-red-700'
               }`}>
                 {parseFloat(balance.formatted).toFixed(4)} ETH
               </span>
@@ -358,15 +570,15 @@ export default function PaidPinModal({
           )}
 
           {/* Action Buttons */}
-          <div className="p-4 sm:p-6 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+          <div className="p-4 sm:p-6 bg-soft-sunken border-t border-soft-line">
           {/* ETH Payment Button */}
           <button
             onClick={handlePayAndPin}
             disabled={buttonState.disabled}
-            className={`w-full py-3 mt-4 font-bold text-white rounded-lg transition-all 
-              ${buttonState.disabled 
-                ? 'bg-gray-600 cursor-not-allowed' 
-                : 'bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 transform hover:scale-105'}`
+            className={`w-full py-3 mt-4 font-soft-display font-bold rounded-pill transition-[background-color,box-shadow,transform] [transition-duration:var(--dur-press)] ease-out-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2
+              ${buttonState.disabled
+                ? 'bg-soft-line text-soft-ink-soft cursor-not-allowed'
+                : 'bg-soft-accent text-soft-ink shadow-chip hover:shadow-float active:scale-[0.97]'}`
             }
           >
             {buttonState.text}
@@ -375,106 +587,32 @@ export default function PaidPinModal({
           {/* Base Pay Button - 50% cheaper alternative */}
           <div className="mt-4">
             <div className="text-center mb-2">
-              <span className="text-xs text-gray-600 dark:text-gray-400">Or pay with Base Pay </span>
-              <span className="text-xs text-green-600 dark:text-green-400 font-semibold">(50% cheaper - ${selectedPrice.usdcAmount.toFixed(2)} USDC!)</span>
+              <span className="text-xs text-soft-ink-muted">Or pay with Base Pay </span>
+              <span className="text-xs text-soft-accent-deep font-semibold">(50% cheaper - ${selectedPrice.usdcAmount.toFixed(2)} USDC!)</span>
             </div>
-            <BasePayButton
-              colorScheme="light"
-              onClick={async () => {
-                try {
-                  // Ensure we're on Base network first
-                  const switched = await ensureBaseNetwork();
-                  if (!switched) {
-                    return;
-                  }
-                  
-                  setIsProcessing(true);
-                  
-                  const canPostBePinned = await canPinPost(postId);
-                  if (!canPostBePinned) {
-                    toast.error('This post is already pinned or cannot be pinned');
-                    setIsProcessing(false);
-                    return;
-                  }
-                  
-                  const paymentResult = await pay({
-                    amount: selectedPrice.usdcAmount.toString(),
-                    to: MYSPHERE_ADDRESS,
-                    testnet: false
-                  });
-                  
-                  // Bezpieczne wydobycie ID z różnych możliwych struktur PaymentResult
-                  const id = (paymentResult as any)?.id || 
-                            (paymentResult as any)?.paymentId || 
-                            (paymentResult as any)?.transactionId || 
-                            paymentResult;
-                  
-                  // Poll for transaction status
-                  const pollStatus = async () => {
-                    try {
-                      const { status } = await getPaymentStatus({ 
-                        id,
-                        testnet: false
-                      });
-                      
-                      if (status === 'completed') {
-                        // Zapisz do Firebase tak samo jak ETH pin
-                        const success = await createPaidPin(
-                          postId,
-                          address!,
-                          selectedDuration,
-                          id, // Base Pay transaction ID
-                          selectedPrice.usdcAmount.toString(),
-                          chain?.id || 8453
-                        );
-
-                        if (success) {
-                          toast.success(`Post pinned for $${selectedPrice.usdcAmount.toFixed(2)} USDC via Base Pay! 🎉`);
-                          if (onPinSuccess) {
-                            onPinSuccess(id, selectedDuration);
-                          }
-                          onClose();
-                        } else {
-                          toast.error('Failed to create pin record');
-                        }
-                        setIsProcessing(false);
-                      } else if (status === 'failed') {
-                        throw new Error('Payment failed');
-                      } else {
-                        setTimeout(pollStatus, 2000);
-                      }
-                    } catch (error) {
-                      console.error('Error checking payment status:', error);
-                      toast.error('Failed to verify payment status');
-                      setIsProcessing(false);
-                    }
-                  };
-                  
-                  setTimeout(pollStatus, 1000);
-                  
-                } catch (error) {
-                  console.error('Base Pay error:', error);
-                  const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-                  toast.error(`Base Pay failed: ${errorMessage}`);
-                  setIsProcessing(false);
-                }
-              }}
-            />
+            {/* BasePayButton nie przyjmuje `disabled`, wiec blokujemy wrapperem
+                i strazą w handlerze - inaczej drugie kliknieciu placilo drugi raz. */}
+            <div className={isProcessing || !canPin ? 'pointer-events-none opacity-50' : ''}>
+              <BasePayButton
+                colorScheme="light"
+                onClick={handleBasePayAndPin}
+              />
+            </div>
           </div>
 
-          <p className="text-center text-gray-500 mt-4 text-xs">
+          <p className="text-center text-soft-ink-soft mt-4 text-xs">
             Pinning is only available on Base Mainnet.
           </p>
-          
+
           {!isCorrectNetwork && (
-            <p className="text-center text-red-500 mt-2 text-sm">
+            <p className="text-center text-red-700 mt-2 text-sm">
               Please switch to Base Mainnet to pin posts.
             </p>
           )}
           </div>
 
           {/* Help text */}
-          <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-3">
+          <p className="text-xs text-soft-ink-soft text-center mt-3">
             Your post will be featured at the top of the feed for the selected duration
           </p>
         </div>

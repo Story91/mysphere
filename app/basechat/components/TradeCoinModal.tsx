@@ -38,16 +38,22 @@ interface TradeCoinModalProps {
   isOpen: boolean;
   onClose: () => void;
   coin: CreatorCoinData;
-  userBalance?: string;
+  /**
+   * Saldo w tej monecie. `null`/brak = NIE ODCZYTANO.
+   *
+   * Domyslne '0' bylo tu klamstwem o cudzych pieniadzach: nieodczytane saldo
+   * rysowalo "Balance: 0", a przycisk MAX wpisywal zero do pola sprzedazy.
+   */
+  userBalance?: string | null;
   mode?: 'buy' | 'sell';
   onTradeSuccess?: () => void;
 }
 
-export default function TradeCoinModal({ 
-  isOpen, 
-  onClose, 
-  coin, 
-  userBalance = '0',
+export default function TradeCoinModal({
+  isOpen,
+  onClose,
+  coin,
+  userBalance = null,
   mode: initialMode = 'buy',
   onTradeSuccess
 }: TradeCoinModalProps) {
@@ -55,7 +61,9 @@ export default function TradeCoinModal({
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
   
-  const [mode] = useState<'buy' | 'sell'>(initialMode);
+  // Tryb ustala rodzic przy otwarciu i nigdy sie nie zmienia w trakcie zycia
+  // modala - to byl useState bez settera, czyli stala udajaca stan.
+  const mode = initialMode;
   const [amount, setAmount] = useState('');
   const [slippage, setSlippage] = useState(0.05);
   const [isLoading, setIsLoading] = useState(false);
@@ -69,7 +77,22 @@ export default function TradeCoinModal({
     }
   }, [isOpen]);
 
-  const estimateOutput = useCallback(async () => {
+  /** Jedna definicja zlecenia - wczesniej ten sam obiekt byl budowany osobno
+   *  do wyceny i osobno do transakcji, z ryzykiem rozjechania sie parametrow. */
+  const buildTradeParams = useCallback((amountIn: bigint): TradeParameters => {
+    const coinAsset = { type: 'erc20' as const, address: coin.address as `0x${string}` };
+    const ethAsset = { type: 'eth' as const };
+
+    return {
+      sell: mode === 'buy' ? ethAsset : coinAsset,
+      buy: mode === 'buy' ? coinAsset : ethAsset,
+      amountIn,
+      slippage,
+      sender: address as `0x${string}`,
+    };
+  }, [mode, coin.address, slippage, address]);
+
+  const estimateOutput = useCallback(async (isStale: () => boolean) => {
     if (!amount || parseFloat(amount) <= 0 || !address || !publicClient) {
       setEstimatedOutput(null);
       return;
@@ -77,39 +100,33 @@ export default function TradeCoinModal({
 
     setIsEstimating(true);
     try {
-      const amountIn = parseEther(amount);
+      const quote = await createTradeCall(buildTradeParams(parseEther(amount)));
+      // Wycena dla poprzedniej kwoty nie moze wygrac z biezaca - inaczej po
+      // szybkiej zmianie pola uzytkownik widzial kurs dla innej liczby.
+      if (isStale()) return;
 
-      const tradeParams: TradeParameters = {
-        sell: mode === 'buy' 
-          ? { type: 'eth' as const }
-          : { type: 'erc20' as const, address: coin.address as `0x${string}` },
-        buy: mode === 'buy'
-          ? { type: 'erc20' as const, address: coin.address as `0x${string}` }
-          : { type: 'eth' as const },
-        amountIn,
-        slippage,
-        sender: address as `0x${string}`,
-      };
-
-      const quote = await createTradeCall(tradeParams);
-      
       if (quote?.quote?.amountOut) {
-        const formatted = formatUnits(BigInt(quote.quote.amountOut), 18);
-        setEstimatedOutput(formatted);
+        setEstimatedOutput(formatUnits(BigInt(quote.quote.amountOut), 18));
       }
     } catch (error) {
+      if (isStale()) return;
       console.error('Error estimating output:', error);
       setEstimatedOutput(null);
     } finally {
-      setIsEstimating(false);
+      if (!isStale()) setIsEstimating(false);
     }
-  }, [amount, mode, coin.address, address, publicClient, slippage]);
+  }, [amount, address, publicClient, buildTradeParams]);
 
   useEffect(() => {
+    let stale = false;
     const debounce = setTimeout(() => {
-      estimateOutput();
+      estimateOutput(() => stale);
     }, 500);
-    return () => clearTimeout(debounce);
+
+    return () => {
+      stale = true;
+      clearTimeout(debounce);
+    };
   }, [estimateOutput]);
 
   const handleTrade = async () => {
@@ -124,31 +141,25 @@ export default function TradeCoinModal({
       return;
     }
 
-    if (mode === 'sell' && parseFloat(userBalance) < amountNum) {
-      toast.error('Insufficient balance');
-      return;
+    if (mode === 'sell') {
+      // Nie sprzedajemy w ciemno. Nieznane saldo to nie jest "za malo" - to
+      // brak podstawy, zeby cokolwiek twierdzic o cudzym portfelu.
+      if (userBalance === null) {
+        toast.error('We could not read your balance. Reopen this window and try again.');
+        return;
+      }
+      if (parseFloat(userBalance) < amountNum) {
+        toast.error('Insufficient balance');
+        return;
+      }
     }
 
     setIsLoading(true);
     const toastId = toast.loading(`${mode === 'buy' ? 'Buying' : 'Selling'} ${coin.symbol}...`);
 
     try {
-      const amountIn = parseEther(amount);
+      const quote = await createTradeCall(buildTradeParams(parseEther(amount)));
 
-      const tradeParams: TradeParameters = {
-        sell: mode === 'buy' 
-          ? { type: 'eth' as const }
-          : { type: 'erc20' as const, address: coin.address as `0x${string}` },
-        buy: mode === 'buy'
-          ? { type: 'erc20' as const, address: coin.address as `0x${string}` }
-          : { type: 'eth' as const },
-        amountIn,
-        slippage,
-        sender: address as `0x${string}`,
-      };
-
-      const quote = await createTradeCall(tradeParams);
-      
       if (!quote?.call) {
         throw new Error('Failed to get trade quote');
       }
@@ -265,7 +276,8 @@ export default function TradeCoinModal({
               <span>{isBuy ? 'Amount in ETH' : `Amount in ${coin.symbol}`}</span>
               {!isBuy && (
                 <span className="text-xs text-slate-500">
-                  Balance: {formatCompactNumber(parseFloat(userBalance))}
+                  {/* Kreska, nie zero - salda nie odczytano. */}
+                  Balance: {userBalance === null ? '—' : formatCompactNumber(parseFloat(userBalance))}
                 </span>
               )}
             </label>
@@ -285,7 +297,8 @@ export default function TradeCoinModal({
                 )}
               />
               <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                {!isBuy && (
+                {/* MAX bez znanego salda wpisywalby zero - lepiej go nie dawac. */}
+                {!isBuy && userBalance !== null && (
                   <button
                     onClick={() => setAmount(userBalance)}
                     className="text-xs font-medium text-slate-400 hover:text-white transition-colors px-2 py-1 rounded bg-slate-700/50 hover:bg-slate-700"
@@ -331,7 +344,8 @@ export default function TradeCoinModal({
               </div>
             ) : (
               <div className="flex gap-2">
-                {[25, 50, 75, 100].map((percent) => {
+                {/* Procenty licza sie Z SALDA - bez salda nie ma z czego. */}
+                {userBalance !== null && [25, 50, 75, 100].map((percent) => {
                   const value = (parseFloat(userBalance) * percent / 100).toString();
                   return (
                     <button

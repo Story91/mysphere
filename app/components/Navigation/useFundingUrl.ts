@@ -6,10 +6,10 @@ import { useAccount } from 'wagmi';
 /**
  * Zwraca gotowy URL Coinbase Onramp dla podlaczonego adresu albo `undefined`.
  *
- * `undefined` oznacza "nie wiemy / nie skonfigurowane" - wtedy przekazujemy
- * sterowanie z powrotem do OnchainKit, ktory dla Coinbase Smart Walleta i tak
- * zbuduje wlasny link do keys.coinbase.com. Dzieki temu wlaczenie Onrampu
- * poprawia sytuacje EOA, a niczego nie psuje smart walletom.
+ * `undefined` oznacza "nie wiemy / nie skonfigurowane". Jedyny konsument
+ * (WalletButton) po prostu NIE POKAZUJE wtedy wiersza "Add funds" - martwy
+ * link jest gorszy niz jego brak. Smart wallety maja i tak swoja sciezke
+ * doladowania w keys.coinbase.com, dostepna z wiersza "Wallet" wyzej.
  */
 export function useFundingUrl(): string | undefined {
   const { address, isConnected } = useAccount();

@@ -1,12 +1,26 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Notification, NotificationType } from '../../utils/friends';
 import { useSocial } from './hooks';
 
 // ===============================================
 // 🔔 NOTIFICATIONS VIEW COMPONENT
 // ===============================================
+
+/**
+ * Trasy, ktore ten produkt NAPRAWDE serwuje.
+ *
+ * `actionUrl` bylo tu martwe: warunek `if (notification.actionUrl)` sprawdzal
+ * jego istnienie i nie uzywal go do niczego - klikniecie zawsze otwieralo
+ * profil nadawcy. Nie da sie jednak po prostu przechodzic pod kazdy
+ * `actionUrl`, bo czesc powiadomien wskazuje adresy, ktorych w app/ nie ma
+ * (/profile/{id}, /friends/requests, /achievements) - przeslanie tam
+ * zamienialoby dzialajacy panel profilu na 404. Wiec: przechodzimy tam, gdzie
+ * jest co pokazac, a dla reszty zostaje dotychczasowe zachowanie.
+ */
+const NAVIGABLE_ACTION_PREFIXES = ['/money', '/asks', '/post/', '/u/'];
 
 interface NotificationsViewProps {
   currentUserAddress: string;
@@ -27,8 +41,25 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
     markAllNotificationsAsRead
   } = useSocial(currentUserAddress);
 
+  const router = useRouter();
   const [filterType, setFilterType] = useState<NotificationType | 'all'>('all');
   const [showOnlyUnread, setShowOnlyUnread] = useState(false);
+  const [markingAll, setMarkingAll] = useState(false);
+
+  /**
+   * Przycisk byl podpiety wprost pod markAllNotificationsAsRead i zostawal
+   * aktywny na czas zapytania - dwa szybkie klikniecia wysylaly dwie serie
+   * zapisow do Firestore. Teraz drugie klikniecie nie ma czego wyslac.
+   */
+  const handleMarkAllAsRead = async () => {
+    if (markingAll) return;
+    setMarkingAll(true);
+    try {
+      await markAllNotificationsAsRead();
+    } finally {
+      setMarkingAll(false);
+    }
+  };
 
   // Filter notifications
   const filteredNotifications = notifications.filter(notification => {
@@ -67,24 +98,21 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
   const getNotificationColor = (type: NotificationType) => {
     switch (type) {
       case 'LIKE':
-        return 'text-red-500';
+        return 'text-red-600';
       case 'COMMENT':
-        return 'text-blue-500';
       case 'FOLLOW':
-        return 'text-purple-500';
+        return 'text-soft-primary-deep';
       case 'FRIEND_REQUEST':
       case 'FRIEND_REQUEST_ACCEPTED':
-        return 'text-green-500';
+        return 'text-soft-primary-deep';
       case 'TIP_RECEIVED':
-        return 'text-yellow-500';
       case 'POST_PINNED':
-        return 'text-indigo-500';
       case 'ACHIEVEMENT':
-        return 'text-orange-500';
+        return 'text-soft-accent-deep';
       case 'SYSTEM':
-        return 'text-gray-500';
+        return 'text-soft-ink-soft';
       default:
-        return 'text-gray-500';
+        return 'text-soft-ink-soft';
     }
   };
 
@@ -95,12 +123,16 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
       await markNotificationAsRead(notification.id!);
     }
 
-    // Handle action URL or user click
-    if (notification.actionUrl) {
-      // For now, just handle user clicks
-      if (notification.fromUserId && onUserClick) {
-        onUserClick(notification.fromUserId);
-      }
+    const actionUrl = notification.actionUrl;
+    if (actionUrl && NAVIGABLE_ACTION_PREFIXES.some((prefix) => actionUrl.startsWith(prefix))) {
+      // Powiadomienie o pieniadzach prowadzi na /money, gdzie stoi przycisk
+      // odbioru - inaczej mowiloby "odbierz" i nie pokazywalo gdzie.
+      router.push(actionUrl);
+      return;
+    }
+
+    if (notification.fromUserId && onUserClick) {
+      onUserClick(notification.fromUserId);
     }
   };
 
@@ -108,8 +140,8 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
     return (
       <div className="space-y-4">
         <div className="text-center py-8">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading notifications...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-soft-primary mx-auto"></div>
+          <p className="mt-4 font-soft text-soft-ink-muted">Loading notifications...</p>
         </div>
       </div>
     );
@@ -130,41 +162,53 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Header with stats */}
-      <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl p-6 text-white">
-        <h2 className="text-2xl font-bold mb-2">🔔 Notifications</h2>
-        <div className="flex items-center gap-6">
-          <div className="text-center">
-            <div className="text-3xl font-bold">{notificationsSummary?.total || 0}</div>
-            <div className="text-blue-100">Total</div>
+      {/* ===== NAGLOWEK EKRANU, NIE KARTA Z EMOTKA =====
+          Cztery widoki z lewej nawigacji zaczynaly sie identycznie: biala
+          karta, w niej emotka z tytulem i trzy wielkie liczby na srodku.
+          Ten sam szablon cztery razy - a karta byla naglowkiem kolumny, ktora
+          i tak stoi sama na tle strony, wiec ramka niczego nie oddzielala
+          od niczego.
+
+          Teraz tytul jest tytulem: stoi wprost na tle, a liczby ida w jednym
+          rzedzie pod nim, oddzielone wlosowa linia. Ten sam jezyk co panel
+          Trends w prawej kolumnie - liczba po prawej, podpis wersalikami. */}
+      <div className="font-soft">
+        <h2 className="font-soft-display text-[26px] font-bold leading-none text-soft-ink">Notifications</h2>
+        <div className="mt-4 flex items-center gap-6 border-t border-soft-line pt-4">
+          <div>
+            <div className="font-soft-display text-[22px] font-bold tabular-nums text-soft-ink">{notificationsSummary?.total || 0}</div>
+            <div className="mt-0.5 font-soft text-[11px] font-semibold uppercase tracking-[0.07em] text-soft-ink-soft">Total</div>
           </div>
-          <div className="text-center">
-            <div className="text-3xl font-bold">{unreadCount}</div>
-            <div className="text-blue-100">Unread</div>
+          <div>
+            {/* Kreska, nie zero - licznika nie odczytano. */}
+            <div className="font-soft-display text-[22px] font-bold tabular-nums text-soft-primary-deep">{unreadCount === null ? '—' : unreadCount}</div>
+            <div className="mt-0.5 font-soft text-[11px] font-semibold uppercase tracking-[0.07em] text-soft-ink-soft">Unread</div>
           </div>
-          <div className="text-center">
-            <div className="text-3xl font-bold">{notificationsSummary?.recent.length || 0}</div>
-            <div className="text-blue-100">Recent</div>
+          <div>
+            <div className="font-soft-display text-[22px] font-bold tabular-nums text-soft-ink">{notificationsSummary?.recent.length || 0}</div>
+            <div className="mt-0.5 font-soft text-[11px] font-semibold uppercase tracking-[0.07em] text-soft-ink-soft">Recent</div>
           </div>
         </div>
       </div>
 
       {/* Controls */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm">
+      <div className="bg-soft-surface border border-soft-line rounded-card p-4 shadow-card font-soft">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           {/* Filters */}
           <div className="flex items-center gap-2">
             <select
               value={filterType}
               onChange={(e) => setFilterType(e.target.value as NotificationType | 'all')}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="px-3 py-2 border border-soft-line rounded-pill bg-soft-surface text-soft-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
             >
                                 <option value="all">All Types</option>
                   <option value="LIKE">Likes</option>
                   <option value="COMMENT">Comments</option>
                   <option value="FOLLOW">Follows</option>
                   <option value="FRIEND_REQUEST">Friend Requests</option>
-                  <option value="TIP_RECEIVED">Tips</option>
+                  {/* Ta polka to nie tylko napiwki - leza na niej takze
+                      wyplaty za przyjete odpowiedzi na Aski (notifyAskPayout). */}
+                  <option value="TIP_RECEIVED">Money</option>
                   <option value="SYSTEM">System</option>
             </select>
 
@@ -173,19 +217,20 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                 type="checkbox"
                 checked={showOnlyUnread}
                 onChange={(e) => setShowOnlyUnread(e.target.checked)}
-                className="rounded border-gray-300"
+                className="rounded border-soft-line-strong text-soft-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
               />
-              <span className="text-sm text-gray-700 dark:text-gray-300">
+              <span className="text-sm text-soft-ink-muted">
                 Unread only
               </span>
             </label>
           </div>
 
           {/* Mark all as read button */}
-          {unreadCount > 0 && (
+          {unreadCount !== null && unreadCount > 0 && (
             <button
-              onClick={markAllNotificationsAsRead}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+              onClick={handleMarkAllAsRead}
+              disabled={markingAll}
+              className="px-4 py-2 font-semibold bg-soft-primary text-white rounded-pill shadow-chip transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
             >
               Mark all as read
             </button>
@@ -195,16 +240,16 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
 
       {/* Notifications list */}
       {filteredNotifications.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-xl">
-          <div className="text-gray-400 mb-4">
+        <div className="text-center py-12 bg-soft-surface border border-soft-line rounded-card shadow-card font-soft">
+          <div className="text-soft-ink-faint mb-4">
             <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
           </div>
-          <h3 className="text-xl font-semibold text-gray-600 dark:text-gray-300 mb-2">
+          <h3 className="font-soft-display text-xl font-semibold text-soft-ink mb-2">
             No notifications
           </h3>
-          <p className="text-gray-500">
+          <p className="text-soft-ink-muted">
             {showOnlyUnread 
                           ? 'All caught up!'
             : 'Start interacting to receive notifications!'
@@ -214,13 +259,18 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
       ) : (
         <div className="space-y-2">
           {filteredNotifications.map((notification) => (
-            <div
+            // Byl to klikalny <div>: bez focusu z klawiatury i bez Enter/Spacji.
+            <button
               key={notification.id}
+              type="button"
               onClick={() => handleNotificationClick(notification)}
               className={`
-                bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700 
-                hover:shadow-md transition-all cursor-pointer
-                ${!notification.isRead ? 'border-l-4 border-l-blue-500 bg-blue-50 dark:bg-blue-900/20' : ''}
+                w-full text-left font-soft
+                bg-soft-surface rounded-card p-4 shadow-card border border-soft-line
+                transition-[box-shadow,transform] [transition-duration:var(--dur-press)] ease-out-strong
+                hover:shadow-float active:scale-[0.99] cursor-pointer
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary
+                ${!notification.isRead ? 'border-l-4 border-l-soft-primary bg-soft-sunken' : ''}
               `}
             >
               <div className="flex items-start space-x-3">
@@ -233,13 +283,13 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                 <div className="flex-1">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <h4 className="font-semibold text-gray-900 dark:text-white">
+                      <h4 className="font-soft-display font-semibold text-soft-ink">
                         {notification.title}
                       </h4>
-                      
-                      <p className="text-gray-700 dark:text-gray-300 mt-1">
+
+                      <p className="text-soft-ink-muted mt-1">
                         {notification.fromUserName && (
-                          <span className="font-medium text-blue-600 dark:text-blue-400">
+                          <span className="font-semibold text-soft-primary-deep">
                             {notification.fromUserName}{' '}
                           </span>
                         )}
@@ -247,12 +297,12 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                       </p>
 
                       <div className="flex items-center gap-4 mt-2">
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-soft-ink-faint">
                           {new Date(notification.createdAt).toLocaleString('en-US')}
                         </p>
-                        
+
                         {!notification.isRead && (
-                          <span className="text-xs bg-blue-500 text-white px-2 py-1 rounded-full">
+                          <span className="text-xs font-semibold bg-soft-primary text-white px-2.5 py-1 rounded-pill">
                             New
                           </span>
                         )}
@@ -270,19 +320,16 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                   </div>
                 </div>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       )}
 
-      {/* Load more notifications */}
-      {filteredNotifications.length > 0 && filteredNotifications.length % 20 === 0 && (
-        <div className="text-center">
-          <button className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
-            Load More
-          </button>
-        </div>
-      )}
+      {/* USUNIETO: przycisk "Load More". Nie mial onClick - a warunek
+          `% 20 === 0` trafial czesto (useSocial wczytuje dokladnie 20
+          powiadomien), wiec aktywny uzytkownik regularnie widzial przycisk,
+          ktory po kliknieciu nie robil nic. Doczytywanie kolejnej strony
+          wymaga kursora w useSocial - decyzja produktowa. */}
     </div>
   );
 };

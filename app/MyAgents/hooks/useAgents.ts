@@ -1,61 +1,92 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { kya } from "@/lib/kya";
-import type { AgentSummary } from "@registrai/kya";
+/**
+ * Lista agentow dla /MyAgents.
+ *
+ * ZRODLO DANYCH: rejestr MySphere w Firestore (app/utils/agents/registry.ts).
+ * Wczesniej hook czytal wylacznie z `@registrai/kya`, czyli z uslugi, ktora nie
+ * istnieje (szczegoly w lib/kya.ts) - nie mial wlasnego magazynu, wiec lista
+ * agentow byla zawsze pusta albo bledna.
+ *
+ * STRONICOWANIE: kursorem po `registeredAtMs`, a nie po numerze strony -
+ * Firestore nie ma offsetu, a kursor nie przelicza poprzednich stron.
+ * Publiczny ksztalt hooka zostaje bez zmian, zeby page.tsx nie wymagal
+ * przerobki.
+ *
+ * PUSTA KOLEKCJA: `agents: []`, `error: null`, `hasMore: false`. AgentGrid
+ * pokazuje wtedy swoj wlasny stan "No agents found" - bez bledu.
+ */
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { listAgents } from "@/app/utils/agents/registry";
+import type { AgentRecord } from "@/app/utils/agents/types";
 import type { AgentFilters } from "../types";
 
 const PAGE_SIZE = 24;
 
 export function useAgents(filters: AgentFilters = {}) {
-  const [agents, setAgents] = useState<AgentSummary[]>([]);
+  const [agents, setAgents] = useState<AgentRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
 
-  const fetchAgents = useCallback(async (pageNum: number, reset: boolean) => {
-    if (pageNum === 1) setLoading(true);
-    else setLoadingMore(true);
-    setError(null);
+  // Kursor trzymamy w ref, a nie w stanie - jest wejsciem do nastepnego
+  // pobrania, a nie czyms, co renderuje sie na ekranie.
+  const cursorRef = useRef<number | null>(null);
+  // Numer zadania odsiewa odpowiedzi po szybkiej zmianie filtra: liczy sie
+  // tylko wynik ostatniego pobrania.
+  const requestRef = useRef(0);
 
-    try {
-      const result = await kya.listAgents({
-        page: pageNum,
-        limit: PAGE_SIZE,
-        network: filters.network || "mainnet",
-      });
+  const network = filters.network || "mainnet";
+  const chain = filters.chain;
 
-      const items: AgentSummary[] = Array.isArray(result)
-        ? result
-        : (result as any).items ?? (result as any).agents ?? [];
+  const fetchPage = useCallback(
+    async (reset: boolean) => {
+      const requestId = ++requestRef.current;
 
       if (reset) {
-        setAgents(items);
+        cursorRef.current = null;
+        setLoading(true);
       } else {
-        setAgents((prev) => [...prev, ...items]);
+        setLoadingMore(true);
       }
-      setHasMore(items.length === PAGE_SIZE);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load agents");
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  }, [filters.network]);
+      setError(null);
 
+      try {
+        const result = await listAgents({
+          limit: PAGE_SIZE,
+          cursor: reset ? null : cursorRef.current,
+          network,
+          chain,
+        });
+        if (requestId !== requestRef.current) return;
+
+        cursorRef.current = result.nextCursor;
+        setHasMore(result.hasMore);
+        setAgents((prev) => (reset ? result.items : [...prev, ...result.items]));
+      } catch (err) {
+        if (requestId !== requestRef.current) return;
+        setError(err instanceof Error ? err.message : "Failed to load agents");
+      } finally {
+        if (requestId === requestRef.current) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
+      }
+    },
+    [network, chain]
+  );
+
+  // Zmiana filtra zaczyna liste od nowa - stary kursor dotyczyl innego zbioru.
   useEffect(() => {
-    setPage(1);
-    fetchAgents(1, true);
-  }, [filters.network]);
+    void fetchPage(true);
+  }, [fetchPage]);
 
-  const loadMore = () => {
-    if (loadingMore || !hasMore) return;
-    const nextPage = page + 1;
-    setPage(nextPage);
-    fetchAgents(nextPage, false);
-  };
+  const loadMore = useCallback(() => {
+    if (loadingMore || loading || !hasMore) return;
+    void fetchPage(false);
+  }, [fetchPage, hasMore, loading, loadingMore]);
 
   return { agents, loading, loadingMore, error, hasMore, loadMore };
 }

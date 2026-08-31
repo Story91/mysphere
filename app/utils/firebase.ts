@@ -21,15 +21,41 @@ import {
   deleteField,
   deleteDoc,
   startAfter as firestoreStartAfter,
+  documentId,
+  DocumentData,
   QueryDocumentSnapshot,
   runTransaction
 } from 'firebase/firestore';
 import { getAuth, TwitterAuthProvider } from 'firebase/auth';
 import { UserProfile, Post, Comment } from '../types';
 import { DEFAULT_REFERRAL_CONFIG } from './referrals/types';
+// Jedyna normalizacja adresu w repo. types.ts nie ciagnie za soba Firestore
+// ani niczego ciezkiego (sam viem), wiec import jest bezpieczny takze tutaj.
+import { normalizeAddress, addressReadVariants } from './monetization/types';
 
 // Stała z adresem admina
-export const ADMIN_ADDRESS = '0xF1fa20027b6202bc18e4454149C85CB01dC91Dfd'.toLowerCase();
+/**
+ * Brama uprawnien w aplikacji: kasowanie cudzych postow i komentarzy,
+ * przypinanie, panel /admin, moderacja tresci, reczny cleanup przypiec.
+ *
+ * PRZENIESIONE 6 sierpnia 2026 z 0xF1fa2002...1Dfd na ten adres - decyzja
+ * wlasciciela. Ten sam portfel trzyma ADMIN_PRIVATE_KEY, wystawia kontrakty
+ * i jest odbiorca platnosci x402, wiec od teraz jest JEDNYM adresem
+ * administracyjnym calego produktu zamiast dwoch rozjezdzajacych sie.
+ *
+ * SKUTEK: ze starego portfela nie da sie juz moderowac. To bylo swiadome.
+ *
+ * === TA STALA JEST JEDYNYM ZRODLEM ===
+ * app/utils/friends/config.ts i app/api/cleanup-expired-pins/route.ts mialy
+ * wlasne kopie tego adresu; dzis oba importuja stad. Nie dopisuj kolejnej -
+ * kopia zostaje przy starym wlascicielu przy nastepnej zmianie.
+ *
+ * NIE MYLIC z MYSPHERE_ADDRESS w PaidPinModal.tsx. Tamten ma dzis te sama
+ * wartosc co STARY admin, ale znaczy co innego: to ODBIORCA PLATNOSCI za
+ * przypiete posty. Nie ruszam go tutaj, bo przeniesienie uprawnien i zmiana
+ * konta, na ktore wplywaja pieniadze, to dwie osobne decyzje.
+ */
+export const ADMIN_ADDRESS = '0xD4885A5aa53446843CABcDE1F35DE9b4E906030e'.toLowerCase();
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -45,550 +71,279 @@ export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const twitterProvider = new TwitterAuthProvider();
 
-const convertTimestamp = (timestamp: Timestamp): number => {
-  return timestamp.toMillis();
+// ===============================================
+// PRYWATNE HELPERY - wzorce powtarzane w calym pliku
+// ===============================================
+
+/** Dzieli tablice na kawalki - Firestore przyjmuje max 30 wartosci w operatorze "in". */
+const chunkArray = <T>(items: T[], size: number): T[][] => {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size));
+  return chunks;
 };
+
+/**
+ * Pobiera dokumenty po ID: jedno zapytanie na kazde 30 sztuk zamiast getDoc()
+ * per dokument. Zwraca mape id -> dane; dokumenty, ktorych nie ma, po prostu
+ * nie trafiaja do mapy (getDoc na nieistniejacy dokument tez kosztuje odczyt).
+ */
+const fetchDocsByIds = async (
+  collectionName: string,
+  ids: string[]
+): Promise<Map<string, DocumentData>> => {
+  const result = new Map<string, DocumentData>();
+  const unique = Array.from(new Set(ids.filter(Boolean)));
+  if (unique.length === 0) return result;
+
+  const snapshots = await Promise.all(
+    chunkArray(unique, 30).map(chunk =>
+      getDocs(query(collection(db, collectionName), where(documentId(), 'in', chunk)))
+    )
+  );
+  snapshots.forEach(snapshot => {
+    snapshot.docs.forEach(docSnap => result.set(docSnap.id, docSnap.data()));
+  });
+  return result;
+};
+
+/**
+ * Czas w tej bazie siedzi raz jako Timestamp, raz jako liczba milisekund,
+ * raz jako ISO string. Kazde miejsce robilo wlasny `instanceof Timestamp ? ... : ...`.
+ */
+const toMillis = (value: any): number | undefined => {
+  if (value === null || value === undefined) return undefined;
+  if (value instanceof Timestamp) return value.toMillis();
+  if (typeof value.toMillis === 'function') return value.toMillis();
+  if (typeof value === 'number') return value;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === 'string') {
+    const parsed = Date.parse(value);
+    return Number.isNaN(parsed) ? undefined : parsed;
+  }
+  if (typeof value.seconds === 'number') return value.seconds * 1000;
+  return undefined;
+};
+
+/**
+ * Kwoty tipow leza w Firestore jako stringi. Jeden rekord z pusta albo
+ * uszkodzona kwota dawal NaN, ktore zjadalo CALA sume w statystykach.
+ */
+const parseAmount = (value: unknown): number => {
+  const amount = typeof value === 'number' ? value : parseFloat(String(value ?? ''));
+  return Number.isFinite(amount) ? amount : 0;
+};
+
+/**
+ * Mapowanie dokumentu posta na obiekt feedu. Bylo skopiowane znak w znak
+ * w fetchPosts i fetchBaseNameFeedPosts - dwie kopie rozjezdzaly sie przy
+ * kazdym nowym polu posta.
+ */
+const mapPostDoc = (postDoc: QueryDocumentSnapshot): ExtendedPost => {
+  const postData = postDoc.data();
+  return {
+    id: postDoc.id,
+    author: postData.author,
+    content: postData.content,
+    timestamp: toMillis(postData.timestamp) || Date.now(),
+    likes: postData.likes || 0,
+    likedBy: postData.likedBy || [],
+    // Tablica w dokumencie to LEGACY: nowe komentarze zyja tylko w kolekcji
+    // `comments` i dociagaja sie przy rozwinieciu sekcji (PostList). Tablicy
+    // nie ruszamy, bo stare komentarze moga istniec wylacznie w niej.
+    comments: postData.comments || [],
+    // Liczba do plakietki: licznik z zapisu, a dla postow sprzed licznikow
+    // dlugosc tablicy, ktora i tak przyjechala z dokumentem. Clamp do zera,
+    // bo atomowy decrement przy podwojnym usunieciu moze zejsc ponizej.
+    commentsCount: Math.max(
+      0,
+      typeof postData.commentsCount === 'number'
+        ? postData.commentsCount
+        : (postData.comments || []).length
+    ),
+    tags: postData.tags || [],
+    mentions: postData.mentions || [],
+    image: postData.image || null,
+    video: postData.video || null,
+    txHash: postData.txHash || null,
+    lastEdited: postData.lastEdited || null,
+    zoraCoinAddress: postData.zoraCoinAddress || null,
+    network: postData.network || 'base',
+    musicTrack: postData.musicTrack || null,
+    isPinned: postData.isPinned || false,
+    pinnedAt: toMillis(postData.pinnedAt),
+    pinnedBy: postData.pinnedBy || undefined,
+    isPaidPin: postData.isPaidPin || false,
+    paidPinExpiresAt: toMillis(postData.paidPinExpiresAt),
+
+    /**
+     * === BEZ TYCH DWOCH POL PLATNY POST BYL NIEWIDOCZNY DLA KUPUJACEGO ===
+     *
+     * To mapowanie jest JEDYNA droga, ktora dokument posta pokonuje z Firestore
+     * do feedu - i nie przepisywalo ono ANI hasPremium, ANI unlockPrice. Feed
+     * decyduje o narysowaniu bramki przez hasPremiumContent(), ktore pyta
+     * dokladnie o te pola, wiec dla KAZDEGO posta wczytanego z bazy wychodzilo
+     * "to nie jest platny post". Czytelnik nie widzial ceny, tokena ani
+     * przycisku - nie mial czego kupic, choc dokument w Firestore byl poprawny.
+     *
+     * Autor widzial bramke tylko dlatego, ze jego wlasny post trafial do stanu
+     * Reacta z pominieciem tej funkcji (optymistyczny wpis z kompozytora).
+     * Stad dwa rozne widoki tego samego posta.
+     *
+     * `premiumContent` (tresc starych postow, sprzed przeniesienia jej do
+     * zapieczetowanej kolekcji) skladamy TU do flagi zamiast przepisywac tekst:
+     * feed i tak go nie renderuje - wydaje go GET /api/premium - a obiekty
+     * postow lada potem w localStorage.
+     */
+    hasPremium:
+      postData.hasPremium === true ||
+      (typeof postData.premiumContent === 'string' && postData.premiumContent.trim() !== ''),
+    // Cena bywa w bazie liczba (rekordy sprzed ustalenia formatu), a feed i
+    // bramka licza na stringu dziesietnym. Zamiana zamiast odrzucenia, bo
+    // "zly typ" nie moze znaczyc "post nie jest platny".
+    unlockPrice:
+      typeof postData.unlockPrice === 'string'
+        ? postData.unlockPrice
+        : typeof postData.unlockPrice === 'number' && Number.isFinite(postData.unlockPrice)
+          ? String(postData.unlockPrice)
+          : undefined,
+    unlockToken:
+      postData.unlockToken === 'ETH' || postData.unlockToken === 'USDC'
+        ? postData.unlockToken
+        : undefined,
+  };
+};
+
+/** Przypiete na gorze, potem reszta w kolejnosci, jaka dal Firestore. */
+const sortPinnedFirst = (posts: ExtendedPost[]): ExtendedPost[] =>
+  posts.sort((a, b) => {
+    if (a.isPinned && !b.isPinned) return -1;
+    if (!a.isPinned && b.isPinned) return 1;
+    if (a.isPinned && b.isPinned) return (b.pinnedAt || 0) - (a.pinnedAt || 0);
+    return 0;
+  });
 
 // ✅ FIREBASE OPTIMIZATION: hasBaseName() function REMOVED - replaced with string.endsWith('.base.eth') checks
 // This eliminates expensive Firebase reads from 'usernames' collection, saving $100-200/day
 
-// Funkcja dodająca bonus BaseName dla użytkownika
-const addBaseNameBonusToUser = async (userAddress: string): Promise<void> => {
+// ===============================================
+// BONUSY DOMENOWE (.base.eth / .sphere / .camper / .celo / .world)
+// ===============================================
+// Kazdy z pieciu bonusow mial wlasna kopie tej samej funkcji: 5 x ~65 linii,
+// roznica wylacznie w nazwie pola, liczbie punktow i emoji w logu. Teraz jest
+// jedna implementacja sterowana tabela ponizej.
+
+interface DomainBonusDefinition {
+  /** wartosc parametru `suffix` w saveProfileName */
+  key: 'baseName' | 'sphere' | 'camper' | 'celo' | 'world';
+  /** pole w users.baseChatPoints */
+  field: string;
+  points: number;
+  /** flaga w kolekcji `usernames`, po ktorej znajdujemy uprawnionych */
+  usernamesFlag: string;
+  /** koncowka nazwy uprawniajaca do bonusu */
+  suffix: string;
+  label: string;
+}
+
+const DOMAIN_BONUSES: Record<DomainBonusDefinition['key'], DomainBonusDefinition> = {
+  baseName: { key: 'baseName', field: 'baseNameBonus', points: 1000, usernamesFlag: 'isBaseName', suffix: '.base.eth', label: 'BaseName' },
+  sphere:   { key: 'sphere',   field: 'sphereBonus',   points: 1500, usernamesFlag: 'isSphere',   suffix: '.sphere',   label: '.sphere' },
+  camper:   { key: 'camper',   field: 'camperBonus',   points: 1000, usernamesFlag: 'isCamper',   suffix: '.camper',   label: '.camper' },
+  celo:     { key: 'celo',     field: 'celoBonus',     points: 1250, usernamesFlag: 'isCelo',     suffix: '.celo',     label: '.celo' },
+  world:    { key: 'world',    field: 'worldBonus',    points: 1250, usernamesFlag: 'isWorld',    suffix: '.world',    label: '.world' }
+};
+
+const DOMAIN_BONUS_LIST: DomainBonusDefinition[] = Object.values(DOMAIN_BONUSES);
+
+/**
+ * Wszystkie skladniki, z ktorych liczy sie totalPoints.
+ *
+ * UWAGA: wersja dla BaseName sumowala tylko cztery pierwsze, wiec przyznanie
+ * bonusu BaseName KASOWALO z sumy bonusy .sphere/.camper/.celo/.world oraz
+ * punkty referralowe. Po ujednoliceniu suma jest jedna dla wszystkich piesciu.
+ */
+const POINT_COMPONENTS = [
+  'activityBonus',
+  'likePoints',
+  'postPoints',
+  'baseNameBonus',
+  'camperBonus',
+  'sphereBonus',
+  'celoBonus',
+  'worldBonus',
+  'referralPoints'
+] as const;
+
+/** Dodaje bonus domenowy, o ile uzytkownik jeszcze go nie ma. */
+const addDomainBonusToUser = async (userAddress: string, bonus: DomainBonusDefinition): Promise<void> => {
   try {
     const userRef = doc(db, 'users', userAddress);
     const userDoc = await getDoc(userRef);
-    
-    if (userDoc.exists()) {
-      const userData = userDoc.data();
-      
-      // Sprawdź, czy baseChatPoints jest stringiem (błąd)
-      let baseChatPoints: any = userData.baseChatPoints;
-      
-      // Jeśli baseChatPoints jest stringiem lub nie istnieje, utwórz nowy obiekt
-      if (typeof baseChatPoints === 'string' || !baseChatPoints) {
-        baseChatPoints = {
-          activityBonus: 0,
-          likePoints: 0,
-          postPoints: 0,
-          totalPoints: 0
-        };
-      }
-      
-      // Upewnij się, że wszystkie pola są liczbami
-      baseChatPoints.activityBonus = Number(baseChatPoints.activityBonus || 0);
-      baseChatPoints.likePoints = Number(baseChatPoints.likePoints || 0);
-      baseChatPoints.postPoints = Number(baseChatPoints.postPoints || 0);
-      baseChatPoints.baseNameBonus = Number(baseChatPoints.baseNameBonus || 0);
-      
-      // Sprawdź czy użytkownik już ma baseNameBonus - jeśli tak, nie dodawaj ponownie
-      if (baseChatPoints.baseNameBonus) {
-        return; // Użytkownik już ma bonus, nie rób nic
-      }
-      
-      // Dodaj baseNameBonus jako liczbę
-      baseChatPoints.baseNameBonus = 1000;
-      
-      // Przelicz totalPoints jako sumę wszystkich składników
-      baseChatPoints.totalPoints = 
-        baseChatPoints.activityBonus + 
-        baseChatPoints.likePoints + 
-        baseChatPoints.postPoints + 
-        baseChatPoints.baseNameBonus;
-      
-      // Zaktualizuj dokument użytkownika
-      await updateDoc(userRef, {
-        baseChatPoints: baseChatPoints,
-        lastUpdated: serverTimestamp()
-      });
-      
-      console.log(`✅ Dodano baseNameBonus (1000 pts) dla nowego użytkownika ${userAddress}`);
-    }
+    if (!userDoc.exists()) return;
+
+    // W bazie baseChatPoints bywa stringiem albo nie ma go wcale.
+    const stored = userDoc.data().baseChatPoints;
+    const baseChatPoints: Record<string, any> =
+      !stored || typeof stored !== 'object' ? {} : { ...stored };
+
+    POINT_COMPONENTS.forEach(component => {
+      baseChatPoints[component] = Number(baseChatPoints[component] || 0);
+    });
+
+    if (baseChatPoints[bonus.field] > 0) return; // bonus juz przyznany
+
+    baseChatPoints[bonus.field] = bonus.points;
+    baseChatPoints.totalPoints = POINT_COMPONENTS.reduce(
+      (sum, component) => sum + baseChatPoints[component],
+      0
+    );
+
+    await updateDoc(userRef, {
+      baseChatPoints,
+      lastUpdated: serverTimestamp()
+    });
   } catch (error) {
-    console.error('Error adding BaseName bonus:', error);
+    console.error(`Error adding ${bonus.label} bonus:`, error);
   }
 };
 
-// Funkcja dodająca bonus 500 punktów za .camper
-const addCamperBonusToUser = async (userAddress: string): Promise<void> => {
+/**
+ * Przyznaje bonus wszystkim uzytkownikom oznaczonym odpowiednia flaga
+ * w kolekcji `usernames`.
+ */
+const addDomainBonusToAllUsers = async (
+  bonus: DomainBonusDefinition
+): Promise<{success: boolean, updatedUsers: number, error?: string}> => {
   try {
-    console.log(`🏕️ [addCamperBonusToUser] Rozpoczynam dodawanie bonusu dla ${userAddress}`);
-    const userRef = doc(db, 'users', userAddress);
-    const userDoc = await getDoc(userRef);
-    
-    if (userDoc.exists()) {
-      const userData = userDoc.data();
-      
-      // Sprawdź, czy baseChatPoints jest stringiem (błąd)
-      let baseChatPoints: any = userData.baseChatPoints;
-      
-      // Jeśli baseChatPoints jest stringiem lub nie istnieje, utwórz nowy obiekt
-      if (typeof baseChatPoints === 'string' || !baseChatPoints) {
-        baseChatPoints = {
-          activityBonus: 0,
-          likePoints: 0,
-          postPoints: 0,
-          totalPoints: 0
-        };
-      }
-      
-      // Upewnij się, że wszystkie pola są liczbami
-      baseChatPoints.activityBonus = Number(baseChatPoints.activityBonus || 0);
-      baseChatPoints.likePoints = Number(baseChatPoints.likePoints || 0);
-      baseChatPoints.postPoints = Number(baseChatPoints.postPoints || 0);
-      baseChatPoints.baseNameBonus = Number(baseChatPoints.baseNameBonus || 0);
-      baseChatPoints.sphereBonus = Number(baseChatPoints.sphereBonus || 0);
-      baseChatPoints.celoBonus = Number(baseChatPoints.celoBonus || 0);
-      baseChatPoints.worldBonus = Number(baseChatPoints.worldBonus || 0);
-      baseChatPoints.referralPoints = Number(baseChatPoints.referralPoints || 0);
-      
-      // Sprawdź czy użytkownik już ma camperBonus - jeśli tak, nie dodawaj ponownie
-      if (baseChatPoints.camperBonus) {
-        console.log(`Użytkownik ${userAddress} już ma camperBonus, pomijam dodawanie`);
-        return;
-      }
-      
-      // Dodaj camperBonus jako liczbę
-      baseChatPoints.camperBonus = 1000;
-      
-      // Przelicz totalPoints jako sumę wszystkich składników
-      baseChatPoints.totalPoints = 
-        baseChatPoints.activityBonus + 
-        baseChatPoints.likePoints + 
-        baseChatPoints.postPoints + 
-        baseChatPoints.baseNameBonus + 
-        baseChatPoints.camperBonus +
-        baseChatPoints.sphereBonus +
-        baseChatPoints.celoBonus +
-        baseChatPoints.worldBonus +
-        baseChatPoints.referralPoints;
-      
-      // Zaktualizuj dokument użytkownika
-      await updateDoc(userRef, {
-        baseChatPoints: baseChatPoints,
-        lastUpdated: serverTimestamp()
-      });
-      
-      console.log(`🏕️ Dodano camperBonus (1000 pts) dla użytkownika ${userAddress}! Nowe total: ${baseChatPoints.totalPoints}`);
-    }
-  } catch (error) {
-    console.error('Error adding Camper bonus:', error);
-  }
-};
+    const snapshot = await getDocs(
+      query(collection(db, 'usernames'), where(bonus.usernamesFlag, '==', true))
+    );
 
-// Funkcja dodająca bonus 1500 punktów za .sphere
-const addSphereBonusToUser = async (userAddress: string): Promise<void> => {
-  try {
-    console.log(`🌐 [addSphereBonusToUser] Rozpoczynam dodawanie bonusu dla ${userAddress}`);
-    const userRef = doc(db, 'users', userAddress);
-    const userDoc = await getDoc(userRef);
-    
-    if (userDoc.exists()) {
-      const userData = userDoc.data();
-      
-      // Sprawdź, czy baseChatPoints jest stringiem (błąd)
-      let baseChatPoints: any = userData.baseChatPoints;
-      
-      // Jeśli baseChatPoints jest stringiem lub nie istnieje, utwórz nowy obiekt
-      if (typeof baseChatPoints === 'string' || !baseChatPoints) {
-        baseChatPoints = {
-          activityBonus: 0,
-          likePoints: 0,
-          postPoints: 0,
-          totalPoints: 0
-        };
-      }
-      
-      // Upewnij się, że wszystkie pola są liczbami
-      baseChatPoints.activityBonus = Number(baseChatPoints.activityBonus || 0);
-      baseChatPoints.likePoints = Number(baseChatPoints.likePoints || 0);
-      baseChatPoints.postPoints = Number(baseChatPoints.postPoints || 0);
-      baseChatPoints.baseNameBonus = Number(baseChatPoints.baseNameBonus || 0);
-      baseChatPoints.camperBonus = Number(baseChatPoints.camperBonus || 0);
-      baseChatPoints.sphereBonus = Number(baseChatPoints.sphereBonus || 0);
-      baseChatPoints.celoBonus = Number(baseChatPoints.celoBonus || 0);
-      baseChatPoints.worldBonus = Number(baseChatPoints.worldBonus || 0);
-      baseChatPoints.referralPoints = Number(baseChatPoints.referralPoints || 0);
-      
-      // Sprawdź czy użytkownik już ma sphereBonus - jeśli tak, nie dodawaj ponownie
-      if (baseChatPoints.sphereBonus) {
-        console.log(`Użytkownik ${userAddress} już ma sphereBonus, pomijam dodawanie`);
-        return;
-      }
-      
-      // Dodaj sphereBonus jako liczbę
-      baseChatPoints.sphereBonus = 1500;
-      
-      // Przelicz totalPoints jako sumę wszystkich składników
-      baseChatPoints.totalPoints = 
-        baseChatPoints.activityBonus + 
-        baseChatPoints.likePoints + 
-        baseChatPoints.postPoints + 
-        baseChatPoints.baseNameBonus + 
-        baseChatPoints.camperBonus +
-        baseChatPoints.sphereBonus +
-        baseChatPoints.celoBonus +
-        baseChatPoints.worldBonus +
-        baseChatPoints.referralPoints;
-      
-      // Zaktualizuj dokument użytkownika
-      await updateDoc(userRef, {
-        baseChatPoints: baseChatPoints,
-        lastUpdated: serverTimestamp()
-      });
-      
-      console.log(`🌐 Dodano sphereBonus (1500 pts) dla użytkownika ${userAddress}! Nowe total: ${baseChatPoints.totalPoints}`);
-    }
-  } catch (error) {
-    console.error('Error adding Sphere bonus:', error);
-  }
-};
-
-// Funkcja dodająca bonus 1250 punktów za .celo
-const addCeloBonusToUser = async (userAddress: string): Promise<void> => {
-  try {
-    console.log(`💛 [addCeloBonusToUser] Rozpoczynam dodawanie bonusu dla ${userAddress}`);
-    const userRef = doc(db, 'users', userAddress);
-    const userDoc = await getDoc(userRef);
-    
-    if (userDoc.exists()) {
-      const userData = userDoc.data();
-      
-      // Sprawdź, czy baseChatPoints jest stringiem (błąd)
-      let baseChatPoints: any = userData.baseChatPoints;
-      
-      // Jeśli baseChatPoints jest stringiem lub nie istnieje, utwórz nowy obiekt
-      if (typeof baseChatPoints === 'string' || !baseChatPoints) {
-        baseChatPoints = {
-          activityBonus: 0,
-          likePoints: 0,
-          postPoints: 0,
-          totalPoints: 0
-        };
-      }
-      
-      // Upewnij się, że wszystkie pola są liczbami
-      baseChatPoints.activityBonus = Number(baseChatPoints.activityBonus || 0);
-      baseChatPoints.likePoints = Number(baseChatPoints.likePoints || 0);
-      baseChatPoints.postPoints = Number(baseChatPoints.postPoints || 0);
-      baseChatPoints.baseNameBonus = Number(baseChatPoints.baseNameBonus || 0);
-      baseChatPoints.camperBonus = Number(baseChatPoints.camperBonus || 0);
-      baseChatPoints.sphereBonus = Number(baseChatPoints.sphereBonus || 0);
-      baseChatPoints.celoBonus = Number(baseChatPoints.celoBonus || 0);
-      baseChatPoints.worldBonus = Number(baseChatPoints.worldBonus || 0);
-      baseChatPoints.referralPoints = Number(baseChatPoints.referralPoints || 0);
-      
-      // Sprawdź czy użytkownik już ma celoBonus - jeśli tak, nie dodawaj ponownie
-      if (baseChatPoints.celoBonus) {
-        console.log(`Użytkownik ${userAddress} już ma celoBonus, pomijam dodawanie`);
-        return;
-      }
-      
-      // Dodaj celoBonus jako liczbę
-      baseChatPoints.celoBonus = 1250;
-      
-      // Przelicz totalPoints jako sumę wszystkich składników
-      baseChatPoints.totalPoints = 
-        baseChatPoints.activityBonus + 
-        baseChatPoints.likePoints + 
-        baseChatPoints.postPoints + 
-        baseChatPoints.baseNameBonus + 
-        baseChatPoints.camperBonus +
-        baseChatPoints.sphereBonus +
-        baseChatPoints.celoBonus +
-        baseChatPoints.worldBonus +
-        baseChatPoints.referralPoints;
-      
-      // Zaktualizuj dokument użytkownika
-      await updateDoc(userRef, {
-        baseChatPoints: baseChatPoints,
-        lastUpdated: serverTimestamp()
-      });
-      
-      console.log(`💛 Dodano celoBonus (1250 pts) dla użytkownika ${userAddress}! Nowe total: ${baseChatPoints.totalPoints}`);
-    }
-  } catch (error) {
-    console.error('Error adding Celo bonus:', error);
-  }
-};
-
-// Funkcja dodająca bonus 1250 punktów za .world
-const addWorldBonusToUser = async (userAddress: string): Promise<void> => {
-  try {
-    console.log(`🌍 [addWorldBonusToUser] Rozpoczynam dodawanie bonusu dla ${userAddress}`);
-    const userRef = doc(db, 'users', userAddress);
-    const userDoc = await getDoc(userRef);
-    
-    if (userDoc.exists()) {
-      const userData = userDoc.data();
-      
-      // Sprawdź, czy baseChatPoints jest stringiem (błąd)
-      let baseChatPoints: any = userData.baseChatPoints;
-      
-      // Jeśli baseChatPoints jest stringiem lub nie istnieje, utwórz nowy obiekt
-      if (typeof baseChatPoints === 'string' || !baseChatPoints) {
-        baseChatPoints = {
-          activityBonus: 0,
-          likePoints: 0,
-          postPoints: 0,
-          totalPoints: 0
-        };
-      }
-      
-      // Upewnij się, że wszystkie pola są liczbami
-      baseChatPoints.activityBonus = Number(baseChatPoints.activityBonus || 0);
-      baseChatPoints.likePoints = Number(baseChatPoints.likePoints || 0);
-      baseChatPoints.postPoints = Number(baseChatPoints.postPoints || 0);
-      baseChatPoints.baseNameBonus = Number(baseChatPoints.baseNameBonus || 0);
-      baseChatPoints.camperBonus = Number(baseChatPoints.camperBonus || 0);
-      baseChatPoints.sphereBonus = Number(baseChatPoints.sphereBonus || 0);
-      baseChatPoints.celoBonus = Number(baseChatPoints.celoBonus || 0);
-      baseChatPoints.worldBonus = Number(baseChatPoints.worldBonus || 0);
-      baseChatPoints.referralPoints = Number(baseChatPoints.referralPoints || 0);
-      
-      // Sprawdź czy użytkownik już ma worldBonus - jeśli tak, nie dodawaj ponownie
-      if (baseChatPoints.worldBonus) {
-        console.log(`Użytkownik ${userAddress} już ma worldBonus, pomijam dodawanie`);
-        return;
-      }
-      
-      // Dodaj worldBonus jako liczbę
-      baseChatPoints.worldBonus = 1250;
-      
-      // Przelicz totalPoints jako sumę wszystkich składników
-      baseChatPoints.totalPoints = 
-        baseChatPoints.activityBonus + 
-        baseChatPoints.likePoints + 
-        baseChatPoints.postPoints + 
-        baseChatPoints.baseNameBonus + 
-        baseChatPoints.camperBonus +
-        baseChatPoints.sphereBonus +
-        baseChatPoints.celoBonus +
-        baseChatPoints.worldBonus +
-        baseChatPoints.referralPoints;
-      
-      // Zaktualizuj dokument użytkownika
-      await updateDoc(userRef, {
-        baseChatPoints: baseChatPoints,
-        lastUpdated: serverTimestamp()
-      });
-      
-      console.log(`🌍 Dodano worldBonus (1250 pts) dla użytkownika ${userAddress}! Nowe total: ${baseChatPoints.totalPoints}`);
-    }
-  } catch (error) {
-    console.error('Error adding World bonus:', error);
-  }
-};
-
-// Funkcja dodająca bonus BaseName dla wszystkich użytkowników z BaseName
-export const addBaseNameBonusToAllUsers = async (): Promise<{success: boolean, updatedUsers: number, error?: string}> => {
-  try {
-    console.log('Rozpoczynam dodawanie bonusu BaseName dla wszystkich użytkowników...');
-    
-    // Pobierz wszystkich użytkowników z kolekcji usernames, którzy mają isBaseName: true
-    const usernamesRef = collection(db, 'usernames');
-    const baseNameQuery = query(usernamesRef, where('isBaseName', '==', true));
-    const baseNameSnapshot = await getDocs(baseNameQuery);
-    
     let updatedUsers = 0;
-    
-    // Przetwórz każdego użytkownika z BaseName
-    for (const usernameDoc of baseNameSnapshot.docs) {
-      const userAddress = usernameDoc.id;
-      
-      // Dodaj bonus BaseName dla użytkownika
-      await addBaseNameBonusToUser(userAddress);
+    for (const usernameDoc of snapshot.docs) {
+      await addDomainBonusToUser(usernameDoc.id, bonus);
       updatedUsers++;
-      
-      // Loguj co 10 użytkowników
-      if (updatedUsers % 10 === 0) {
-        console.log(`Zaktualizowano ${updatedUsers} użytkowników...`);
-      }
     }
-    
-    console.log(`Zakończono dodawanie bonusu BaseName:
-    - Zaktualizowano ${updatedUsers} użytkowników`);
-    
-    return {
-      success: true,
-      updatedUsers
-    };
+
+    console.log(`Zakonczono dodawanie bonusu ${bonus.label}: zaktualizowano ${updatedUsers} uzytkownikow`);
+    return { success: true, updatedUsers };
   } catch (error) {
-    console.error('Błąd podczas dodawania bonusu BaseName:', error);
+    console.error(`Blad podczas dodawania bonusu ${bonus.label}:`, error);
     return {
       success: false,
       updatedUsers: 0,
-      error: error instanceof Error ? error.message : 'Nieznany błąd podczas dodawania bonusu BaseName'
+      error: error instanceof Error ? error.message : `Nieznany blad podczas dodawania bonusu ${bonus.label}`
     };
   }
 };
 
-// Funkcja dodająca bonus .sphere dla wszystkich użytkowników z .sphere
-export const addSphereBonusToAllUsers = async (): Promise<{success: boolean, updatedUsers: number, error?: string}> => {
-  try {
-    console.log('🌐 Rozpoczynam dodawanie bonusu .sphere dla wszystkich użytkowników...');
-    
-    // Pobierz wszystkich użytkowników z kolekcji usernames, którzy mają isSphere: true
-    const usernamesRef = collection(db, 'usernames');
-    const sphereQuery = query(usernamesRef, where('isSphere', '==', true));
-    const sphereSnapshot = await getDocs(sphereQuery);
-    
-    let updatedUsers = 0;
-    
-    // Przetwórz każdego użytkownika z .sphere
-    for (const usernameDoc of sphereSnapshot.docs) {
-      const userAddress = usernameDoc.id;
-      
-      // Dodaj bonus .sphere dla użytkownika
-      await addSphereBonusToUser(userAddress);
-      updatedUsers++;
-      
-      // Loguj co 10 użytkowników
-      if (updatedUsers % 10 === 0) {
-        console.log(`🌐 Zaktualizowano ${updatedUsers} użytkowników z .sphere...`);
-      }
-    }
-    
-    console.log(`🌐 Zakończono dodawanie bonusu .sphere: Zaktualizowano ${updatedUsers} użytkowników`);
-    
-    return {
-      success: true,
-      updatedUsers
-    };
-  } catch (error) {
-    console.error('Błąd podczas dodawania bonusu .sphere:', error);
-    return {
-      success: false,
-      updatedUsers: 0,
-      error: error instanceof Error ? error.message : 'Nieznany błąd podczas dodawania bonusu .sphere'
-    };
-  }
-};
+type DomainBonusResult = Promise<{success: boolean, updatedUsers: number, error?: string}>;
 
-// Funkcja dodająca bonus .camper dla wszystkich użytkowników z .camper
-export const addCamperBonusToAllUsers = async (): Promise<{success: boolean, updatedUsers: number, error?: string}> => {
-  try {
-    console.log('🏕️ Rozpoczynam dodawanie bonusu .camper dla wszystkich użytkowników...');
-    
-    // Pobierz wszystkich użytkowników z kolekcji usernames, którzy mają isCamper: true
-    const usernamesRef = collection(db, 'usernames');
-    const camperQuery = query(usernamesRef, where('isCamper', '==', true));
-    const camperSnapshot = await getDocs(camperQuery);
-    
-    let updatedUsers = 0;
-    
-    // Przetwórz każdego użytkownika z .camper
-    for (const usernameDoc of camperSnapshot.docs) {
-      const userAddress = usernameDoc.id;
-      
-      // Dodaj bonus .camper dla użytkownika
-      await addCamperBonusToUser(userAddress);
-      updatedUsers++;
-      
-      // Loguj co 10 użytkowników
-      if (updatedUsers % 10 === 0) {
-        console.log(`🏕️ Zaktualizowano ${updatedUsers} użytkowników z .camper...`);
-      }
-    }
-    
-    console.log(`🏕️ Zakończono dodawanie bonusu .camper: Zaktualizowano ${updatedUsers} użytkowników`);
-    
-    return {
-      success: true,
-      updatedUsers
-    };
-  } catch (error) {
-    console.error('Błąd podczas dodawania bonusu .camper:', error);
-    return {
-      success: false,
-      updatedUsers: 0,
-      error: error instanceof Error ? error.message : 'Nieznany błąd podczas dodawania bonusu .camper'
-    };
-  }
-};
-
-// Funkcja dodająca bonus .celo dla wszystkich użytkowników z .celo
-export const addCeloBonusToAllUsers = async (): Promise<{success: boolean, updatedUsers: number, error?: string}> => {
-  try {
-    console.log('💛 Rozpoczynam dodawanie bonusu .celo dla wszystkich użytkowników...');
-    
-    // Pobierz wszystkich użytkowników z kolekcji usernames, którzy mają isCelo: true
-    const usernamesRef = collection(db, 'usernames');
-    const celoQuery = query(usernamesRef, where('isCelo', '==', true));
-    const celoSnapshot = await getDocs(celoQuery);
-    
-    let updatedUsers = 0;
-    
-    // Przetwórz każdego użytkownika z .celo
-    for (const usernameDoc of celoSnapshot.docs) {
-      const userAddress = usernameDoc.id;
-      
-      // Dodaj bonus .celo dla użytkownika
-      await addCeloBonusToUser(userAddress);
-      updatedUsers++;
-      
-      // Loguj co 10 użytkowników
-      if (updatedUsers % 10 === 0) {
-        console.log(`💛 Zaktualizowano ${updatedUsers} użytkowników z .celo...`);
-      }
-    }
-    
-    console.log(`💛 Zakończono dodawanie bonusu .celo: Zaktualizowano ${updatedUsers} użytkowników`);
-    
-    return {
-      success: true,
-      updatedUsers
-    };
-  } catch (error) {
-    console.error('Błąd podczas dodawania bonusu .celo:', error);
-    return {
-      success: false,
-      updatedUsers: 0,
-      error: error instanceof Error ? error.message : 'Nieznany błąd podczas dodawania bonusu .celo'
-    };
-  }
-};
-
-// Funkcja dodająca bonus .world dla wszystkich użytkowników z .world
-export const addWorldBonusToAllUsers = async (): Promise<{success: boolean, updatedUsers: number, error?: string}> => {
-  try {
-    console.log('🌍 Rozpoczynam dodawanie bonusu .world dla wszystkich użytkowników...');
-    
-    // Pobierz wszystkich użytkowników z kolekcji usernames, którzy mają isWorld: true
-    const usernamesRef = collection(db, 'usernames');
-    const worldQuery = query(usernamesRef, where('isWorld', '==', true));
-    const worldSnapshot = await getDocs(worldQuery);
-    
-    let updatedUsers = 0;
-    
-    // Przetwórz każdego użytkownika z .world
-    for (const usernameDoc of worldSnapshot.docs) {
-      const userAddress = usernameDoc.id;
-      
-      // Dodaj bonus .world dla użytkownika
-      await addWorldBonusToUser(userAddress);
-      updatedUsers++;
-      
-      // Loguj co 10 użytkowników
-      if (updatedUsers % 10 === 0) {
-        console.log(`🌍 Zaktualizowano ${updatedUsers} użytkowników z .world...`);
-      }
-    }
-    
-    console.log(`🌍 Zakończono dodawanie bonusu .world: Zaktualizowano ${updatedUsers} użytkowników`);
-    
-    return {
-      success: true,
-      updatedUsers
-    };
-  } catch (error) {
-    console.error('Błąd podczas dodawania bonusu .world:', error);
-    return {
-      success: false,
-      updatedUsers: 0,
-      error: error instanceof Error ? error.message : 'Nieznany błąd podczas dodawania bonusu .world'
-    };
-  }
-};
+export const addBaseNameBonusToAllUsers = (): DomainBonusResult => addDomainBonusToAllUsers(DOMAIN_BONUSES.baseName);
+export const addSphereBonusToAllUsers = (): DomainBonusResult => addDomainBonusToAllUsers(DOMAIN_BONUSES.sphere);
+export const addCamperBonusToAllUsers = (): DomainBonusResult => addDomainBonusToAllUsers(DOMAIN_BONUSES.camper);
+export const addCeloBonusToAllUsers = (): DomainBonusResult => addDomainBonusToAllUsers(DOMAIN_BONUSES.celo);
+export const addWorldBonusToAllUsers = (): DomainBonusResult => addDomainBonusToAllUsers(DOMAIN_BONUSES.world);
 
 // Funkcja do odświeżenia wszystkich bonusów domenowych dla istniejących użytkowników
 export const refreshAllDomainBonuses = async (): Promise<{
@@ -639,117 +394,136 @@ export const refreshAllDomainBonuses = async (): Promise<{
   }
 };
 
-// Zaawansowany system lajków
-export const toggleLike = async (postId: string, userId: string): Promise<boolean> => {
+/**
+ * Przelaczenie lajka.
+ *
+ * === DLACZEGO TO NIE JEST JUZ TRANSAKCJA ===
+ * Bylo `runTransaction`. Wygladalo poprawnie i przez to bylo trudne do
+ * znalezienia: lajki NIE DZIALALY w produkcji, a przycisk pokazywal
+ * "Could not save your like" - komunikat z bloku catch, czyli zlapany wyjatek
+ * udajacy odmowe.
+ *
+ * Zmierzone sonda tylko do odczytu na tej bazie:
+ *   - getDoc / getDocs                      -> OK
+ *   - getCountFromServer                    -> RESOURCE_EXHAUSTED
+ *   - runTransaction NIC NIE ZAPISUJACA     -> RESOURCE_EXHAUSTED
+ *
+ * Czyli wyczerpany limit obejmuje CALA sciezke transakcyjna, a nie tylko
+ * agregacje - dlatego postowanie i komentowanie dzialalo, a lajkowanie nie.
+ * Wczesniejsza poprawka (commit 1c6a673) zdjela z agregacji sam LICZNIK
+ * globalny i to bylo za malo, bo prawdziwa blokada byla o poziom nizej.
+ *
+ * === DLACZEGO TRANSAKCJA BYLA TU ZBEDNA OD POCZATKU ===
+ * Sluzyla wylacznie do odczytania `likedBy`, zeby wiedziec, czy to lajk czy
+ * cofniecie. Ale `arrayUnion` i `arrayRemove` sa IDEMPOTENTNE po stronie
+ * serwera - podwojne dodanie tego samego adresu nie robi duplikatu, a
+ * usuniecie nieobecnego nie jest bledem. Odczyt pod zamkiem chronil wiec
+ * decyzje, ktorej i tak nie da sie zepsuc.
+ *
+ * === CO SIE PRZEZ TO TRACI (uczciwie) ===
+ * Pole `likes` to osobny licznik i `increment` nie jest warunkowy. Przy
+ * DWOCH rownoczesnych klknieciach tego samego uzytkownika w tego samego
+ * posta `likedBy` zostanie poprawne, a `likes` moze rozjechac sie o jeden.
+ * To jest realna cena i swiadomie ja placimy: alternatywa to lajki, ktore
+ * nie dzialaja wcale.
+ *
+ * === PODPOWIEDZI OD WYWOLUJACEGO ===
+ * `hints` pozwala pominac odczyt calkowicie. PostList i tak zna `wasLiked`
+ * (liczy je z post.likedBy, zeby narysowac serduszko) oraz autora posta -
+ * przekazanie ich tutaj zamienia lajk w JEDEN zapis i ZERO odczytow.
+ * Bez podpowiedzi spadamy na zwykly getDoc, ktory dziala.
+ */
+export const toggleLike = async (
+  postId: string,
+  userId: string,
+  hints?: { wasLiked?: boolean; author?: string }
+): Promise<boolean> => {
   try {
     const postRef = doc(db, 'posts', postId);
 
-    // Użyj transakcji zamiast batcha - jest szybsza i bardziej niezawodna
-    return await runTransaction(db, async (transaction) => {
-      const postDoc = await transaction.get(postRef);
+    let isLiked: boolean;
+    let author: string | undefined;
 
+    if (typeof hints?.wasLiked === 'boolean' && hints.author) {
+      isLiked = hints.wasLiked;
+      author = hints.author;
+    } else {
+      // Zwykly odczyt - ta sciezka NIE jest objeta limitem transakcji.
+      const postDoc = await getDoc(postRef);
       if (!postDoc.exists()) {
         throw new Error('Post nie istnieje');
       }
-
       const postData = postDoc.data();
-      const likedBy = postData.likedBy || [];
-      const isLiked = likedBy.includes(userId);
-      
-      // Aktualizuj post z inkrementacją/dekrementacją lajków
-      transaction.update(postRef, {
-        likes: increment(isLiked ? -1 : 1),
-        likedBy: isLiked ? arrayRemove(userId) : arrayUnion(userId)
-      });
-      
-      // Zaktualizuj profil autora tylko jeśli autor != lajkujący (optymalizacja)
-      // Zrobimy to w osobnym wywołaniu, asynchronicznie, aby nie blokować transakcji
-      if (postData.author !== userId) {
-        // Zaktualizujemy autora poza transakcją, aby była ona szybsza
-        setTimeout(async () => {
-          try {
-            const authorRef = doc(db, 'users', postData.author);
-            await updateDoc(authorRef, {
-              likesReceived: increment(isLiked ? -1 : 1),
-              lastActive: serverTimestamp()
-            });
-          } catch (error) {
-            console.error('Error updating author stats:', error);
-          }
-        }, 10);
-      }
-      
-      return !isLiked; // Zwróć true jeśli dodano lajka, false jeśli usunięto
+      isLiked = (postData.likedBy || []).includes(userId);
+      author = postData.author as string;
+    }
+
+    await updateDoc(postRef, {
+      likes: increment(isLiked ? -1 : 1),
+      likedBy: isLiked ? arrayRemove(userId) : arrayUnion(userId)
     });
+
+    const outcome = { isLiked, author };
+
+    // Licznik lajkow autora AKTUALIZUJEMY DOPIERO PO zapisie lajka.
+    // Wczesniej stal setTimeout wewnatrz callbacku transakcji - a Firestore
+    // uruchamia ten callback ponownie przy kazdym konflikcie zapisu, wiec przy
+    // dwoch rownoczesnych lajkach autor dostawal +2 za jeden lajk. Zapis osobno
+    // jest z zalozenia nieatomowy, ale przynajmniej wykonuje sie raz.
+    if (outcome.author && outcome.author !== userId) {
+      try {
+        await updateDoc(doc(db, 'users', outcome.author), {
+          likesReceived: increment(outcome.isLiked ? -1 : 1),
+          lastActive: serverTimestamp()
+        });
+      } catch (error) {
+        // Nie przewracamy lajka z powodu statystyk autora - lajk juz sie zapisal.
+        console.error('Error updating author stats:', error);
+      }
+    }
+
+    /**
+     * GLOBALNY LICZNIK LAJKOW - jeden zapis, zero agregacji.
+     *
+     * === DLACZEGO NIE LICZYMY TEGO NA ZADANIE ===
+     * Lajki nie maja wlasnej kolekcji - siedza jako pole `likes` na postach,
+     * wiec ich policzenie to SUMA po 263 613 dokumentach. Jedyna tania droga
+     * to `getAggregateFromServer(sum('likes'))`.
+     *
+     * A agregacje w tym projekcie NIE DZIALAJA. Zmierzone: `count()` zwraca
+     * RESOURCE_EXHAUSTED nawet dla kolekcji z ZEREM dokumentow, podczas gdy
+     * zwykle `getDocs` odpowiada normalnie. Czyli wyczerpany jest limit
+     * LICZBY ZAPYTAN agregujacych, nie ilosci danych - i nie odnowil sie przez
+     * kilkanascie godzin.
+     *
+     * Licznik przyrostowy uniezaleznia te liczbe od tamtego limitu na zawsze:
+     * jeden `increment` przy lajku zamiast sumowania cwiercmiliona dokumentow
+     * przy kazdym pytaniu.
+     *
+     * === CZEGO TA LICZBA NIE OBEJMUJE ===
+     * Lajkow sprzed wprowadzenia licznika. Dlatego `globalStats` trzyma je
+     * w polu `likesSince`, a nie `likes` - interfejs ma powiedziec, od kiedy
+     * liczy, zamiast podawac niepelna sume jako calosc. Gdy limit agregacji
+     * wroci, jednorazowa suma uzupelni stan poczatkowy.
+     *
+     * Zapis NIE MOZE wywrocic lajka - lajk juz sie zapisal w transakcji wyzej.
+     */
+    void (async () => {
+      try {
+        const { doc: fsDoc, setDoc: fsSetDoc, increment: fsIncrement } = await import('firebase/firestore');
+        await fsSetDoc(
+          fsDoc(db, 'globalStats', 'current'),
+          { likesSince: fsIncrement(outcome.isLiked ? -1 : 1) },
+          { merge: true }
+        );
+      } catch (counterError) {
+        console.warn('⚠️ Nie udalo sie zaktualizowac licznika lajkow:', counterError);
+      }
+    })();
+
+    return !outcome.isLiked; // true jesli dodano lajka, false jesli usunieto
   } catch (error) {
     console.error('Error toggling like:', error);
-    throw error;
-  }
-};
-
-// Funkcja do przeliczania lajków użytkownika
-export const recalculateUserLikes = async (userId: string) => {
-  try {
-    console.log('Przeliczam lajki dla użytkownika:', userId);
-    
-    // Pobierz wszystkie posty użytkownika
-    const postsRef = collection(db, 'posts');
-    const postsQuery = query(postsRef, where('author', '==', userId));
-    const postsSnapshot = await getDocs(postsQuery);
-    
-    let totalLikes = 0;
-    
-    // Zlicz wszystkie lajki z postów
-    postsSnapshot.forEach((doc) => {
-      const postData = doc.data();
-      totalLikes += postData.likes || 0;
-    });
-    
-    // Aktualizuj profil użytkownika
-    const userRef = doc(db, 'users', userId);
-    await updateDoc(userRef, {
-      likesReceived: totalLikes,
-      lastCalculated: serverTimestamp()
-    });
-    
-    console.log('Zaktualizowano licznik lajków:', totalLikes);
-    return totalLikes;
-  } catch (error) {
-    console.error('Błąd podczas przeliczania lajków:', error);
-    throw error;
-  }
-};
-
-// Funkcja do usuwania lajków posta
-export const deletePostLikes = async (postId: string) => {
-  try {
-    console.log('Usuwam lajki dla posta:', postId);
-    
-    // Pobierz wszystkie lajki dla danego posta
-    const likesRef = collection(db, 'likes');
-    const likesQuery = query(likesRef, where('postId', '==', postId));
-    const likesSnapshot = await getDocs(likesQuery);
-    
-    // Użyj batcha do usunięcia wszystkich lajków
-    const batch = writeBatch(db);
-    likesSnapshot.forEach((doc) => {
-      batch.delete(doc.ref);
-    });
-    
-    await batch.commit();
-    console.log('Usunięto lajki:', likesSnapshot.size);
-    
-    // Pobierz autora posta
-    const postRef = doc(db, 'posts', postId);
-    const postDoc = await getDoc(postRef);
-    
-    if (postDoc.exists()) {
-      const authorId = postDoc.data().author;
-      // Przelicz lajki dla autora
-      await recalculateUserLikes(authorId);
-    }
-  } catch (error) {
-    console.error('Błąd podczas usuwania lajków:', error);
     throw error;
   }
 };
@@ -767,8 +541,12 @@ export const deletePost = async (postId: string, authorAddress: string) => {
     const postData = postSnap.data();
     
     // ✅ NAPRAWKA: Sprawdź czy użytkownik to autor LUB admin
-    const isAdmin = authorAddress.toLowerCase() === ADMIN_ADDRESS.toLowerCase();
-    const isAuthor = postData.author === authorAddress;
+    // Adresy porownujemy bez wzgledu na wielkosc liter: w bazie leza zapisane
+    // raz w checksumie, raz malymi. Porownanie znak w znak odbieralo autorowi
+    // prawo do skasowania wlasnego posta.
+    const isAdmin = authorAddress.toLowerCase() === ADMIN_ADDRESS;
+    const isAuthor = typeof postData.author === 'string'
+      && postData.author.toLowerCase() === authorAddress.toLowerCase();
     
     if (!isAuthor && !isAdmin) {
       throw new Error('Unauthorized to delete this post');
@@ -809,53 +587,48 @@ export const deletePost = async (postId: string, authorAddress: string) => {
   }
 };
 
-// System powiadomień
-export const addNotification = async (userId: string, notification: {
-  type: 'LIKE' | 'COMMENT' | 'MENTION' | 'FOLLOW';
-  fromUser: string;
-  postId?: string;
-  commentId?: string;
-  timestamp: number;
-}): Promise<void> => {
-  const notificationsRef = collection(db, `users/${userId}/notifications`);
-  await addDoc(notificationsRef, {
-    ...notification,
-    read: false,
-    timestamp: serverTimestamp()
-  });
-};
-
-// Pobierz nieprzeczytane powiadomienia
-export const fetchUnreadNotifications = async (userId: string) => {
-  const notificationsRef = collection(db, `users/${userId}/notifications`);
-  const q = query(
-    notificationsRef,
-    where('read', '==', false),
-    firestoreOrderBy('timestamp', 'desc'),
-    firestoreLimit(20)
-  );
-  
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data(),
-    timestamp: convertTimestamp(doc.data().timestamp as Timestamp)
-  }));
-};
-
-// Oznacz powiadomienie jako przeczytane
-export const markNotificationAsRead = async (userId: string, notificationId: string): Promise<void> => {
-  const notificationRef = doc(db, `users/${userId}/notifications/${notificationId}`);
-  await updateDoc(notificationRef, {
-    read: true
-  });
-};
+/*
+ * === POWIADOMIENIA MIESZKAJA W app/utils/friends/notifications.ts ===
+ *
+ * Stal tu DRUGI, rownolegly system powiadomien (addNotification,
+ * fetchUnreadNotifications, markNotificationAsRead) piszacy do tej samej
+ * subkolekcji users/{id}/notifications, ale INNYM ksztaltem dokumentu:
+ * pole `read` zamiast `isRead` i `fromUser` zamiast `fromUserId`. Zaden
+ * z tych trzech eksportow nie mial juz ani jednego wolajacego (zweryfikowane
+ * grepem po calym repo), a jedyny slad po nim to zakomentowany import
+ * w utils/friends/index.ts.
+ *
+ * Zostawienie go bylo realnym ryzykiem: pierwsze uzycie zapisaloby
+ * powiadomienie, ktorego zywy system nie policzy jako nieprzeczytane
+ * (pyta o `isRead`), czyli kropka na dzwonku milczalaby o istniejacym
+ * wpisie. Jeden system, jeden ksztalt dokumentu, jedno miejsce w kodzie.
+ */
 
 // Utwórz nowy post z zaawansowanymi opcjami
-export const createPost = async (post: { 
-  author: string; 
-  content: string; 
+/**
+ * Post powstal, ale nie udalo sie zapisac jego platnego fragmentu.
+ * Wlasna klasa, bo to jest CALKIEM INNY stan niz "post sie nie utworzyl" -
+ * uzytkownik nie ma publikowac drugi raz.
+ */
+export class PremiumContentError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PremiumContentError';
+  }
+}
+
+export const createPost = async (post: {
+  author: string;
+  content: string;
   timestamp: number;
+  /**
+   * Tresc premium. NIE trafia do dokumentu posta - feed czyta posty klienckim
+   * SDK, wiec wszystko, co tam wpiszemy, jest publiczne niezaleznie od UI.
+   * Zapisuje ja trasa /api/premium do kolekcji poza zasiegiem przegladarki.
+   */
+  premiumContent?: string;
+  unlockPrice?: string;
+  unlockToken?: 'ETH' | 'USDC';
   image?: string | null;
   video?: string | null;
   tags?: string[];
@@ -863,7 +636,7 @@ export const createPost = async (post: {
   visibility?: 'public' | 'followers' | 'private';
   txHash?: string; // Keep this as it now represents the Zora creation tx hash
   zoraCoinAddress?: string; // <-- ADDED
-  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain'; // Add network parameter to identify the source network
+  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood'; // Add network parameter to identify the source network
   musicTrack?: { // 🎵 Dodaj obsługę załączników muzycznych
     id: string;
     name: string;
@@ -884,12 +657,19 @@ export const createPost = async (post: {
   };
 }): Promise<string> => { // Zmieniamy typ zwracany na Promise<string>
   try {
+    // Tresc premium wyjmujemy z danych posta ZANIM cokolwiek trafi do Firestore.
+    // Dokument posta niesie tylko fakt istnienia platnej czesci i jej cene;
+    // sama tresc idzie osobnym kanalem, do kolekcji, ktorej klient nie czyta.
+    const { premiumContent, ...postFields } = post;
+    const hasPremium = typeof premiumContent === 'string' && premiumContent.trim() !== '';
+
     const postData = {
-      ...post,
+      ...postFields,
       timestamp: serverTimestamp(),
       likes: 0,
       likedBy: [],
       comments: [],
+      commentsCount: 0,
       isPinned: false,
       image: post.image || null,
       video: post.video || null,
@@ -917,7 +697,7 @@ export const createPost = async (post: {
 
     // 3. Jeśli autor ma BaseName, dodaj kopię posta do `baseNameFeed`
     if (hasBaseName) {
-      console.log(`👤 Użytkownik ${post.author} ma BaseName. Dodaję post do baseNameFeed.`);
+      console.log('👤 Autor ma BaseName - post trafia tez do baseNameFeed.');
       const baseNameFeedCollection = collection(db, 'baseNameFeed');
       // Użyj tego samego ID dla posta w obu kolekcjach
       const baseNameFeedPostRef = doc(baseNameFeedCollection, newPostRef.id);
@@ -936,14 +716,52 @@ export const createPost = async (post: {
     await batch.commit();
     
     console.log(`✅ Post created with ID: ${newPostRef.id}`);
-    
-    // 6. Check if this is user's first post and award referral bonus
+
+    // 5b. Tresc premium - osobnym kanalem, po utworzeniu posta.
+    //
+    // Trasa /api/premium zapisuje ja do kolekcji poza zasiegiem przegladarki
+    // i DOPIERO POTEM oznacza post jako platny. Kolejnosc jest celowa: gdy
+    // zapis padnie, post zostaje zwyklym postem, zamiast dostac cene bez
+    // tresci. Autor dowiaduje sie o tym z rzuconego bledu.
+    if (hasPremium) {
+      const response = await fetch('/api/premium', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          postId: newPostRef.id,
+          content: premiumContent,
+          unlockPrice: post.unlockPrice,
+          unlockToken: post.unlockToken,
+        }),
+      });
+
+      if (!response.ok) {
+        let detail = 'Premium content could not be saved.';
+        try {
+          const data = (await response.json()) as { error?: string };
+          if (typeof data.error === 'string' && data.error) detail = data.error;
+        } catch {
+          // odpowiedz bez JSON - zostajemy przy komunikacie domyslnym
+        }
+        console.error('❌ Zapis tresci premium nie powiodl sie:', response.status, detail);
+        throw new PremiumContentError(`${detail} Your post was published without the paid section.`);
+      }
+    }
+
+    // 6. Check if this is user's first post and award referral bonus.
+    //
+    // firestoreLimit(2) wystarczy, zeby odroznic "dokladnie jeden post" od
+    // "wiecej niz jeden". Bez tego limitu KAZDE opublikowanie posta czytalo
+    // CALA historie autora - uzytkownik z 500 postami placil 500 odczytow za
+    // sprawdzenie, ktore i tak moze dac tylko odpowiedz "nie, nie pierwszy".
     const userPostsQuery = query(
       collection(db, 'posts'),
-      where('author', '==', post.author)
+      where('author', '==', post.author),
+      firestoreLimit(2)
     );
     const userPostsSnapshot = await getDocs(userPostsQuery);
-    
+
     // If this is user's first post (only the one just created)
     if (userPostsSnapshot.size === 1) {
       // Dynamic import to avoid circular dependencies
@@ -954,13 +772,19 @@ export const createPost = async (post: {
       
       // Award first post bonus
       await awardFirstPostBonus(post.author);
-      console.log(`🎁 Checked first post bonus and activated referral for ${post.author}`);
+      console.log('🎁 Checked first post bonus and activated referral');
     }
     
     // Zwróć ID nowego posta
     return newPostRef.id;
 
   } catch (error) {
+    // Blad zapisu tresci premium przepuszczamy z wlasnym komunikatem: post
+    // ISTNIEJE i jest widoczny, nie powstal tylko jego platny fragment.
+    // Zamiana tego na "Failed to create post" mowilaby uzytkownikowi
+    // nieprawde i kazalaby publikowac drugi raz.
+    if (error instanceof PremiumContentError) throw error;
+
     console.error('❌ Error creating post:', error);
     throw new Error('Failed to create post in Firebase');
   }
@@ -973,6 +797,20 @@ interface FetchPostsParams {
   startAfter?: QueryDocumentSnapshot | null;
   orderBy?: 'newest' | 'oldest';
   authorFilter?: string | null;
+  /**
+   * Lista autorow - feed obserwowanych.
+   *
+   * Do tej pory zakladka "Follows" przekazywala `authorFilter: address`, czyli
+   * WLASNY adres uzytkownika, i pokazywala jego wlasne posty. Etykieta mowila
+   * "Follows", tresc byla "moje" - a caly graf obserwowanych nie mial zadnego
+   * wplywu na feed.
+   *
+   * LIMIT: Firestore przyjmuje w `in` najwyzej 30 wartosci. Kto obserwuje
+   * wiecej, dostaje 30 pierwszych z listy - wolajacy MA o tym powiedziec,
+   * zamiast po cichu ucinac. Cicha wersja tego ograniczenia bylaby feedem,
+   * ktory gubi ludzi bez podania powodu.
+   */
+  authorsIn?: string[] | null;
   tagFilter?: string | null;
   searchTerm?: string | null;
   networkFilter?: 'base' | 'basecamp' | null; // Add network filter parameter
@@ -991,6 +829,7 @@ export const fetchPosts = async ({
   startAfter = null, 
   orderBy = 'newest',
   authorFilter = null,
+  authorsIn = null,
   tagFilter = null,
   searchTerm = null,
   networkFilter = null // Default to null (no filtering)
@@ -1010,7 +849,13 @@ export const fetchPosts = async ({
     if (authorFilter) {
       queryConstraints.push(where('author', '==', authorFilter));
     }
-    
+
+    // Feed obserwowanych. `in` ma twardy limit 30 wartosci - wiecej Firestore
+    // odrzuca bledem, nie obcieciem, wiec tniemy sami i to jawnie.
+    if (authorsIn && authorsIn.length > 0) {
+      queryConstraints.push(where('author', 'in', authorsIn.slice(0, 30)));
+    }
+
     if (tagFilter) {
       queryConstraints.push(where('tags', 'array-contains', tagFilter));
     }
@@ -1033,78 +878,18 @@ export const fetchPosts = async ({
     const postsQuery = query(postsCollection, ...queryConstraints);
     const postsSnapshot = await getDocs(postsQuery);
     
-    // Pobierz dokumenty
-    const posts: ExtendedPost[] = [];
-    
-    // Referencja do ostatniego dokumentu dla paginacji
-    let lastVisible: QueryDocumentSnapshot | null = null;
-    
-    if (!postsSnapshot.empty) {
-      lastVisible = postsSnapshot.docs[postsSnapshot.docs.length - 1];
-      
-      // Iteruj po dokumentach i twórz obiekty postów
-      for (const postDoc of postsSnapshot.docs) {
-        const postData = postDoc.data();
-        const post: ExtendedPost = {
-          id: postDoc.id,
-          author: postData.author,
-          content: postData.content,
-          timestamp: postData.timestamp instanceof Timestamp 
-            ? postData.timestamp.toMillis() 
-            : (postData.timestamp || Date.now()),
-          likes: postData.likes || 0,
-          likedBy: postData.likedBy || [],
-          comments: postData.comments || [], // Użyj już zapisanych komentarzy zamiast ponownego pobierania
-          tags: postData.tags || [],
-          mentions: postData.mentions || [],
-          image: postData.image || null,
-          video: postData.video || null,
-          txHash: postData.txHash || null,
-          lastEdited: postData.lastEdited || null,
-          zoraCoinAddress: postData.zoraCoinAddress || null,
-          network: postData.network || 'base', // Include network property and default to 'base' for backward compatibility
-          musicTrack: postData.musicTrack || null, // 🎵 Pobierz dane muzyki z Firebase
-          isPinned: postData.isPinned || false,
-          pinnedAt: postData.pinnedAt instanceof Timestamp 
-            ? postData.pinnedAt.toMillis() 
-            : (postData.pinnedAt || undefined),
-          pinnedBy: postData.pinnedBy || undefined,
-          isPaidPin: postData.isPaidPin || false,
-          paidPinExpiresAt: postData.paidPinExpiresAt instanceof Timestamp 
-            ? postData.paidPinExpiresAt.toMillis() 
-            : (postData.paidPinExpiresAt || undefined),
-        };
-        
-        // Dodatkowe filtrowanie po stronie klienta dla wyszukiwania (jeśli potrzebne)
-        if (searchTerm && typeof post.content === 'string' && 
-            !post.content.toLowerCase().includes(searchTerm.toLowerCase())) {
-          continue; // Pomiń post, jeśli nie zawiera szukanej frazy
-        }
-        
-        // Remove this debugging log to reduce console output
-        // console.log(`Post ${post.id} network: ${post.network}, content: ${post.content.substring(0, 20)}...`);
-        
-        posts.push(post);
-      }
-    }
-    
-    // Sortuj posty: przypięte na górze, potem reszta według kolejności
-    posts.sort((a, b) => {
-      // Jeśli jeden post jest przypięty, a drugi nie
-      if (a.isPinned && !b.isPinned) return -1;
-      if (!a.isPinned && b.isPinned) return 1;
-      
-      // Jeśli oba posty są przypięte, sortuj po czasie przypięcia (najnowsze przypięcie pierwsze)
-      if (a.isPinned && b.isPinned) {
-        const aPinnedAt = a.pinnedAt || 0;
-        const bPinnedAt = b.pinnedAt || 0;
-        return bPinnedAt - aPinnedAt;
-      }
-      
-      // Jeśli żaden post nie jest przypięty, zachowaj oryginalną kolejność (już posortowaną przez Firebase)
-      return 0;
-    });
-    
+    // Mapowanie dokumentow na obiekty postow (wspolne z feedem BaseName)
+    const lastVisible: QueryDocumentSnapshot | null = postsSnapshot.empty
+      ? null
+      : postsSnapshot.docs[postsSnapshot.docs.length - 1];
+
+    const needle = searchTerm ? searchTerm.toLowerCase() : null;
+    const posts = sortPinnedFirst(
+      postsSnapshot.docs
+        .map(mapPostDoc)
+        // Doszukiwanie po stronie klienta - Firestore nie umie "zawiera".
+        .filter(post => !needle || (typeof post.content === 'string' && post.content.toLowerCase().includes(needle)))
+    );
     // Zwróć posty wraz z informacją o ostatnim widocznym dokumencie do paginacji
     return { 
       posts, 
@@ -1149,38 +934,7 @@ export const fetchBaseNameFeedPosts = async ({
     const postsQuery = query(postsCollection, ...queryConstraints);
     const postsSnapshot = await getDocs(postsQuery);
     
-    const posts: ExtendedPost[] = postsSnapshot.docs.map(doc => {
-      const postData = doc.data();
-      return {
-        id: doc.id,
-        author: postData.author,
-        content: postData.content,
-        timestamp: postData.timestamp instanceof Timestamp 
-          ? postData.timestamp.toMillis() 
-          : (postData.timestamp || Date.now()),
-        likes: postData.likes || 0,
-        likedBy: postData.likedBy || [],
-        comments: postData.comments || [],
-        tags: postData.tags || [],
-        mentions: postData.mentions || [],
-        image: postData.image || null,
-        video: postData.video || null,
-        txHash: postData.txHash || null,
-        lastEdited: postData.lastEdited || null,
-        zoraCoinAddress: postData.zoraCoinAddress || null,
-        network: postData.network || 'base',
-        musicTrack: postData.musicTrack || null, // 🎵 Pobierz dane muzyki z Firebase
-        isPinned: postData.isPinned || false,
-        pinnedAt: postData.pinnedAt instanceof Timestamp 
-          ? postData.pinnedAt.toMillis() 
-          : (postData.pinnedAt || undefined),
-        pinnedBy: postData.pinnedBy || undefined,
-        isPaidPin: postData.isPaidPin || false,
-        paidPinExpiresAt: postData.paidPinExpiresAt instanceof Timestamp 
-          ? postData.paidPinExpiresAt.toMillis() 
-          : (postData.paidPinExpiresAt || undefined),
-      };
-    });
+    const posts: ExtendedPost[] = postsSnapshot.docs.map(mapPostDoc);
 
     const lastVisible = postsSnapshot.docs.length > 0 
       ? postsSnapshot.docs[postsSnapshot.docs.length - 1] 
@@ -1190,23 +944,6 @@ export const fetchBaseNameFeedPosts = async ({
   } catch (error) {
     console.error('Error fetching BaseName feed posts:', error);
     throw error;
-  }
-};
-
-// Funkcja do pobierania postów (wersja uproszczona)
-export const fetchPostsSimple = async () => {
-  try {
-    const postsCollection = collection(db, 'posts');
-    const q = query(
-      postsCollection, 
-      firestoreOrderBy('timestamp', 'desc'),
-      firestoreLimit(20)
-    );
-    const postSnapshots = await getDocs(q);
-    
-    // ... existing code ...
-  } catch (error) {
-    // ... existing code ...
   }
 };
 
@@ -1254,8 +991,19 @@ export const addComment = async (postId: string, comment: {
   likedBy: string[];
   mentions: string[];
   txHash?: string | null;
-  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain';
-}): Promise<void> => {
+  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood';
+  /**
+   * ZWRACA ID UTWORZONEGO KOMENTARZA.
+   *
+   * Wczesniej bylo `Promise<void>`, wiec wolajacy nie mial jak poznac
+   * identyfikatora i wstawial do listy komentarz z ID "temp-...". Skutek widzial
+   * uzytkownik: swiezo dodanego komentarza NIE DALO SIE polubic ani usunac, bo
+   * obie operacje szly pod dokument `comments/temp-123`, ktory nie istnieje -
+   * i konczyly sie falszywym komunikatem o awarii plus pelnym odswiezeniem feedu.
+   *
+   * Zmiana jest CZYSTO DODAJACA: kto ignorowal wynik, dziala dalej bez zmian.
+   */
+}): Promise<string> => {
   // Pobierz nazwę autora komentarza
   const authorName = await getUserName(comment.author);
   
@@ -1274,23 +1022,25 @@ export const addComment = async (postId: string, comment: {
     onchain: comment.txHash ? true : false // Oznacz, czy komentarz jest na blockchainie
   });
 
-  // Dodaj komentarz do tablicy comments w dokumencie posta
+  // Post dostaje TYLKO podbicie licznika. Wczesniej caly komentarz byl
+  // doklejany do tablicy w dokumencie posta - dokument tyl z kazdym
+  // komentarzem i kazdy odczyt feedu ciagnal pelna historie rozmow.
+  // Tresc zyje w kolekcji `comments` (zapis wyzej); feed czyta licznik,
+  // a sekcja komentarzy dociaga tresci przy rozwinieciu.
   const postRef = doc(db, 'posts', postId);
   const postDoc = await getDoc(postRef);
-  
+
   if (postDoc.exists()) {
     const postData = postDoc.data();
+    // Post z licznikiem dostaje ATOMOWY increment - dwa rownolegle komentarze
+    // nie zgubia podbicia. Post sprzed licznikow (pole nie istnieje) dostaje
+    // wartosc DOKLADNA z dlugosci tablicy legacy: migracja przy dotknieciu,
+    // stare posty bez ruchu nie kosztuja ani jednego zapisu.
     await updateDoc(postRef, {
-      comments: [...(postData.comments || []), {
-        id: commentDoc.id,
-        ...comment,
-        authorName, // Dodaj nazwę autora do komentarza w poście
-        timestamp: Date.now(),
-        likes: 0,
-        likedBy: [],
-        mentions: [],
-        network: comment.network || null // Dodaj network komentarza
-      }]
+      commentsCount:
+        typeof postData.commentsCount === 'number'
+          ? increment(1)
+          : (postData.comments || []).length + 1
     });
 
     // Aktualizuj statystyki użytkownika
@@ -1300,6 +1050,42 @@ export const addComment = async (postId: string, comment: {
       lastActive: serverTimestamp()
     });
   }
+
+  // Zwracamy ID nawet gdy post zniknal miedzy zapisem komentarza a odczytem -
+  // dokument w kolekcji `comments` juz powstal i ma ten identyfikator.
+  return commentDoc.id;
+};
+
+/**
+ * Komentarze posta z kolekcji `comments` - dociagane DOPIERO przy rozwinieciu
+ * sekcji komentarzy (PostList), nigdy dla calego feedu.
+ *
+ * Nowe komentarze zyja wylacznie tutaj (dokument posta niesie sam licznik),
+ * stare bywaja tylko w tablicy posta - wolajacy SCALA oba zrodla po id.
+ * Indeks (postId, timestamp desc) jest wdrozony, wiec zapytanie jest tanie;
+ * wynik odwracamy do rosnacej chronologii, w ktorej rysuje sie watek.
+ */
+export const fetchCommentsForPost = async (postId: string): Promise<Comment[]> => {
+  const snap = await getDocs(
+    query(
+      collection(db, 'comments'),
+      where('postId', '==', postId),
+      firestoreOrderBy('timestamp', 'desc'),
+      firestoreLimit(200)
+    )
+  );
+  return snap.docs
+    .map((d) => {
+      const data = d.data();
+      return {
+        ...data,
+        id: d.id,
+        timestamp: toMillis(data.timestamp) || Date.now(),
+        likes: data.likes || 0,
+        likedBy: data.likedBy || [],
+      } as Comment;
+    })
+    .reverse();
 };
 
 // Funkcja do pobierania profilu użytkownika
@@ -1315,7 +1101,6 @@ export const fetchUserProfile = async (address: string, options: { loadSocialLin
     
     if (userDoc.exists()) {
       const data = userDoc.data();
-      console.log("Loaded user profile from Firebase:", data);
       return {
         id: userDoc.id,
         name: data.name,
@@ -1323,12 +1108,8 @@ export const fetchUserProfile = async (address: string, options: { loadSocialLin
         postsCount: data.postsCount || 0, // 💡 Użyj zapisanej wartości zamiast liczenia na nowo
         likesReceived: data.likesReceived || 0,
         address: address,
-        joinedAt: data.joinedAt instanceof Timestamp 
-          ? data.joinedAt.toMillis() 
-          : (data.joinedAt || Date.now()),
-        lastActive: data.lastActive instanceof Timestamp 
-          ? data.lastActive.toMillis() 
-          : (data.lastActive || Date.now()),
+        joinedAt: toMillis(data.joinedAt) || Date.now(),
+        lastActive: toMillis(data.lastActive) || Date.now(),
         bio: data.bio,
         socialLinks: loadSocialLinks ? data.socialLinks || {
           twitter: '',
@@ -1345,7 +1126,7 @@ export const fetchUserProfile = async (address: string, options: { loadSocialLin
     
     // 🆕 PRZYWRÓCENIE ORYGINALNEJ FUNKCJONALNOŚCI: Automatyczne tworzenie konta w Firebase
     // Kiedy użytkownik po raz pierwszy łączy portfel, od razu tworzymy mu dokument w bazie
-    console.log(`🆕 Tworzę nowe konto użytkownika dla ${address}`);
+    console.log('🆕 Tworzę nowe konto użytkownika');
     
     const newUserProfile = {
       walletAddress: address,
@@ -1376,7 +1157,7 @@ export const fetchUserProfile = async (address: string, options: { loadSocialLin
     
     // Zapisz nowy profil do Firebase
     await setDoc(userRef, newUserProfile);
-    console.log(`✅ Utworzono nowe konto użytkownika: ${address}`);
+
     
     // 🎉 UWAGA: Base Name i bonus 1000 punktów będą dodane automatycznie 
     // przez useEffect w basechat/page.tsx gdy baseName się załaduje
@@ -1482,35 +1263,13 @@ export const saveProfileName = async (address: string, name: string, suffix?: 's
       lastUpdated: serverTimestamp()
     }, { merge: true });
     
-    // Jeśli to BaseName, dodaj bonus 1000 punktów
-    if (isBaseName) {
-      await addBaseNameBonusToUser(address);
+    // Bonusy domenowe - jedna petla po tabeli zamiast pieciu takich samych ifow.
+    for (const bonus of DOMAIN_BONUS_LIST) {
+      if (name.endsWith(bonus.suffix) || suffix === bonus.key) {
+        await addDomainBonusToUser(address, bonus);
+      }
     }
-    
-    // Jeśli to .sphere, dodaj bonus 1500 punktów
-    if (isSphere || suffix === 'sphere') {
-      console.log(`🌐 Próba dodania sphereBonus dla ${address}, isSphere: ${isSphere}, suffix: ${suffix}`);
-      await addSphereBonusToUser(address);
-    }
-    
-    // Jeśli to .camper, dodaj bonus 1000 punktów
-    if (isCamper || suffix === 'camper') {
-      console.log(`🏕️ Próba dodania camperBonus dla ${address}, isCamper: ${isCamper}, suffix: ${suffix}`);
-      await addCamperBonusToUser(address);
-    }
-    
-    // Jeśli to .celo, dodaj bonus 1250 punktów
-    if (isCelo || suffix === 'celo') {
-      console.log(`💛 Próba dodania celoBonus dla ${address}, isCelo: ${isCelo}, suffix: ${suffix}`);
-      await addCeloBonusToUser(address);
-    }
-    
-    // Jeśli to .world, dodaj bonus 1250 punktów
-    if (isWorld || suffix === 'world') {
-      console.log(`🌍 Próba dodania worldBonus dla ${address}, isWorld: ${isWorld}, suffix: ${suffix}`);
-      await addWorldBonusToUser(address);
-    }
-    
+
     return true;
   } catch (error) {
     console.error('Error saving profile name:', error);
@@ -1534,40 +1293,43 @@ export const getProfileName = async (address: string): Promise<string | null> =>
   }
 };
 
-// Prosta funkcja do pobierania wielu nazw profilowych
-export const getBulkUserNames = async (addresses: string[]): Promise<{[key: string]: {name: string, avatar?: string}}> => {
-  console.warn('⚠️ getBulkUserNames is DEPRECATED - use getBulkUserNamesOptimized for 95% cost reduction');
-  return getBulkUserNamesOptimized(addresses);
-};
-
 // Funkcja do edycji komentarza
 export const editComment = async (postId: string, commentId: string, newContent: string) => {
   try {
+    // Najpierw dokument w kolekcji `comments` - tam zyja wszystkie nowe
+    // komentarze i wiekszosc starych. Tablica w poscie zostaje SPOJNA tylko
+    // dla wpisow, ktore w niej sa (legacy); nowych nigdy do niej nie piszemy.
+    const commentRef = doc(db, 'comments', commentId);
+    const commentDoc = await getDoc(commentRef);
+
+    if (commentDoc.exists()) {
+      await updateDoc(commentRef, { content: newContent, lastEdited: serverTimestamp() });
+    }
+
     const postRef = doc(db, 'posts', postId);
     const postDoc = await getDoc(postRef);
-    
     if (!postDoc.exists()) {
+      if (commentDoc.exists()) return true;
       throw new Error('Post not found');
     }
-    
+
     const postData = postDoc.data();
     const comments = postData.comments || [];
     const commentIndex = comments.findIndex((c: any) => c.id === commentId);
-    
-    if (commentIndex === -1) {
+
+    // Wpis w tablicy aktualizujemy tylko wtedy, gdy tam JEST - stary
+    // komentarz sprzed kolekcji. Brak w obu miejscach to dopiero blad.
+    if (commentIndex !== -1) {
+      comments[commentIndex] = {
+        ...comments[commentIndex],
+        content: newContent,
+        lastEdited: Date.now()
+      };
+      await updateDoc(postRef, { comments });
+    } else if (!commentDoc.exists()) {
       throw new Error('Comment not found');
     }
-    
-    // Aktualizuj komentarz
-    comments[commentIndex] = {
-      ...comments[commentIndex],
-      content: newContent,
-      lastEdited: serverTimestamp()
-    };
-    
-    // Zapisz zaktualizowane komentarze
-    await updateDoc(postRef, { comments });
-    
+
     return true;
   } catch (error) {
     console.error('Error editing comment:', error);
@@ -1578,7 +1340,6 @@ export const editComment = async (postId: string, commentId: string, newContent:
 // Funkcja do usuwania komentarza - dodaję sprawdzenie uprawnień
 export const deleteComment = async (postId: string, commentId: string, userId: string) => {
   try {
-    console.log(`[DEBUG] Usuwanie komentarza ${commentId} z posta ${postId} przez ${userId}`);
     
     // 1. Przygotuj batch do operacji atomowych
     const batch = writeBatch(db);
@@ -1588,144 +1349,185 @@ export const deleteComment = async (postId: string, commentId: string, userId: s
     const postDoc = await getDoc(postRef);
     
     if (!postDoc.exists()) {
-      console.error(`[DEBUG] Post ${postId} nie istnieje!`);
+      console.error(`Post ${postId} nie istnieje!`);
       throw new Error('Post not found');
     }
     
     const postData = postDoc.data();
     const comments = postData.comments || [];
-    
-    console.log(`[DEBUG] Znaleziono ${comments.length} komentarzy w poście ${postId}`);
-    
-    // Znajdź komentarz który ma zostać usunięty
-    const commentToDelete = comments.find((c: any) => c.id === commentId);
-    
+
+    // Komentarz moze zyc w tablicy posta (legacy), w kolekcji `comments`
+    // (wszystkie nowe) albo w obu. Do sprawdzenia uprawnien wystarczy
+    // KTORAKOLWIEK kopia.
+    const legacyComment = comments.find((c: any) => c.id === commentId);
+    const commentRef = doc(db, 'comments', commentId);
+    const commentDoc = legacyComment ? null : await getDoc(commentRef);
+    const commentToDelete = legacyComment ?? (commentDoc?.exists() ? commentDoc.data() : null);
+
     if (!commentToDelete) {
       throw new Error('Comment not found');
     }
-    
+
     // Sprawdź uprawnienia - tylko autor komentarza lub admin mogą usuwać
-    const isAdmin = userId.toLowerCase() === ADMIN_ADDRESS.toLowerCase();
-    const isAuthor = commentToDelete.author === userId;
-    
+    // (adresy bez wzgledu na wielkosc liter - patrz komentarz w deletePost)
+    const isAdmin = userId.toLowerCase() === ADMIN_ADDRESS;
+    const isAuthor = typeof commentToDelete.author === 'string'
+      && commentToDelete.author.toLowerCase() === userId.toLowerCase();
+
     if (!isAdmin && !isAuthor) {
       throw new Error('Unauthorized to delete this comment');
     }
-    
-    // 3. Znajdź odpowiedzi do usuwanego komentarza
-    const repliesToDelete = comments.filter((c: any) => c.replyTo === commentId);
-    console.log(`[DEBUG] Znaleziono ${repliesToDelete.length} odpowiedzi do usuwanego komentarza`);
-    
-    // 4. Usuń główny komentarz z kolekcji comments
+
+    // 3. Odpowiedzi zbieramy z OBU miejsc: tablica (legacy) + kolekcja (nowe).
+    // Rownosc+rownosc nie wymaga indeksu zlozonego.
+    const legacyReplies = comments.filter((c: any) => c.replyTo === commentId);
+    let collectionReplyIds: string[] = [];
     try {
-      const commentRef = doc(db, 'comments', commentId);
-      batch.delete(commentRef);
+      const replySnap = await getDocs(
+        query(collection(db, 'comments'), where('postId', '==', postId), where('replyTo', '==', commentId))
+      );
+      collectionReplyIds = replySnap.docs.map((d) => d.id);
     } catch (error) {
-      console.error(`[DEBUG] Błąd podczas usuwania komentarza z głównej kolekcji:`, error);
+      console.error('Błąd odczytu odpowiedzi z kolekcji comments:', error);
     }
-    
-    // 5. Usuń odpowiedzi z kolekcji comments
-    for (const reply of repliesToDelete) {
-      try {
-        const replyRef = doc(db, 'comments', reply.id);
-        batch.delete(replyRef);
-      } catch (error) {
-        console.error(`[DEBUG] Błąd podczas usuwania odpowiedzi ${reply.id}:`, error);
-      }
+    const replyIds = Array.from(
+      new Set([...legacyReplies.map((r: any) => r.id), ...collectionReplyIds])
+    ).filter(Boolean);
+
+    // 4-5. Usuń główny komentarz i odpowiedzi z kolekcji comments
+    batch.delete(commentRef);
+    for (const replyId of replyIds) {
+      batch.delete(doc(db, 'comments', replyId));
     }
-    
-    // 6. Przygotuj zaktualizowaną tablicę komentarzy w poście (bez głównego komentarza i jego odpowiedzi)
-    const replyIds = repliesToDelete.map((r: any) => r.id);
-    const updatedComments = comments.filter((c: any) => 
-      c.id !== commentId && !replyIds.includes(c.id)
+
+    // 6-7. Tablice w poscie przepisujemy tylko, gdy cokolwiek z niej znika -
+    // dla nowych komentarzy (spoza tablicy) post dostaje sam licznik.
+    const updatedComments = comments.filter(
+      (c: any) => c.id !== commentId && !replyIds.includes(c.id)
     );
-    
-    console.log(`[DEBUG] Po usunięciu zostało ${updatedComments.length} komentarzy (usunięto ${comments.length - updatedComments.length})`);
-    
-    // 7. Zaktualizuj tablicę komentarzy w dokumencie posta
-    batch.update(postRef, { comments: updatedComments });
-    
+    const removedCount = 1 + replyIds.length;
+    // Atomowy decrement, gdy pole istnieje - Math.max robic nie ma czym,
+    // wiec przed ujemna wartoscia (podwojne usuniecie w wyscigu) chroni
+    // clamp przy odczycie w mapPostDoc.
+    const postUpdate: { [key: string]: any } = {
+      commentsCount:
+        typeof postData.commentsCount === 'number'
+          ? increment(-removedCount)
+          : Math.max(0, comments.length - removedCount),
+    };
+    if (updatedComments.length !== comments.length) {
+      postUpdate.comments = updatedComments;
+    }
+    batch.update(postRef, postUpdate);
+
     // 8. Wykonaj wszystkie operacje atomowo
     await batch.commit();
-    
-    console.log(`[DEBUG] Komentarz ${commentId} i ${repliesToDelete.length} odpowiedzi zostały usunięte`);
-    
+
+
     return true;
   } catch (error) {
-    console.error('[DEBUG] Error deleting comment:', error);
+    console.error('Error deleting comment:', error);
     throw error;
   }
 };
 
-// Funkcja do przełączania polubienia komentarza
+/**
+ * Przelaczenie lajka pod komentarzem.
+ *
+ * === TA SAMA PRZYCZYNA CO W toggleLike ===
+ * Bylo `runTransaction`, a transakcje sa na tej bazie odrzucane
+ * (RESOURCE_EXHAUSTED nawet dla transakcji, ktora nic nie zapisuje). Lajk pod
+ * komentarzem po prostu nie dzialal. Pelna diagnoza przy `toggleLike` wyzej.
+ *
+ * === DLACZEGO TU JEST TRUDNIEJ NIZ PRZY POSCIE ===
+ * Lajk posta da sie zrobic bez odczytu, bo `arrayUnion` / `arrayRemove` sa
+ * idempotentne. Komentarz siedzi jako ELEMENT TABLICY w dokumencie posta,
+ * a Firestore nie umie zaadresowac elementu tablicy - trzeba wczytac cala
+ * tablice, podmienic jeden wpis i zapisac ja z powrotem. Odczyt jest wiec
+ * nieusuwalny; usuwalna byla tylko transakcja wokol niego.
+ *
+ * `getDoc` (zwykly odczyt) dziala normalnie, wiec czytamy nim, a oba zapisy
+ * wysylamy jednym `writeBatch`. Batch NIE JEST transakcja - nie sprawdza, czy
+ * dane nie zmienily sie od odczytu - ale gwarantuje, ze dokument posta
+ * i dokument komentarza zmienia sie razem albo wcale. Batche na tej bazie
+ * dzialaja (chodzi po nich kasowanie komentarzy i przyznawanie bonusow).
+ *
+ * === CENA, KTORA PLACIMY SWIADOMIE ===
+ * Zgubiona aktualizacja przy wyscigu: jesli dwie osoby lajkuja DWA ROZNE
+ * komentarze pod TYM SAMYM postem w tej samej chwili, ta druga nadpisze cala
+ * tablice wersja sprzed pierwszej i tamten lajk przepadnie. Transakcja by
+ * tego pilnowala. Zamieniamy rzadka utrate jednego lajka na funkcje, ktora
+ * w ogole dziala - przy dzisiejszym ruchu to nie jest bliska decyzja.
+ */
 export const toggleCommentLike = async (postId: string, commentId: string, userId: string) => {
   try {
     const postRef = doc(db, 'posts', postId);
     const commentRef = doc(db, 'comments', commentId);
-    
-    // Użyj transakcji zamiast wielu operacji odczytu/zapisu
-    return await runTransaction(db, async (transaction) => {
-      // Wykonaj WSZYSTKIE odczyty na początku transakcji
-      const postDoc = await transaction.get(postRef);
-      const commentDoc = await transaction.get(commentRef);
 
-      if (!postDoc.exists()) {
-        throw new Error('Post not found');
-      }
-      
-      // Pobierz tablicę komentarzy z dokumentu posta
-      const postData = postDoc.data();
-      const comments = postData.comments || [];
-      
-      // Znajdź indeks komentarza w tablicy
-      const commentIndex = comments.findIndex((c: any) => c.id === commentId);
-      
-      if (commentIndex === -1) {
-        throw new Error('Comment not found');
-      }
-      
-      // Pobierz dane komentarza
+    // Oba odczyty rownolegle - sa niezalezne, a i tak czekamy na komplet.
+    const [postDoc, commentDoc] = await Promise.all([getDoc(postRef), getDoc(commentRef)]);
+
+    if (!postDoc.exists()) {
+      throw new Error('Post not found');
+    }
+
+    const postData = postDoc.data();
+    const comments = [...(postData.comments || [])];
+
+    // Komentarz moze byc w tablicy posta (legacy), w kolekcji (nowe) albo
+    // w obu - lajk ma dzialac w kazdym z tych przypadkow. Bledem jest
+    // dopiero brak OBU kopii.
+    const commentIndex = comments.findIndex((c: any) => c.id === commentId);
+    if (commentIndex === -1 && !commentDoc.exists()) {
+      throw new Error('Comment not found');
+    }
+
+    const batch = writeBatch(db);
+
+    // Stan "przed" bierzemy z tego zrodla, ktore komentarz MA - do zwrotki
+    // dla UI (true = dodano lajka).
+    let wasLiked = false;
+
+    if (commentIndex !== -1) {
       const comment = comments[commentIndex];
       const likedBy = comment.likedBy || [];
       const isLiked = likedBy.includes(userId);
-      
-      // Przygotuj zaktualizowaną wersję komentarza
-      const updatedComment = {
+      wasLiked = isLiked;
+
+      comments[commentIndex] = {
         ...comment,
-        likes: (comment.likes || 0) + (isLiked ? -1 : 1),
-        likedBy: isLiked 
+        likes: Math.max(0, (comment.likes || 0) + (isLiked ? -1 : 1)),
+        likedBy: isLiked
           ? likedBy.filter((id: string) => id !== userId)
           : [...likedBy, userId]
       };
-      
-      // Utwórz nową tablicę komentarzy z zaktualizowanym komentarzem
-      comments[commentIndex] = updatedComment;
-      
-      // WSZYSTKIE ZAPISY wykonuj PO wszystkich odczytach
-      
-      // Zaktualizuj dokument posta w transakcji
-      transaction.update(postRef, { 
-        comments: comments,
+
+      batch.update(postRef, {
+        comments,
         lastUpdated: serverTimestamp()
       });
-      
-      // Jeśli komentarz istnieje w kolekcji comments, zaktualizuj go również tam
-      if (commentDoc.exists()) {
-        const commentData = commentDoc.data();
-        const commentLikedBy = commentData.likedBy || [];
-        const isCommentLiked = commentLikedBy.includes(userId);
-        
-        transaction.update(commentRef, {
-          likes: (commentData.likes || 0) + (isCommentLiked ? -1 : 1),
-          likedBy: isCommentLiked 
-            ? commentLikedBy.filter((id: string) => id !== userId)
-            : [...commentLikedBy, userId],
-          lastUpdated: serverTimestamp()
-        });
-      }
-      
-      return !isLiked; // Zwróć true jeśli dodano lajka, false jeśli usunięto
-    });
+    }
+
+    // Kolekcja `comments`: nowe komentarze zyja WYLACZNIE tutaj, starsze
+    // bywaja tylko w tablicy na poscie. Brak dokumentu nie jest bledem.
+    if (commentDoc.exists()) {
+      const commentData = commentDoc.data();
+      const commentLikedBy = commentData.likedBy || [];
+      const isCommentLiked = commentLikedBy.includes(userId);
+      if (commentIndex === -1) wasLiked = isCommentLiked;
+
+      batch.update(commentRef, {
+        likes: Math.max(0, (commentData.likes || 0) + (isCommentLiked ? -1 : 1)),
+        likedBy: isCommentLiked
+          ? commentLikedBy.filter((id: string) => id !== userId)
+          : [...commentLikedBy, userId],
+        lastUpdated: serverTimestamp()
+      });
+    }
+
+    await batch.commit();
+
+    return !wasLiked; // true = dodano lajka, false = usunieto
   } catch (error) {
     console.error('Error toggling comment like:', error);
     throw error;
@@ -1736,11 +1538,12 @@ export const addCommentReply = async (postId: string, commentId: string, replyDa
   author: string, 
   content: string,
   txHash?: string | null,
-  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain'
+  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood'
 }) => {
   try {
     const postRef = doc(db, 'posts', postId);
-    const postDoc = await getDoc(postRef);
+    const parentRef = doc(db, 'comments', commentId);
+    const [postDoc, parentDoc] = await Promise.all([getDoc(postRef), getDoc(parentRef)]);
 
     if (!postDoc.exists()) {
       throw new Error('Post not found');
@@ -1748,48 +1551,58 @@ export const addCommentReply = async (postId: string, commentId: string, replyDa
 
     const post = postDoc.data();
     const comments = post.comments || [];
-    
-    // Sprawdź czy komentarz istnieje
-    const parentComment = comments.find((c: any) => c.id === commentId);
-    if (!parentComment) {
+
+    // Rodzic moze byc w tablicy posta (legacy) albo w kolekcji (nowe).
+    const parentInArray = comments.some((c: any) => c.id === commentId);
+    if (!parentInArray && !parentDoc.exists()) {
       throw new Error('Parent comment not found');
     }
 
-    // Utwórz nową odpowiedź z wszystkimi wymaganymi polami
+    // Odpowiedz laduje w kolekcji `comments`, jak kazdy nowy komentarz -
+    // wczesniej szla WYLACZNIE do tablicy posta z lokalnie zmyslonym id,
+    // wiec tuczyl dokument i zyla poza jedynym zrodlem prawdy.
+    const replyDoc = await addDoc(collection(db, 'comments'), {
+      postId,
+      author: replyData.author,
+      content: replyData.content,
+      timestamp: serverTimestamp(),
+      likes: 0,
+      likedBy: [],
+      mentions: [],
+      replyTo: commentId,
+      txHash: replyData.txHash || null,
+      network: replyData.network || null,
+      onchain: replyData.txHash ? true : false
+    });
+
+    // Post dostaje tylko podbicie licznika - atomowe, gdy pole istnieje
+    // (patrz addComment).
+    await updateDoc(postRef, {
+      commentsCount:
+        typeof post.commentsCount === 'number' ? increment(1) : comments.length + 1,
+      lastUpdated: serverTimestamp()
+    });
+
     const newReply = {
-      id: generateId(),
-      postId: postId, // Dodane pole postId
+      id: replyDoc.id,
+      postId,
       author: replyData.author,
       content: replyData.content,
       timestamp: Date.now(),
       likes: 0,
       likedBy: [],
-      mentions: [], // Dodane pole mentions
-      replyTo: commentId, // Dodaj referencję do komentarza nadrzędnego
-      txHash: replyData.txHash || null, // Dodajemy obsługę txHash dla onchain
-      network: replyData.network, // Dodajemy network odpowiedzi
-      onchain: replyData.txHash ? true : false // Oznaczamy czy jest onchain
+      mentions: [],
+      replyTo: commentId,
+      txHash: replyData.txHash || null,
+      network: replyData.network,
+      onchain: replyData.txHash ? true : false
     };
-
-    // Dodaj odpowiedź do tablicy komentarzy
-    comments.push(newReply);
-
-    // Zaktualizuj dokument
-    await updateDoc(postRef, {
-      comments: comments,
-      lastUpdated: serverTimestamp() // Aktualizujemy czas ostatniej zmiany
-    });
 
     return newReply;
   } catch (error) {
     console.error('Error adding reply:', error);
     throw error;
   }
-};
-
-// Funkcja do generowania unikalnych ID
-const generateId = (): string => {
-  return Math.random().toString(36).substring(2) + Date.now().toString(36);
 };
 
 // Usuń blokadę zmiany avatara dla admina
@@ -1800,14 +1613,6 @@ export const removeAvatarRestriction = async (address: string) => {
       lastImageUpdate: null
     });
   }
-};
-
-// Debug funkcja - sprawdź status użytkownika
-export const checkUserStatus = async (address: string) => {
-  const userRef = doc(db, 'users', address);
-  const userDoc = await getDoc(userRef);
-  console.log('User data:', userDoc.data());
-  return userDoc.data();
 };
 
 // Reset profilu admina
@@ -1873,790 +1678,6 @@ export const saveUserAvatar = async (address: string, avatarUrl: string) => {
     avatar: avatarUrl,
     lastImageUpdate: serverTimestamp()
   });
-};
-
-// ===============================================
-// 🏆 ULTRA-CHEAP USER SEARCH SYSTEM (99.97% taniej!)
-// ===============================================
-
-// Cache dla wyszukiwania użytkowników (TTL 10 minut)
-let userSearchCache: { [key: string]: { results: any[], timestamp: number } } = {};
-const USER_SEARCH_CACHE_TTL = 10 * 60 * 1000; // 10 minut
-
-// 24h localStorage cache dla TOP użytkowników (5k users - oszczędność pamięci)
-const FULL_USERS_CACHE_KEY = 'fullUsersDatabase_v3';
-const FULL_USERS_CACHE_TIMESTAMP_KEY = 'fullUsersDatabaseTime_v3';
-const FULL_USERS_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // ✅ OPTYMALIZACJA: 7 dni zamiast 24h (86% mniej synców)
-const MAX_CACHED_USERS = 1000; // ✅ OPTYMALIZACJA: 1000 zamiast 5000 (80% mniej reads przy sync)
-
-// Ultra-minimalistyczny interface dla użytkownika (maksymalna oszczędność pamięci)
-interface UserSearchResult {
-  a: string; // address (skrócone nazwy pól)
-  n?: string; // name
-  p?: number; // points
-  l?: number; // lastActive
-}
-
-// ===============================================
-// 🚀 SMART SYNC SYSTEM - Pobierz TOP 5000 użytkowników (localStorage friendly)
-// ===============================================
-export const syncFullUsersDatabase = async (): Promise<UserSearchResult[]> => {
-  console.log('🔄 Starting smart users sync... (TOP 1000 users)'); // ✅ ZAKTUALIZOWANO: komunikat
-  
-  try {
-    // Pobierz TOP użytkowników posortowanych po punktach
-    const usersRef = collection(db, 'users');
-    const q = query(usersRef, firestoreOrderBy('baseChatPoints.totalPoints', 'desc'), firestoreLimit(MAX_CACHED_USERS));
-    const snapshot = await getDocs(q);
-    
-    const allUsers: UserSearchResult[] = [];
-    
-    snapshot.forEach((doc) => {
-      const data = doc.data();
-      // Ultra-minimalistyczne dane - maksymalna oszczędność pamięci
-      allUsers.push({
-        a: doc.id, // address
-        n: data.name || '', // name
-        p: data.baseChatPoints?.totalPoints || 0, // points
-        l: data.lastActive || 0 // lastActive
-      });
-    });
-    
-    // Zapisz do localStorage z timestampem
-    const cacheData = JSON.stringify(allUsers);
-    console.log(`💾 Cache size: ${(cacheData.length / 1024).toFixed(1)}KB`);
-    
-    localStorage.setItem(FULL_USERS_CACHE_KEY, cacheData);
-    localStorage.setItem(FULL_USERS_CACHE_TIMESTAMP_KEY, Date.now().toString());
-    
-    console.log(`✅ Smart sync completed: ${allUsers.length} users cached`);
-    console.log(`💰 Cost: ${allUsers.length} Firebase reads (~$${(allUsers.length * 0.00006).toFixed(2)})`);
-    
-    return allUsers;
-    
-  } catch (error) {
-    console.error('❌ Smart sync failed:', error);
-    throw error;
-  }
-};
-
-// ===============================================
-// ⚡ ULTRA-FAST SEARCH - Wyszukuje w localStorage (0 Firebase reads!)
-// ===============================================
-const searchInCache = (query: string, allUsers: UserSearchResult[]): UserSearchResult[] => {
-  if (!query || query.length < 2) return allUsers.slice(0, 50); // TOP 50 przy pustym query
-  
-  const searchLower = query.toLowerCase();
-  
-  return allUsers.filter(user => {
-    // Wyszukaj w adresie (a)
-    if (user.a.toLowerCase().includes(searchLower)) return true;
-    
-    // Wyszukaj w nazwie (n)
-    if (user.n && user.n.toLowerCase().includes(searchLower)) return true;
-    
-    // Wyszukaj w ENS-style (.eth, .sphere, .camper)
-    if (searchLower.includes('.') && user.n && user.n.toLowerCase().includes(searchLower)) return true;
-    
-    return false;
-  }).slice(0, 100); // Max 100 wyników
-};
-
-// ===============================================
-// 🔄 HYBRID SEARCH - Cache + targeted Firebase queries
-// ===============================================
-export const searchUsersUltraFast = async (
-  searchQuery: string, 
-  limit: number = 50
-): Promise<UserSearchResult[]> => {
-  if (!searchQuery.trim()) return [];
-  
-  const searchTerm = searchQuery.toLowerCase().trim();
-  
-  try {
-    // 1. Sprawdź cache localStorage najpierw
-    const cachedData = localStorage.getItem(FULL_USERS_CACHE_KEY);
-    const cacheTime = localStorage.getItem(FULL_USERS_CACHE_TIMESTAMP_KEY);
-    
-    const now = Date.now();
-    let cacheResults: UserSearchResult[] = [];
-    
-    // Jeśli cache jest świeży (24h), użyj go
-    if (cachedData && cacheTime && (now - parseInt(cacheTime)) < FULL_USERS_CACHE_TTL) {
-      console.log('⚡ Searching in localStorage cache - 0 Firebase reads');
-      const allUsers: UserSearchResult[] = JSON.parse(cachedData);
-      cacheResults = searchInCache(searchQuery, allUsers);
-      
-      // Jeśli znaleziono wystarczająco wyników w cache, zwróć je
-      if (cacheResults.length >= limit) {
-        return cacheResults.slice(0, limit);
-      }
-    }
-    
-    // 2. Cache nie ma wystarczająco wyników - targeted Firebase search
-    console.log('🎯 Targeted Firebase search for specific suffixes...');
-    const firebaseResults = await searchSpecificSuffixes(searchTerm);
-    
-    // 3. Połącz wyniki (cache + Firebase) i usuń duplikaty
-    const combinedResults = [...cacheResults];
-    
-    firebaseResults.forEach(fbUser => {
-      const exists = combinedResults.find(cacheUser => cacheUser.a === fbUser.a);
-      if (!exists) {
-        combinedResults.push(fbUser);
-      }
-    });
-    
-    console.log(`✅ Hybrid search completed: ${combinedResults.length} results (cache: ${cacheResults.length}, firebase: ${firebaseResults.length})`);
-    return combinedResults.slice(0, limit);
-    
-  } catch (error) {
-    console.error('❌ Hybrid search failed:', error);
-    return [];
-  }
-};
-
-// ===============================================
-// 🎯 TARGETED SEARCH - Specific Firebase queries for .eth, .sphere, .camper
-// ===============================================
-const searchSpecificSuffixes = async (searchTerm: string): Promise<UserSearchResult[]> => {
-  const results: UserSearchResult[] = [];
-  
-  try {
-    const usersRef = collection(db, 'users');
-    
-    // Jeśli searchTerm zawiera . lub wygląda jak ENS
-    if (searchTerm.includes('.') || searchTerm.length > 10) {
-      
-      // Query 1: Szukaj po nazwie użytkownika
-      const nameQuery = query(
-        usersRef,
-        where('name', '>=', searchTerm),
-        where('name', '<=', searchTerm + '\uf8ff'),
-        firestoreLimit(10) // ✅ OPTYMALIZACJA: 10 zamiast 20 (50% mniej reads)
-      );
-      
-      const nameSnapshot = await getDocs(nameQuery);
-      nameSnapshot.docs.forEach(doc => {
-        const data = doc.data();
-        results.push({
-          a: doc.id,
-          n: data.name || '',
-          p: data.baseChatPoints?.totalPoints || 0,
-          l: data.lastActive || 0
-        });
-      });
-      
-      // Query 2: Szukaj dokładnych dopasowań dla popular suffixes
-      const popularSuffixes = ['.eth', '.sphere', '.camper'];
-      for (const suffix of popularSuffixes) {
-        if (searchTerm.includes(suffix) || searchTerm + suffix) {
-          const suffixTerm = searchTerm.includes(suffix) ? searchTerm : searchTerm + suffix;
-          
-          const suffixQuery = query(
-            usersRef,
-            where('name', '==', suffixTerm),
-            firestoreLimit(5) // ✅ OPTYMALIZACJA: 5 zamiast 10 (50% mniej reads)
-          );
-          
-          const suffixSnapshot = await getDocs(suffixQuery);
-          suffixSnapshot.docs.forEach(doc => {
-            const data = doc.data();
-            const exists = results.find(r => r.a === doc.id);
-            if (!exists) {
-              results.push({
-                a: doc.id,
-                n: data.name || '',
-                p: data.baseChatPoints?.totalPoints || 0,
-                l: data.lastActive || 0
-              });
-            }
-          });
-        }
-      }
-    }
-    
-    // Query 3: Jeśli wygląda jak adres (0x...)
-    if (searchTerm.startsWith('0x') && searchTerm.length >= 6) {
-      // Range query dla adresów
-      const addressQuery = query(
-        usersRef,
-        where('__name__', '>=', searchTerm),
-        where('__name__', '<=', searchTerm + '\uf8ff'),
-        firestoreLimit(5) // ✅ OPTYMALIZACJA: 5 zamiast 10 (50% mniej reads)
-      );
-      
-      const addressSnapshot = await getDocs(addressQuery);
-      addressSnapshot.docs.forEach(doc => {
-        const data = doc.data();
-        const exists = results.find(r => r.a === doc.id);
-        if (!exists) {
-          results.push({
-            a: doc.id,
-            n: data.name || '',
-            p: data.baseChatPoints?.totalPoints || 0,
-            l: data.lastActive || 0
-          });
-        }
-      });
-    }
-    
-    console.log(`🎯 Firebase targeted search found: ${results.length} additional results`);
-    return results;
-    
-  } catch (error) {
-    console.error('❌ Targeted Firebase search failed:', error);
-    return [];
-  }
-};
-
-// ===============================================
-// 🎯 GET CACHED USERS - Pobiera z cache lub sync
-// ===============================================
-export const getCachedFullUsers = async (): Promise<UserSearchResult[]> => {
-  try {
-    const cachedData = localStorage.getItem(FULL_USERS_CACHE_KEY);
-    const cacheTime = localStorage.getItem(FULL_USERS_CACHE_TIMESTAMP_KEY);
-    
-    const now = Date.now();
-    
-    // Jeśli cache jest świeży (7 dni), użyj go ✅ ZAKTUALIZOWANO: komentarz
-    if (cachedData && cacheTime && (now - parseInt(cacheTime)) < FULL_USERS_CACHE_TTL) {
-      console.log('⚡ Using cached users database - 0 Firebase reads');
-      return JSON.parse(cachedData);
-    }
-    
-    // Cache wygasł - pobierz nowe dane
-    console.log('🔄 Syncing full users database...');
-    return await syncFullUsersDatabase();
-    
-  } catch (error) {
-    console.error('❌ Failed to get cached users:', error);
-    return [];
-  }
-};
-
-// ===============================================
-// 🚀 PRELOAD CACHE - Background refresh gdy potrzeba
-// ===============================================
-export const preloadUserSearchCache = async (): Promise<void> => {
-  try {
-    const cachedData = localStorage.getItem(FULL_USERS_CACHE_KEY);
-    const cacheTime = localStorage.getItem(FULL_USERS_CACHE_TIMESTAMP_KEY);
-    
-    const now = Date.now();
-    const cacheAge = cacheTime ? now - parseInt(cacheTime) : Infinity;
-    
-    // Jeśli cache jest starszy niż 5 dni, odśwież w background
-    if (cacheAge > 5 * 24 * 60 * 60 * 1000) {
-      console.log('🔄 Preloading user search cache in background...');
-      
-      // Background refresh z 5 sekund delay
-      setTimeout(() => {
-        syncFullUsersDatabase()
-          .then(() => console.log('✅ Background cache refresh completed'))
-          .catch(error => console.error('❌ Background cache refresh failed:', error));
-      }, 5000);
-    }
-  } catch (error) {
-    console.error('❌ Preload cache check failed:', error);
-  }
-};
-
-// ===============================================
-// 🔧 LEGACY SEARCH (drogi system - tylko dla compatibility)
-// ===============================================
-// Funkcje do obsługi wiadomości bezpośrednich - hybrydowa wyszukiwarka
-export const searchUsers = async (
-  searchQuery: string, 
-  limit: number = 5, 
-  searchAll: boolean = false
-): Promise<{
-  address: string;
-  name?: string;
-  avatar?: string;
-  totalPoints?: number;
-  postsCount?: number;
-  likesReceived?: number;
-}[]> => {
-  if (!searchQuery.trim()) return [];
-  
-  const searchTerm = searchQuery.toLowerCase().trim();
-  const cacheKey = `${searchTerm}_${limit}_${searchAll}`;
-  
-  // Sprawdź cache
-  if (userSearchCache[cacheKey] && Date.now() - userSearchCache[cacheKey].timestamp < USER_SEARCH_CACHE_TTL) {
-    console.log(`📋 Using cached search results for: "${searchTerm}" (searchAll: ${searchAll})`);
-    return userSearchCache[cacheKey].results;
-  }
-  
-  try {
-    console.log(`🔍 Searching users for: "${searchQuery}" -> normalized: "${searchTerm}" (searchAll: ${searchAll})`);
-    
-    const usersRef = collection(db, 'users');
-    let matchedUsers: any[] = [];
-    
-    if (searchAll) {
-      // PEŁNE WYSZUKIWANIE - przeszukaj całą bazę Firebase (12k+ użytkowników)
-      console.log('🌐 Performing full Firebase search...');
-      
-      try {
-        // Strategia 1: Jeśli wygląda jak adres, spróbuj bezpośredniego dostępu do dokumentu
-        if (searchTerm.startsWith('0x') && searchTerm.length >= 6) {
-          console.log(`🎯 Direct address search for: ${searchTerm}`);
-          
-          // Spróbuj różne case variations dla exact match
-          const addressVariations = [
-            searchQuery.trim(), // Oryginalna wersja
-            searchQuery.trim().toLowerCase(), // lowercase
-            searchQuery.trim().toUpperCase(), // uppercase
-          ];
-          
-          // Jeśli to pełny adres (42 znaki), spróbuj dokładnego dopasowania
-          if (searchQuery.trim().length === 42) {
-            for (const addressVariation of addressVariations) {
-              try {
-                const userDocRef = doc(db, 'users', addressVariation);
-                const userDoc = await getDoc(userDocRef);
-                
-                if (userDoc.exists()) {
-                  const userData = userDoc.data();
-                  matchedUsers.push({
-                    address: userDoc.id,
-                    name: userData.name || userData.displayName || `${userDoc.id.slice(0, 6)}...${userDoc.id.slice(-4)}`,
-                    avatar: userData.avatar,
-                    totalPoints: userData.baseChatPoints?.totalPoints || userData.totalPoints || 0,
-                    postsCount: userData.postsCount || 0,
-                    likesReceived: userData.likesReceived || 0
-                  });
-                  console.log(`✅ Found exact document match: ${userDoc.id}`);
-                  break; // Znaleziony, przerwij pętlę
-                }
-              } catch (error) {
-                console.log(`Direct doc access failed for ${addressVariation}:`, error);
-              }
-            }
-          }
-          
-          // Jeśli nie znaleziono exact match, spróbuj range queries
-          if (matchedUsers.length === 0) {
-            // Spróbuj range query z różnymi case variations
-            for (const addressVariation of addressVariations) {
-              try {
-                const rangeQuery = query(
-                  usersRef,
-                  where('__name__', '>=', addressVariation),
-                  where('__name__', '<=', addressVariation + '\uf8ff'),
-                  firestoreLimit(limit * 2)
-                );
-                
-                const rangeSnapshot = await getDocs(rangeQuery);
-                rangeSnapshot.docs.forEach(doc => {
-                  const userData = doc.data();
-                  if (!matchedUsers.find(u => u.address === doc.id)) {
-                    matchedUsers.push({
-                      address: doc.id,
-                      name: userData.name || userData.displayName || `${doc.id.slice(0, 6)}...${doc.id.slice(-4)}`,
-                      avatar: userData.avatar,
-                      totalPoints: userData.baseChatPoints?.totalPoints || userData.totalPoints || 0,
-                      postsCount: userData.postsCount || 0,
-                      likesReceived: userData.likesReceived || 0
-                    });
-                  }
-                });
-                
-                if (rangeSnapshot.docs.length > 0) {
-                  console.log(`✅ Range query found: ${rangeSnapshot.docs.length} users with ${addressVariation}`);
-                  break; // Znaleziono wyniki, przerwij pętlę
-                }
-              } catch (error) {
-                console.log(`Range query failed for ${addressVariation}:`, error);
-              }
-            }
-          }
-        }
-        
-        // Strategia 2: Jeśli nie znaleźliśmy wystarczająco przez adres, wyszukaj po nazwie
-        if (matchedUsers.length < limit) {
-          // Wyszukaj po name field
-          const nameQuery = query(
-            usersRef,
-            where('name', '>=', searchTerm),
-            where('name', '<=', searchTerm + '\uf8ff'),
-            firestoreLimit(limit * 3)
-          );
-          
-          try {
-            const nameSnapshot = await getDocs(nameQuery);
-            nameSnapshot.docs.forEach(doc => {
-              const userData = doc.data();
-              const address = doc.id;
-              
-              // Sprawdź czy już nie mamy tego użytkownika
-              if (!matchedUsers.find(u => u.address === address)) {
-                matchedUsers.push({
-                  address: address,
-                  name: userData.name || userData.displayName || `${address.slice(0, 6)}...${address.slice(-4)}`,
-                  avatar: userData.avatar,
-                  totalPoints: userData.baseChatPoints?.totalPoints || userData.totalPoints || 0,
-                  postsCount: userData.postsCount || 0,
-                  likesReceived: userData.likesReceived || 0
-                });
-              }
-            });
-          } catch (nameError) {
-            console.log('Name query failed, trying batch search...');
-          }
-        }
-        
-        // Strategia 3: Jeśli wciąż za mało wyników, przeszukaj batch'ami
-        if (matchedUsers.length < limit) {
-          console.log('🔄 Not enough results, performing batch search...');
-          
-          let batchCount = 0;
-          const maxBatches = 5; // Maksymalnie 5 batch'y aby nie przeciążyć
-          
-          while (matchedUsers.length < limit && batchCount < maxBatches) {
-            const batchQuery = query(
-              usersRef,
-              firestoreLimit(1000)
-            );
-            
-            const batchSnapshot = await getDocs(batchQuery);
-            
-            batchSnapshot.docs.forEach(doc => {
-              const userData = doc.data();
-              const userAddress = doc.id.toLowerCase();
-              const originalAddress = doc.id; // Zachowaj oryginalny case
-              const address = doc.id;
-              
-              // Sprawdź czy już nie mamy tego użytkownika
-              if (matchedUsers.find(u => u.address === address)) {
-                return;
-              }
-              
-              // Pobierz nazwy użytkowników
-              const userName = (userData.name || '').toLowerCase();
-              const displayName = (userData.displayName || '').toLowerCase();
-              
-              // Sprawdź różne kryteria wyszukiwania (case insensitive)
-              const matchesCriteria = 
-                // Dopasowanie nazw
-                userName.includes(searchTerm) ||
-                displayName.includes(searchTerm) ||
-                userName.includes(searchTerm.replace(/\.(eth|sphere|camper)$/, '')) ||
-                displayName.includes(searchTerm.replace(/\.(eth|sphere|camper)$/, '')) ||
-                (searchTerm.match(/\.(eth|sphere|camper)$/) && (
-                  userName === searchTerm ||
-                  displayName === searchTerm
-                )) ||
-                // Lepsze dopasowanie adresów - case insensitive
-                (searchTerm.startsWith('0x') && (
-                  userAddress === searchTerm ||
-                  userAddress.startsWith(searchTerm) ||
-                  originalAddress.toLowerCase() === searchTerm ||
-                  originalAddress.toLowerCase().startsWith(searchTerm)
-                )) ||
-                // Jeśli search term nie ma 0x prefix, sprawdź czy może to być część adresu (case insensitive)
-                (!searchTerm.startsWith('0x') && (
-                  userAddress.includes(searchTerm) ||
-                  originalAddress.toLowerCase().includes(searchTerm)
-                )) ||
-                // Dodatkowe dopasowanie dla części adresu
-                (searchTerm.startsWith('0x') && userAddress.includes(searchTerm));
-              
-              if (matchesCriteria) {
-                matchedUsers.push({
-                  address: address,
-                  name: userData.name || userData.displayName || `${address.slice(0, 6)}...${address.slice(-4)}`,
-                  avatar: userData.avatar,
-                  totalPoints: userData.baseChatPoints?.totalPoints || userData.totalPoints || 0,
-                  postsCount: userData.postsCount || 0,
-                  likesReceived: userData.likesReceived || 0
-                });
-              }
-            });
-            
-            batchCount++;
-          }
-        }
-        
-      } catch (error) {
-        console.error('Full search failed:', error);
-      }
-      
-    } else {
-      // SZYBKIE WYSZUKIWANIE - używaj cache'owanych danych (1000 użytkowników)
-      console.log('⚡ Quick Search - checking cache and direct Firebase access...');
-      
-      // Jeśli to wygląda jak pełny adres Ethereum, spróbuj bezpośredniego dostępu
-      if (searchTerm.startsWith('0x') && searchQuery.trim().length === 42) {
-        console.log(`🎯 Quick Search - trying direct Firebase access for: ${searchQuery.trim()}`);
-        
-        const addressVariations = [
-          searchQuery.trim(), // Oryginalna wersja
-          searchQuery.trim().toLowerCase(), // lowercase
-          searchQuery.trim().toUpperCase(), // uppercase
-        ];
-        
-        for (const addressVariation of addressVariations) {
-          try {
-            const userDocRef = doc(db, 'users', addressVariation);
-            const userDoc = await getDoc(userDocRef);
-            
-            if (userDoc.exists()) {
-              const userData = userDoc.data();
-              matchedUsers.push({
-                address: userDoc.id,
-                name: userData.name || userData.displayName || `${userDoc.id.slice(0, 6)}...${userDoc.id.slice(-4)}`,
-                avatar: userData.avatar,
-                totalPoints: userData.baseChatPoints?.totalPoints || userData.totalPoints || 0,
-                postsCount: userData.postsCount || 0,
-                likesReceived: userData.likesReceived || 0
-              });
-              console.log(`✅ Quick Search - found direct Firebase match: ${userDoc.id}`);
-              
-              // Jeśli znaleziono exact match, zwróć od razu
-              const result = [{
-                address: userDoc.id,
-                name: userData.name || userData.displayName || `${userDoc.id.slice(0, 6)}...${userDoc.id.slice(-4)}`,
-                avatar: userData.avatar,
-                totalPoints: userData.baseChatPoints?.totalPoints || userData.totalPoints || 0,
-                postsCount: userData.postsCount || 0,
-                likesReceived: userData.likesReceived || 0
-              }];
-              
-              // Cache wynik
-              userSearchCache[cacheKey] = {
-                results: result,
-                timestamp: Date.now()
-              };
-              
-              return result;
-            }
-          } catch (error) {
-            console.log(`Quick Search - direct Firebase access failed for ${addressVariation}:`, error);
-          }
-        }
-      }
-      
-      let usersToSearch: any[] = [];
-      
-      // Spróbuj pobrać z localStorage active users cache
-      if (typeof localStorage !== 'undefined') {
-        const cachedActiveUsers = localStorage.getItem('activeUsers');
-        if (cachedActiveUsers) {
-          try {
-            const parsed = JSON.parse(cachedActiveUsers);
-            usersToSearch = parsed.map((user: any) => ({
-              id: user.address,
-              userData: {
-                name: user.name || '',
-                displayName: user.displayName || '',
-                avatar: user.avatar,
-                baseChatPoints: { totalPoints: user.points || 0 },
-                totalPoints: user.points || 0,
-                postsCount: user.stats?.posts || 0,
-                likesReceived: user.stats?.likes || 0
-              }
-            }));
-          } catch (error) {
-            console.log('Failed to parse cached active users, falling back to Firebase query');
-          }
-        }
-      }
-      
-      // Jeśli nie ma cache'u, pobierz próbkę użytkowników z Firebase
-      if (usersToSearch.length === 0) {
-        try {
-          const sampleQuery = query(
-            usersRef,
-            firestoreOrderBy('baseChatPoints.totalPoints', 'desc'),
-            firestoreLimit(1000)
-          );
-          
-          const sampleSnapshot = await getDocs(sampleQuery);
-          usersToSearch = sampleSnapshot.docs.map(doc => ({
-            id: doc.id,
-            userData: doc.data()
-          }));
-        } catch (error) {
-          console.log('Failed to query with ordering, trying without order');
-          const fallbackQuery = query(usersRef, firestoreLimit(1000));
-          const fallbackSnapshot = await getDocs(fallbackQuery);
-          usersToSearch = fallbackSnapshot.docs.map(doc => ({
-            id: doc.id,
-            userData: doc.data()
-          }));
-        }
-      }
-      
-      // Przeszukaj cache'owanych użytkowników
-      usersToSearch.forEach(user => {
-        const userData = user.userData;
-        const userAddress = user.id.toLowerCase();
-        const originalUserAddress = user.id; // Zachowaj oryginalny case
-        
-        // Pobierz nazwy użytkowników
-        const userName = (userData.name || '').toLowerCase();
-        const displayName = (userData.displayName || '').toLowerCase();
-        
-        // Sprawdź różne kryteria wyszukiwania (Quick Search)
-        const matchesCriteria = 
-          // Dopasowanie nazw
-          userName.includes(searchTerm) ||
-          displayName.includes(searchTerm) ||
-          userName.includes(searchTerm.replace(/\.(eth|sphere|camper)$/, '')) ||
-          displayName.includes(searchTerm.replace(/\.(eth|sphere|camper)$/, '')) ||
-          (searchTerm.match(/\.(eth|sphere|camper)$/) && (
-            userName === searchTerm ||
-            displayName === searchTerm
-          )) ||
-          // Lepsze dopasowanie adresów - case insensitive
-          (searchTerm.startsWith('0x') && (
-            userAddress === searchTerm ||
-            userAddress.startsWith(searchTerm) ||
-            originalUserAddress.toLowerCase() === searchTerm ||
-            originalUserAddress.toLowerCase().startsWith(searchTerm)
-          )) ||
-          // Jeśli search term nie ma 0x prefix, sprawdź czy może to być część adresu (case insensitive)
-          (!searchTerm.startsWith('0x') && (
-            userAddress.includes(searchTerm) ||
-            originalUserAddress.toLowerCase().includes(searchTerm)
-          )) ||
-          // Dodatkowe dopasowanie dla części adresu bez 0x
-          (searchTerm.startsWith('0x') && userAddress.includes(searchTerm));
-        
-        if (matchesCriteria) {
-          matchedUsers.push({
-            address: user.id,
-            name: userData.name || userData.displayName || `${user.id.slice(0, 6)}...${user.id.slice(-4)}`,
-            avatar: userData.avatar,
-            totalPoints: userData.baseChatPoints?.totalPoints || userData.totalPoints || 0,
-            postsCount: userData.postsCount || 0,
-            likesReceived: userData.likesReceived || 0
-          });
-        }
-      });
-    }
-    
-    // Sortuj po totalPoints (malejąco) i ogranicz wyniki
-    const sortedUsers = matchedUsers
-      .sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0))
-      .slice(0, limit);
-    
-    // Cache wyniki
-    userSearchCache[cacheKey] = {
-      results: sortedUsers,
-      timestamp: Date.now()
-    };
-    
-    console.log(`✅ Found ${sortedUsers.length} matching users (searchAll: ${searchAll})`);
-    return sortedUsers;
-    
-  } catch (error) {
-    console.error('Error searching users:', error);
-    return [];
-  }
-};
-
-// ✅ USUNIĘTO: createChat - funkcja messaging nieużywana
-
-// ✅ USUNIĘTO: sendMessage - funkcja messaging nieużywana
-
-// ✅ USUNIĘTO: getMessages - funkcja messaging nieużywana
-
-// ✅ USUNIĘTO: getUserChats - funkcja messaging nieużywana
-
-// ✅ USUNIĘTO: Friend System interfaces - nieużywane
-
-// ✅ USUNIĘTO: getFriendsList - funkcja friends nieużywana
-
-// ✅ USUNIĘTO: sendFriendRequest - funkcja friends nieużywana
-
-// ✅ USUNIĘTO: checkFriendship - funkcja friends nieużywana
-
-// ✅ USUNIĘTO: getReceivedFriendRequests - funkcja friends nieużywana
-
-// ✅ USUNIĘTO: getSentFriendRequests - funkcja friends nieużywana
-
-// ✅ USUNIĘTO: acceptFriendRequest - funkcja friends nieużywana
-
-// ✅ USUNIĘTO: rejectFriendRequest - funkcja friends nieużywana
-
-// ✅ USUNIĘTO: clearAllFriendRequests - funkcja friends nieużywana
-
-// ✅ KONIEC USUWANIA FUNKCJI MESSAGING I FRIENDS
-
-// Calculate user statistics from posts
-export const calculateUserStats = async (userAddress: string) => {
-  try {
-    const postsRef = collection(db, 'posts');
-    const userPostsQuery = query(
-      postsRef,
-      where('author', '==', userAddress)
-    );
-    
-    const postsSnapshot = await getDocs(userPostsQuery);
-    let totalLikes = 0;
-    let totalPosts = postsSnapshot.size;
-    
-    // Calculate total likes from all user's posts
-    postsSnapshot.forEach((doc) => {
-      const postData = doc.data();
-      totalLikes += postData.likes || 0;
-    });
-
-    // Get last 30 days activity
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
-    const recentPostsQuery = query(
-      postsRef,
-      where('author', '==', userAddress),
-      where('timestamp', '>=', thirtyDaysAgo)
-    );
-    
-    const recentPostsSnapshot = await getDocs(recentPostsQuery);
-    const recentActivityBonus = recentPostsSnapshot.size > 0 ? 1.25 : 1;
-
-    // ✅ FIREBASE OPTIMIZATION: Replace expensive hasBaseName() Firebase read with simple check
-    // Check if user has BaseName by looking at their stored name instead of Firebase usernames collection
-    const userDoc = await getDoc(doc(db, 'users', userAddress));
-    const userData = userDoc.data();
-    const userName = userData?.name || '';
-    const isBaseNameUser = userName.endsWith('.base.eth');
-    const baseNameBonus = isBaseNameUser ? 1000 : 0;
-
-    // Calculate total points
-    // Base formula: (posts * 5) + (likes * 1) + BaseName bonus
-    const points = ((totalPosts * 5) + totalLikes) * recentActivityBonus + baseNameBonus;
-
-    // Update user statistics
-    const userRef = doc(db, 'users', userAddress);
-    await updateDoc(userRef, {
-      postsCount: totalPosts,
-      likesReceived: totalLikes,
-      lastCalculated: serverTimestamp(),
-      'stats.posts': totalPosts,
-      'stats.likes': totalLikes,
-      'stats.points': Math.round(points),
-      'stats.hasBaseName': isBaseNameUser,
-      'stats.baseNameBonus': baseNameBonus
-    });
-
-    return {
-      posts: totalPosts,
-      likes: totalLikes,
-      points: Math.round(points),
-      hasRecentActivity: recentActivityBonus > 1,
-      hasBaseName: isBaseNameUser,
-      baseNameBonus: baseNameBonus
-    };
-  } catch (error) {
-    console.error('Error calculating user stats:', error);
-    throw error;
-  }
 };
 
 // Funkcja do odświeżania wszystkich postów
@@ -2725,14 +1746,17 @@ export const refreshTop50UsersOnly = async () => {
       userStats[post.author].likes += actualLikes;
     }
     
+    // Punkty referralowe czytamy JEDNYM zapytaniem na 30 uzytkownikow.
+    // Wczesniej w tej petli stalo `await getDoc(userRef)` - 50 osobnych
+    // odczytow ustawionych szeregowo, jeden po drugim.
+    const usersById = await fetchDocsByIds('users', Object.keys(userStats));
+
     // Aktualizuj statystyki użytkowników (uwzględnij BaseName i referral)
     for (const [userId, stats] of Object.entries(userStats)) {
       const userRef = doc(db, 'users', userId);
       const baseNameBonus = stats.hasBaseName ? 1000 : 0;
-      // Pobierz referralPoints z bieżących danych użytkownika (jeśli istnieją)
-      const userDoc = await getDoc(userRef);
-      const existingReferralPoints = userDoc.exists() ? Number(userDoc.data().baseChatPoints?.referralPoints || 0) : 0;
-      
+      const existingReferralPoints = Number(usersById.get(userId)?.baseChatPoints?.referralPoints || 0);
+
       batch.update(userRef, {
         postsCount: stats.posts,
         likesReceived: stats.likes,
@@ -3231,11 +2255,13 @@ export const getGlobalStatsRealTime = async () => {
         totalLikes += postData.likes;
       }
       
-      // Dodaj komentarze
-      if (postData.comments && Array.isArray(postData.comments)) {
+      // Dodaj komentarze - licznik przed tablica: pusta tablica jest truthy,
+      // a nowe komentarze zyja tylko w kolekcji, wiec stara kolejnosc
+      // pomijala caly ruch po wprowadzeniu licznikow.
+      if (typeof postData.commentsCount === 'number') {
+        totalComments += Math.max(0, postData.commentsCount);
+      } else if (postData.comments && Array.isArray(postData.comments)) {
         totalComments += postData.comments.length;
-      } else if (postData.commentsCount) {
-        totalComments += postData.commentsCount;
       }
     }
 
@@ -3300,10 +2326,11 @@ export const getGlobalStatsIncremental = async (forceFullRefresh: boolean = fals
           totalLikes += postData.likes;
         }
         
-        if (postData.comments && Array.isArray(postData.comments)) {
+        // Licznik przed tablica - jak w getGlobalStatsRealTime.
+        if (typeof postData.commentsCount === 'number') {
+          totalComments += Math.max(0, postData.commentsCount);
+        } else if (postData.comments && Array.isArray(postData.comments)) {
           totalComments += postData.comments.length;
-        } else if (postData.commentsCount) {
-          totalComments += postData.commentsCount;
         }
       }
       
@@ -3398,14 +2425,32 @@ export const getGlobalStatsIncremental = async (forceFullRefresh: boolean = fals
     
   } catch (error) {
     console.error('❌ ADMIN Error in incremental stats fetch:', error);
-    // Fallback to full fetch on error
+
+    // Fallback na pelne pobranie - ale TYLKO gdy padla sciezka inkrementalna.
+    // Wczesniej stalo tu bezwarunkowe `getGlobalStatsIncremental(true)`, wiec
+    // gdy padalo samo `getDocs` (offline, brak uprawnien), funkcja wolala sama
+    // siebie z tym samym argumentem w nieskonczonosc.
+    if (forceFullRefresh) throw error;
+
     console.log('🔄 Falling back to full fetch due to error...');
     return await getGlobalStatsIncremental(true);
   }
 };
 
-// Funkcja do pobierania globalnych statystyk dla strony głównej
-// ⚠️ OPTIMIZED - Global stats with 12h cache per user for accurate data
+/**
+ * Globalne statystyki platformy (panel admina).
+ *
+ * @throws gdy odczyt sie nie powiedzie - wolajacy MUSI to odroznic od wyniku.
+ *
+ * === TU BYLY LICZBY WZIETE Z POWIETRZA ===
+ * `catch` zwracal `{ userCount: 41547, postsCount: 39660, transactionsCount:
+ * 4950, likesCount: 9121, commentsCount: 2101 }`. To nie byla nawet awaria
+ * udajaca zero - to byla awaria udajaca KONKRETNY, wiarygodnie wygladajacy
+ * pomiar, ktorego nikt nigdy nie zmierzyl. Panel animowal te liczby licznikiem
+ * i wpisywal date "ostatniej aktualizacji", wiec nie do odroznienia od prawdy.
+ * Wywolujacy (app/admin/page.tsx) ma juz `catch`, ktory ustawia `null` i nie
+ * pokazuje niczego.
+ */
 export const getGlobalStats = async () => {
   try {
     // Create unique cache key per user session if possible, otherwise global
@@ -3448,11 +2493,13 @@ export const getGlobalStats = async () => {
         totalLikes += postData.likes;
       }
       
-      // Dodaj komentarze
-      if (postData.comments && Array.isArray(postData.comments)) {
+      // Dodaj komentarze - licznik przed tablica: pusta tablica jest truthy,
+      // a nowe komentarze zyja tylko w kolekcji, wiec stara kolejnosc
+      // pomijala caly ruch po wprowadzeniu licznikow.
+      if (typeof postData.commentsCount === 'number') {
+        totalComments += Math.max(0, postData.commentsCount);
+      } else if (postData.comments && Array.isArray(postData.comments)) {
         totalComments += postData.comments.length;
-      } else if (postData.commentsCount) {
-        totalComments += postData.commentsCount;
       }
     }
 
@@ -3477,14 +2524,8 @@ export const getGlobalStats = async () => {
     
   } catch (error) {
     console.error('Error fetching global stats:', error);
-    // Return fallback values
-    return {
-      userCount: 41547,
-      postsCount: 39660,
-      transactionsCount: 4950,
-      likesCount: 9121,
-      commentsCount: 2101
-    };
+    // Zadnych "fallback values". Niezmierzonej liczby sie nie wymysla.
+    throw error;
   }
 };
 
@@ -3499,184 +2540,7 @@ interface ExtendedPost extends Post {
   paidPinExpiresAt?: any;
 }
 
-// Funkcja do usuwania postów wg. filtru
-export const deletePostsByFilter = async (filter: { author?: string }) => {
-  try {
-    const postsCollection = collection(db, 'posts');
-    const queryConstraints = [];
-    
-    if (filter.author) {
-      queryConstraints.push(where('author', '==', filter.author));
-    }
-    
-    // Zastosuj limit bezpieczeństwa
-    queryConstraints.push(firestoreLimit(1000));
-    
-    const q = query(postsCollection, ...queryConstraints);
-    const snapshot = await getDocs(q);
-    
-    const batch = writeBatch(db);
-    snapshot.docs.forEach(doc => {
-      batch.delete(doc.ref);
-    });
-    
-    await batch.commit();
-    return { deleted: snapshot.size };
-  } catch (error) {
-    console.error('Error deleting posts by filter:', error);
-    throw error;
-  }
-};
 
-// Funkcja do pobierania statystyk dla użytkownika
-export const fetchUserStats = async (userId: string) => {
-  try {
-    // Pobierz liczbę postów użytkownika
-    const postsRef = collection(db, 'posts');
-    const postsQuery = query(
-      postsRef, 
-      where('author', '==', userId),
-      firestoreOrderBy('timestamp', 'desc')
-    );
-    const postsSnapshot = await getDocs(postsQuery);
-    const actualPostsCount = postsSnapshot.size;
-    
-    if (postsSnapshot.empty) {
-      return {
-        posts: 0,
-        likes: 0,
-        points: 0,
-        hasRecentActivity: false,
-        hasBaseName: false,
-        baseNameBonus: 0
-      };
-    }
-    
-    let totalLikes = 0;
-    let totalPosts = actualPostsCount;
-    
-    // Calculate total likes from all user's posts
-    postsSnapshot.forEach((doc) => {
-      const postData = doc.data();
-      totalLikes += postData.likes || 0;
-    });
-
-    // Get last 30 days activity
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
-    const recentPostsQuery = query(
-      postsRef,
-      where('author', '==', userId),
-      where('timestamp', '>=', thirtyDaysAgo)
-    );
-    
-    const recentPostsSnapshot = await getDocs(recentPostsQuery);
-    const recentActivityBonus = recentPostsSnapshot.size > 0 ? 1.25 : 1;
-
-    // ✅ FIREBASE OPTIMIZATION: Replace expensive hasBaseName() with simple check
-    // Since we already have user data, check the stored name for BaseName
-    const userRef = doc(db, 'users', userId);
-    const userDoc = await getDoc(userRef);
-    const userData = userDoc.data();
-    const userName = userData?.name || '';
-    const isBaseNameUser = userName.endsWith('.base.eth');
-    const baseNameBonus = isBaseNameUser ? 1000 : 0;
-
-    // Calculate total points
-    // Base formula: (posts * 5) + (likes * 1) + BaseName bonus
-    const points = ((totalPosts * 5) + totalLikes) * recentActivityBonus + baseNameBonus;
-
-    return {
-      posts: totalPosts,
-      likes: totalLikes,
-      points: Math.round(points),
-      hasRecentActivity: recentActivityBonus > 1,
-      hasBaseName: isBaseNameUser,
-      baseNameBonus: baseNameBonus
-    };
-  } catch (error) {
-    console.error('Error calculating user stats:', error);
-    throw error;
-  }
-};
-
-// Pobieranie użytkowników dla proponowanych użytkowników
-export const fetchRecommendedUsers = async (currentUserId: string) => {
-  try {
-    // Najpierw pobierz obserwowanych użytkowników, aby ich wykluczyć
-    const userFollowingRef = collection(db, `users/${currentUserId}/following`);
-    const followingSnapshot = await getDocs(userFollowingRef);
-    const followingIds = followingSnapshot.docs.map(doc => doc.id);
-    
-    // Dodaj też aktualnego użytkownika do wykluczonych
-    const excludedIds = [...followingIds, currentUserId];
-    
-    // Pobierz wszystkich użytkowników
-    // ... existing code ...
-  } catch (error) {
-    // ... existing code ...
-  }
-};
-
-// Pobieranie opinii o użytkowniku
-export const fetchUserRatings = async (userId: string) => {
-  try {
-    // ... existing code ...
-    
-    // Pobierz opinie o użytkowniku
-    const ratingsRef = collection(db, 'userRatings');
-    const q = query(
-      ratingsRef,
-      where('ratedUserId', '==', userId),
-      firestoreOrderBy('timestamp', 'desc')
-    );
-    const ratingsSnapshot = await getDocs(q);
-    
-    // ... existing code ...
-  } catch (error) {
-    // ... existing code ...
-  }
-};
-
-// Pobranie historii płatności użytkownika
-export const fetchPaymentHistory = async (userId: string) => {
-  try {
-    // ... existing code ...
-    
-    const paymentsRef = collection(db, 'payments');
-    const q = query(
-      paymentsRef,
-      where('userId', '==', userId),
-      firestoreOrderBy('timestamp', 'desc')
-    );
-    const paymentsSnapshot = await getDocs(q);
-    
-    // ... existing code ...
-  } catch (error) {
-    // ... existing code ...
-  }
-};
-
-// Zmieniam nazwę zduplikowanej funkcji
-export const fetchUserProfileSimple = async (userId: string) => {
-  try {
-    // ... existing code ...
-    
-    // Pobierz posty użytkownika
-    const postsRef = collection(db, 'posts');
-    const postsQuery = query(
-      postsRef,
-      where('author', '==', userId),
-      firestoreOrderBy('timestamp', 'desc')
-    );
-    const postsSnapshot = await getDocs(postsQuery);
-    
-    // ... existing code ...
-  } catch (error) {
-    // ... existing code ...
-  }
-};
 
 // --- MySphere Social Media Tracking Functions ---
 
@@ -3756,7 +2620,7 @@ export const saveMySphereUserConnections = async (
       });
     }
     
-    console.log(`✅ Zapisano połączenia social media dla ${address}:`, connectedPlatforms);
+    console.log('✅ Zapisano połączenia social media:', connectedPlatforms.length);
   } catch (error) {
     console.error('❌ Błąd podczas zapisywania połączeń social media:', error);
     throw error;
@@ -4172,11 +3036,14 @@ export const getCachedActiveUsers = async (limit: number = 50, forceRefresh: boo
   console.log('🔄 Refreshing active users cache...');
   
   try {
-    const userDocs = await getTopActiveUsers(Math.min(limit * 1.2, 1200)); // Pobierz 20% więcej dla lepszego cache'u, max 1200
+    // Math.ceil, bo firestoreLimit() na ulamku (np. 1 * 1.2) wywraca zapytanie.
+    const userDocs = await getTopActiveUsers(Math.ceil(Math.min(limit * 1.2, 1200))); // 20% zapasu dla cache'u, max 1200
     
     const users = userDocs.map(docSnapshot => {
       const data = docSnapshot.data();
-      const lastActive = data.lastActive ? new Date(data.lastActive).getTime() : Date.now();
+      // lastActive bywa Timestampem - new Date(Timestamp) dawalo Invalid Date -> NaN,
+      // przez co sortowanie i wyswietlanie "ostatnio aktywny" bylo losowe.
+      const lastActive = toMillis(data.lastActive) || Date.now();
 
       // Oblicz punktację w sposób odporny na nadpisania pól
       let totalPoints = 0;
@@ -4285,19 +3152,25 @@ export const fetchPinnedPosts = async (): Promise<ExtendedPost[]> => {
   const now = Timestamp.now();
   
   try {
+    // Oba zapytania byly BEZ limitu i rosly liniowo z kazdym postem
+    // kiedykolwiek przypietym - na kazde wejscie na feed. Sekcja przypietych
+    // pokazuje kilka pozycji, wiec sufit 12+24 to wielokrotny zapas, a koszt
+    // przestaje rosnac z historia.
     // 1. Fetch Admin-pinned posts
     const adminPinnedQuery = query(
       collection(db, 'posts'),
       where('isPinned', '==', true),
-      firestoreOrderBy('pinnedAt', 'desc')
+      firestoreOrderBy('pinnedAt', 'desc'),
+      firestoreLimit(12)
     );
-    
+
     // 2. Fetch Active Paid-pinned posts
     const paidPinsQuery = query(
       collection(db, 'paidPins'),
       where('isActive', '==', true),
       where('expiresAt', '>', now),
-      firestoreOrderBy('expiresAt', 'desc')
+      firestoreOrderBy('expiresAt', 'desc'),
+      firestoreLimit(24)
     );
 
     const [adminPinnedSnapshot, paidPinsSnapshot] = await Promise.all([
@@ -4333,39 +3206,27 @@ export const fetchPinnedPosts = async (): Promise<ExtendedPost[]> => {
       return [];
     }
     
-    // Efficiently fetch all post documents in chunks
-    const postDocs: QueryDocumentSnapshot[] = [];
+    // Efficiently fetch all post documents in chunks (rownolegle, nie po kolei)
     const postIdsArray = Array.from(postIds);
-
-    for (let i = 0; i < postIdsArray.length; i += 30) {
-      const chunk = postIdsArray.slice(i, i + 30);
-      if (chunk.length > 0) {
-        const postsQuery = query(collection(db, 'posts'), where('__name__', 'in', chunk));
-        const chunkSnap = await getDocs(postsQuery);
-        postDocs.push(...chunkSnap.docs);
-      }
-    }
+    const postsById = await fetchDocsByIds('posts', postIdsArray);
 
     // Map fetched documents to ExtendedPost objects
     const postsMap = new Map<string, ExtendedPost>();
-    postDocs.forEach(doc => {
-      if (doc.exists()) {
-        const postData = doc.data();
-        const post = { id: doc.id, ...postData } as ExtendedPost;
-        
-        // Add paid pin details if available
-        if (paidPostDetails[doc.id]) {
-          post.isPaidPin = true;
-          post.paidPinExpiresAt = paidPostDetails[doc.id].paidPinExpiresAt;
-        }
+    postsById.forEach((postData, id) => {
+      const post = { id, ...postData } as ExtendedPost;
 
-        // Ensure isPinned is correctly set for admin pins
-        if (postData.isPinned) {
-            post.isPinned = true;
-        }
-
-        postsMap.set(doc.id, post);
+      // Add paid pin details if available
+      if (paidPostDetails[id]) {
+        post.isPaidPin = true;
+        post.paidPinExpiresAt = paidPostDetails[id].paidPinExpiresAt;
       }
+
+      // Ensure isPinned is correctly set for admin pins
+      if (postData.isPinned) {
+        post.isPinned = true;
+      }
+
+      postsMap.set(id, post);
     });
     
     // Create final list and filter out any undefined posts
@@ -4405,7 +3266,7 @@ export const fetchPinnedPosts = async (): Promise<ExtendedPost[]> => {
 // Typy tokenów obsługiwanych przez system tipowania
 export type TipTokenType = 'ETH' | 'USDC' | 'CELO' | 'WLD' | 'LINEA' | 'CAMP';
 // 'basecamp' zachowane dla kompatybilności wstecznej ze starymi danymi w Firebase
-export type TipNetworkType = 'base' | 'ethereum' | 'celo' | 'world' | 'linea' | 'camp' | 'basecamp';
+export type TipNetworkType = 'base' | 'ethereum' | 'celo' | 'world' | 'linea' | 'camp' | 'robinhood' | 'basecamp';
 
 export interface Tip {
   id?: string;
@@ -4459,13 +3320,78 @@ export interface PostTipStats {
 // Zapisuje tip do Firebase po udanej transakcji
 export const saveTip = async (tip: Omit<Tip, 'id' | 'timestamp'>): Promise<string> => {
   try {
+    /**
+     * ADRESY MALYMI LITERAMI - INACZEJ NAPIWEK ZNIKA Z CZYJEJS KSIEGI.
+     *
+     * === CO BYLO ===
+     * Tu szlo `...tip` prosto z portfela, czyli adres w takiej pisowni, jaka
+     * akurat podal portfel - zwykle checksuma (`0xAbC...`). Firestore porownuje
+     * stringi bajt po bajcie, wiec `where('recipientAddress','==','0xabc...')`
+     * MIJA taki dokument. Odbiorca patrzyl na /money i widzial ksiege bez
+     * swojego napiwka, mimo ze transakcja byla na lancuchu. Brakujaca pozycja
+     * nie wyglada jak blad - wyglada jak "nie dostales".
+     *
+     * === DLACZEGO TO NIE WYSTARCZA SAMO ===
+     * Poprawka dziala od teraz w przod. 187 z 189 istniejacych dokumentow ma
+     * adres w checksumie i tak zostanie, dopoki wlasciciel bazy nie zdecyduje
+     * o migracji (scripts/migrateAddressCasing.mjs, NIEURUCHOMIONY). Dlatego
+     * odczyty MUSZA dalej pytac o oba warianty - patrz `addressReadVariants`.
+     *
+     * Wybor malych liter, a nie checksumy, jest opisany przy `normalizeAddress`
+     * w app/utils/monetization/types.ts.
+     */
     const tipData = {
       ...tip,
+      senderAddress: normalizeAddress(tip.senderAddress),
+      recipientAddress: normalizeAddress(tip.recipientAddress),
       timestamp: Date.now(),
     };
-    
+
     const docRef = await addDoc(collection(db, 'tips'), tipData);
-    console.log('✅ Tip zapisany:', tipData);
+    console.log('✅ Tip zapisany:', docRef.id); // sam identyfikator - bez adresow i kwot w konsoli
+
+    /**
+     * ODBIORCA DOWIADUJE SIE, ZE DOSTAL PIENIADZE.
+     *
+     * === CO BYLO ===
+     * `saveTip` konczylo sie na `return docRef.id`. Funkcja
+     * `notifyTipReceived` istniala od dawna w app/utils/friends/notifications.ts
+     * i nie miala ANI JEDNEGO wywolania w calym repo.
+     *
+     * Skutek: 188 rozliczonych napiwkow, ZERO powiadomionych odbiorcow. Ktos
+     * wysylal komus prawdziwe pieniadze, a tamten nie mial jak sie o tym
+     * dowiedziec inaczej niz przypadkiem, przegladajac wlasny profil.
+     *
+     * Na produkcie, ktorego cala teza brzmi "tu pieniadze chodza miedzy
+     * ludzmi", jedyne zdarzenie warte powiadomienia bylo jedynym, ktore
+     * powiadomienia nie wysylalo. Przy 14 aktywnych tygodniowo to nie jest
+     * drobiazg - to brak jedynego powodu, zeby wrocic.
+     *
+     * === DLACZEGO NIE PRZERYWA ZAPISU ===
+     * Powiadomienie jest SKUTKIEM UBOCZNYM. Napiwek juz sie rozliczyl na
+     * lancuchu i zapisal w bazie; blad przy powiadamianiu nie moze cofnac ani
+     * jednego, ani drugiego, ani pokazac uzytkownikowi bledu przy udanej
+     * platnosci. Stad `.catch` zamiast `await` w glownym torze.
+     */
+    // Import DYNAMICZNY, nie statyczny: ten plik importuje pol aplikacji,
+    // wiec wiazanie go na sztywno z modulem powiadomien tylko po to, zeby
+    // wyslac jedno powiadomienie, dokladaloby go do kazdego bundle'a, ktory
+    // dotyka Firestore. Przy okazji odpada ryzyko cyklu importow.
+    void (async () => {
+      try {
+        const { notifyTipReceived } = await import('./friends/notifications');
+        await notifyTipReceived(
+          tip.recipientAddress,
+          tip.senderAddress,
+          String(tip.amount),
+          tip.token,
+          tip.postId
+        );
+      } catch (notifyError) {
+        console.warn('⚠️ Nie udalo sie powiadomic o tipie:', notifyError);
+      }
+    })();
+
     return docRef.id;
   } catch (error) {
     console.error('❌ Błąd zapisywania tipu:', error);
@@ -4473,134 +3399,179 @@ export const saveTip = async (tip: Omit<Tip, 'id' | 'timestamp'>): Promise<strin
   }
 };
 
-// Pobiera statystyki tipów dla użytkownika
-export const getUserTipStats = async (userAddress: string): Promise<TipStats> => {
+/**
+ * Token -> przedrostek pola w statystykach (ethReceived, usdcTips, ...).
+ * Ten sam switch po szesciu tokenach byl przepisany cztery razy.
+ */
+const TIP_TOKEN_FIELD: Record<TipTokenType, string> = {
+  ETH: 'eth',
+  USDC: 'usdc',
+  CELO: 'celo',
+  WLD: 'wld',
+  LINEA: 'linea',
+  CAMP: 'camp'
+};
+
+/** Dopisuje kwote do pola `<token><suffix>`; nieznane tokeny sa pomijane. */
+const addTipAmount = (
+  stats: Record<string, number>,
+  token: TipTokenType,
+  suffix: 'Received' | 'Sent' | 'Tips',
+  amount: number
+): void => {
+  const field = TIP_TOKEN_FIELD[token];
+  if (!field) return; // token spoza listy - stare dane, nie wywracamy sumy
+  stats[`${field}${suffix}`] += amount;
+};
+
+/** Pusty komplet statystyk tipow uzytkownika - ten sam obiekt byl wpisany z reki dwa razy. */
+const emptyTipStats = (): TipStats => ({
+  totalReceived: 0,
+  totalSent: 0,
+  tipCount: 0,
+  ethReceived: 0,
+  usdcReceived: 0,
+  celoReceived: 0,
+  wldReceived: 0,
+  lineaReceived: 0,
+  campReceived: 0,
+  ethSent: 0,
+  usdcSent: 0,
+  celoSent: 0,
+  wldSent: 0,
+  lineaSent: 0,
+  campSent: 0
+});
+
+/** Pusty komplet statystyk tipow posta - byl wpisany z reki w trzech miejscach. */
+const emptyPostTipStats = (): PostTipStats => ({
+  totalTips: 0,
+  ethTips: 0,
+  usdcTips: 0,
+  celoTips: 0,
+  wldTips: 0,
+  lineaTips: 0,
+  campTips: 0,
+  tipCount: 0,
+  uniqueTippers: 0,
+  networkTips: []
+});
+
+/**
+ * Statystyki tipow jednego czlowieka.
+ *
+ * @returns `null` znaczy AWARIE ODCZYTU, nigdy "nie dostal zadnego napiwku".
+ *
+ * Wczesniej nieudany odczyt zwracal komplet zer i profil pisal "0" komus, kto
+ * dostal piecdziesiat napiwkow - awaria udajaca fakt o swiecie. To sa PIENIADZE
+ * czlowieka, wiec pomylka kosztuje tu najwiecej. Ten sam podzial co
+ * getMoneyLedger i getAskAuthorStats: pustka to jedno, awaria to drugie.
+ */
+export const getUserTipStats = async (userAddress: string): Promise<TipStats | null> => {
+  // Brak adresu to pytanie bez adresata, a nie awaria - i tak nie wolno go
+  // puscic dalej, bo `in` z pusta lista jest w Firestore bledem zapytania.
+  // Zostaje zerem, bo o NICZYM nie klamie: nie bylo o kogo zapytac.
+  if (!userAddress || !userAddress.trim()) return emptyTipStats();
+
   try {
     const tipsRef = collection(db, 'tips');
-    const receivedQuery = query(tipsRef, where('recipientAddress', '==', userAddress));
-    const sentQuery = query(tipsRef, where('senderAddress', '==', userAddress));
-    
+    /**
+     * WARSTWA ZGODNOSCI WSTECZNEJ, a nie stan docelowy.
+     *
+     * Zapisy sa od teraz normalizowane (`saveTip`), ale 187 z 189 istniejacych
+     * dokumentow ma adres w checksumie. Rownosc `==` na jednej pisowni gubila
+     * tu cala historie kazdego, kto trafil do bazy w drugiej postaci - i to bez
+     * sladu, bo pusty wynik wygladal jak "zero napiwkow". Pytanie o oba warianty
+     * kosztuje tyle samo (Firestore rozlicza ZWROCONE dokumenty).
+     *
+     * Do usuniecia dopiero po migracji danych - patrz
+     * scripts/migrateAddressCasing.mjs.
+     */
+    const variants = addressReadVariants(userAddress);
+    // Sufit 500 na strone: bez niego zapytania rosly bez konca z historia
+    // napiwkow uzytkownika (Firestore rozlicza kazdy zwrocony dokument).
+    // `orderBy` od 2026-08-13 (wdrozone indeksy tips: recipientAddress/
+    // senderAddress + timestamp, dzialaja takze z `in`): dzieki temu sufit
+    // ucina NAJSTARSZE wpisy, a nie arbitralny podzbior w kolejnosci po ID.
+    const receivedQuery = query(
+      tipsRef,
+      where('recipientAddress', 'in', variants),
+      firestoreOrderBy('timestamp', 'desc'),
+      firestoreLimit(500)
+    );
+    const sentQuery = query(
+      tipsRef,
+      where('senderAddress', 'in', variants),
+      firestoreOrderBy('timestamp', 'desc'),
+      firestoreLimit(500)
+    );
+
     const [receivedSnapshot, sentSnapshot] = await Promise.all([
       getDocs(receivedQuery),
       getDocs(sentQuery)
     ]);
-    
-    const stats: TipStats = {
-      totalReceived: 0,
-      totalSent: 0,
-      tipCount: 0,
-      ethReceived: 0,
-      usdcReceived: 0,
-      celoReceived: 0,
-      wldReceived: 0,
-      lineaReceived: 0,
-      campReceived: 0,
-      ethSent: 0,
-      usdcSent: 0,
-      celoSent: 0,
-      wldSent: 0,
-      lineaSent: 0,
-      campSent: 0
-    };
-    
+
+    const stats = emptyTipStats();
+    const fields = stats as unknown as Record<string, number>;
+
     // Policz otrzymane tipy
     receivedSnapshot.docs.forEach(doc => {
       const tip = doc.data() as Tip;
-      const amount = parseFloat(tip.amount);
+      const amount = parseAmount(tip.amount);
       stats.tipCount++;
       stats.totalReceived += amount;
-      
-      switch (tip.token) {
-        case 'ETH': stats.ethReceived += amount; break;
-        case 'USDC': stats.usdcReceived += amount; break;
-        case 'CELO': stats.celoReceived += amount; break;
-        case 'WLD': stats.wldReceived += amount; break;
-        case 'LINEA': stats.lineaReceived += amount; break;
-        case 'CAMP': stats.campReceived += amount; break;
-      }
+      addTipAmount(fields, tip.token, 'Received', amount);
     });
-    
+
     // Policz wysłane tipy
     sentSnapshot.docs.forEach(doc => {
       const tip = doc.data() as Tip;
-      const amount = parseFloat(tip.amount);
+      const amount = parseAmount(tip.amount);
       stats.totalSent += amount;
-      
-      switch (tip.token) {
-        case 'ETH': stats.ethSent += amount; break;
-        case 'USDC': stats.usdcSent += amount; break;
-        case 'CELO': stats.celoSent += amount; break;
-        case 'WLD': stats.wldSent += amount; break;
-        case 'LINEA': stats.lineaSent += amount; break;
-        case 'CAMP': stats.campSent += amount; break;
-      }
+      addTipAmount(fields, tip.token, 'Sent', amount);
     });
-    
+
     return stats;
   } catch (error) {
     console.error('❌ Błąd pobierania statystyk tipów:', error);
-    return {
-      totalReceived: 0,
-      totalSent: 0,
-      tipCount: 0,
-      ethReceived: 0,
-      usdcReceived: 0,
-      celoReceived: 0,
-      wldReceived: 0,
-      lineaReceived: 0,
-      campReceived: 0,
-      ethSent: 0,
-      usdcSent: 0,
-      celoSent: 0,
-      wldSent: 0,
-      lineaSent: 0,
-      campSent: 0
-    };
+    // Nie zgadujemy zera. Wolajacy ma napisac "nie udalo sie wczytac".
+    return null;
   }
 };
 
-// Pobiera statystyki tipów dla konkretnego posta
-export const getPostTipStats = async (postId: string): Promise<PostTipStats> => {
+/**
+ * Statystyki tipow jednego posta.
+ *
+ * @returns `null` znaczy AWARIE ODCZYTU, nigdy "pod tym postem nie ma tipow".
+ * Tabelka tipow z samymi zerami wyglada jak stwierdzenie o poscie, a byla
+ * wylacznie stwierdzeniem o naszym nieudanym zapytaniu.
+ */
+export const getPostTipStats = async (postId: string): Promise<PostTipStats | null> => {
   try {
     const tipsRef = collection(db, 'tips');
     const postTipsQuery = query(tipsRef, where('postId', '==', postId));
     const snapshot = await getDocs(postTipsQuery);
     
-    const stats: PostTipStats = {
-      totalTips: 0,
-      ethTips: 0,
-      usdcTips: 0,
-      celoTips: 0,
-      wldTips: 0,
-      lineaTips: 0,
-      campTips: 0,
-      tipCount: 0,
-      uniqueTippers: 0,
-      networkTips: []
-    };
-    
+    const stats = emptyPostTipStats();
+    const fields = stats as unknown as Record<string, number>;
+
     const uniqueTippers = new Set<string>();
     // Map to aggregate tips by network+token combination
     const networkTokenMap = new Map<string, { network: TipNetworkType; token: TipTokenType; amount: number }>();
-    
+
     snapshot.docs.forEach(doc => {
       const tip = doc.data() as Tip;
-      const amount = parseFloat(tip.amount);
-      
+      const amount = parseAmount(tip.amount);
+
       stats.tipCount++;
       stats.totalTips += amount;
-      uniqueTippers.add(tip.senderAddress);
-      
+      // Malymi literami, bo ten sam czlowiek bywa zapisany raz checksuma, raz
+      // nie - bez tego liczylby sie jako dwoch wspierajacych pod jednym postem.
+      uniqueTippers.add(normalizeAddress(tip.senderAddress ?? ''));
+
       // Legacy per-token stats (kept for backwards compatibility)
-      switch (tip.token) {
-        case 'ETH': stats.ethTips += amount; break;
-        case 'USDC': stats.usdcTips += amount; break;
-        case 'CELO': stats.celoTips += amount; break;
-        case 'WLD': stats.wldTips += amount; break;
-        case 'LINEA': stats.lineaTips += amount; break;
-        case 'CAMP': stats.campTips += amount; break;
-      }
-      
+      addTipAmount(fields, tip.token, 'Tips', amount);
+
       // New: aggregate by network+token
       const key = `${tip.network}:${tip.token}`;
       const existing = networkTokenMap.get(key);
@@ -4616,74 +3587,65 @@ export const getPostTipStats = async (postId: string): Promise<PostTipStats> => 
     return stats;
   } catch (error) {
     console.error('❌ Błąd pobierania statystyk tipów posta:', error);
-    return {
-      totalTips: 0,
-      ethTips: 0,
-      usdcTips: 0,
-      celoTips: 0,
-      wldTips: 0,
-      lineaTips: 0,
-      campTips: 0,
-      tipCount: 0,
-      uniqueTippers: 0,
-      networkTips: []
-    };
+    return null;
   }
 };
 
 /**
  * Statystyki tipow dla WIELU postow naraz - jedno zapytanie na kazde 30 postow
  * zamiast osobnego getDocs() per post (feed z 25 postami = 25 zapytan).
+ *
+ * @returns `null` znaczy AWARIE ODCZYTU calego zbiorczego zapytania.
+ *
+ * To bylo najszersze zero w calym repo: mapa jest WSTEPNIE WYPELNIANA zerami
+ * (zeby post bez ani jednego tipa mial swoj wpis), a `catch` oddawal ja bez
+ * slowa. Jedno nieudane zapytanie pisalo wiec "0 tipow" pod KAZDYM postem
+ * w feedzie naraz - i wygladalo to dokladnie jak prawda o feedzie.
  */
-export const getBulkPostTipStats = async (postIds: string[]): Promise<{ [postId: string]: PostTipStats }> => {
-  const empty = (): PostTipStats => ({
-    totalTips: 0, ethTips: 0, usdcTips: 0, celoTips: 0, wldTips: 0,
-    lineaTips: 0, campTips: 0, tipCount: 0, uniqueTippers: 0, networkTips: []
-  });
-
+export const getBulkPostTipStats = async (postIds: string[]): Promise<{ [postId: string]: PostTipStats } | null> => {
   const result: { [postId: string]: PostTipStats } = {};
   const unique = Array.from(new Set(postIds.filter(Boolean)));
   if (unique.length === 0) return result;
 
-  unique.forEach(id => { result[id] = empty(); });
+  unique.forEach(id => { result[id] = emptyPostTipStats(); });
 
   const tippersByPost = new Map<string, Set<string>>();
   const networkTokenByPost = new Map<string, Map<string, { network: TipNetworkType; token: TipTokenType; amount: number }>>();
 
   try {
-    for (let i = 0; i < unique.length; i += 30) {
-      const chunk = unique.slice(i, i + 30);
-      const snapshot = await getDocs(query(collection(db, 'tips'), where('postId', 'in', chunk)));
+    // Kawalki po 30 leca rownolegle - wczesniej feed czekal na kazdy po kolei.
+    const snapshots = await Promise.all(
+      chunkArray(unique, 30).map(chunk =>
+        getDocs(query(collection(db, 'tips'), where('postId', 'in', chunk)))
+      )
+    );
 
+    snapshots.forEach(snapshot => {
       snapshot.docs.forEach(d => {
         const tip = d.data() as Tip;
-        const stats = result[tip.postId as string];
+        const postId = tip.postId as string;
+        const stats = result[postId];
         if (!stats) return;
 
-        const amount = parseFloat(tip.amount);
+        const amount = parseAmount(tip.amount);
         stats.tipCount++;
         stats.totalTips += amount;
 
-        if (!tippersByPost.has(tip.postId as string)) tippersByPost.set(tip.postId as string, new Set());
-        tippersByPost.get(tip.postId as string)!.add(tip.senderAddress);
+        if (!tippersByPost.has(postId)) tippersByPost.set(postId, new Set());
+        // Malymi literami - ten sam wspierajacy w dwoch pisowniach liczyl sie
+        // dotad jako dwie osoby pod postem.
+        tippersByPost.get(postId)!.add(normalizeAddress(tip.senderAddress ?? ''));
 
-        switch (tip.token) {
-          case 'ETH': stats.ethTips += amount; break;
-          case 'USDC': stats.usdcTips += amount; break;
-          case 'CELO': stats.celoTips += amount; break;
-          case 'WLD': stats.wldTips += amount; break;
-          case 'LINEA': stats.lineaTips += amount; break;
-          case 'CAMP': stats.campTips += amount; break;
-        }
+        addTipAmount(stats as unknown as Record<string, number>, tip.token, 'Tips', amount);
 
-        if (!networkTokenByPost.has(tip.postId as string)) networkTokenByPost.set(tip.postId as string, new Map());
-        const map = networkTokenByPost.get(tip.postId as string)!;
+        if (!networkTokenByPost.has(postId)) networkTokenByPost.set(postId, new Map());
+        const map = networkTokenByPost.get(postId)!;
         const key = `${tip.network}:${tip.token}`;
         const existing = map.get(key);
         if (existing) existing.amount += amount;
         else map.set(key, { network: tip.network, token: tip.token, amount });
       });
-    }
+    });
 
     Object.keys(result).forEach(postId => {
       result[postId].uniqueTippers = tippersByPost.get(postId)?.size || 0;
@@ -4691,28 +3653,53 @@ export const getBulkPostTipStats = async (postIds: string[]): Promise<{ [postId:
     });
   } catch (error) {
     console.error('❌ Błąd pobierania zbiorczych statystyk tipów:', error);
+    // Czesciowy wynik tez jest klamstwem: kawalki po 30 leca rownolegle, wiec
+    // gdy padnie jeden, posty z pozostalych kawalkow maja juz policzone tipy,
+    // a te z padnietego zostaja z wpisanym zerem. Nie da sie tego rozroznic po
+    // stronie wolajacego, wiec caly odczyt oznaczamy jako nieudany.
+    return null;
   }
 
   return result;
 };
 
-// Pobiera ostatnie tipy użytkownika (otrzymane)
+/**
+ * Ostatnie OTRZYMANE napiwki. Trzy naprawy naraz, bo kazda z osobna zostawiala
+ * kafelek pusty:
+ *
+ * 1. PISOWNIA ADRESU. Bylo `==` na jednej postaci, a 187 z 189 dokumentow ma
+ *    adres w checksumie. Pytamy o oba warianty (warstwa zgodnosci wstecznej -
+ *    patrz `addressReadVariants`).
+ *
+ * 2. BRAK INDEKSU. Bylo `where(...) + orderBy('timestamp')`, a firestore.indexes.json
+ *    NIE MA ani jednego indeksu zlozonego dla `tips`. Takie zapytanie konczy sie
+ *    bledem FAILED_PRECONDITION ZAWSZE - kafelek "Recent tips" nie mogl pokazac
+ *    niczego nikomu. Sortujemy w pamieci, dokladnie jak getMoneyLedger.
+ *
+ * 3. AWARIA UDAJACA PUSTKE. `catch` zwracal `[]`, wiec RecentTips.tsx dostawal
+ *    "zero napiwkow" i pisal "No tips received yet" takze wtedy, gdy odczyt
+ *    padl. Komponent ma juz wlasny stan `loadFailed` i wlasny komunikat - byl
+ *    martwy, bo nigdy nie dostawal wyjatku. Teraz RZUCAMY dalej.
+ *
+ * @throws gdy odczyt sie nie powiedzie - wolajacy MUSI to odroznic od pustki.
+ */
 export const getRecentTips = async (userAddress: string, limit: number = 10): Promise<Tip[]> => {
-  try {
-    const tipsRef = collection(db, 'tips');
-    const recentTipsQuery = query(
-      tipsRef, 
-      where('recipientAddress', '==', userAddress),
-      firestoreOrderBy('timestamp', 'desc'),
-      firestoreLimit(limit)
-    );
-    
-    const snapshot = await getDocs(recentTipsQuery);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tip));
-  } catch (error) {
-    console.error('❌ Błąd pobierania ostatnich tipów:', error);
-    return [];
-  }
+  if (!userAddress || !userAddress.trim()) return [];
+
+  const snapshot = await getDocs(
+    query(
+      collection(db, 'tips'),
+      where('recipientAddress', 'in', addressReadVariants(userAddress)),
+      // Limit celowo WIEKSZY niz zadany: bez orderBy Firestore obcina dowolne
+      // `limit` wierszy, wiec najnowsze musza sie najpierw zmiescic w probce.
+      firestoreLimit(Math.max(limit * 5, 50))
+    )
+  );
+
+  return snapshot.docs
+    .map(entry => ({ id: entry.id, ...entry.data() } as Tip))
+    .sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0))
+    .slice(0, limit);
 };
 
 // ===============================================
@@ -4778,46 +3765,35 @@ export const getBulkUserNamesOptimized = async (addresses: string[]): Promise<{[
       }
     });
     
-    // 3. BATCH FETCH only missing addresses (NOT 2x calls per address!)
+    // 3. BATCH FETCH only missing addresses.
+    //
+    // Wczesniej bylo tu 2 x getDoc() NA KAZDY adres, czyli dla feedu z 25
+    // autorami 50 osobnych zapytan (rownoleglych, ale kazde to osobny round-trip
+    // i osobny odczyt - takze wtedy, gdy dokumentu w ogole nie ma). Teraz sa
+    // dwa zapytania `where(documentId(), 'in', ...)` na kazde 30 adresow.
     if (addressesToFetch.length > 0) {
       console.log(`🔄 Fetching ${addressesToFetch.length}/${uniqueAddresses.length} user names (${((1 - addressesToFetch.length/uniqueAddresses.length) * 100).toFixed(1)}% cache hit)`);
-      
-      // SINGLE batch query for users collection
-      const userRefs = addressesToFetch.map(addr => doc(db, 'users', addr));
-      const userDocs = await Promise.all(userRefs.map(ref => getDoc(ref)));
-      
-      // SINGLE batch query for usernames collection  
-      const usernameRefs = addressesToFetch.map(addr => doc(db, 'usernames', addr));
-      const usernameDocs = await Promise.all(usernameRefs.map(ref => getDoc(ref)));
-      
-      // Process results
-      for (let i = 0; i < addressesToFetch.length; i++) {
-        const address = addressesToFetch[i];
-        const userDoc = userDocs[i];
-        const usernameDoc = usernameDocs[i];
-        
-        let name = '';
-        let avatar = undefined;
-        
+
+      const [usersById, usernamesById] = await Promise.all([
+        fetchDocsByIds('users', addressesToFetch),
+        fetchDocsByIds('usernames', addressesToFetch)
+      ]);
+
+      for (const address of addressesToFetch) {
+        const userData = usersById.get(address);
+        const usernameData = usernamesById.get(address);
+
         // Priority: usernames > users > fallback
-        if (usernameDoc.exists() && usernameDoc.data().name) {
-          name = usernameDoc.data().name;
-        } else if (userDoc.exists() && userDoc.data().name) {
-          name = userDoc.data().name;
-        } else {
-          name = `${address.slice(0, 6)}...${address.slice(-4)}`;
-        }
-        
-        if (userDoc.exists()) {
-          avatar = userDoc.data().avatar;
-        }
-        
-        const userData = { name, avatar };
-        result[address] = userData;
-        
+        const name = usernameData?.name
+          || userData?.name
+          || `${address.slice(0, 6)}...${address.slice(-4)}`;
+
+        const entry = { name, avatar: userData?.avatar };
+        result[address] = entry;
+
         // Cache with timestamp
         userNamesCache[address] = {
-          ...userData,
+          ...entry,
           timestamp: now
         };
       }
@@ -4961,22 +3937,36 @@ export const getTopActiveUsersPaginated = async (
     
     if (cacheValid && paginatedActiveUsersCache.pages[pageIndex]) {
       console.log(`📋 Using cached page ${limitedPage}/${MAX_PAGES} of active users`);
+      // Te same liczby co w gałęzi bez cache'u - inaczej ten sam ekran
+      // raportowalby raz 5 stron, raz tyle, ile realnie jest.
+      const cachedPages = paginatedActiveUsersCache.totalPages || paginatedActiveUsersCache.pages.length;
       return {
         users: paginatedActiveUsersCache.pages[pageIndex],
         currentPage: limitedPage,
-        totalPages: MAX_PAGES,
-        hasNext: limitedPage < MAX_PAGES,
+        totalPages: Math.max(1, cachedPages),
+        hasNext: limitedPage < cachedPages,
         hasPrev: limitedPage > 1,
-        totalUsers: MAX_USERS
+        totalUsers: paginatedActiveUsersCache.pages.reduce((sum, page) => sum + page.length, 0),
       };
     }
 
     // 🚀 PRAWDZIWE LAZY LOADING: Pobierz tylko potrzebną ilość danych
     console.log(`🔄 Fetching page ${limitedPage}/${MAX_PAGES} from Firebase (${pageSize} users)...`);
     
-    // Jeśli nie ma cache, pobierz tylko tyle ile potrzeba do aktualnej strony
-    const usersNeeded = limitedPage * pageSize;
-    const allUsers = await getCachedActiveUsers(Math.min(usersNeeded, MAX_USERS), forceRefresh);
+    // POBIERAMY OD RAZU CALY ZESTAW (50), NIE TYLKO BIEZACA STRONE.
+    //
+    // Wczesniej bylo `limitedPage * pageSize`, czyli przy pierwszym wejsciu 10 -
+    // a getCachedActiveUsers dokłada 20% zapasu, wiec z Firestore wracalo
+    // dokladnie 12 dokumentow. To jest odpowiedz na pytanie "czemu Most Active
+    // pokazuje tylko 12 osob".
+    //
+    // Gorsze bylo to, ze funkcja i tak RAPORTOWALA 5 stron i 50 uzytkownikow
+    // niezaleznie od tego, ile danych przyszlo. Paginacja obiecywala strony,
+    // ktorych nie mialo z czego zbudowac.
+    //
+    // 50 dokumentow to jeden odczyt na okno cache'u - roznica wobec 12 jest
+    // kosztowo nieistotna, a lista przestaje klamac.
+    const allUsers = await getCachedActiveUsers(MAX_USERS, forceRefresh);
     
     // Podziel na strony (maksymalnie 5 stron)
     const pages: any[][] = [];
@@ -4992,7 +3982,7 @@ export const getTopActiveUsersPaginated = async (
     paginatedActiveUsersCache = {
       pages,
       currentPage: limitedPage,
-      totalPages: MAX_PAGES,
+      totalPages: Math.max(1, availablePages),
       lastUpdated: now,
       pageSize
     };
@@ -5002,13 +3992,15 @@ export const getTopActiveUsersPaginated = async (
     // Zwróć żądaną stronę
     const currentPageUsers = pages[pageIndex] || [];
     
+    // Liczby RZECZYWISTE, nie deklarowane. Wczesniej szly tu MAX_PAGES
+    // i MAX_USERS niezaleznie od tego, ile danych faktycznie przyszlo.
     return {
       users: currentPageUsers,
       currentPage: limitedPage,
-      totalPages: MAX_PAGES,
-      hasNext: limitedPage < MAX_PAGES && limitedPage < availablePages,
+      totalPages: Math.max(1, availablePages),
+      hasNext: limitedPage < availablePages,
       hasPrev: limitedPage > 1,
-      totalUsers: MAX_USERS
+      totalUsers: allUsers.length
     };
     
   } catch (error) {
@@ -5410,6 +4402,9 @@ export const rebuildReferralAggregates = async (): Promise<{ success: boolean; u
       }
     };
 
+    // Jedno zapytanie na 30 uzytkownikow zamiast getDoc() w kazdym obrocie petli.
+    const usersById = await fetchDocsByIds('users', Object.keys(sumsByUser));
+
     for (const [userId, sum] of Object.entries(sumsByUser)) {
       try {
         // referralStats
@@ -5419,8 +4414,7 @@ export const rebuildReferralAggregates = async (): Promise<{ success: boolean; u
 
         // users.baseChatPoints
         const userRef = doc(db, 'users', userId);
-        const userDoc = await getDoc(userRef);
-        const userData = userDoc.exists() ? (userDoc.data() as any) : {};
+        const userData = (usersById.get(userId) || {}) as any;
         const bcp = userData.baseChatPoints || {};
         const postPoints = Number(bcp.postPoints || 0);
         const likePoints = Number(bcp.likePoints || 0);
@@ -5502,6 +4496,9 @@ export const recomputeReferralPointsStrict = async (): Promise<{
       }
     };
 
+    // Jedno zapytanie na 30 uzytkownikow zamiast getDoc() w kazdym obrocie petli.
+    const usersById = await fetchDocsByIds('users', Object.keys(byReferrer));
+
     for (const [userId, agg] of Object.entries(byReferrer)) {
       try {
         const completed = agg.completed || 0;
@@ -5540,8 +4537,7 @@ export const recomputeReferralPointsStrict = async (): Promise<{
 
         // Update users.baseChatPoints
         const userRef = doc(db, 'users', userId);
-        const userDoc = await getDoc(userRef);
-        const userData = userDoc.exists() ? (userDoc.data() as any) : {};
+        const userData = (usersById.get(userId) || {}) as any;
         const bcp = userData.baseChatPoints || {};
         const postPoints = Number(bcp.postPoints || 0);
         const likePoints = Number(bcp.likePoints || 0);
@@ -5723,50 +4719,47 @@ export const migrateHistoricalBaseNamePosts = async (): Promise<{
       };
     }
     
-    // 2. Pobierz posty od użytkowników z BaseName (w batch'ach po 10 użytkowników)
+    // 2. Pobierz posty od użytkowników z BaseName (w grupach po 10 autorów)
     let totalProcessed = 0;
     let totalMigrated = 0;
-    const batch = writeBatch(db);
+    // `let`, nie `const`: po commit() WriteBatch jest zuzyty i kazdy kolejny
+    // set() na nim rzuca wyjatkiem. Wczesniej probowano go "zresetowac" przez
+    // Object.assign(batch, newBatch), co nie podmienia stanu wewnetrznego -
+    // migracja powyzej 500 postow wywracala sie na pierwszym commicie.
+    let batch = writeBatch(db);
     let batchCount = 0;
     const maxBatchSize = 500; // Firestore limit
-    
-    for (let i = 0; i < baseNameUsers.length; i += 10) {
-      const userChunk = baseNameUsers.slice(i, i + 10);
-      
+
+    for (const userChunk of chunkArray(baseNameUsers, 10)) {
       // Pobierz posty dla tej grupy użytkowników
       const postsRef = collection(db, 'posts');
       const postsQuery = query(postsRef, where('author', 'in', userChunk));
       const postsSnapshot = await getDocs(postsQuery);
-      
-      // Przetwórz każdy post
+
+      // Ktore z tych postow sa juz w baseNameFeed - jedno zapytanie na 30 ID
+      // zamiast getDoc() per post (to byl klasyczny odczyt N+1).
+      const existingIds = await fetchDocsByIds('baseNameFeed', postsSnapshot.docs.map(d => d.id));
+
       for (const postDoc of postsSnapshot.docs) {
         totalProcessed++;
-        
-        // Sprawdź czy post już istnieje w baseNameFeed
-        const baseNameFeedRef = doc(db, 'baseNameFeed', postDoc.id);
-        const existingPost = await getDoc(baseNameFeedRef);
-        
-        if (!existingPost.exists()) {
-          // Dodaj post do batch'a do skopiowania
-          batch.set(baseNameFeedRef, postDoc.data());
-          totalMigrated++;
-          batchCount++;
-          
-          // Wykonaj batch jeśli osiągnęliśmy limit
-          if (batchCount >= maxBatchSize) {
-            await batch.commit();
-            console.log(`✅ Batch wykonany: ${batchCount} postów skopiowanych`);
-            // Rozpocznij nowy batch
-            const newBatch = writeBatch(db);
-            Object.assign(batch, newBatch);
-            batchCount = 0;
-          }
+        if (existingIds.has(postDoc.id)) continue;
+
+        batch.set(doc(db, 'baseNameFeed', postDoc.id), postDoc.data());
+        totalMigrated++;
+        batchCount++;
+
+        // Wykonaj batch jeśli osiągnęliśmy limit
+        if (batchCount >= maxBatchSize) {
+          await batch.commit();
+          console.log(`✅ Batch wykonany: ${batchCount} postów skopiowanych`);
+          batch = writeBatch(db);
+          batchCount = 0;
         }
       }
-      
-      console.log(`📊 Przetworzono ${i + userChunk.length}/${baseNameUsers.length} użytkowników`);
+
+      console.log(`📊 Przetworzono ${totalProcessed} postów, skopiowano ${totalMigrated}`);
     }
-    
+
     // Wykonaj ostatni batch jeśli zawiera jakieś operacje
     if (batchCount > 0) {
       await batch.commit();
@@ -5804,6 +4797,11 @@ export const getUsersWithBasenameCount = async (): Promise<number> => {
     return baseNameSnapshot.size;
   } catch (error) {
     console.error("Błąd podczas pobierania liczby użytkowników z BaseName:", error);
-    return 0;
+    /**
+     * @throws zamiast `0`. Panel pokazywal "0 uzytkownikow z BaseName" jako
+     * wynik pomiaru; wolajacy (app/admin/page.tsx) ma juz `catch`, ktory
+     * ustawia `null`, wiec ta sciezka byla martwa.
+     */
+    throw error;
   }
 };

@@ -1,0 +1,65 @@
+{
+  "ranAt": "2026-08-10T19:52:01.530Z",
+  "chain": "robinhood",
+  "chainId": 4663,
+  "rpc": "https://rpc.mainnet.chain.robinhood.com",
+  "forkBlock": 33063991,
+  "pool": {
+    "token": "0xeD882075A48C5A06AcC8012A572D105918FdCf96",
+    "launchGas": "888666",
+    "buyGas": "163612",
+    "graduateGas": "456173",
+    "swapExactInputGas": "316423",
+    "swapExactOutputGas": "149523",
+    "tokenFactoryGas": "1543912",
+    "padDeployGas": "7217652"
+  },
+  "b20": null,
+  "checks": [
+    {
+      "name": "fork robinhood ma prawdziwy PoolManager",
+      "ok": true,
+      "detail": "0x8366a39cc670b4001a1121b8f6a443a643e40951, 24009 B kodu"
+    },
+    {
+      "name": "hook ma wymagane bity v4",
+      "ok": true,
+      "detail": "0x5644f7A30e21c920b6119aD1F746939b6Cc2E044"
+    },
+    {
+      "name": "launch na forku przechodzi bez tworzenia puli",
+      "ok": true,
+      "detail": "token 0xeD882075A48C5A06AcC8012A572D105918FdCf96, gas 888666"
+    },
+    {
+      "name": "kupno domyka krzywa do Locked",
+      "ok": true,
+      "detail": "gas 163612"
+    },
+    {
+      "name": "graduate przechodzi przez prawdziwy initialize/modifyLiquidity",
+      "ok": true,
+      "detail": "gas 456173, liquidity 21251635231200453637758"
+    },
+    {
+      "name": "POOLS_SLOT=6 czyta cene prawdziwego PoolManagera",
+      "ok": true,
+      "detail": "poolId 0x181a126965294cc319a6129764614ba8683f0739ed36ff6de7aeb8e5edbf6eee"
+    },
+    {
+      "name": "sciezka seed wysyla nadmiar tokena na 0xdEaD",
+      "ok": true,
+      "detail": "dead balance 44799999999999938394887713"
+    },
+    {
+      "name": "afterSwap dodatnia delta hooka domyka exactInput na prawdziwym v4",
+      "ok": true,
+      "detail": "delta0 -1000000000000000, delta1 52623570549883768351813, gas 316423"
+    },
+    {
+      "name": "afterSwap dodatnia delta hooka domyka exactOutput na prawdziwym v4",
+      "ok": true,
+      "detail": "delta0 -19007623657658, delta1 1000000000000000000000, gas 149523"
+    }
+  ]
+}

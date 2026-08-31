@@ -1,0 +1,32 @@
+{
+  "chainId": 31337,
+  "network": "hardhat",
+  "rehearsal": true,
+  "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+  "launchpad": "0xCF541A7EcE881945833ff1680dFc067C5Dd4cE2D",
+  "safe": "0x83E2DE974FC6B866FDb78AEFa5596d58fDc4142F",
+  "sphereRewards": "0xb4DE08Ae7d977FC220d963D0823123C88f0069c8",
+  "sphereTokenVesting": "0x401D5D9a4Fa8B46197cA52e681E0f1f52402bdDA",
+  "sphereCreatorEscrow": "0x30FDC180f5dBD86955beEebd1D1D5596bF745BfD",
+  "consumer": "0x83E2DE974FC6B866FDb78AEFa5596d58fDc4142F",
+  "beneficiary": "0x83E2DE974FC6B866FDb78AEFa5596d58fDc4142F",
+  "pot": "0x83E2DE974FC6B866FDb78AEFa5596d58fDc4142F",
+  "ops": "0x83E2DE974FC6B866FDb78AEFa5596d58fDc4142F",
+  "ethPotBps": 5000,
+  "buybackBps": "5000",
+  "receiverSharesBps": [
+    6000,
+    4000
+  ],
+  "vanitySalt": "0x6f274efbd3e928309750578e495e08d34bbba5de90ab87884f7e6d5c9eabf33a",
+  "predictedToken": "0x685F9E7e5a61dA67E171a73988feAdd897f31996",
+  "token": "0x685F9E7e5a61dA67E171a73988feAdd897f31996",
+  "devBuyEth": "0.05",
+  "windowCap": "62532833020637898686679174",
+  "vesting": {
+    "start": "1788131550",
+    "cliff": "2592000",
+    "duration": "31536000"
+  },
+  "deployedAt": "2026-08-30T22:16:51.532Z"
+}

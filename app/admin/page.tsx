@@ -17,7 +17,18 @@ import { getGlobalStats, getGlobalStatsRealTime, getGlobalStatsIncremental, getM
 const ADMIN_BASENAME = "story91.base.eth";
 
 export default function AdminPanel() {
-  const { address, isConnected } = useAccount();
+  // `status`, nie samo `isConnected`.
+  //
+  // Po wejsciu na strone wagmi najpierw odtwarza konektor z pamieci i przez
+  // ten czas raportuje `isConnected: false`. Efekt sprawdzajacy admina odpalal
+  // sie WLASNIE wtedy, ustawial `isAdmin: false`, a render robil
+  // `router.push('/')` - czyli wyrzucalo z panelu, ZANIM portfel zdazyl sie
+  // zglosic. Nie dalo sie wejsc zadnym portfelem, takze wlasciwym.
+  //
+  // 'connecting' i 'reconnecting' znacza "jeszcze nie wiem" i musza czekac,
+  // a nie liczyc sie jako odmowa.
+  const { address, isConnected, status: accountStatus } = useAccount();
+  const isSettling = accountStatus === 'connecting' || accountStatus === 'reconnecting';
   const router = useRouter();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -40,8 +51,12 @@ export default function AdminPanel() {
 
   useEffect(() => {
     const checkAdminStatus = async () => {
+      // Portfel jeszcze sie odtwarza - to nie jest odmowa, tylko brak
+      // odpowiedzi. Wychodzimy BEZ gaszenia `loading`, zeby render nie
+      // podjal decyzji na niepelnych danych.
+      if (isSettling) return;
+
       if (!isConnected || !address) {
-        console.log('Brak zalogowanego adresu');
         setLoading(false);
         setIsAdmin(false);
         return;
@@ -68,7 +83,7 @@ export default function AdminPanel() {
     };
 
     checkAdminStatus();
-  }, [address, isConnected]);
+  }, [address, isConnected, isSettling]);
 
   // ⚡ OPTIMIZED: Smart auto-loading przy wejściu na Global Stats (tylko jeśli brak danych)
   useEffect(() => {
@@ -96,12 +111,16 @@ export default function AdminPanel() {
             }
           } catch (error) {
             console.error('Error parsing cached data:', error);
-            console.log('📊 Cache invalid - performing smart refresh...');
-            handleFetchRealTimeStats(false);
+            // NIE skanujemy automatycznie. Pusty/zepsuty cache oznacza, ze
+            // pierwsze policzenie to PELNY skan users+posts (~450k odczytow) -
+            // odpalany dotad samym wejsciem na zakladke. Teraz czeka na
+            // swiadome klikniecie (Smart / Full / Legacy).
+            console.log('📊 Cache invalid - waiting for a manual refresh.');
           }
         } else {
-          console.log('📊 No cache found - performing smart refresh...');
-          handleFetchRealTimeStats(false); // false = smart incremental refresh
+          // Brak cache: tez bez auto-skanu. Panel pokazuje pusty stan
+          // i przyciski, a admin decyduje, kiedy zaplacic za skan.
+          console.log('📊 No cache found - waiting for a manual refresh.');
         }
       } else {
         console.log('📊 BaseChat data already loaded - skipping refresh');
@@ -427,14 +446,52 @@ export default function AdminPanel() {
     );
   }
 
-  if (!isConnected) {
-    router.push('/');
-    return null;
-  }
+  // ===== ZAMIAST CICHEGO WYRZUCENIA: POWIEDZ, O CO CHODZI =====
+  //
+  // Bylo tu `router.push('/')` w obu przypadkach. Skutek dla czlowieka:
+  // wpisujesz /admin, przez ulamek sekundy widzisz spinner i ladujesz na
+  // stronie glownej bez slowa wyjasnienia. Wygladalo to jak "nie ma takiej
+  // strony" - i dokladnie tak zostalo zgloszone.
+  //
+  // Przekierowanie kasuje tez adres z paska, wiec po podlaczeniu portfela nie
+  // ma juz dokad wrocic. Teraz strona zostaje i mowi, czego brakuje.
+  if (!isConnected || !isAdmin) {
+    return (
+      <div className="mx-auto flex min-h-screen max-w-[520px] items-center px-5">
+        <div className="w-full rounded-card bg-soft-surface p-8 shadow-card">
+          <h1 className="mb-2 font-soft-display text-[22px] font-bold text-soft-ink">
+            Panel administratora
+          </h1>
 
-  if (!isAdmin) {
-    router.push('/');
-    return null;
+          {!isConnected ? (
+            <p className="font-soft text-[14px] leading-relaxed text-soft-ink-muted">
+              Podłącz portfel administratora, żeby wejść. Przycisk połączenia jest
+              w nawigacji na górze.
+            </p>
+          ) : (
+            <>
+              <p className="mb-3 font-soft text-[14px] leading-relaxed text-soft-ink-muted">
+                Ten portfel nie ma uprawnień administratora.
+              </p>
+              {/* Pokazujemy PODLACZONY adres, a nie oczekiwany. Wypisanie
+                  adresu admina na publicznej stronie ulatwialoby celowanie
+                  w niego, a i tak nie pomaga temu, kto go nie ma. */}
+              <p className="font-mono text-[12px] text-soft-ink-faint">
+                Podłączony: {address}
+              </p>
+            </>
+          )}
+
+          <button
+            type="button"
+            onClick={() => router.push('/basechat')}
+            className="mt-6 rounded-pill bg-soft-primary px-5 py-2.5 font-soft text-[13.5px] font-bold text-white transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+          >
+            Wróć do feedu
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -443,13 +500,24 @@ export default function AdminPanel() {
         Panel Administratora
       </h1>
 
+      {/* Konsola operatora stoi za WLASNA bramka serwerowa (sesja SIWE + adres
+          admina), wiec to jest tylko odnosnik, a nie nadanie dostepu. Zwykly
+          <a>, nie <Link>: docelowa strona jest komponentem serwerowym, ktory
+          czyta cookie sesji, i ma sie przeladowac w calosci. */}
+      <a
+        href="/admin/ops"
+        className="inline-flex items-center gap-2 mb-8 px-4 py-2 rounded-lg border border-purple-500/40 bg-purple-500/10 text-purple-200 hover:bg-purple-500/20 transition-transform ease-out-strong [transition-duration:var(--dur-press)] hover:scale-[1.02] active:scale-[0.98]"
+      >
+        Operator console — gas, escrow solvency, contracts
+      </a>
+
       {/* Firebase Cost Optimization Notice */}
               <div className="mb-6 p-4 bg-green-900/20 border border-green-500/30 rounded-lg">
           <h3 className="text-lg font-semibold text-green-400 mb-2">🎉 Krytyczna Optymalizacja Kosztów Firebase Zakończona!</h3>
           <div className="text-sm text-green-300 space-y-1">
             <p>✅ <strong>refreshAllPosts():</strong> TOP 50 użytkowników zamiast wszystkich (95% redukcja)</p>
-            <p>✅ <strong>Admin Statistics:</strong> Całkowicie wyłączony (3000+ reads)</p>
-            <p>✅ <strong>Admin UserManagement:</strong> Całkowicie wyłączony (3000+ reads)</p>
+            <p>✅ <strong>Admin Statistics:</strong> Działa na agregacjach — ~467 odczytów zamiast ~461 000 (getCountFromServer liczy po stronie Firestore, 1 odczyt / 1000 wpisów)</p>
+            <p>✅ <strong>Admin UserManagement:</strong> Działa na odczytach punktowych — szukanie po adresie to 2 odczyty, lista nigdy nie jest ładowana w całości</p>
             <p>✅ <strong>BaseChat global stats:</strong> Używa systemu strony głównej (pełne dane + cache 12h per user)</p>
             <p>✅ <strong>Main page getGlobalStats():</strong> Cache 12h per user + pełne dane (6000+ reads → 0.2/user/12h)</p>
             <p>✅ <strong>MyCamp Platform Distribution:</strong> Sekcja usunięta (dodatkowe oszczędności)</p>
@@ -971,8 +1039,8 @@ export default function AdminPanel() {
               <div className="flex items-center gap-3 bg-green-900/20 border border-green-500/30 rounded-lg px-4 py-2">
                 <span className="text-green-400">🤖</span>
                 <div className="text-sm">
-                  <div className="text-green-300 font-medium">Auto-loading enabled</div>
-                  <div className="text-green-200/70">Real Firebase data loads automatically</div>
+                  <div className="text-green-300 font-medium">On-demand stats</div>
+                  <div className="text-green-200/70">BaseChat counts run only when you press a refresh button (full scan)</div>
                 </div>
               </div>
 
@@ -1135,6 +1203,13 @@ export default function AdminPanel() {
                 {/* Global Stats Row */}
                 <div>
                   <h4 className="text-lg font-bold text-white mb-4">📊 Global BaseChat Statistics</h4>
+                  {!globalStats ? (
+                    // Bez skanu nie pokazujemy zer jako pomiaru - liczenie users
+                    // i posts to pelny skan, wiec rusza dopiero po kliknieciu.
+                    <div className="rounded-lg border border-white/10 bg-white/5 p-6 text-center text-sm text-gray-300">
+                      Not loaded yet. Counting users and posts is a full scan, so it runs only when you press Smart Refresh, Full or Legacy above.
+                    </div>
+                  ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div className={`relative bg-purple-500/20 rounded-lg p-6 text-center border border-purple-500/30 transition-all duration-300 ${
                       updateTrigger.users ? 'scale-105 shadow-lg shadow-purple-500/20' : ''
@@ -1192,6 +1267,7 @@ export default function AdminPanel() {
                       )}
                     </div>
                   </div>
+                  )}
                 </div>
 
                 {/* MySphere Stats Row */}

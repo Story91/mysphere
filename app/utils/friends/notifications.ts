@@ -182,6 +182,13 @@ export const createNotification = async (
 
 /**
  * Pobierz powiadomienia użytkownika
+ *
+ * @throws gdy odczyt sie nie powiedzie - wolajacy MUSI to odroznic od pustki.
+ *
+ * DOKLADNIE TEN SAM BLAD, CO W RecentTips: `catch` zwracal `[]`, wiec ekran
+ * powiadomien pisal "No notifications - all caught up!" takze wtedy, gdy nie
+ * udalo sie ich odczytac. NotificationsView ma juz wlasny stan bledu (`error`)
+ * i wlasny komunikat - byl martwy, bo nigdy nie dostawal wyjatku.
  */
 export const getUserNotifications = async (
   userId: string,
@@ -219,7 +226,7 @@ export const getUserNotifications = async (
 
   } catch (error) {
     console.error('Błąd pobierania powiadomień użytkownika:', error);
-    return [];
+    throw error;
   }
 };
 
@@ -279,7 +286,31 @@ export const markAllNotificationsAsRead = async (userId: string): Promise<number
     );
 
     const snapshot = await getDocs(unreadQuery);
-    if (snapshot.empty) return 0;
+
+    /**
+     * ===== LICZNIK ZERUJEMY ZAWSZE, TAKZE GDY NIE MA CO OZNACZAC =====
+     *
+     * Bylo tu `if (snapshot.empty) return 0;` PRZED `resetUnreadCount`, wiec
+     * pusty wynik zapytania konczyl funkcje, nie dotykajac licznika.
+     *
+     * Dzwonek w nawigacji NIE LICZY dokumentow - czyta pole
+     * `unreadNotifications` z dokumentu uzytkownika (getUnreadNotificationsCount
+     * nizej). Te dwie rzeczy potrafia sie rozjechac: licznik rosnie przy kazdym
+     * nowym powiadomieniu, a dokument moze potem zniknac, zapis moze paść po
+     * inkrementacji, albo nieprzeczytanych bywa wiecej niz `limit(100)` w jednej
+     * turze. Gdy licznik mowi 3, a zadnego dokumentu z `isRead: false` juz nie
+     * ma, stary kod wychodzil od razu i pole zostawalo na 3 NA ZAWSZE. Kropka
+     * przy dzwonku przezywala "mark all as read" i przezywala odswiezenie
+     * strony, bo po odswiezeniu czytane jest wlasnie to pole.
+     *
+     * "Oznacz wszystko jako przeczytane" znaczy "od teraz nic nie jest
+     * nieprzeczytane", wiec licznik ma po tej akcji byc zerem niezaleznie od
+     * tego, ile dokumentow trzeba bylo poprawic.
+     */
+    if (snapshot.empty) {
+      await resetUnreadCount(userId);
+      return 0;
+    }
 
     const batch = writeBatch(db);
     const timestamp = serverTimestamp();
@@ -341,9 +372,16 @@ export const deleteNotification = async (
 
 /**
  * Pobierz liczbę nieprzeczytanych powiadomień
+ *
+ * @returns `null` znaczy AWARIE ODCZYTU, nigdy "nic nowego".
+ *
+ * Zero na dzwonku to komunikat "nikt sie do ciebie nie odezwal". Wpisane po
+ * padnietym `getDoc` jest to zdanie falszywe i kosztowne: czlowiek nie wchodzi
+ * sprawdzic czegos, o czym mu powiedziano, ze nie istnieje.
  */
-export const getUnreadNotificationsCount = async (userId: string): Promise<number> => {
+export const getUnreadNotificationsCount = async (userId: string): Promise<number | null> => {
   try {
+    // Adres nie do przyjecia - nie bylo o kogo zapytac, wiec zero nie klamie.
     if (!isValidEthereumAddress(userId)) {
       return 0;
     }
@@ -359,7 +397,7 @@ export const getUnreadNotificationsCount = async (userId: string): Promise<numbe
     return 0;
   } catch (error) {
     console.error('Błąd pobierania liczby nieprzeczytanych powiadomień:', error);
-    return 0;
+    return null;
   }
 };
 
@@ -492,6 +530,92 @@ export const notifyTipReceived = async (
 };
 
 /**
+ * Jak wygrany dostaje swoje pieniadze - a wiec co mu wolno o nich powiedziec.
+ *
+ *   'escrow'  kontrakt ZAPISAL saldo (zdarzenie SeatAwarded). W portfelu
+ *             jeszcze nic nie ma: claim() to osobna transakcja, ktora wygrany
+ *             musi podpisac sam i zaplacic za nia gaz na Base.
+ *   'wallet'  autor przelal wprost, a transfer zostal potwierdzony na lancuchu
+ *             (verifyBasePayment). Pieniadze SA juz na miejscu.
+ */
+export type AskPayoutDelivery = 'escrow' | 'wallet';
+
+/**
+ * Powiadomienie o wyplacie za przyjeta odpowiedz na Aska.
+ *
+ * === CO NAPRAWIA ===
+ * Rozstrzygniecie Aska przypisywalo pieniadze i na tym sie konczylo. Wygrany
+ * dowiadywal sie o nich wylacznie wtedy, gdy sam z siebie zajrzal na /money
+ * albo /asks. Przy escrow oznacza to pieniadze lezace w kontrakcie NIEODEBRANE,
+ * bo nikt nie wie, ze sa.
+ *
+ * === DWA ZDANIA, BO DWIE ROZNE SYTUACJE ===
+ * Przy escrow "otrzymales" byloby obietnica, ktorej kod nie dotrzymuje - tam
+ * trzeba jeszcze kliknac i zaplacic gaz. Przy przelewie bezposrednim pieniadze
+ * naprawde juz sa w portfelu. Stad `delivery`, a nie jedno uniwersalne zdanie.
+ *
+ * === DLACZEGO TYP TIP_RECEIVED, A NIE WLASNY ===
+ * `createNotification` odrzuca wszystko, czego nie ma w preferencjach odbiorcy
+ * (`preferences.types[type]`), a dokumenty preferencji SA JUZ ZAPISANE w bazie -
+ * z tymi kluczami, ktore istnialy w chwili zapisu. Nowy typ bylby dla kazdego
+ * istniejacego uzytkownika `undefined`, czyli po cichu zablokowany: kod
+ * wygladalby na dzialajacy, a nikt nie dostalby nic. TIP_RECEIVED to ta sama
+ * polka - "pieniadze dla ciebie" - i ma juz ikone, kolor, filtr w
+ * NotificationsView oraz miejsce na liscie subskrypcji w hooks.ts.
+ *
+ * === O ADRESACH ===
+ * `recipientId` i `askAuthorId` musza przyjsc W FORMIE EIP-55 (checksum).
+ * Powiadomienia lezą pod `users/{adres}/notifications`, a czyta je przegladarka
+ * adresem prosto z wagmi, ktory JEST checksumowany. Sesja SIWE trzyma adres
+ * malymi literami (app/api/auth/verify), wiec zapis "jak leci" trafilby pod
+ * klucz, do ktorego nikt nigdy nie zaglada. Checksumuje wolajacy - to trasy
+ * serwerowe maja viem, a ten modul ladowany jest takze w przegladarce.
+ */
+export const notifyAskPayout = async (params: {
+  recipientId: string;
+  askAuthorId: string;
+  askId: string;
+  answerId: string;
+  /** Kwota gotowa do pokazania, np. "5.00" - formatuje ja wolajacy, bo to on wie, czy patrzy na lancuch, czy na zapis. */
+  amount: string;
+  token: string;
+  delivery: AskPayoutDelivery;
+  /** Hash rozstrzygniecia albo przelewu - zostaje w dokumencie jako slad. */
+  txHash: string;
+}): Promise<void> => {
+  const { recipientId, askAuthorId, askId, answerId, amount, token, delivery, txHash } = params;
+
+  // Autor nie moze wygrac wlasnego Aska (trasy tego pilnuja), ale gdyby kiedys
+  // przeszlo - nie zawiadamiamy kogos o przelewie samemu sobie.
+  if (recipientId.toLowerCase() === askAuthorId.toLowerCase()) return;
+
+  const held = delivery === 'escrow';
+
+  const created = await createNotification({
+    userId: recipientId,
+    type: 'TIP_RECEIVED',
+    fromUserId: askAuthorId,
+    // Tekst widoczny dla uzytkownika - po angielsku, jak reszta interfejsu.
+    title: held ? 'Ask payout waiting for you' : 'Ask payout received',
+    message: held
+      ? `awarded you ${amount} ${token} for your answer. The escrow contract is holding it until you claim it - open Money to collect.`
+      : `paid you ${amount} ${token} for your answer. It is already in your wallet.`,
+    data: { askId, answerId, tipAmount: amount, token, delivery, txHash },
+    // /money to jedyne miejsce z PRZYCISKIEM ODBIORU (AskClaimPanel) i z lista
+    // tego, co juz wplynelo. Trasa istnieje - app/money/page.tsx.
+    actionUrl: '/money'
+  });
+
+  if (!created) {
+    // AWARIA != PUSTKA. `createNotification` zwraca null zarowno przy bledzie
+    // zapisu, jak i przy wyciszeniu przez preferencje albo quiet hours - w
+    // kazdym z tych przypadkow czlowiek NIE WIE o swoich pieniadzach, wiec
+    // slad musi zostac w logu.
+    console.warn('⚠️ Powiadomienie o wyplacie za Aska nie zostalo dostarczone:', { askId, answerId });
+  }
+};
+
+/**
  * Powiadomienie systemowe
  */
 export const notifySystem = async (
@@ -602,9 +726,17 @@ export const getNotificationsSummary = async (userId: string): Promise<Notificat
       return getEmptyNotificationSummary();
     }
 
-    // Drugie zapytanie bylo zbedne - recent to po prostu pierwsza piatka tej samej
-    // listy. Byly to 105 odczytow Firestore zamiast 100.
-    const allNotifications = await getUserNotifications(userId, 100);
+    // `total`, `recent` i `byType` licza sie z pobranej listy (jak dotad, 100 -
+    // zeby "Total" nie skurczyl sie u kogos z wieloma powiadomieniami). Zmienia
+    // sie tylko zrodlo `unread`: bierzemy WIEKSZA z dwoch liczb - licznika
+    // w profilu (lapie nieprzeczytane spoza okna 100) i tego, co realnie
+    // nieprzeczytane w pobranej liscie. `max`, nie sam licznik: gdyby licznik
+    // zdryfowal w dol albo do zera, przycisk "Mark all as read" i tak zostaje
+    // widoczny, dopoki na liscie sa nieprzeczytane wpisy.
+    const [allNotifications, unreadFromCounter] = await Promise.all([
+      getUserNotifications(userId, 100),
+      getUnreadNotificationsCount(userId),
+    ]);
     const recentNotifications = allNotifications.slice(0, 5);
 
     const byType: { [K in NotificationType]: number } = {
@@ -620,25 +752,26 @@ export const getNotificationsSummary = async (userId: string): Promise<Notificat
       ACHIEVEMENT: 0
     };
 
-    let unread = 0;
-
+    let unreadInPage = 0;
     allNotifications.forEach(notification => {
       byType[notification.type]++;
       if (!notification.isRead) {
-        unread++;
+        unreadInPage++;
       }
     });
 
     return {
       total: allNotifications.length,
-      unread,
+      unread: Math.max(unreadFromCounter ?? 0, unreadInPage),
       byType,
       recent: recentNotifications
     };
 
   } catch (error) {
     console.error('Błąd pobierania podsumowania powiadomień:', error);
-    return getEmptyNotificationSummary();
+    // Puste podsumowanie ma `unread: 0` i puste `recent` - czyli wyglada
+    // identycznie jak czyste konto. Wolajacy ma sie dowiedziec, ze nie wiemy.
+    throw error;
   }
 };
 

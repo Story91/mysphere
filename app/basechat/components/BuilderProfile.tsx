@@ -1,20 +1,56 @@
 // @ts-nocheck
 import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../utils/firebase';
 import ProfileSocials from './ProfileSocials';
+import { isRouteDisabled } from '@/config/routeStatus';
 import { toast } from 'react-hot-toast';
 // ✅ USUNIĘTO: UserRank i RANK_DESCRIPTIONS - nie używane już
-import { Avatar } from '@coinbase/onchainkit/identity';
+// Warstwa tozsamosci na wagmi/viem - zamiennik @coinbase/onchainkit/identity
+import { Avatar } from '../../components/identity';
 import TipButton from './TipButton';
 import RecentTips from './RecentTips';
 import { getUserTipStats, TipStats as TipStatsType } from '../../utils/firebase';
 import { ChevronUpIcon, ChevronDownIcon } from '@heroicons/react/24/solid';
-import { useSocial } from '../friendsystem/hooks';
-import { sendFriendRequest as sendFriendRequestDirect } from '../friendsystem/friends_system';
+import { useSocialActions } from '../friendsystem/hooks';
+// Kanoniczna implementacja z utils/friends. Kopia w friendsystem/friends_system.ts
+// miala zaslepke powiadomien (tylko console.log) i polskie komunikaty bledow,
+// ktorych ten komponent nigdy nie rozpoznawal.
+import {
+  sendFriendRequest as sendFriendRequestDirect,
+  getUserFollowStats,
+  getFriendsStats,
+  type FollowStats,
+  type FriendsStats
+} from '../../utils/friends';
 import ReferralDashboard from '../../utils/referrals/components/ReferralDashboard';
 import { initializeReferralStats } from '../../utils/referrals';
 import CreatorCoinSection from './CreatorCoinSection';
+
+/**
+ * Konektor Camp Network (podpinanie X / Spotify / TikTok).
+ *
+ * ssr:false jest wymogiem, nie optymalizacja: CampProvider i hooki z
+ * @campnetwork/origin/react wolaja useContext/useState warunkowo od
+ * `typeof window`, wiec render serwerowy i hydracja maja rozna liczbe hookow.
+ * Przy okazji caly SDK Campa nie wchodzi do pierwszego pakietu /basechat -
+ * dociaga sie dopiero, gdy ktos otworzy WLASNY profil.
+ */
+const CampSocialsCard = dynamic(() => import('../../utils/socials/CampSocialsCard'), {
+  ssr: false,
+  loading: () => (
+    <div className="mb-6 rounded-card bg-soft-surface border border-soft-line shadow-card p-6">
+      <div className="animate-pulse flex items-center">
+        <div className="w-12 h-12 rounded-full bg-soft-sunken mr-4" />
+        <div className="flex-1 space-y-2">
+          <div className="h-4 w-40 bg-soft-sunken rounded-pill" />
+          <div className="h-3 w-64 bg-soft-sunken rounded-pill" />
+        </div>
+      </div>
+    </div>
+  )
+});
 
 // Talent Protocol API types
 interface TalentScore {
@@ -354,6 +390,16 @@ interface BuilderProfileProps {
     };
   };
   onBackToFeed: () => void;
+  /**
+   * Otwiera panel edycji profilu, ktory stoi NAD tym komponentem
+   * (basechat/page.tsx, `isEditingProfile`). Awatar, nazwa i linki zmieniaja
+   * sie tam i tylko tam - drugi upload w tym pliku bylby drugim miejscem,
+   * w ktorym trzeba naprawiac ten sam blad przy zapisie zdjecia.
+   *
+   * Bez tej funkcji zdjecie na profilu jest tylko obrazkiem: wchodzisz na
+   * wlasny profil, patrzysz na swoj awatar i nie masz go jak zmienic.
+   */
+  onEditProfile?: () => void;
   toEthereumAddress?: (address: string) => `0x${string}`; // Opcjonalne teraz
   // ✅ USUNIĘTO: RANK_DESCRIPTIONS - nie potrzebne już
   onSocialLinksUpdate?: (links: { twitter: string; farcaster: string; discord: string }) => void;
@@ -365,6 +411,7 @@ export default function BuilderProfile({
   currentUserAddress, 
   profile, 
   onBackToFeed,
+  onEditProfile,
   toEthereumAddress: externalToEthereumAddress,
   onSocialLinksUpdate
 }: BuilderProfileProps) {
@@ -379,11 +426,20 @@ export default function BuilderProfile({
   const [isEditingBio, setIsEditingBio] = useState(false);
   const [newBio, setNewBio] = useState(profile.bio || '');
   const [isSaving, setIsSaving] = useState(false);
+  // Zapisane bio nie wraca do `profile` (rodzic trzyma je w swoim stanie i nie
+  // ma dla niego zadnego callbacku). Bez tej nakladki po udanym zapisie sekcja
+  // "About" pokazywala STARY tekst az do ponownego wejscia w profil.
+  const [savedBioOverride, setSavedBioOverride] = useState<string | null>(null);
+  const displayedBio = savedBioOverride ?? profile.bio;
   
   
   // Tip Stats state
   const [tipStats, setTipStats] = useState<TipStatsType | null>(null);
   const [loadingTipStats, setLoadingTipStats] = useState(false);
+  /* Nieudany odczyt zarobkow. Kafelek "Creator Earnings" musi wtedy napisac,
+     ze nie wie - "0.0000 ETH" bylo twierdzeniem o czyichs pieniadzach, a wynikalo
+     wylacznie z padnietego zapytania. */
+  const [tipStatsFailed, setTipStatsFailed] = useState(false);
   
   // Talent Protocol state
   const [talentScore, setTalentScore] = useState<TalentScore | null>(null);
@@ -395,10 +451,14 @@ export default function BuilderProfile({
   const [twitterTweets, setTwitterTweets] = useState<TwitterTweet[]>([]);
   const [loadingTwitterData, setLoadingTwitterData] = useState(false);
   const [isTwitterSectionExpanded, setIsTwitterSectionExpanded] = useState(false);
+  /* Nieudany odczyt z Campa. Null znaczy "nie bylo awarii", NIE "nie ma danych" -
+     brak podpietego konta zostaje osobnym, pustym stanem. */
+  const [twitterError, setTwitterError] = useState<string | null>(null);
 
   // Spotify/Camp Network state
   const [spotifyUserData, setSpotifyUserData] = useState<SpotifyUserData | null>(null);
   const [loadingSpotifyData, setLoadingSpotifyData] = useState(false);
+  const [spotifyError, setSpotifyError] = useState<string | null>(null);
   const [isSpotifySectionExpanded, setIsSpotifySectionExpanded] = useState(false);
 
   // Audio Player state
@@ -414,28 +474,66 @@ export default function BuilderProfile({
   const [showReferralDashboard, setShowReferralDashboard] = useState(false);
   const [referralStatsInitialized, setReferralStatsInitialized] = useState(false);
 
-  // 🚀 SOCIAL FEATURES: Hook i stany  
-  // Get stats for the profile we're viewing (userAddress)
-  const { 
-    followStats, 
-    friendsStats
-  } = useSocial(userAddress || null);
-  
+  // 🚀 SOCIAL FEATURES: Hook i stany
+  // Statystyki ogladanego profilu. Wczesniej szedl tu pelny useSocial, ktory dla
+  // dwoch licznikow dociagal listy obserwujacych/znajomych/powiadomien (~150
+  // odczytow) i zakladal nasluch na powiadomienia OBCEGO uzytkownika.
+  const [followStats, setFollowStats] = useState<FollowStats | null>(null);
+  const [friendsStats, setFriendsStats] = useState<FriendsStats | null>(null);
+  /* Odczyt licznikow padl. Bez tego `null` znaczylo dokladnie to samo, co
+     "jeszcze nie wczytane", wiec rzad odznak po prostu znikal - a milczenie
+     w miejscu, gdzie stalo "128 followers", czyta sie jak zero. */
+  const [socialStatsFailed, setSocialStatsFailed] = useState(false);
+
+  useEffect(() => {
+    if (!userAddress) {
+      setFollowStats(null);
+      setFriendsStats(null);
+      setSocialStatsFailed(false);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const [follow, friends] = await Promise.all([
+          getUserFollowStats(userAddress),
+          getFriendsStats(userAddress)
+        ]);
+        if (cancelled) return;
+        // `null` z ktoregokolwiek odczytu to awaria, nie "zero znajomych".
+        setSocialStatsFailed(follow === null || friends === null);
+        setFollowStats(follow);
+        setFriendsStats(friends);
+      } catch (error) {
+        console.error('Error loading profile social stats:', error);
+        if (!cancelled) setSocialStatsFailed(true);
+      }
+    })();
+
+    // Odpowiedz dla poprzedniego profilu nie moze nadpisac biezacego.
+    return () => { cancelled = true; };
+  }, [userAddress]);
+
   // Get actions for the current logged-in user
   const {
-    followUser, 
-    unfollowUser, 
-    checkIfFollowing
-  } = useSocial(currentUserAddress || null);
-  
+    followUser,
+    unfollowUser,
+    getFollowStatuses
+  } = useSocialActions(currentUserAddress || null);
+
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [checkingFollowStatus, setCheckingFollowStatus] = useState(true);
+  // "Add Friend" nie mial zadnej blokady na czas zapytania - kazde kolejne
+  // klikniecie wysylalo nastepne zaproszenie i nastepny toast "Sending...".
+  const [sendingFriendRequest, setSendingFriendRequest] = useState(false);
   
   // Zresetuj stan edycji bio kiedy zmienia się profil
   useEffect(() => {
     setNewBio(profile.bio || '');
     setIsEditingBio(false);
+    setSavedBioOverride(null);
   }, [profile]);
   
   // Initialize referral stats
@@ -463,21 +561,26 @@ export default function BuilderProfile({
       return;
     }
 
+    let cancelled = false;
     const checkFollowStatusAsync = async () => {
       setCheckingFollowStatus(true);
       try {
-        const isCurrentlyFollowing = await checkIfFollowing(userAddress);
-        setIsFollowing(isCurrentlyFollowing);
+        const statuses = await getFollowStatuses([userAddress]);
+        if (cancelled) return;
+        setIsFollowing(Boolean(statuses[userAddress]));
       } catch (error) {
+        if (cancelled) return;
         console.error('Error checking follow status:', error);
         setIsFollowing(false);
       } finally {
-        setCheckingFollowStatus(false);
+        if (!cancelled) setCheckingFollowStatus(false);
       }
     };
 
     checkFollowStatusAsync();
-  }, [currentUserAddress, userAddress, checkIfFollowing]);
+    // Szybkie przelaczanie profili nie moze wpisac odpowiedzi dla poprzedniego.
+    return () => { cancelled = true; };
+  }, [currentUserAddress, userAddress, getFollowStatuses]);
 
   // 🚀 FOLLOW/UNFOLLOW HANDLERS
   const handleFollowUser = async () => {
@@ -539,11 +642,13 @@ export default function BuilderProfile({
   };
 
   const handleSendFriendRequest = async () => {
+    if (sendingFriendRequest) return;
+
     if (!currentUserAddress) {
       toast.error('Please connect your wallet first!');
       return;
     }
-    
+
     // Check if trying to send request to yourself
     if (currentUserAddress === userAddress) {
       toast.error('🚫 Cannot send friend request to yourself!', {
@@ -553,11 +658,13 @@ export default function BuilderProfile({
       return;
     }
     
+    setSendingFriendRequest(true);
+
     // Show loading toast
     const loadingToast = toast.loading('Sending friend request...', {
       position: 'top-right',
     });
-    
+
     try {
       const result = await sendFriendRequestDirect(currentUserAddress!, userAddress, 'Hello! Let\'s be friends! 🤝');
       
@@ -600,40 +707,72 @@ export default function BuilderProfile({
         duration: 4000,
         position: 'top-right',
       });
+    } finally {
+      setSendingFriendRequest(false);
     }
   };
 
+  /**
+   * Wynik odczytu z tras Campa.
+   *
+   * DLACZEGO NIE `T | null`. Trasy /api/camp/* moga teraz odmowic (zly adres,
+   * za szybko) albo nie dostac odpowiedzi od Campa. Zwijanie tego do `null`
+   * sprawialo, ze awaria rysowala sie dokladnie tak samo jak "ten portfel nic
+   * nie podpial" - czyli klamalismy uzytkownikowi w oczy.
+   */
+  type CampReadResult<T> =
+    | { state: 'ok'; data: T }
+    | { state: 'error'; message: string };
+
+  /** Wyciaga zdanie od serwera; kazda odmowa niesie `error`. */
+  const readCampError = async (response: Response, fallback: string): Promise<string> => {
+    try {
+      const data = await response.json();
+      if (typeof data?.error === 'string' && data.error.trim()) return data.error;
+    } catch {
+      // odpowiedz bez JSON - zostajemy przy zdaniu zapasowym
+    }
+    return fallback;
+  };
+
   // Fetch Twitter data from Camp Network
-  const fetchTwitterData = async (address: string) => {
-    if (!address) return null;
-    
+  const fetchTwitterData = async (address: string): Promise<CampReadResult<any>> => {
+    if (!address) return { state: 'error', message: 'No wallet address to look up.' };
+
+    const fallback = 'X data could not be loaded for this wallet.';
+
     try {
       // Try direct Camp Network API first for more complete data
       const response = await fetch(`/api/camp/twitter?address=${encodeURIComponent(address)}&direct=true`);
-      
+
       if (!response.ok) {
         console.warn(`Twitter API returned ${response.status} for address ${address}`);
-        return null;
+        return { state: 'error', message: await readCampError(response, fallback) };
       }
-      
+
       const data = await response.json();
-      
+
       if (data.error) {
         console.warn('Twitter API error:', data.error);
-        return null;
+        return {
+          state: 'error',
+          message: typeof data.error === 'string' && data.error.trim() ? data.error : fallback,
+        };
       }
-      
-      return data.data;
+
+      return { state: 'ok', data: data.data };
     } catch (error) {
       console.error('Error fetching Twitter data:', error);
-      return null;
+      return { state: 'error', message: 'Could not reach the server to load X data.' };
     }
   };
 
   // Fetch Spotify data from Camp Network with localStorage caching
-  const fetchSpotifyData = async (address: string) => {
-    if (!address) return null;
-    
+  const fetchSpotifyData = async (address: string): Promise<CampReadResult<any>> => {
+    if (!address) return { state: 'error', message: 'No wallet address to look up.' };
+
+    const fallback = 'Spotify data could not be loaded for this wallet.';
+
     // Try to load from localStorage first
     const cacheKey = `spotify_data_${address}`;
     const cacheTimestampKey = `spotify_data_${address}_timestamp`;
@@ -647,7 +786,7 @@ export default function BuilderProfile({
         const age = Date.now() - parseInt(cachedTimestamp);
         if (age < CACHE_DURATION) {
           console.log(`🎵 Spotify data loaded from cache (${Math.round(age/1000)}s old)`);
-          return JSON.parse(cachedData);
+          return { state: 'ok', data: JSON.parse(cachedData) };
         } else {
           // Cache expired, remove old data
           localStorage.removeItem(cacheKey);
@@ -662,17 +801,26 @@ export default function BuilderProfile({
     try {
       // Fetch comprehensive Spotify data using Camp Network API
       const response = await fetch(`/api/camp/spotify?address=${encodeURIComponent(address)}&type=full`);
-      
+
       if (!response.ok) {
         console.warn(`Spotify API returned ${response.status} for address ${address}`);
-        return null;
+        return { state: 'error', message: await readCampError(response, fallback) };
       }
-      
+
       const data = await response.json();
-      
-      if (!data.success || data.error) {
+
+      if (data.error) {
         console.warn('Spotify API error:', data.message || data.error);
-        return null;
+        return {
+          state: 'error',
+          message: typeof data.error === 'string' && data.error.trim() ? data.error : fallback,
+        };
+      }
+
+      // 200 + success:false to jedyny przypadek, w ktorym trasa naprawde mowi
+      // "sprawdzilem i nic tu nie ma" - i tylko to wolno pokazac jako pustke.
+      if (!data.success) {
+        return { state: 'ok', data: null };
       }
 
       // 🐛 DEBUG: Check what data we're getting
@@ -693,11 +841,11 @@ export default function BuilderProfile({
       } catch (cacheError) {
         console.warn('Failed to cache Spotify data:', cacheError);
       }
-      
-      return data.data;
+
+      return { state: 'ok', data: data.data };
     } catch (error) {
       console.error('Error fetching Spotify data:', error);
-      return null;
+      return { state: 'error', message: 'Could not reach the server to load Spotify data.' };
     }
   };
 
@@ -712,19 +860,61 @@ export default function BuilderProfile({
     }
   };
 
+  /**
+   * Jedno wejscie do odczytu X - uzywaja go pierwsze ladowanie i przycisk
+   * ponowienia. Awaria zostawia wlasny komunikat, a nie pusty panel.
+   */
+  const loadTwitterData = async (address: string) => {
+    setLoadingTwitterData(true);
+    setTwitterError(null);
+    try {
+      const result = await fetchTwitterData(address);
+
+      if (result.state === 'error') {
+        setTwitterUser(null);
+        setTwitterTweets([]);
+        setTwitterError(result.message);
+        return;
+      }
+
+      const twitterData = result.data;
+      if (twitterData && twitterData.twitterUser) {
+        setTwitterUser(twitterData.twitterUser);
+        setTwitterTweets(twitterData.tweets || []);
+      } else {
+        // Camp odpowiedzial i nic nie mial - to JEST pustka, wolno ja pokazac.
+        setTwitterUser(null);
+        setTwitterTweets([]);
+      }
+    } finally {
+      setLoadingTwitterData(false);
+    }
+  };
+
+  /** To samo dla Spotify - wspolne dla ladowania i przycisku odswiezenia. */
+  const loadSpotifyData = async (address: string) => {
+    setLoadingSpotifyData(true);
+    setSpotifyError(null);
+    try {
+      const result = await fetchSpotifyData(address);
+
+      if (result.state === 'error') {
+        setSpotifyUserData(null);
+        setSpotifyError(result.message);
+        return;
+      }
+
+      setSpotifyUserData(result.data);
+    } finally {
+      setLoadingSpotifyData(false);
+    }
+  };
+
   // Refresh Spotify data
   const refreshSpotifyData = async () => {
     if (!userAddress) return;
     clearSpotifyCache(userAddress);
-    setLoadingSpotifyData(true);
-    try {
-      const freshData = await fetchSpotifyData(userAddress);
-      setSpotifyUserData(freshData);
-    } catch (error) {
-      console.error('Error refreshing Spotify data:', error);
-    } finally {
-      setLoadingSpotifyData(false);
-    }
+    await loadSpotifyData(userAddress);
   };
 
   // Audio Player Functions
@@ -834,11 +1024,15 @@ export default function BuilderProfile({
       if (!userAddress) return;
       
       setLoadingTipStats(true);
+      setTipStatsFailed(false);
       try {
+        // `null` = odczyt padl. Zera z tego miejsca byly "Creator Earnings 0".
         const stats = await getUserTipStats(userAddress);
+        setTipStatsFailed(stats === null);
         setTipStats(stats);
       } catch (error) {
         console.error('Error fetching tip stats:', error);
+        setTipStatsFailed(true);
       } finally {
         setLoadingTipStats(false);
       }
@@ -873,55 +1067,16 @@ export default function BuilderProfile({
 
   // Fetch Twitter data
   useEffect(() => {
-    const fetchTwitterDataEffect = async () => {
-      if (!userAddress) return;
-      
-      setLoadingTwitterData(true);
-      try {
-        const twitterData = await fetchTwitterData(userAddress);
-        
-        if (twitterData && twitterData.twitterUser) {
-          setTwitterUser(twitterData.twitterUser);
-          setTwitterTweets(twitterData.tweets || []);
-        } else {
-          setTwitterUser(null);
-          setTwitterTweets([]);
-        }
-      } catch (error) {
-        console.error('Error fetching Twitter data:', error);
-        setTwitterUser(null);
-        setTwitterTweets([]);
-      } finally {
-        setLoadingTwitterData(false);
-      }
-    };
-
-    fetchTwitterDataEffect();
+    if (!userAddress) return;
+    void loadTwitterData(userAddress);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userAddress]);
 
   // Fetch Spotify data
   useEffect(() => {
-    const fetchSpotifyDataEffect = async () => {
-      if (!userAddress) return;
-      
-      setLoadingSpotifyData(true);
-      try {
-        const spotifyData = await fetchSpotifyData(userAddress);
-        
-        if (spotifyData) {
-          setSpotifyUserData(spotifyData);
-        } else {
-          setSpotifyUserData(null);
-        }
-      } catch (error) {
-        console.error('Error fetching Spotify data:', error);
-        setSpotifyUserData(null);
-      } finally {
-        setLoadingSpotifyData(false);
-      }
-    };
-
-    fetchSpotifyDataEffect();
+    if (!userAddress) return;
+    void loadSpotifyData(userAddress);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userAddress]);
 
   // Funkcja do zapisywania nowego bio
@@ -947,11 +1102,15 @@ export default function BuilderProfile({
       }
 
       if (newBio.length <= 90) {
-        await updateDoc(userRef, { 
+        await updateDoc(userRef, {
           bio: newBio,
           lastBioUpdate: serverTimestamp()
         });
-        
+
+        // Pokaz to, co naprawde zostalo zapisane - inaczej po zamknieciu
+        // edytora wraca stara tresc z propsa `profile`.
+        setSavedBioOverride(newBio);
+
         // Zamknij tryb edycji
         setIsEditingBio(false);
       } else {
@@ -971,93 +1130,150 @@ export default function BuilderProfile({
     toast.success('Address copied to clipboard!');
   };
 
+  /**
+   * Kopiuje link do PUBLICZNEGO profilu (/u/[address]).
+   *
+   * Ten panel jest widoczny tylko wewnatrz aplikacji - nie da sie go nikomu
+   * wyslac. Trasa /u/[address] jest serwerowa, ma wlasne metadane i karte OG,
+   * wiec dopiero ona jest czyms, co ma sens wkleic poza aplikacja.
+   */
+  const copyPublicProfileLink = () => {
+    // origin z przegladarki, a nie stala - dzieki temu link dziala tak samo na
+    // produkcji, na preview Vercela i lokalnie.
+    const url = `${window.location.origin}/u/${profile.address}`;
+    navigator.clipboard.writeText(url);
+    toast.success('Profile link copied — paste it anywhere.');
+  };
+
   return (
-    <div className="font-['Coinbase_Display']">
-      {/* Builder Panel Header with Back Button - nowoczesny gradient */}
-      <div className="bg-gradient-to-r from-blue-600 via-blue-500 to-blue-700 p-5 relative overflow-hidden">
-        {/* Dodajemy efekt połysku */}
-        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white to-transparent opacity-30"></div>
-        <div className="absolute -top-24 -right-24 w-48 h-48 bg-blue-400 rounded-full filter blur-3xl opacity-20"></div>
-        <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-purple-400 rounded-full filter blur-3xl opacity-10"></div>
-        
-        <div className="flex items-center justify-between relative z-10">
-          <button 
-            onClick={onBackToFeed}
-            className="flex items-center text-white bg-white/10 backdrop-blur-md rounded-lg px-4 py-2 transition-all duration-300 hover:bg-white/20 hover:scale-105 border border-white/10"
+    <div className="font-soft">
+      {/* ===== POWROT: SAMA STRZALKA =====
+          Stal tu fioletowy pas przez cala szerokosc kolumny, z trzema
+          rozmytymi kolami w tle, przyciskiem "Back to Feed" i napisem
+          "Builder Profile" na srodku. Napis nazywal ekran, na ktory czlowiek
+          wlasnie sam wszedl i ktory ma przed oczami - a pas zabieral pierwsze
+          80 pikselow, czyli miejsce, gdzie powinno stac zdjecie i nazwa.
+
+          Zostala sama strzalka. Wyjscie musi byc, tytul nie. */}
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <button
+          onClick={onBackToFeed}
+          aria-label="Back to feed"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-pill bg-soft-surface text-soft-ink-muted shadow-card transition-transform [transition-duration:var(--dur-press)] ease-out-strong hover:text-soft-ink active:scale-[0.94] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+        >
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+
+        {/* Wejscie w edycje stoi w JEDNYM rzedzie z powrotem, a nie samotnie
+            nad cala kolumna. Ten sam handler co aparat przy zdjeciu. */}
+        {onEditProfile && currentUserAddress === userAddress && (
+          <button
+            type="button"
+            onClick={onEditProfile}
+            className="inline-flex items-center gap-1.5 rounded-pill bg-soft-surface px-4 py-2 font-soft text-[13px] font-semibold text-soft-primary-deep shadow-card transition-transform [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
           >
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
             </svg>
-            Back to Feed
+            Edit profile
           </button>
-          <div className="text-xl font-light text-white font-['Coinbase_Display']">Builder Profile</div>
-          <div className="w-24"></div> {/* Placeholder dla wyrównania */}
-        </div>
+        )}
       </div>
-      
-      {/* User Info Section */}
-      <div className="p-6">
-        <div className="flex flex-col lg:flex-row items-start lg:items-center gap-8 lg:gap-12 mb-6 p-8 lg:p-12 relative overflow-hidden rounded-3xl bg-gradient-to-br from-white via-slate-50/80 to-blue-50/60 border border-white/60 backdrop-blur-2xl shadow-2xl">
-          {/* Premium białe i niebieskie efekty świetlne */}
-          <div className="absolute -top-8 -right-8 w-40 h-40 bg-gradient-to-br from-blue-200/30 to-indigo-300/20 rounded-full filter blur-3xl animate-pulse"></div>
-          <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-gradient-to-tr from-white/40 to-blue-100/30 rounded-full filter blur-2xl"></div>
-          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-300/60 to-transparent"></div>
-          <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/80 to-transparent"></div>
-          
-          {/* Efekt premium szkła z białymi refleksami */}
-          <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-white/20 to-blue-50/30 backdrop-blur-xl"></div>
-          <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent"></div>
-          
-          <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center gap-8 lg:gap-12 w-full">
-          <div className="flex flex-col items-center lg:items-start">
-            <div className="w-28 h-28 lg:w-32 lg:h-32 rounded-full overflow-hidden flex-shrink-0 relative group">
-              {/* Premium ramka z białym gradientem */}
-              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white via-blue-100 to-blue-200 p-1 shadow-2xl">
-                <div className="w-full h-full rounded-full overflow-hidden bg-white">
+
+      {/* ===== TOZSAMOSC BEZ RAMKI =====
+          Ta sekcja byla karta z obwodka i cieniem, w srodku kolumny, ktora
+          sama juz jest kolumna - pudelko w pudelku. Do tego cztery rozmyte
+          kola i dwie linie "premium" w tle oraz dwa puste <div> po efektach
+          szkla, ktore nic nie rysowaly.
+
+          Teraz tresc rozklada sie wprost na tle strony, a role granicy pelni
+          odstep i wlosowa linia pod spodem. Zadnej nowej ramki. */}
+      <div>
+        <div className="mb-6">
+          <div className="flex w-full flex-col gap-6">
+          {/* ===== NAGLOWEK JAK W KAZDEJ APLIKACJI Z PROFILAMI =====
+              Bylo tu na desktopie DWIE KOLUMNY obok siebie: waski slupek
+              ze zdjeciem, nazwa, adresem, socjalami i kaflem Sphere Identity,
+              a obok drugi slupek z zarobkami, licznikami i poleceniami. Slupek
+              ze zdjeciem dostawal przez to okolo 200px i wszystko w nim stalo
+              jedno pod drugim, w kolumnie waskiej jak na telefonie - na ekranie
+              szerokim na 1900px.
+
+              Teraz to jest zwykly naglowek profilu: zdjecie i tozsamosc w
+              jednym rzedzie, a wszystko inne pod spodem, na pelnej szerokosci
+              kolumny. */}
+          <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-center">
+            {/* ===== ZDJECIE, A NA WLASNYM PROFILU TAKZE JEGO ZMIANA =====
+                Awatar byl tu samym obrazkiem: wchodzilo sie na wlasny profil,
+                patrzylo na swoje zdjecie i nie mialo go jak zmienic - jedyne
+                wejscie stalo w pasku nad komponentem, pod napisem "Edit
+                profile", ktory nie mowil, ze da sie tam podmienic zdjecie.
+
+                Przycisk aparatu NIE robi drugiego uploadu. Otwiera ten sam
+                panel edycji co pasek wyzej, wiec zapis zdjecia ma dalej jedno
+                miejsce w kodzie. Widoczny jest wylacznie dla wlasciciela
+                profilu i tylko wtedy, gdy rodzic poda `onEditProfile`. */}
+            <div className="relative h-28 w-28 flex-shrink-0 lg:h-32 lg:w-32">
+              <div className="h-full w-full overflow-hidden rounded-full bg-soft-surface p-1 shadow-card">
+                <div className="h-full w-full overflow-hidden rounded-full bg-soft-sunken">
                   {profile.avatar ? (
-                    <img 
-                      src={profile.avatar} 
-                      alt="Profile" 
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                    <img
+                      src={profile.avatar}
+                      alt=""
+                      className="h-full w-full object-cover"
                     />
                   ) : (
                     <Avatar address={convertAddress(profile.address)} className="w-full h-full" />
                   )}
                 </div>
               </div>
-              
-              {/* Premium efekty świetlne */}
-              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/30 via-transparent to-blue-300/20 opacity-70"></div>
-              <div className="absolute -inset-2 rounded-full bg-gradient-to-br from-blue-200/20 to-transparent filter blur-lg opacity-60 group-hover:opacity-80 transition-opacity duration-300"></div>
+
+              {onEditProfile && currentUserAddress === userAddress && (
+                <button
+                  type="button"
+                  onClick={onEditProfile}
+                  aria-label="Change profile picture"
+                  title="Change profile picture"
+                  className="absolute bottom-0 right-0 flex h-9 w-9 items-center justify-center rounded-full border-2 border-soft-bg bg-soft-primary text-white shadow-chip transition-transform [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.94] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-bg"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3 9a2 2 0 012-2h1.5l1-2h7l1 2H18a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                    <circle cx="12" cy="13" r="3.2" />
+                  </svg>
+                </button>
+              )}
             </div>
             
-            {/* Nazwa użytkownika pod avatarem */}
-            <div className={`mt-3 text-lg lg:text-xl font-semibold text-center lg:text-left ${
-              isVitalik 
-                ? "bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-600 text-transparent bg-clip-text"
-                : ""
+            {/* Nazwa, odznaka i adres stoja OBOK zdjecia, nie pod nim. */}
+            <div className="min-w-0 flex-1 text-center sm:text-left">
+            <div className={`text-[22px] lg:text-[26px] font-soft-display font-bold ${
+              isVitalik
+                ? "text-soft-accent-deep"
+                : "text-soft-ink"
             }`}>
               {profile.name.endsWith('.base.eth') ? (
-                <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-transparent bg-clip-text font-medium">{profile.name}</span>
+                <span className="text-soft-primary-deep font-semibold">{profile.name}</span>
               ) : profile.name.endsWith('.sphere') ? (
                 <>
-                  <span className="text-gray-900 dark:text-white">{profile.name.replace('.sphere', '')}</span>
-                  <span className="text-blue-500">.sphere</span>
+                  <span className="text-soft-ink">{profile.name.replace('.sphere', '')}</span>
+                  <span className="text-soft-primary-deep">.sphere</span>
                 </>
               ) : profile.name.endsWith('.camper') ? (
                 <>
-                  <span className="text-gray-900 dark:text-white">{profile.name.replace('.camper', '')}</span>
-                  <span className="text-orange-500">.camper🏕️</span>
+                  <span className="text-soft-ink">{profile.name.replace('.camper', '')}</span>
+                  <span className="text-soft-accent-deep">.camper🏕️</span>
                 </>
               ) : profile.name.endsWith('.celo') ? (
                 <>
-                  <span className="text-gray-900 dark:text-white">{profile.name.replace('.celo', '')}</span>
-                  <span className="!text-yellow-500">.celo</span>
+                  <span className="text-soft-ink">{profile.name.replace('.celo', '')}</span>
+                  <span className="!text-soft-accent-deep">.celo</span>
                 </>
               ) : profile.name.endsWith('.world') ? (
                 <>
-                  <span className="text-gray-900 dark:text-white">{profile.name.replace('.world', '')}</span>
-                  <span className="text-green-500">.world</span>
+                  <span className="text-soft-ink">{profile.name.replace('.world', '')}</span>
+                  <span className="text-soft-info">.world</span>
                 </>
               ) : (
                 <>
@@ -1078,26 +1294,56 @@ export default function BuilderProfile({
             {/* Badge dla Vitalika */}
             {isVitalik && (
               <div className="mt-1 flex justify-center lg:justify-start">
-                <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-yellow-500 text-white text-xs font-medium">
+                <span className="inline-flex items-center px-3 py-0.5 rounded-pill bg-soft-accent-deep text-white text-xs font-semibold shadow-chip">
                   Ethereum Founder
                 </span>
               </div>
             )}
             
             {/* Skrócony adres portfela pod avatarem */}
-            <div className="mt-3 lg:mt-4 w-full lg:w-auto flex flex-col items-center lg:items-start space-y-3">
+            <div className="mt-3 flex w-full flex-col items-center gap-2.5 sm:w-auto sm:items-start">
               <button
                 onClick={copyAddressToClipboard}
-                className="flex items-center text-xs text-slate-600 hover:text-blue-600 bg-gradient-to-r from-white to-blue-50 hover:from-blue-50 hover:to-blue-100 px-3 py-1.5 rounded-lg border border-blue-200/50 backdrop-blur-sm shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 w-fit"
+                aria-label="Copy wallet address"
+                className="flex items-center text-xs text-soft-ink-muted hover:text-soft-primary-deep bg-soft-sunken hover:bg-soft-line px-3 py-1.5 rounded-pill border border-soft-line shadow-chip transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary w-fit"
               >
-                <span className="mr-2 font-mono text-slate-700">{profile.address.slice(0,6)}...{profile.address.slice(-4)}</span>
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <span className="mr-2 font-mono tabular-nums text-soft-ink">{profile.address.slice(0,6)}...{profile.address.slice(-4)}</span>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                 </svg>
               </button>
-              
+
+              {/* Link do publicznego profilu - jedyne wyjscie z tego panelu na
+                  zewnatrz aplikacji. Otwiera trase w nowej karcie, a ikona obok
+                  kopiuje ten sam adres do schowka. */}
+              <div className="flex items-center gap-1.5">
+                <a
+                  href={`/u/${profile.address}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center text-xs text-soft-primary-deep hover:bg-soft-line bg-soft-sunken px-3 py-1.5 rounded-pill border border-soft-line shadow-chip transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary w-fit"
+                >
+                  <span className="mr-1.5 font-semibold">Public profile</span>
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </a>
+                <button
+                  onClick={copyPublicProfileLink}
+                  title="Copy profile link"
+                  aria-label="Copy profile link"
+                  className="flex items-center justify-center h-[30px] w-[30px] text-soft-ink-muted hover:text-soft-primary-deep bg-soft-surface hover:bg-soft-sunken rounded-pill border border-soft-line shadow-chip transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5M10.172 13.828a4 4 0 010-5.656l3-3a4 4 0 015.656 5.656l-1.5 1.5" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            </div>
+
               {/* Linki społecznościowe */}
-              <ProfileSocials 
+              <ProfileSocials
                 address={convertAddress(profile.address)}
                 initialLinks={profile.socialLinks}
                 lazyLoad={false}
@@ -1108,8 +1354,42 @@ export default function BuilderProfile({
                   }
                 }}
               />
+
+              {/* ===== SPHERE IDENTITY - PRZENIESIONE Z KOLUMNY BOCZNEJ =====
+                  Kafel stal w lewej kolumnie feedu, ktora zostala sprowadzona
+                  do samej nawigacji. Jest to odnosnik do PELNEJ aktywnosci
+                  onchain wlasciciela profilu, wiec jego miejsce jest na
+                  profilu, pod linkami spolecznosciowymi - a nie w menu.
+
+                  Ten sam warunek `isRouteDisabled('/base')` co przedtem: bez
+                  niego kafel prowadzilby w przekierowanie z powrotem. */}
+              {!isRouteDisabled('/base') && (
+                <a
+                  href="/base"
+                  /* Ten sam granat co karta Aska (#141a33). W produkcie jest
+                     dokladnie JEDEN ciemny kolor - trzy odcienie czerni na
+                     dwoch kaflach obok siebie czytaly sie jak niedokonczona
+                     podmiana, a nie jak decyzja. */
+                  className="mt-3 block w-full rounded-card bg-[#141a33] p-4 text-center shadow-card transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                >
+                  <div className="mb-1.5 flex items-center justify-center gap-2">
+                    <span className="font-soft-display text-[15px] font-bold text-white">
+                      Sphere Identity
+                    </span>
+                    <span className="flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5">
+                      <svg className="h-3.5 w-3.5" viewBox="0 0 146 146" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <circle cx="73" cy="73" r="73" fill="#0052FF" />
+                        <path d="M73.323 123.729C101.617 123.729 124.553 100.832 124.553 72.5875C124.553 44.343 101.617 21.4463 73.323 21.4463C46.4795 21.4463 24.4581 42.0558 22.271 68.2887H89.9859V76.8864H22.271C24.4581 103.119 46.4795 123.729 73.323 123.729Z" fill="white" />
+                      </svg>
+                      <span className="font-soft text-[10.5px] font-medium text-white">Base</span>
+                    </span>
+                  </div>
+                  <p className="font-soft text-[12px] leading-[1.45] text-blue-200">
+                    Transactions, tokens, NFTs and contracts, straight from the chain.
+                  </p>
+                </a>
+              )}
             </div>
-          </div>
 
           <div className="flex-1 w-full lg:max-w-none">
             <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between mb-4 lg:mb-6">
@@ -1117,9 +1397,9 @@ export default function BuilderProfile({
                 <div className="flex flex-col space-y-4 lg:space-y-5">
                   {/* Creator Earnings - Rozciągnięty na całą szerokość */}
                   {(tipStats && tipStats.tipCount > 0) ? (
-                    <div className="bg-gradient-to-r from-yellow-50 via-amber-50/50 to-yellow-100 border border-yellow-300/60 rounded-xl px-6 py-4 shadow-md backdrop-blur-sm hover:scale-[1.02] hover:shadow-lg transition-all duration-300 relative w-full">
+                    <div className="bg-soft-surface border border-soft-line rounded-card px-6 py-4 shadow-card transition-shadow [transition-duration:var(--dur-press)] ease-out-strong relative w-full">
                       {/* Golden glow effect */}
-                      <div className="absolute inset-0 bg-gradient-to-r from-yellow-100/30 to-amber-200/30 rounded-xl opacity-50"></div>
+                      <div className="absolute inset-0 bg-soft-accent-soft/30 rounded-card opacity-50"></div>
                       
                       <div className="relative flex items-center justify-between">
                         {/* Left side - Title and icon */}
@@ -1129,7 +1409,7 @@ export default function BuilderProfile({
                             alt="MySphere" 
                             className="w-4 h-4 object-contain"
                           />
-                          <span className="text-sm font-bold text-amber-700">Creator Earnings</span>
+                          <span className="text-xs font-semibold uppercase tracking-wider text-soft-ink-faint">Creator Earnings</span>
                         </div>
                         
                         {/* Right side - ETH, USDC and CAMP values with proper icons */}
@@ -1140,7 +1420,7 @@ export default function BuilderProfile({
                                 <img src="/brand-kit/base/logo/in-product/Base_Network_Logo.svg" alt="Base" className="w-4 h-4 z-10" />
                                 <img src="/icons/eth.svg" alt="ETH" className="w-4 h-4" />
                               </div>
-                              <span className="text-sm font-semibold text-amber-700">
+                              <span className="text-sm font-semibold text-soft-accent-deep font-soft-display tabular-nums">
                                 {tipStats.ethReceived.toFixed(4)}
                               </span>
                             </div>
@@ -1148,7 +1428,7 @@ export default function BuilderProfile({
                           {tipStats.usdcReceived > 0 && (
                             <div className="flex items-center space-x-1.5">
                               <img src="/icons/usdc.svg" alt="USDC" className="w-4 h-4" />
-                              <span className="text-sm font-semibold text-amber-700">
+                              <span className="text-sm font-semibold text-soft-accent-deep font-soft-display tabular-nums">
                                 {tipStats.usdcReceived.toFixed(2)}
                               </span>
                             </div>
@@ -1156,7 +1436,7 @@ export default function BuilderProfile({
                           {/* CAMP token support - ODBLOKOWANY */}
                           <div className="flex items-center space-x-1.5">
                             <img src="/Camp.png" alt="CAMP" className="w-4 h-4" />
-                            <span className="text-sm font-semibold text-amber-700">
+                            <span className="text-sm font-semibold text-soft-accent-deep font-soft-display tabular-nums">
                               0.00
                             </span>
                           </div>
@@ -1164,11 +1444,21 @@ export default function BuilderProfile({
                       </div>
                     </div>
                   ) : loadingTipStats ? (
-                    <div className="bg-gradient-to-r from-yellow-50 via-amber-50/50 to-yellow-100 border border-yellow-300/60 rounded-xl px-6 py-4 shadow-md backdrop-blur-sm w-full">
+                    <div className="bg-soft-surface border border-soft-line rounded-card px-6 py-4 shadow-card w-full">
                       <div className="flex items-center justify-center space-x-2">
-                        <div className="animate-pulse bg-amber-200 rounded px-3 py-2 text-sm">
+                        <div className="animate-pulse bg-soft-sunken text-soft-ink-faint rounded-pill px-3 py-2 text-sm">
                           Loading earnings...
                         </div>
+                      </div>
+                    </div>
+                  ) : tipStatsFailed ? (
+                    /* Awaria odczytu. Kafelek zostaje NA EKRANIE i mowi wprost, ze
+                       nie wie - zniknieciem udawalby, ze ten czlowiek nic nie
+                       zarobil. Bez `soft-accent`: to nie jest kwota. */
+                    <div className="bg-soft-surface border border-soft-line rounded-card px-6 py-4 shadow-card w-full">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-soft-ink-faint">Creator Earnings</span>
+                        <span className="font-soft text-sm text-soft-ink-soft">Couldn&apos;t be loaded</span>
                       </div>
                     </div>
                   ) : null}
@@ -1180,35 +1470,40 @@ export default function BuilderProfile({
                   />
 
                   {/* Separator gradientowy przed social stats */}
-                  {(followStats || friendsStats) && (
+                  {(followStats || friendsStats || socialStatsFailed) && (
                     <>
-                      <div className="w-full h-px bg-gradient-to-r from-transparent via-purple-300/60 to-transparent my-3"></div>
+                      <div className="w-full h-px bg-soft-line my-3"></div>
                       <div className="flex items-center flex-wrap gap-3 lg:gap-4 text-xs">
+                        {/* Odczyt padl - mowimy to wprost. Brak odznaki wygladal
+                            jak brak obserwujacych. */}
+                        {socialStatsFailed && (
+                          <span className="font-soft text-soft-ink-soft">Follower and friend counts couldn&apos;t be loaded</span>
+                        )}
                         {followStats && (
                         <>
-                          <div className="flex items-center space-x-1 bg-gradient-to-r from-purple-50 to-purple-100 border border-purple-300/60 px-3 py-1.5 rounded-full shadow-md backdrop-blur-sm">
-                            <svg className="w-3 h-3 text-purple-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <div className="flex items-center space-x-1 bg-soft-sunken border border-soft-line px-3 py-1.5 rounded-pill shadow-chip">
+                            <svg className="w-3 h-3 text-soft-primary-deep" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                             </svg>
-                            <span className="text-purple-800 font-semibold">{followStats.followers}</span>
-                            <span className="text-purple-700 text-xs font-medium">followers</span>
+                            <span className="text-soft-ink font-soft-display font-bold tabular-nums">{followStats.followers}</span>
+                            <span className="text-soft-ink-faint text-xs font-semibold uppercase tracking-wider">followers</span>
                           </div>
-                          <div className="flex items-center space-x-1 bg-gradient-to-r from-blue-50 to-cyan-100 border border-cyan-300/60 px-3 py-1.5 rounded-full shadow-md backdrop-blur-sm">
-                            <svg className="w-3 h-3 text-cyan-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <div className="flex items-center space-x-1 bg-soft-sunken border border-soft-line px-3 py-1.5 rounded-pill shadow-chip">
+                            <svg className="w-3 h-3 text-soft-primary-deep" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                             </svg>
-                            <span className="text-cyan-800 font-semibold">{followStats.following}</span>
-                            <span className="text-cyan-700 text-xs font-medium">following</span>
+                            <span className="text-soft-ink font-soft-display font-bold tabular-nums">{followStats.following}</span>
+                            <span className="text-soft-ink-faint text-xs font-semibold uppercase tracking-wider">following</span>
                           </div>
                         </>
                         )}
                         {friendsStats && (
-                          <div className="flex items-center space-x-1 bg-gradient-to-r from-green-50 to-emerald-100 border border-green-300/60 px-3 py-1.5 rounded-full shadow-md backdrop-blur-sm">
-                            <svg className="w-3 h-3 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <div className="flex items-center space-x-1 bg-soft-sunken border border-soft-line px-3 py-1.5 rounded-pill shadow-chip">
+                            <svg className="w-3 h-3 text-soft-primary-deep" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
                             </svg>
-                            <span className="text-green-800 font-semibold">{friendsStats.totalFriends}</span>
-                            <span className="text-green-700 text-xs font-medium">friends</span>
+                            <span className="text-soft-ink font-soft-display font-bold tabular-nums">{friendsStats.totalFriends}</span>
+                            <span className="text-soft-ink-faint text-xs font-semibold uppercase tracking-wider">friends</span>
                           </div>
                         )}
                       </div>
@@ -1218,12 +1513,13 @@ export default function BuilderProfile({
                   {/* Referral System Button - only for own profile */}
                   {currentUserAddress === userAddress && (
                     <>
-                      <div className="w-full h-px bg-gradient-to-r from-transparent via-green-300/60 to-transparent my-3"></div>
+                      <div className="w-full h-px bg-soft-line my-3"></div>
                       <button
                         onClick={() => setShowReferralDashboard(!showReferralDashboard)}
-                        className="flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700 transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105"
+                        aria-expanded={showReferralDashboard}
+                        className="flex items-center space-x-2 px-4 py-2 rounded-pill text-sm font-semibold bg-soft-primary text-white hover:bg-soft-primary-deep transition-colors [transition-duration:var(--dur-press)] ease-out-strong shadow-chip active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M4.5 12a7.5 7.5 0 1115 0 7.5 7.5 0 01-15 0z" />
                         </svg>
                         <span>Referral System</span>
@@ -1237,22 +1533,22 @@ export default function BuilderProfile({
                   {/* Separator gradientowy przed action buttons */}
                   {currentUserAddress !== userAddress && (
                     <>
-                      <div className="w-full h-px bg-gradient-to-r from-transparent via-indigo-300/60 to-transparent my-3"></div>
+                      <div className="w-full h-px bg-soft-line my-3"></div>
                       <div className="flex items-center flex-wrap gap-3 lg:gap-4">
                       {/* Follow Button (Przycisk obserwowania) */}
                       {!checkingFollowStatus && (
                         <button
                           onClick={isFollowing ? handleUnfollowUser : handleFollowUser}
                           disabled={followLoading}
-                          className={`flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-300 shadow-sm backdrop-blur-sm border hover:scale-105 ${
+                          className={`flex items-center space-x-1 px-3 py-1.5 rounded-pill text-xs font-semibold transition-colors [transition-duration:var(--dur-press)] ease-out-strong shadow-chip border active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
                             isFollowing
-                              ? 'bg-gradient-to-r from-white to-indigo-50 border-indigo-200/50 text-indigo-700 hover:from-indigo-50 hover:to-indigo-100'
-                              : 'bg-gradient-to-r from-indigo-500 to-blue-600 border-indigo-400/50 text-white hover:from-indigo-600 hover:to-blue-700 shadow-lg'
+                              ? 'bg-soft-sunken border-soft-line text-soft-primary-deep hover:bg-soft-line'
+                              : 'bg-soft-primary border-soft-primary text-white hover:bg-soft-primary-deep'
                           } ${followLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                           {followLoading ? (
                             <>
-                              <div className="w-3 h-3 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></div>
+                              <div className="w-3 h-3 border-2 border-soft-ink-soft border-t-transparent rounded-full animate-spin"></div>
                               <span>Loading...</span>
                             </>
                           ) : isFollowing ? (
@@ -1276,20 +1572,21 @@ export default function BuilderProfile({
                       {/* Friend Request Button (Przycisk zaproszenia do znajomych) */}
                       <button
                         onClick={handleSendFriendRequest}
-                        className="flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-gradient-to-r from-emerald-500 to-green-600 border border-emerald-400/50 text-white hover:from-emerald-600 hover:to-green-700 transition-all duration-300 shadow-sm backdrop-blur-sm hover:scale-105 shadow-lg"
+                        disabled={sendingFriendRequest}
+                        className={`flex items-center space-x-1 px-3 py-1.5 rounded-pill text-xs font-semibold bg-soft-accent-deep border border-soft-accent-deep text-white hover:bg-soft-accent transition-colors [transition-duration:var(--dur-press)] ease-out-strong shadow-chip active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${sendingFriendRequest ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
                         </svg>
                         <span>Add Friend</span>
                       </button>
 
                       {/* Tip Button */}
-                      <div className="bg-gradient-to-r from-white to-yellow-50 border border-yellow-200/50 rounded-lg shadow-sm backdrop-blur-sm hover:scale-105 transition-all duration-300">
+                      <div className="bg-soft-sunken border border-soft-line rounded-pill shadow-chip transition-colors [transition-duration:var(--dur-press)] ease-out-strong">
                         <TipButton
                           recipientAddress={userAddress}
                           postId={`profile-${userAddress}`}
-                          className="text-yellow-600 hover:text-yellow-700 p-2 transition-colors"
+                          className="text-soft-accent-deep p-2"
                         />
                       </div>
                       </div>
@@ -1314,64 +1611,67 @@ export default function BuilderProfile({
           
         {/* Talent Protocol Builder Score */}
         {(talentScore || talentProfile || loadingTalentData) && (
-          <div className="mb-6 relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-900 via-black to-gray-800 border border-gray-700/50 backdrop-blur-xl shadow-2xl">
+          <div className="mb-6 relative overflow-hidden rounded-card bg-soft-surface border border-soft-line shadow-card">
             {/* Neonowa poświata */}
-            <div className="absolute -top-6 -right-6 w-24 h-24 bg-green-400/30 rounded-full filter blur-2xl animate-pulse"></div>
-            <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-emerald-400/20 rounded-full filter blur-xl"></div>
-            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-green-400/50 to-transparent"></div>
-            
+            <div className="absolute -top-6 -right-6 w-24 h-24 bg-soft-primary/10 rounded-full"></div>
+            <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-soft-accent-soft/50 rounded-full"></div>
+            <div className="absolute top-0 left-0 right-0 h-px bg-soft-line"></div>
+
             {/* Efekt szkła */}
-            <div className="absolute inset-0 bg-white/5 backdrop-blur-sm"></div>
-            
+            <div className="absolute inset-0 bg-transparent"></div>
+
             <div className="relative z-10 p-6">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center">
-                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-green-400/20 to-emerald-500/20 backdrop-blur-sm border border-green-400/30 mr-4 shadow-lg">
-                    <svg className="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-soft-sunken border border-soft-line mr-4 shadow-chip">
+                    <svg className="w-6 h-6 text-soft-primary-deep" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
                   <div>
-                    <h3 className="font-light text-xl text-white">Talent Protocol</h3>
-                    <p className="text-sm text-green-400/80">Builder Reputation</p>
+                    <h3 className="font-soft-display font-bold text-xl text-soft-ink">Talent Protocol</h3>
+                    <p className="text-sm text-soft-ink-muted">Builder Reputation</p>
                   </div>
                 </div>
-                
+
                 {talentProfile?.human_checkmark && (
-                  <div className="flex items-center bg-green-400/10 backdrop-blur-sm border border-green-400/30 px-3 py-1.5 rounded-full">
-                    <svg className="w-4 h-4 text-green-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="flex items-center bg-soft-sunken border border-soft-line px-3 py-1.5 rounded-pill shadow-chip">
+                    <svg className="w-4 h-4 text-soft-primary-deep mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <span className="text-xs text-green-400 font-medium">Human Verified</span>
+                    <span className="text-xs text-soft-primary-deep font-semibold">Human Verified</span>
                   </div>
                 )}
               </div>
               
               {loadingTalentData ? (
                 <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-10 w-10 border-2 border-green-400/30 border-t-green-400"></div>
-                  <span className="ml-4 text-green-400/80">Loading Builder Score...</span>
+                  <div className="animate-spin rounded-full h-10 w-10 border-2 border-soft-line border-t-soft-primary"></div>
+                  <span className="ml-4 text-soft-ink-muted">Loading Builder Score...</span>
                 </div>
               ) : (talentScore && (talentScore.score !== undefined || talentScore.percentile !== undefined)) ? (
                 <div className="text-center">
-                  {/* Builder Score z neonową poświatą */}
-                  <div className="relative inline-block mb-2">
-                    <div className="text-6xl font-light text-green-400 drop-shadow-[0_0_15px_rgba(34,197,94,0.5)] relative z-10">
-                      {(talentScore.score !== undefined && talentScore.score !== null) ? talentScore.score.toFixed(0) : 'N/A'}
-                    </div>
-                    {/* Dodatkowa neonowa poświata */}
-                    <div className="absolute inset-0 text-6xl font-light text-green-400 blur-md opacity-40">
-                      {(talentScore.score !== undefined && talentScore.score !== null) ? talentScore.score.toFixed(0) : 'N/A'}
-                    </div>
+                  {/* ===== BEZ "NEONOWEJ POSWIATY" =====
+                      Pod ta liczba lezala JEJ DRUGA KOPIA, ustawiona
+                      absolutnie, w `blur-md` i `opacity-20`. Filtr rozmycia na
+                      tekscie musi byc rasteryzowany na nowo przy kazdej klatce
+                      przewijania - na telefonie widac to jako miganie
+                      dokladnie tej jednej sekcji i tylko w ruchu. Zglosil to
+                      wlasciciel produktu.
+
+                      Poswiata nie niosla zadnej informacji: ta sama liczba,
+                      rozmyta, pod ta sama liczba. Liczba zostaje. */}
+                  <div className="mb-2 font-soft-display text-6xl font-bold tabular-nums text-soft-primary-deep">
+                    {(talentScore.score !== undefined && talentScore.score !== null) ? talentScore.score.toFixed(0) : 'N/A'}
                   </div>
-                  
-                  <div className="text-lg text-gray-300 font-light mb-4">Builder Score</div>
+
+                  <div className="text-xs uppercase tracking-wider font-semibold text-soft-ink-faint mb-4">Builder Score</div>
                   
                   {/* Percentile - jeśli dostępny */}
                   {(talentScore.percentile !== undefined && talentScore.percentile !== null) && (
                     <div className="flex items-center justify-center">
-                      <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-full px-4 py-2">
-                        <span className="text-green-400 text-sm font-medium">
+                      <div className="bg-soft-sunken border border-soft-line rounded-pill px-4 py-2 shadow-chip">
+                        <span className="text-soft-primary-deep text-sm font-semibold tabular-nums">
                           Top {100 - talentScore.percentile}% Builder
                         </span>
                       </div>
@@ -1380,13 +1680,13 @@ export default function BuilderProfile({
                 </div>
               ) : talentProfile ? (
                 <div className="text-center py-6">
-                  <div className="text-gray-400 text-sm">
+                  <div className="text-soft-ink-soft text-sm">
                     Profile found but Builder Score not available
                   </div>
                 </div>
               ) : (
                 <div className="text-center py-6">
-                  <div className="text-gray-400 text-sm">
+                  <div className="text-soft-ink-soft text-sm">
                     No Talent Protocol data available
                   </div>
                 </div>
@@ -1395,45 +1695,71 @@ export default function BuilderProfile({
           </div>
         )}
 
-        {/* Twitter Profile Section */}
-        {(twitterUser || loadingTwitterData) && (
-          <div className="mb-6 relative overflow-hidden rounded-2xl bg-gradient-to-br from-sky-900 via-blue-800 to-blue-900 border border-sky-700/50 backdrop-blur-xl shadow-2xl">
+        {/* Konektor Camp Network - tylko na wlasnym profilu.
+            Stoi NAD sekcjami Twittera i Spotify celowo: te sekcje pokazuja dane
+            czytane z Campa po adresie portfela, wiec bez podpiecia konta nie
+            renderuja sie wcale. Wczesniej nie bylo z tego miejsca zadnej drogi
+            do podpiecia - mechanizm zyl tylko na /mycamp, a ta trasa jest
+            wylaczona w config/routeStatus.js. */}
+        {currentUserAddress === userAddress && (
+          <CampSocialsCard address={userAddress} />
+        )}
+
+        {/* Twitter Profile Section.
+            Sekcja pokazuje sie takze przy awarii odczytu - inaczej padnieta
+            trasa /api/camp/twitter znikala bez sladu i wygladala jak brak konta. */}
+        {(twitterUser || loadingTwitterData || twitterError) && (
+          <div className="mb-6 relative overflow-hidden rounded-card bg-soft-surface border border-soft-line shadow-card">
             {/* Twitter blue poświata */}
-            <div className="absolute -top-6 -right-6 w-24 h-24 bg-sky-400/30 rounded-full filter blur-2xl animate-pulse"></div>
-            <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-blue-400/20 rounded-full filter blur-xl"></div>
-            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-sky-400/50 to-transparent"></div>
-            
+            <div className="absolute -top-6 -right-6 w-24 h-24 bg-soft-primary/10 rounded-full"></div>
+            <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-soft-accent-soft/50 rounded-full"></div>
+            <div className="absolute top-0 left-0 right-0 h-px bg-soft-line"></div>
+
             {/* Efekt szkła */}
-            <div className="absolute inset-0 bg-white/5 backdrop-blur-sm"></div>
-            
+            <div className="absolute inset-0 bg-transparent"></div>
+
             <div className="relative z-10 p-6">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center">
-                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-sky-400/20 to-blue-500/20 backdrop-blur-sm border border-sky-400/30 mr-4 shadow-lg">
-                    <svg className="w-6 h-6 text-sky-400" fill="currentColor" viewBox="0 0 24 24">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-soft-sunken border border-soft-line mr-4 shadow-chip">
+                    <svg className="w-6 h-6 text-soft-primary-deep" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                       <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
                     </svg>
                   </div>
                   <div>
-                    <h3 className="font-light text-xl text-white">Twitter Profile</h3>
-                    <p className="text-sm text-sky-400/80">Social Activity</p>
+                    <h3 className="font-soft-display font-bold text-xl text-soft-ink">Twitter Profile</h3>
+                    <p className="text-sm text-soft-ink-muted">Social Activity</p>
                   </div>
                 </div>
-                
+
                 {twitterUser?.isVerified && (
-                  <div className="flex items-center bg-sky-400/10 backdrop-blur-sm border border-sky-400/30 px-3 py-1.5 rounded-full">
-                    <svg className="w-4 h-4 text-sky-400 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                  <div className="flex items-center bg-soft-sunken border border-soft-line px-3 py-1.5 rounded-pill shadow-chip">
+                    <svg className="w-4 h-4 text-soft-primary-deep mr-2" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                       <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
-                    <span className="text-xs text-sky-400 font-medium">Verified</span>
+                    <span className="text-xs text-soft-primary-deep font-semibold">Verified</span>
                   </div>
                 )}
               </div>
               
               {loadingTwitterData ? (
                 <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-10 w-10 border-2 border-sky-400/30 border-t-sky-400"></div>
-                  <span className="ml-4 text-sky-400/80">Loading Twitter data...</span>
+                  <div className="animate-spin rounded-full h-10 w-10 border-2 border-soft-line border-t-soft-primary"></div>
+                  <span className="ml-4 text-soft-ink-muted">Loading Twitter data...</span>
+                </div>
+              ) : twitterError ? (
+                <div className="text-center py-6" role="status">
+                  <div className="text-soft-ink-muted text-sm">{twitterError}</div>
+                  <div className="text-soft-ink-faint text-xs mt-1">
+                    This is a failed lookup, not an empty profile.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => userAddress && loadTwitterData(userAddress)}
+                    className="mt-3 text-xs font-semibold text-soft-primary-deep bg-soft-sunken border border-soft-line px-3 py-1.5 rounded-pill shadow-chip hover:bg-soft-line transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                  >
+                    Try again
+                  </button>
                 </div>
               ) : twitterUser ? (
                 <div>
@@ -1442,7 +1768,7 @@ export default function BuilderProfile({
                     <img
                       src={twitterUser.profilePictureUrl}
                       alt={`${twitterUser.displayName} avatar`}
-                      className="w-16 h-16 rounded-full border-2 border-sky-400/30"
+                      className="w-16 h-16 rounded-full border-2 border-soft-line"
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;
                         target.style.display = 'none';
@@ -1450,22 +1776,22 @@ export default function BuilderProfile({
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-2 mb-2">
-                        <h4 className="text-lg font-medium text-white truncate">{twitterUser.displayName}</h4>
+                        <h4 className="text-lg font-soft-display font-bold text-soft-ink truncate">{twitterUser.displayName}</h4>
                         <a
                           href={`https://x.com/${twitterUser.userHandle}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-sky-400 hover:text-sky-300 text-sm font-mono bg-sky-400/10 px-2 py-1 rounded transition-colors"
+                          className="text-soft-primary-deep hover:bg-soft-line text-sm font-mono bg-soft-sunken px-2 py-1 rounded-pill transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                         >
                           @{twitterUser.userHandle}
                         </a>
                       </div>
                       {twitterUser.profileBio && (
-                        <p className="text-gray-300 text-sm leading-relaxed mb-3">{twitterUser.profileBio}</p>
+                        <p className="text-soft-ink-muted text-sm leading-relaxed mb-3">{twitterUser.profileBio}</p>
                       )}
                       {twitterUser.location && (
-                        <div className="flex items-center text-gray-400 text-sm mb-3">
-                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div className="flex items-center text-soft-ink-soft text-sm mb-3">
+                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                           </svg>
@@ -1476,29 +1802,45 @@ export default function BuilderProfile({
                   </div>
 
                   {/* Twitter Stats */}
-                  <div className="grid grid-cols-3 gap-4 mb-4">
-                    <div className="text-center bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-white/10">
-                      <div className="text-sky-400 text-2xl font-light">{twitterUser.followerCount.toLocaleString()}</div>
-                      <div className="text-gray-300 text-sm">Followers</div>
-                    </div>
-                    <div className="text-center bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-white/10">
-                      <div className="text-sky-400 text-2xl font-light">{twitterUser.followingCount.toLocaleString()}</div>
-                      <div className="text-gray-300 text-sm">Following</div>
-                    </div>
-                    <div className="text-center bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-white/10">
-                      <div className="text-sky-400 text-2xl font-light">{twitterUser.likeCount.toLocaleString()}</div>
-                      <div className="text-gray-300 text-sm">Likes</div>
-                    </div>
-                  </div>
+                  {/* ===== REJESTR, NIE KAFLE Z WIELKA CYFRA =====
+                      Te same trzy (i nizej cztery) biale kwadraty z liczba na
+                      srodku, co w panelu Trends i na czterech ekranach z lewej
+                      nawigacji - i z tego samego powodu schodza: na telefonie
+                      kafel ma tu okolo 100px, wiec liczba i podpis lamia sie
+                      na dwie linijki, a na desktopie to po prostu piaty raz
+                      ten sam uklad. Wiersze z liczba po prawej czytaja sie tak
+                      samo waskim ekranem i szerokim. */}
+                  <dl className="mb-4 rounded-card bg-soft-surface px-4 py-1 shadow-card">
+                    {([
+                      ['Followers', twitterUser.followerCount],
+                      ['Following', twitterUser.followingCount],
+                      ['Likes', twitterUser.likeCount],
+                    ] as const).map(([label, value], index) => (
+                      <div
+                        key={label}
+                        className={`flex items-baseline justify-between gap-3 py-3 ${
+                          index > 0 ? 'border-t border-soft-line/60' : ''
+                        }`}
+                      >
+                        <dt className="font-soft text-[12px] font-semibold uppercase tracking-[0.07em] text-soft-ink-soft">
+                          {label}
+                        </dt>
+                        <dd className="font-soft-display text-[21px] font-bold tabular-nums text-soft-ink">
+                          {value.toLocaleString()}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
 
                   {/* Expandable Recent Tweets */}
                   {twitterTweets.length > 0 && (
                     <>
                       <button
                         onClick={() => setIsTwitterSectionExpanded(!isTwitterSectionExpanded)}
-                        className="w-full flex items-center justify-center text-sky-400 hover:text-sky-300 transition-colors duration-300 border-t border-sky-700/30 pt-4"
+                        aria-expanded={isTwitterSectionExpanded}
+                        className="w-full flex items-center justify-center text-soft-primary-deep hover:text-soft-ink transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary border-t border-soft-line pt-4"
                       >
-                        <span className="text-sm font-medium mr-2">
+                        <span className="text-sm font-semibold mr-2">
                           {isTwitterSectionExpanded ? 'Hide Recent Tweets' : `Show Recent Tweets (${twitterTweets.length})`}
                         </span>
                         {isTwitterSectionExpanded ? (
@@ -1512,9 +1854,9 @@ export default function BuilderProfile({
                       {isTwitterSectionExpanded && (
                         <div className="mt-4 space-y-3 max-h-96 overflow-y-auto">
                           {twitterTweets.slice(0, 5).map((tweet) => (
-                            <div key={tweet.id} className="bg-white/5 backdrop-blur-sm rounded-lg p-4 border border-white/10">
-                              <p className="text-gray-200 text-sm leading-relaxed mb-3">{tweet.tweetText}</p>
-                              <div className="flex items-center justify-between text-xs text-gray-400">
+                            <div key={tweet.id} className="bg-soft-surface rounded-card p-4 border border-soft-line shadow-chip">
+                              <p className="text-soft-ink-muted text-sm leading-relaxed mb-3">{tweet.tweetText}</p>
+                              <div className="flex items-center justify-between text-xs text-soft-ink-faint tabular-nums">
                                 <span>{new Date(tweet.tweetTimestamp).toLocaleDateString()}</span>
                                 <div className="flex items-center space-x-4">
                                   <span className="flex items-center">
@@ -1546,7 +1888,7 @@ export default function BuilderProfile({
                 </div>
               ) : (
                 <div className="text-center py-6">
-                  <div className="text-gray-400 text-sm">
+                  <div className="text-soft-ink-soft text-sm">
                     No Twitter data available for this wallet address
                   </div>
                 </div>
@@ -1555,38 +1897,38 @@ export default function BuilderProfile({
           </div>
         )}
 
-        {/* Spotify Profile Section */}
-        {(spotifyUserData || loadingSpotifyData) && (
-          <div className="mb-6 relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-900 via-emerald-800 to-green-900 border border-green-700/50 backdrop-blur-xl shadow-2xl">
+        {/* Spotify Profile Section - jak wyzej, awaria zostaje widoczna. */}
+        {(spotifyUserData || loadingSpotifyData || spotifyError) && (
+          <div className="mb-6 relative overflow-hidden rounded-card bg-soft-surface border border-soft-line shadow-card">
             {/* Spotify green poświata */}
-            <div className="absolute -top-6 -right-6 w-24 h-24 bg-green-400/30 rounded-full filter blur-2xl animate-pulse"></div>
-            <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-emerald-400/20 rounded-full filter blur-xl"></div>
-            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-green-400/50 to-transparent"></div>
-            
+            <div className="absolute -top-6 -right-6 w-24 h-24 bg-soft-primary/10 rounded-full"></div>
+            <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-soft-accent-soft/50 rounded-full"></div>
+            <div className="absolute top-0 left-0 right-0 h-px bg-soft-line"></div>
+
             {/* Efekt szkła */}
-            <div className="absolute inset-0 bg-white/5 backdrop-blur-sm"></div>
-            
+            <div className="absolute inset-0 bg-transparent"></div>
+
             <div className="relative z-10 p-6">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center">
-                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-green-400/20 to-emerald-500/20 backdrop-blur-sm border border-green-400/30 mr-4 shadow-lg">
-                    <svg className="w-6 h-6 text-green-400" fill="currentColor" viewBox="0 0 24 24">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-soft-sunken border border-soft-line mr-4 shadow-chip">
+                    <svg className="w-6 h-6 text-soft-primary-deep" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                       <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.42 1.56-.299.421-1.02.599-1.559.3z"/>
                     </svg>
                   </div>
                   <div>
-                    <h3 className="font-light text-xl text-white">Spotify Profile</h3>
-                    <p className="text-sm text-green-400/80">Music Activity</p>
+                    <h3 className="font-soft-display font-bold text-xl text-soft-ink">Spotify Profile</h3>
+                    <p className="text-sm text-soft-ink-muted">Music Activity</p>
                   </div>
                 </div>
                 
                 <div className="flex items-center gap-2">
                   {spotifyUserData?.dataSource === 'spotify' && (
-                    <div className="flex items-center bg-green-400/10 backdrop-blur-sm border border-green-400/30 px-3 py-1.5 rounded-full">
-                      <svg className="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                    <div className="flex items-center bg-soft-sunken border border-soft-line px-3 py-1.5 rounded-pill shadow-chip">
+                      <svg className="w-4 h-4 text-soft-primary-deep mr-2" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                       </svg>
-                      <span className="text-xs text-green-400 font-medium">Connected</span>
+                      <span className="text-xs text-soft-primary-deep font-semibold">Connected</span>
                     </div>
                   )}
                   
@@ -1594,14 +1936,16 @@ export default function BuilderProfile({
                   <button
                     onClick={refreshSpotifyData}
                     disabled={loadingSpotifyData}
-                    className="flex items-center justify-center w-8 h-8 rounded-full bg-green-400/10 backdrop-blur-sm border border-green-400/30 hover:bg-green-400/20 hover:border-green-400/50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed group"
+                    className="flex items-center justify-center w-8 h-8 rounded-full bg-soft-sunken border border-soft-line hover:bg-soft-line transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary disabled:opacity-50 disabled:cursor-not-allowed group"
                     title="Refresh Spotify Data"
+                    aria-label="Refresh Spotify Data"
                   >
-                    <svg 
-                      className={`w-4 h-4 text-green-400 group-hover:text-green-300 transition-transform duration-200 ${loadingSpotifyData ? 'animate-spin' : 'group-hover:rotate-180'}`} 
-                      fill="none" 
-                      stroke="currentColor" 
+                    <svg
+                      className={`w-4 h-4 text-soft-primary-deep transition-transform [transition-duration:var(--dur-dropdown)] ease-out-strong ${loadingSpotifyData ? 'animate-spin' : 'group-hover:rotate-180'}`}
+                      fill="none"
+                      stroke="currentColor"
                       viewBox="0 0 24 24"
+                      aria-hidden="true"
                     >
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
@@ -1611,8 +1955,22 @@ export default function BuilderProfile({
               
               {loadingSpotifyData ? (
                 <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-10 w-10 border-2 border-green-400/30 border-t-green-400"></div>
-                  <span className="ml-4 text-green-400/80">Loading Spotify data...</span>
+                  <div className="animate-spin rounded-full h-10 w-10 border-2 border-soft-line border-t-soft-primary"></div>
+                  <span className="ml-4 text-soft-ink-muted">Loading Spotify data...</span>
+                </div>
+              ) : spotifyError ? (
+                <div className="text-center py-6" role="status">
+                  <div className="text-soft-ink-muted text-sm">{spotifyError}</div>
+                  <div className="text-soft-ink-faint text-xs mt-1">
+                    This is a failed lookup, not an empty profile.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={refreshSpotifyData}
+                    className="mt-3 text-xs font-semibold text-soft-primary-deep bg-soft-sunken border border-soft-line px-3 py-1.5 rounded-pill shadow-chip hover:bg-soft-line transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                  >
+                    Try again
+                  </button>
                 </div>
               ) : spotifyUserData ? (
                 <div>
@@ -1622,7 +1980,7 @@ export default function BuilderProfile({
                       <img
                         src={spotifyUserData.user.images[0].url}
                         alt={`${spotifyUserData.user.display_name} avatar`}
-                        className="w-16 h-16 rounded-full border-2 border-green-400/30"
+                        className="w-16 h-16 rounded-full border-2 border-soft-line"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
                           target.style.display = 'none';
@@ -1631,16 +1989,16 @@ export default function BuilderProfile({
                     )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-2 mb-2">
-                        <h4 className="text-lg font-medium text-white truncate">{spotifyUserData.user.display_name}</h4>
+                        <h4 className="text-lg font-soft-display font-bold text-soft-ink truncate">{spotifyUserData.user.display_name}</h4>
                         {spotifyUserData.user.external_urls?.spotify && (
                           <a
                             href={spotifyUserData.user.external_urls.spotify}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-green-400 hover:text-green-300 text-sm font-mono bg-green-400/10 px-2 py-1 rounded transition-all duration-300 hover:scale-105 hover:bg-green-400/20 flex items-center"
+                            className="text-soft-primary-deep hover:bg-soft-line text-sm font-mono bg-soft-sunken px-2 py-1 rounded-pill transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary flex items-center"
                             title="Open Spotify Profile"
                           >
-                            <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                               <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.42 1.56-.299.421-1.02.599-1.559.3z"/>
                             </svg>
                             Open Profile
@@ -1648,75 +2006,80 @@ export default function BuilderProfile({
                         )}
                       </div>
                       {!spotifyUserData.hasContent && (
-                        <div className="flex items-center text-blue-400 text-xs mb-3 bg-blue-400/10 px-2 py-1 rounded">
-                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div className="flex items-center text-soft-info text-xs mb-3 bg-soft-info-soft px-2 py-1 rounded-pill">
+                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                           </svg>
                           Spotify connected • Start saving tracks to see activity
                         </div>
                       )}
-                      <div className="flex items-center text-gray-400 text-sm mb-3">
-                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <div className="flex items-center text-soft-ink-soft text-sm mb-3">
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                         </svg>
-                        {(spotifyUserData.user.followers || 0).toLocaleString()} followers
+                        <span className="font-soft-display font-semibold tabular-nums mr-1">{(spotifyUserData.user.followers || 0).toLocaleString()}</span> followers
                       </div>
                     </div>
                   </div>
 
                   {/* Spotify Analytics Stats */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                    <div className="text-center bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-white/10">
-                      <div className="text-green-400 text-xl font-light">{spotifyUserData.analytics?.totalSavedTracks || 0}</div>
-                      <div className="text-gray-300 text-xs">Saved Tracks</div>
-                    </div>
-                    <div className="text-center bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-white/10">
-                      <div className="text-green-400 text-xl font-light">{spotifyUserData.analytics?.totalSavedAlbums || 0}</div>
-                      <div className="text-gray-300 text-xs">Albums</div>
-                    </div>
-                    <div className="text-center bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-white/10">
-                      <div className="text-green-400 text-xl font-light">{spotifyUserData.analytics?.totalSavedPlaylists || 0}</div>
-                      <div className="text-gray-300 text-xs">Playlists</div>
-                    </div>
-                    <div className="text-center bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-white/10">
-                      <div className="text-green-400 text-xl font-light">{spotifyUserData.analytics?.listeningDiversity || 0}%</div>
-                      <div className="text-gray-300 text-xs">Diversity</div>
-                    </div>
-                  </div>
+                  {/* Ten sam rejestr co przy liczbach z X - uzasadnienie wyzej. */}
+                  <dl className="mb-4 rounded-card bg-soft-surface px-4 py-1 shadow-card">
+                    {([
+                      ['Saved tracks', String(spotifyUserData.analytics?.totalSavedTracks || 0)],
+                      ['Albums', String(spotifyUserData.analytics?.totalSavedAlbums || 0)],
+                      ['Playlists', String(spotifyUserData.analytics?.totalSavedPlaylists || 0)],
+                      ['Diversity', `${spotifyUserData.analytics?.listeningDiversity || 0}%`],
+                    ] as const).map(([label, value], index) => (
+                      <div
+                        key={label}
+                        className={`flex items-baseline justify-between gap-3 py-3 ${
+                          index > 0 ? 'border-t border-soft-line/60' : ''
+                        }`}
+                      >
+                        <dt className="font-soft text-[12px] font-semibold uppercase tracking-[0.07em] text-soft-ink-soft">
+                          {label}
+                        </dt>
+                        <dd className="font-soft-display text-[21px] font-bold tabular-nums text-soft-ink">
+                          {value}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
 
                   {/* Music Matching Profile */}
                   {(spotifyUserData.profile?.topGenres?.length > 0 || spotifyUserData.profile?.topArtists?.length > 0) && (
-                    <div className="mt-4 p-4 bg-white/5 backdrop-blur-sm rounded-lg border border-white/10">
+                    <div className="mt-4 p-4 bg-soft-sunken rounded-card border border-soft-line">
                       <div className="flex items-center mb-3">
-                        <svg className="w-5 h-5 text-green-400 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-5 h-5 text-soft-primary-deep mr-2" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                           <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.58L19 8l-9 9z"/>
                         </svg>
-                        <h4 className="text-green-300 text-sm font-medium">Music Matching Profile</h4>
-                        <span className="ml-2 text-xs text-gray-400">• User compatibility data</span>
+                        <h4 className="text-soft-ink text-sm font-soft-display font-bold">Music Matching Profile</h4>
+                        <span className="ml-2 text-xs text-soft-ink-faint">• User compatibility data</span>
                       </div>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* Top Genres */}
                         {spotifyUserData.profile.topGenres.length > 0 && (
-                          <div className="bg-white/5 rounded-lg p-3">
+                          <div className="bg-soft-surface rounded-card p-3 shadow-card">
                             <div className="flex items-center mb-2">
-                              <svg className="w-4 h-4 text-green-400 mr-1" fill="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-4 h-4 text-soft-primary-deep mr-1" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                 <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
                               </svg>
-                              <span className="text-green-300 text-xs font-medium">Top Genres</span>
-                              <span className="ml-1 text-xs text-gray-400">({spotifyUserData.profile.topGenres.length})</span>
+                              <span className="text-soft-ink-faint text-xs font-semibold uppercase tracking-wider">Top Genres</span>
+                              <span className="ml-1 text-xs text-soft-ink-faint tabular-nums">({spotifyUserData.profile.topGenres.length})</span>
                             </div>
                             <div className="flex flex-wrap gap-1">
                               {spotifyUserData.profile.topGenres.slice(0, 6).map((genre, index) => (
                                 <span 
                                   key={index}
-                                  className="px-2 py-1 bg-green-400/10 text-green-300 text-xs rounded-full border border-green-400/20"
+                                  className="px-2 py-1 bg-soft-sunken text-soft-ink-muted text-xs rounded-pill border border-soft-line"
                                 >
                                   {genre}
                                 </span>
                               ))}
                               {spotifyUserData.profile.topGenres.length > 6 && (
-                                <span className="px-2 py-1 bg-green-400/5 text-green-400 text-xs rounded-full border border-green-400/10">
+                                <span className="px-2 py-1 bg-soft-sunken text-soft-ink-faint text-xs rounded-pill border border-soft-line tabular-nums">
                                   +{spotifyUserData.profile.topGenres.length - 6} more
                                 </span>
                               )}
@@ -1726,25 +2089,25 @@ export default function BuilderProfile({
 
                         {/* Top Artists */}
                         {spotifyUserData.profile.topArtists.length > 0 && (
-                          <div className="bg-white/5 rounded-lg p-3">
+                          <div className="bg-soft-surface rounded-card p-3 shadow-card">
                             <div className="flex items-center mb-2">
-                              <svg className="w-4 h-4 text-green-400 mr-1" fill="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-4 h-4 text-soft-primary-deep mr-1" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                 <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
                               </svg>
-                              <span className="text-green-300 text-xs font-medium">Top Artists</span>
-                              <span className="ml-1 text-xs text-gray-400">({spotifyUserData.profile.topArtists.length})</span>
+                              <span className="text-soft-ink-faint text-xs font-semibold uppercase tracking-wider">Top Artists</span>
+                              <span className="ml-1 text-xs text-soft-ink-faint tabular-nums">({spotifyUserData.profile.topArtists.length})</span>
                             </div>
                             <div className="flex flex-wrap gap-1">
                               {spotifyUserData.profile.topArtists.slice(0, 4).map((artist, index) => (
                                 <span 
                                   key={index}
-                                  className="px-2 py-1 bg-green-400/10 text-green-300 text-xs rounded-full border border-green-400/20"
+                                  className="px-2 py-1 bg-soft-sunken text-soft-ink-muted text-xs rounded-pill border border-soft-line"
                                 >
                                   {artist}
                                 </span>
                               ))}
                               {spotifyUserData.profile.topArtists.length > 4 && (
-                                <span className="px-2 py-1 bg-green-400/5 text-green-400 text-xs rounded-full border border-green-400/10">
+                                <span className="px-2 py-1 bg-soft-sunken text-soft-ink-faint text-xs rounded-pill border border-soft-line tabular-nums">
                                   +{spotifyUserData.profile.topArtists.length - 4} more
                                 </span>
                               )}
@@ -1760,7 +2123,7 @@ export default function BuilderProfile({
                     <>
                       <button
                         onClick={() => setIsSpotifySectionExpanded(!isSpotifySectionExpanded)}
-                        className="w-full flex items-center justify-center text-green-400 hover:text-green-300 transition-colors duration-300 border-t border-green-700/30 pt-4"
+                        className="w-full flex items-center justify-center text-soft-primary-deep hover:text-soft-ink transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary border-t border-soft-line pt-4"
                       >
                         <span className="text-sm font-medium mr-2">
                           {isSpotifySectionExpanded ? 'Hide Music Details' : `Show Recent Music (${Math.max(spotifyUserData.profile?.savedTracks?.length || 0, spotifyUserData.profile?.playedTracks?.length || 0)})`}
@@ -1778,12 +2141,12 @@ export default function BuilderProfile({
                           {/* Recently Played Tracks */}
                           {spotifyUserData.profile?.playedTracks?.length > 0 && (
                             <div>
-                              <h5 className="text-green-300 text-sm font-medium mb-3">Recently Played</h5>
+                              <h5 className="text-soft-ink-faint text-xs font-semibold uppercase tracking-wider mb-3">Recently Played</h5>
                               <div className="space-y-2">
                                 {(spotifyUserData.profile?.playedTracks || []).slice(0, 3).map((item, index) => (
                                   <div 
                                     key={index} 
-                                    className="relative overflow-hidden rounded-lg p-3 hover:scale-[1.02] hover:shadow-2xl hover:shadow-black/30 origin-left transition-all duration-300"
+                                    className="relative overflow-hidden rounded-card p-3 hover:scale-[1.02] hover:shadow-float origin-left transition-[transform,box-shadow] [transition-duration:var(--dur-dropdown)] ease-out-strong"
                                     style={{
                                       backgroundImage: item?.track?.album?.images?.[0]?.url 
                                         ? `url(${item.track.album.images[0].url})` 
@@ -1794,10 +2157,10 @@ export default function BuilderProfile({
                                     }}
                                   >
                                     {/* Blurred Background Overlay */}
-                                    <div className={`absolute inset-0 rounded-lg backdrop-blur-md ${
+                                    <div className={`absolute inset-0 rounded-lg ${
                                       item?.track?.album?.images?.[0]?.url 
                                         ? 'bg-black/40' 
-                                        : 'bg-gradient-to-br from-green-900/30 to-emerald-800/30'
+                                        : 'bg-soft-ink/90'
                                     }`}></div>
                                     
                                     {/* Content Container */}
@@ -1805,26 +2168,39 @@ export default function BuilderProfile({
                                     <div className="flex items-center space-x-3">
                                       {item?.track?.album?.images && item.track.album.images[0] && (
                                         <div className="relative group">
-                                          <a
-                                            href={item?.track?.album?.external_urls?.spotify || '#'}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="block hover:opacity-80 transition-opacity"
-                                            title={`View album: ${item?.track?.album?.name}`}
-                                          >
+                                          {/* Bez adresu albumu bylo tu <a href="#">:
+                                              link wygladal na dzialajacy, a
+                                              klikniecie tylko przeskakiwalo na
+                                              gore strony. Teraz okladka bez
+                                              adresu jest zwyklym obrazkiem. */}
+                                          {item?.track?.album?.external_urls?.spotify ? (
+                                            <a
+                                              href={item.track.album.external_urls.spotify}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="block hover:opacity-80 transition-opacity"
+                                              title={`View album: ${item?.track?.album?.name}`}
+                                            >
+                                              <img
+                                                src={item.track.album.images[0].url}
+                                                alt={item.track.album.name}
+                                                className="w-12 h-12 rounded cursor-pointer hover:shadow-float transition-shadow [transition-duration:var(--dur-press)] ease-out-strong"
+                                              />
+                                            </a>
+                                          ) : (
                                             <img
                                               src={item.track.album.images[0].url}
                                               alt={item.track.album.name}
-                                              className="w-12 h-12 rounded cursor-pointer hover:shadow-lg transition-all duration-200"
+                                              className="w-12 h-12 rounded"
                                             />
-                                          </a>
-                                          
+                                          )}
+
                                           {/* Preview Overlay */}
                                           {item?.track?.preview_url && (
                                             <button
                                               onClick={() => playTrack(item.track.preview_url!)}
                                               disabled={isLoading && currentTrackUrl === item.track.preview_url}
-                                              className={`absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm rounded transition-opacity duration-200 disabled:opacity-50 ${
+                                              className={`absolute inset-0 flex items-center justify-center bg-black/40 rounded transition-opacity duration-200 disabled:opacity-50 ${
                                                 isPlaying && currentTrackUrl === item.track.preview_url 
                                                   ? 'opacity-100' 
                                                   : 'opacity-0 group-hover:opacity-100'
@@ -1860,7 +2236,7 @@ export default function BuilderProfile({
                                         ) : (
                                           <p className="text-white text-sm font-medium truncate">{item?.track?.name || 'Unknown Track'}</p>
                                         )}
-                                        <div className="text-gray-300 text-xs truncate">
+                                        <div className="truncate text-xs text-soft-ink-soft">
                                           {item?.track?.artists?.map((artist, idx) => (
                                             <span key={idx}>
                                               {artist?.external_urls?.spotify ? (
@@ -1904,7 +2280,7 @@ export default function BuilderProfile({
                                               </svg>
                                               <span className="text-yellow-400">
                                                 {item.track.popularity}/100 
-                                                <span className="text-gray-400 ml-1">
+                                                <span className="text-soft-ink-faint ml-1">
                                                   {item.track.popularity >= 70 ? 'Mainstream' : item.track.popularity >= 40 ? 'Popular' : 'Niche'}
                                                 </span>
                                               </span>
@@ -1919,7 +2295,7 @@ export default function BuilderProfile({
                                               </svg>
                                               <span className="text-blue-400">
                                                 {new Date(item.track.album.release_date).getFullYear()}
-                                                <span className="text-gray-400 ml-1">
+                                                <span className="text-soft-ink-faint ml-1">
                                                   {(() => {
                                                     const year = new Date(item.track.album.release_date).getFullYear();
                                                     const currentYear = new Date().getFullYear();
@@ -1941,26 +2317,52 @@ export default function BuilderProfile({
                                           <div className="mt-2 flex items-center gap-2">
                                             {/* Mini Progress Bar */}
                                             <div className="flex-1 flex items-center gap-2">
-                                              <span className="text-xs text-green-400 min-w-[30px]">{formatTime(currentTime)}</span>
-                                              <div 
+                                              <span className="text-xs text-white/80 tabular-nums min-w-[30px]">{formatTime(currentTime)}</span>
+                                              {/* Byl to goly klikalny <div>: bez
+                                                  focusu i bez strzalek nie dalo
+                                                  sie przewinac podgladu z
+                                                  klawiatury. */}
+                                              <div
+                                                role="slider"
+                                                tabIndex={0}
+                                                aria-label="Seek preview"
+                                                aria-valuemin={0}
+                                                aria-valuemax={Math.round(duration)}
+                                                aria-valuenow={Math.round(currentTime)}
+                                                aria-valuetext={`${formatTime(currentTime)} of ${formatTime(duration)}`}
                                                 className="flex-1 h-0.5 bg-green-400/20 rounded-full cursor-pointer"
                                                 onClick={(e) => {
                                                   const rect = e.currentTarget.getBoundingClientRect();
                                                   const percent = (e.clientX - rect.left) / rect.width;
                                                   seekToTime(percent * duration);
                                                 }}
+                                                onKeyDown={(e) => {
+                                                  if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+                                                    e.preventDefault();
+                                                    seekToTime(Math.min(duration, currentTime + 5));
+                                                  } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+                                                    e.preventDefault();
+                                                    seekToTime(Math.max(0, currentTime - 5));
+                                                  } else if (e.key === 'Home') {
+                                                    e.preventDefault();
+                                                    seekToTime(0);
+                                                  } else if (e.key === 'End') {
+                                                    e.preventDefault();
+                                                    seekToTime(duration);
+                                                  }
+                                                }}
                                               >
                                                 <div 
-                                                  className="h-full bg-green-400 rounded-full transition-all"
+                                                  className="h-full bg-soft-accent rounded-full transition-[width] [transition-duration:var(--dur-press)] ease-out-strong"
                                                   style={{ width: `${(currentTime / duration) * 100}%` }}
                                                 ></div>
                                               </div>
-                                              <span className="text-xs text-green-400 min-w-[30px]">{formatTime(duration)}</span>
+                                              <span className="text-xs text-white/80 tabular-nums min-w-[30px]">{formatTime(duration)}</span>
                                             </div>
                                             
                                             {/* Mini Volume */}
                                             <div className="flex items-center gap-1">
-                                              <svg className="w-3 h-3 text-green-400" fill="currentColor" viewBox="0 0 24 24">
+                                              <svg className="w-3 h-3 text-white/80" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                                 <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
                                               </svg>
                                               <input
@@ -1990,12 +2392,12 @@ export default function BuilderProfile({
                           {/* Saved Tracks */}
                           {spotifyUserData.profile?.savedTracks?.length > 0 && (
                             <div>
-                              <h5 className="text-green-300 text-sm font-medium mb-3">Saved Tracks</h5>
+                              <h5 className="text-soft-ink-faint text-xs font-semibold uppercase tracking-wider mb-3">Saved Tracks</h5>
                               <div className="space-y-2">
                                 {(spotifyUserData.profile?.savedTracks || []).slice(0, 3).map((item, index) => (
                                   <div 
                                     key={index} 
-                                    className="relative overflow-hidden rounded-lg p-3 hover:scale-[1.02] hover:shadow-2xl hover:shadow-black/30 origin-left transition-all duration-300"
+                                    className="relative overflow-hidden rounded-card p-3 hover:scale-[1.02] hover:shadow-float origin-left transition-[transform,box-shadow] [transition-duration:var(--dur-dropdown)] ease-out-strong"
                                     style={{
                                       backgroundImage: item?.track?.album?.images?.[0]?.url 
                                         ? `url(${item.track.album.images[0].url})` 
@@ -2006,10 +2408,10 @@ export default function BuilderProfile({
                                     }}
                                   >
                                     {/* Blurred Background Overlay */}
-                                    <div className={`absolute inset-0 rounded-lg backdrop-blur-md ${
+                                    <div className={`absolute inset-0 rounded-lg ${
                                       item?.track?.album?.images?.[0]?.url 
                                         ? 'bg-black/40' 
-                                        : 'bg-gradient-to-br from-green-900/30 to-emerald-800/30'
+                                        : 'bg-soft-ink/90'
                                     }`}></div>
                                     
                                     {/* Content Container */}
@@ -2017,26 +2419,39 @@ export default function BuilderProfile({
                                     <div className="flex items-center space-x-3">
                                       {item?.track?.album?.images && item.track.album.images[0] && (
                                         <div className="relative group">
-                                          <a
-                                            href={item?.track?.album?.external_urls?.spotify || '#'}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="block hover:opacity-80 transition-opacity"
-                                            title={`View album: ${item?.track?.album?.name}`}
-                                          >
+                                          {/* Bez adresu albumu bylo tu <a href="#">:
+                                              link wygladal na dzialajacy, a
+                                              klikniecie tylko przeskakiwalo na
+                                              gore strony. Teraz okladka bez
+                                              adresu jest zwyklym obrazkiem. */}
+                                          {item?.track?.album?.external_urls?.spotify ? (
+                                            <a
+                                              href={item.track.album.external_urls.spotify}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="block hover:opacity-80 transition-opacity"
+                                              title={`View album: ${item?.track?.album?.name}`}
+                                            >
+                                              <img
+                                                src={item.track.album.images[0].url}
+                                                alt={item.track.album.name}
+                                                className="w-12 h-12 rounded cursor-pointer hover:shadow-float transition-shadow [transition-duration:var(--dur-press)] ease-out-strong"
+                                              />
+                                            </a>
+                                          ) : (
                                             <img
                                               src={item.track.album.images[0].url}
                                               alt={item.track.album.name}
-                                              className="w-12 h-12 rounded cursor-pointer hover:shadow-lg transition-all duration-200"
+                                              className="w-12 h-12 rounded"
                                             />
-                                          </a>
-                                          
+                                          )}
+
                                           {/* Preview Overlay */}
                                           {item?.track?.preview_url && (
                                             <button
                                               onClick={() => playTrack(item.track.preview_url!)}
                                               disabled={isLoading && currentTrackUrl === item.track.preview_url}
-                                              className={`absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm rounded transition-opacity duration-200 disabled:opacity-50 ${
+                                              className={`absolute inset-0 flex items-center justify-center bg-black/40 rounded transition-opacity duration-200 disabled:opacity-50 ${
                                                 isPlaying && currentTrackUrl === item.track.preview_url 
                                                   ? 'opacity-100' 
                                                   : 'opacity-0 group-hover:opacity-100'
@@ -2072,7 +2487,7 @@ export default function BuilderProfile({
                                         ) : (
                                           <p className="text-white text-sm font-medium truncate">{item?.track?.name || 'Unknown Track'}</p>
                                         )}
-                                        <div className="text-gray-300 text-xs truncate">
+                                        <div className="truncate text-xs text-soft-ink-soft">
                                           {item?.track?.artists?.map((artist, idx) => (
                                             <span key={idx}>
                                               {artist?.external_urls?.spotify ? (
@@ -2116,7 +2531,7 @@ export default function BuilderProfile({
                                               </svg>
                                               <span className="text-yellow-400">
                                                 {item.track.popularity}/100 
-                                                <span className="text-gray-400 ml-1">
+                                                <span className="text-soft-ink-faint ml-1">
                                                   {item.track.popularity >= 70 ? 'Mainstream' : item.track.popularity >= 40 ? 'Popular' : 'Niche'}
                                                 </span>
                                               </span>
@@ -2131,7 +2546,7 @@ export default function BuilderProfile({
                                               </svg>
                                               <span className="text-blue-400">
                                                 {new Date(item.track.album.release_date).getFullYear()}
-                                                <span className="text-gray-400 ml-1">
+                                                <span className="text-soft-ink-faint ml-1">
                                                   {(() => {
                                                     const year = new Date(item.track.album.release_date).getFullYear();
                                                     const currentYear = new Date().getFullYear();
@@ -2153,26 +2568,52 @@ export default function BuilderProfile({
                                           <div className="mt-2 flex items-center gap-2">
                                             {/* Mini Progress Bar */}
                                             <div className="flex-1 flex items-center gap-2">
-                                              <span className="text-xs text-green-400 min-w-[30px]">{formatTime(currentTime)}</span>
-                                              <div 
+                                              <span className="text-xs text-white/80 tabular-nums min-w-[30px]">{formatTime(currentTime)}</span>
+                                              {/* Byl to goly klikalny <div>: bez
+                                                  focusu i bez strzalek nie dalo
+                                                  sie przewinac podgladu z
+                                                  klawiatury. */}
+                                              <div
+                                                role="slider"
+                                                tabIndex={0}
+                                                aria-label="Seek preview"
+                                                aria-valuemin={0}
+                                                aria-valuemax={Math.round(duration)}
+                                                aria-valuenow={Math.round(currentTime)}
+                                                aria-valuetext={`${formatTime(currentTime)} of ${formatTime(duration)}`}
                                                 className="flex-1 h-0.5 bg-green-400/20 rounded-full cursor-pointer"
                                                 onClick={(e) => {
                                                   const rect = e.currentTarget.getBoundingClientRect();
                                                   const percent = (e.clientX - rect.left) / rect.width;
                                                   seekToTime(percent * duration);
                                                 }}
+                                                onKeyDown={(e) => {
+                                                  if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+                                                    e.preventDefault();
+                                                    seekToTime(Math.min(duration, currentTime + 5));
+                                                  } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+                                                    e.preventDefault();
+                                                    seekToTime(Math.max(0, currentTime - 5));
+                                                  } else if (e.key === 'Home') {
+                                                    e.preventDefault();
+                                                    seekToTime(0);
+                                                  } else if (e.key === 'End') {
+                                                    e.preventDefault();
+                                                    seekToTime(duration);
+                                                  }
+                                                }}
                                               >
                                                 <div 
-                                                  className="h-full bg-green-400 rounded-full transition-all"
+                                                  className="h-full bg-soft-accent rounded-full transition-[width] [transition-duration:var(--dur-press)] ease-out-strong"
                                                   style={{ width: `${(currentTime / duration) * 100}%` }}
                                                 ></div>
                                               </div>
-                                              <span className="text-xs text-green-400 min-w-[30px]">{formatTime(duration)}</span>
+                                              <span className="text-xs text-white/80 tabular-nums min-w-[30px]">{formatTime(duration)}</span>
                                             </div>
                                             
                                             {/* Mini Volume */}
                                             <div className="flex items-center gap-1">
-                                              <svg className="w-3 h-3 text-green-400" fill="currentColor" viewBox="0 0 24 24">
+                                              <svg className="w-3 h-3 text-white/80" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                                 <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
                                               </svg>
                                               <input
@@ -2205,7 +2646,7 @@ export default function BuilderProfile({
                 </div>
               ) : (
                 <div className="text-center py-6">
-                  <div className="text-gray-400 text-sm">
+                  <div className="text-soft-ink-soft text-sm">
                     No Spotify data available for this wallet address
                   </div>
                 </div>
@@ -2215,38 +2656,38 @@ export default function BuilderProfile({
         )}
         
         {/* Bio Section */}
-        <div className="mb-6 relative overflow-hidden rounded-2xl bg-gradient-to-br from-white via-blue-50 to-blue-100 border border-blue-200/50 backdrop-blur-xl shadow-xl">
+        <div className="mb-6 relative overflow-hidden rounded-card bg-soft-surface border border-soft-line shadow-card">
           {/* Niebieska poświata */}
-          <div className="absolute -top-6 -right-6 w-24 h-24 bg-blue-300/20 rounded-full filter blur-2xl"></div>
-          <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-blue-400/15 rounded-full filter blur-xl"></div>
-          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-400/40 to-transparent"></div>
-          
+          <div className="absolute -top-6 -right-6 w-24 h-24 bg-soft-primary/10 rounded-full"></div>
+          <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-soft-accent-soft/50 rounded-full"></div>
+          <div className="absolute top-0 left-0 right-0 h-px bg-soft-line"></div>
+
           {/* Efekt szkła */}
-          <div className="absolute inset-0 bg-white/30 backdrop-blur-sm"></div>
-          
+          <div className="absolute inset-0 bg-transparent"></div>
+
           <div className="relative z-10 p-6">
             <div className="flex justify-between items-center mb-4">
               <div className="flex items-center">
-                <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-blue-400/20 to-blue-500/20 backdrop-blur-sm border border-blue-400/30 mr-3 shadow-lg">
-                  <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-soft-sunken border border-soft-line mr-3 shadow-chip">
+                  <svg className="w-5 h-5 text-soft-primary-deep" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
                 </div>
-                <h3 className="font-light text-xl text-blue-900">About</h3>
+                <h3 className="font-soft-display font-bold text-xl text-soft-ink">About</h3>
               </div>
               {currentUserAddress === userAddress && !isEditingBio && (
                 <button
                   onClick={() => setIsEditingBio(true)}
-                  className="text-xs text-blue-600 hover:text-blue-700 flex items-center bg-blue-100/50 backdrop-blur-sm border border-blue-300/30 px-3 py-1.5 rounded-full transition-all duration-300 hover:scale-105"
+                  className="text-xs font-semibold text-soft-primary-deep hover:bg-soft-line flex items-center bg-soft-sunken border border-soft-line px-3 py-1.5 rounded-pill transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                 >
-                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                   </svg>
                   <span>Edit</span>
                 </button>
               )}
             </div>
-            <div className="bg-white/60 backdrop-blur-sm rounded-xl p-5 border border-blue-200/30">
+            <div className="bg-soft-sunken rounded-card p-5 border border-soft-line">
               {isEditingBio ? (
                 <div>
                   <textarea
@@ -2254,20 +2695,22 @@ export default function BuilderProfile({
                     onChange={(e) => setNewBio(e.target.value)}
                     maxLength={90}
                     placeholder="Write something about yourself..."
-                    className="w-full bg-white border border-blue-200 rounded-lg p-3 text-blue-900 focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all"
+                    className="w-full bg-soft-surface border border-soft-line rounded-card p-3 text-soft-ink placeholder:text-soft-ink-faint transition-colors [transition-duration:var(--dur-press)] ease-out-strong focus:outline-none focus:ring-2 focus:ring-soft-primary focus:border-soft-primary"
                     rows={3}
                   />
                   <div className="flex justify-between items-center mt-2">
-                    <div className="text-xs text-blue-600">
+                    <div className="text-xs text-soft-ink-faint tabular-nums">
                       {newBio.length}/90 characters
                     </div>
                     <div className="flex space-x-2">
                       <button
                         onClick={() => {
                           setIsEditingBio(false);
-                          setNewBio(profile.bio || '');
+                          // displayedBio, nie profile.bio - po wczesniejszym
+                          // zapisie props jest juz nieaktualny.
+                          setNewBio(displayedBio || '');
                         }}
-                        className="px-3 py-1.5 bg-white/80 text-blue-700 border border-blue-200 rounded-lg text-xs hover:bg-blue-50 transition-colors"
+                        className="px-3 py-1.5 bg-soft-surface text-soft-ink-muted border border-soft-line rounded-pill text-xs font-semibold hover:bg-soft-line transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                         disabled={isSaving}
                       >
                         Cancel
@@ -2275,7 +2718,7 @@ export default function BuilderProfile({
                       <button
                         onClick={handleSaveBio}
                         disabled={isSaving}
-                        className="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-xs hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-3 py-1.5 bg-soft-primary text-white rounded-pill text-xs font-semibold shadow-chip hover:bg-soft-primary-deep transition-colors [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {isSaving ? 'Saving...' : 'Save'}
                       </button>
@@ -2283,9 +2726,9 @@ export default function BuilderProfile({
                   </div>
                 </div>
               ) : (
-                <div className="text-blue-800 leading-relaxed font-light">
-                  {profile.bio || 
-                    <span className="text-blue-400 italic">
+                <div className="text-soft-ink-muted leading-relaxed">
+                  {displayedBio ||
+                    <span className="text-soft-ink-faint italic">
                       {currentUserAddress === userAddress ? 
                         "Click Edit to add your bio" : 
                         "This builder hasn't added a bio yet"}
@@ -2299,13 +2742,13 @@ export default function BuilderProfile({
         
         {/* Vitalik Buterin Info - Tylko dla profilu Vitalika */}
         {isVitalik && (
-          <div className="mb-6 bg-gradient-to-br from-yellow-300 to-yellow-500 rounded-2xl shadow-sm p-6 border border-yellow-200 relative overflow-hidden">
+          <div className="mb-6 bg-soft-surface rounded-card shadow-card p-6 border border-soft-line relative overflow-hidden">
             {/* Efekt świecenia */}
-            <div className="absolute -top-24 -right-24 w-48 h-48 bg-yellow-200 rounded-full filter blur-3xl opacity-30"></div>
-            <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-yellow-400 rounded-full filter blur-3xl opacity-20"></div>
-            
-            <div className="text-black relative z-10">
-              <h3 className="font-medium text-xl mb-3">About Vitalik Buterin</h3>
+            <div className="absolute -top-24 -right-24 w-48 h-48 bg-soft-accent-soft rounded-full opacity-40"></div>
+            <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-soft-primary/10 rounded-full opacity-30"></div>
+
+            <div className="text-soft-ink-muted relative z-10">
+              <h3 className="font-soft-display font-bold text-xl mb-3 text-soft-ink">About Vitalik Buterin</h3>
               <div className="space-y-2 text-sm">
                 <p className="leading-relaxed">
                   Vitalik Buterin is the co-founder of Ethereum, a decentralized, open-source blockchain platform that enables smart contracts and decentralized applications (dApps). He proposed Ethereum in a white paper in late 2013 when he was just 19 years old.
@@ -2322,66 +2765,67 @@ export default function BuilderProfile({
         )}
         
         {/* BaseChatPoints - Zunifikowana sekcja z kafelkami */}
-        <div className="mb-6 bg-gray-50 dark:bg-gray-700 rounded-2xl p-6 relative overflow-hidden shadow-xl">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
-          
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-light text-gray-900 dark:text-gray-100 flex items-center">
-              Sphere Points
-              <div className="ml-2 text-3xl animate-bounce">⚡</div>
+        {/* ===== SUMA PUNKTOW JEST TU NAJWAZNIEJSZA =====
+            Naglowek mial obok siebie blyskawice i iskierke, a suma siedziala
+            w kafelku obwiedzionym fioletem, wielkoscia rowna napisowi obok.
+            Dwie emotki i ramka walczyly o uwage z jedyna liczba, po ktora
+            czlowiek tu patrzy.
+
+            Teraz suma jest najwieksza rzecza w tej sekcji i stoi pod tytulem,
+            a rozbicie na skladniki lezy pod nia. Bez emotek: to jest wynik,
+            nie zabawka. */}
+        <div className="mb-6 rounded-card bg-soft-sunken p-6 shadow-card">
+          <div className="mb-6">
+            <h2 className="font-soft text-[11px] font-bold uppercase tracking-[0.14em] text-soft-ink-soft">
+              Sphere points
             </h2>
-            
-            {/* Total Score - zawsze widoczny */}
-            <div className="flex items-center bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 p-0.5 rounded-xl">
-              <div className="bg-white dark:bg-gray-800 px-4 py-2 rounded-xl flex items-center">
-                <span className="text-gray-600 dark:text-gray-400 text-sm mr-2">Total Score:</span>
-                <div className="text-2xl font-bold bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-transparent bg-clip-text animate-pulse">
-                  {profile.baseChatPoints?.totalPoints || Math.round(((profile.postCount || 0) * 5 + (profile.likesReceived || 0)) * 1.25)}
-                </div>
-                <div className="ml-2 text-lg">✨</div>
-              </div>
+            <div className="mt-1 font-soft-display text-[38px] font-bold leading-none tabular-nums text-soft-ink">
+              {profile.baseChatPoints?.totalPoints || Math.round(((profile.postCount || 0) * 5 + (profile.likesReceived || 0)) * 1.25)}
             </div>
+            <p className="mt-1.5 font-soft text-[11.5px] text-soft-ink-soft">
+              Earned from posts, likes and the names on this wallet.
+            </p>
           </div>
 
           {/* Lista punktów */}
           <div className="space-y-2 mb-6">
-            <div className="flex items-center justify-between group transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-600 p-3 rounded-lg">
-              <span className="text-gray-600 dark:text-gray-400 flex items-center">
-                <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
+              <span className="text-soft-ink-muted flex items-center">
+                <svg className="w-5 h-5 mr-2 text-soft-primary-deep" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                   </svg>
                 Posts ({profile.postCount || 0})
               </span>
-              <span className="text-blue-500 font-semibold">
+              <span className="text-soft-primary-deep font-soft-display font-bold tabular-nums">
                 {profile.baseChatPoints?.postPoints || (profile.postCount || 0) * 5} points
               </span>
             </div>
             
-            <div className="flex items-center justify-between group transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-600 p-3 rounded-lg">
-              <span className="text-gray-600 dark:text-gray-400 flex items-center">
-                <svg className="w-5 h-5 mr-2 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
+              <span className="text-soft-ink-muted flex items-center">
+                <svg className="w-5 h-5 mr-2 text-soft-accent-deep" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                   </svg>
                 Likes Received ({profile.likesReceived || 0})
               </span>
-              <span className="text-pink-500 font-semibold">
+              <span className="text-soft-primary-deep font-soft-display font-bold tabular-nums">
                 {profile.baseChatPoints?.likePoints || profile.likesReceived || 0} points
               </span>
             </div>
           </div>
 
           {/* Szczegóły punktów - zawsze widoczne */}
-          <div className="mt-4 space-y-3 border-t border-gray-200 dark:border-gray-600 pt-4">
-              <div className="flex items-center justify-between group transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-600 p-3 rounded-lg">
-                <span className="text-gray-600 dark:text-gray-400 flex items-center">
-                  <svg className="w-4 h-4 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="mt-4 space-y-3 border-t border-soft-line pt-4">
+              <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
+                <span className="text-soft-ink-muted flex items-center">
+                  <svg className="w-4 h-4 mr-2 text-soft-primary-deep" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
                   Activity Bonus
                 </span>
                 <div className="flex items-center space-x-2">
-                  <span className="text-xs text-gray-400">+25%</span>
-                  <span className="text-purple-500 font-semibold">
+                  <span className="text-xs text-soft-ink-faint tabular-nums">+25%</span>
+                  <span className="text-soft-primary-deep font-soft-display font-bold tabular-nums">
                     {profile.baseChatPoints?.activityBonus || Math.round(((profile.postCount || 0) * 5 + (profile.likesReceived || 0)) * 0.25)}
                   </span>
                 </div>
@@ -2389,60 +2833,60 @@ export default function BuilderProfile({
 
               {/* Domain Bonuses */}
               {(profile.baseChatPoints?.baseNameBonus || 0) > 0 && (
-                <div className="flex items-center justify-between group transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-600 p-3 rounded-lg">
-                  <span className="text-gray-600 dark:text-gray-400 flex items-center">
+                <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
+                  <span className="text-soft-ink-muted flex items-center">
                     <span className="mr-2">🌐</span>
                     Base Name Bonus
                   </span>
-                  <span className="text-blue-500 font-semibold">
+                  <span className="text-soft-primary-deep font-soft-display font-bold tabular-nums">
                     +{profile.baseChatPoints?.baseNameBonus || 0}
                   </span>
                   </div>
               )}
 
               {(profile.baseChatPoints?.sphereBonus || 0) > 0 && (
-                <div className="flex items-center justify-between group transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-600 p-3 rounded-lg">
-                  <span className="text-gray-600 dark:text-gray-400 flex items-center">
+                <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
+                  <span className="text-soft-ink-muted flex items-center">
                     <span className="mr-2">🌐</span>
                     .sphere Bonus
                   </span>
-                  <span className="text-blue-500 font-semibold">
+                  <span className="text-soft-primary-deep font-soft-display font-bold tabular-nums">
                     +{profile.baseChatPoints?.sphereBonus || 0}
                   </span>
                   </div>
               )}
 
               {(profile.baseChatPoints?.camperBonus || 0) > 0 && (
-                <div className="flex items-center justify-between group transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-600 p-3 rounded-lg">
-                  <span className="text-gray-600 dark:text-gray-400 flex items-center">
+                <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
+                  <span className="text-soft-ink-muted flex items-center">
                     <span className="mr-2">🏕️</span>
                     .camper Bonus
                   </span>
-                  <span className="text-orange-500 font-semibold">
+                  <span className="text-soft-accent-deep font-soft-display font-bold tabular-nums">
                     +{profile.baseChatPoints?.camperBonus || 0}
                   </span>
                 </div>
               )}
 
               {(profile.baseChatPoints?.celoBonus || 0) > 0 && (
-                <div className="flex items-center justify-between group transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-600 p-3 rounded-lg">
-                  <span className="text-gray-600 dark:text-gray-400 flex items-center">
+                <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
+                  <span className="text-soft-ink-muted flex items-center">
                     <span className="mr-2">💛</span>
                     .celo Bonus
                   </span>
-                  <span className="text-yellow-500 font-semibold">
+                  <span className="text-soft-accent-deep font-soft-display font-bold tabular-nums">
                     +{profile.baseChatPoints?.celoBonus || 0}
                   </span>
               </div>
               )}
 
               {(profile.baseChatPoints?.worldBonus || 0) > 0 && (
-                <div className="flex items-center justify-between group transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-600 p-3 rounded-lg">
-                  <span className="text-gray-600 dark:text-gray-400 flex items-center">
+                <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
+                  <span className="text-soft-ink-muted flex items-center">
                     <span className="mr-2">🌍</span>
                     .world Bonus
                   </span>
-                  <span className="text-green-500 font-semibold">
+                  <span className="text-soft-primary-deep font-soft-display font-bold tabular-nums">
                     +{profile.baseChatPoints?.worldBonus || 0}
                   </span>
             </div>
@@ -2450,12 +2894,12 @@ export default function BuilderProfile({
 
               {/* Referral Points */}
               {(profile.baseChatPoints?.referralPoints || 0) > 0 && (
-                <div className="flex items-center justify-between group transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-600 p-3 rounded-lg">
-                  <span className="text-gray-600 dark:text-gray-400 flex items-center">
+                <div className="flex items-center justify-between group bg-soft-surface shadow-card transition-colors [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken p-3 rounded-card">
+                  <span className="text-soft-ink-muted flex items-center">
                     <span className="mr-2">👥</span>
                     Referral Points
                   </span>
-                  <span className="text-purple-500 font-semibold">
+                  <span className="text-soft-primary-deep font-soft-display font-bold tabular-nums">
                     +{profile.baseChatPoints?.referralPoints || 0}
                   </span>
                 </div>

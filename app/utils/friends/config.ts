@@ -7,13 +7,14 @@
 // co oznaczalo dwa niezalezne kanaly do Firestore i podwojone polaczenia.
 export { db } from '../firebase';
 
-// Stała z adresem admina (kopiowane z głównego firebase.ts)
-export const ADMIN_ADDRESS = '0xF1fa20027b6202bc18e4454149C85CB01dC91Dfd'.toLowerCase();
-
-// Utility function do sprawdzania czy użytkownik jest adminem
-export const isUserAdmin = (userAddress: string): boolean => {
-  return userAddress.toLowerCase() === ADMIN_ADDRESS;
-};
+// Adres admina i sprawdzenie uprawnien - RE-EKSPORT, nie kopia.
+//
+// Wczesniej stala tu wlasna kopia adresu z komentarzem "kopiowane z glownego
+// firebase.ts", czyli druga niezalezna definicja tego, kto jest adminem.
+// Zmiana admina w jednym miejscu zostawilaby drugie przy starym wlascicielu.
+// Ten plik i tak importuje juz `db` z firebase.ts, wiec re-eksport nie
+// wprowadza zadnego nowego sprzezenia - usuwa tylko rozjazd.
+export { ADMIN_ADDRESS, isUserAdmin } from '../firebase';
 
 // ===============================================
 // 📊 COLLECTIONS CONFIGURATION

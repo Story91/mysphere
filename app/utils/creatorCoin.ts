@@ -130,6 +130,14 @@ export async function getCreatorCoin(userAddress: string): Promise<CreatorCoinDa
 /**
  * Fetch all coin balances for a user
  * Based on: https://docs.zora.co/coins/sdk/queries/profile#getprofilebalances
+ *
+ * @throws gdy odczyt z Zory sie nie powiedzie - wolajacy MUSI to odroznic od
+ * pustego portfela.
+ *
+ * Wczesniej `catch` oddawal `[]`, a jedyny wolajacy tlumaczyl pusta liste na
+ * saldo "0". Skutek: po czkawce API czlowiek widzial saldo zero swojej wlasnej
+ * monety, a przycisk "Sell" (rysowany warunkiem `balance > 0`) po prostu
+ * znikal. Salda nie wolno zgadywac - to jest jego majatek.
  */
 export async function getUserCoinBalances(userAddress: string): Promise<UserCoinBalance[]> {
   try {
@@ -193,7 +201,7 @@ export async function getUserCoinBalances(userAddress: string): Promise<UserCoin
       });
   } catch (error) {
     console.error('Error fetching user coin balances:', error);
-    return [];
+    throw error;
   }
 }
 

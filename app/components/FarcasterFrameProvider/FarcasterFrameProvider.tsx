@@ -18,8 +18,21 @@ export function FarcasterFrameProvider({ children }: PropsWithChildren) {
 
     const init = async () => {
       try {
-        // Resolves false within 1s outside a miniapp host — on localhost the old
-        // `await FrameSDK.context` hung forever because no host ever answers.
+        // TU ROZDZIELAJA SIE DWA KLIENTY - to jest cala obsluga dual-mode.
+        //
+        // Farcaster (Warpcast) nadal implementuje spec miniapp i aktywnie go
+        // rozwija, wiec isInMiniApp() zwraca tam true i lecimy sciezka ponizej:
+        // autoconnect konektorem 'farcaster', ready() gaszacy splash, addMiniApp.
+        //
+        // Base App od 9 kwietnia 2026 traktuje wszystkie aplikacje jak zwykle
+        // strony www i NIE odpowiada na wywolania SDK Farcastera - ani ready(),
+        // ani signIn, ani composeCast. isInMiniApp() zwroci tam false, wiec
+        // wychodzimy tutaj, a aplikacja renderuje sie normalnie i laczy portfel
+        // przez konektory injected() / baseAccount() z app/providers.tsx.
+        //
+        // Timeout 1s jest krytyczny: poprzednia wersja robila `await sdk.context`
+        // bez niego i na localhoscie wisiala w nieskonczonosc, bo nikt nie
+        // odpowiadal. Ten sam mechanizm chroni dzis przed zawieszeniem w Base App.
         const inMiniApp = await sdk.isInMiniApp();
         if (!inMiniApp) return;
 
@@ -38,11 +51,12 @@ export function FarcasterFrameProvider({ children }: PropsWithChildren) {
           sdk.actions.ready();
         }, 500);
 
-        // Auto-prompt addMiniApp if not already added
+        // Auto-prompt addMiniApp if not already added.
+        // `addFrame` to legacy alias tej samej metody - uzywamy aktualnej nazwy.
         if (context && !context.client.added) {
           setTimeout(async () => {
             try {
-              const result = await sdk.actions.addFrame();
+              const result = await sdk.actions.addMiniApp();
               console.log('✅ Mini app added successfully');
               if (result?.notificationDetails) {
                 console.log('🔔 Notifications enabled:', result.notificationDetails);

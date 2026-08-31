@@ -7,6 +7,16 @@ import { QuestDay, Quest, UserProgress } from '../types/quest';
 import Quest3DCard from './Quest3DCard';
 import HamburgerMenu from './HamburgerMenu';
 
+// Pojedyncza czastka tla - pozycje sa wyliczone z rozmiaru viewportu.
+type BackgroundParticle = {
+  fromX: number;
+  fromY: number;
+  toX: number;
+  toY: number;
+  duration: number;
+  delay: number;
+};
+
 const QuestSystem: React.FC = () => {
   const [currentDay, setCurrentDay] = useState(1);
   const [selectedQuest, setSelectedQuest] = useState<Quest | null>(null);
@@ -53,6 +63,27 @@ const QuestSystem: React.FC = () => {
 
   const backgroundRef = useRef<HTMLDivElement>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+
+  // Pozycje dekoracyjnych czastek licza sie z window.innerWidth/innerHeight.
+  // Na serwerze nie ma obiektu window, a ten kod siedzial wprost w renderze
+  // (wewnatrz .map()), wiec prerender /mycamp/quest wywalal sie na
+  // "ReferenceError: window is not defined". Teraz na serwerze lista jest pusta,
+  // a wypelnia sie dopiero po zamontowaniu w przegladarce. Warstwa jest czysto
+  // dekoracyjna i startuje z opacity 0, wiec wizualnie nic sie nie zmienia.
+  const [particles, setParticles] = useState<BackgroundParticle[]>([]);
+
+  useEffect(() => {
+    setParticles(
+      Array.from({ length: 20 }, () => ({
+        fromX: Math.random() * window.innerWidth,
+        fromY: Math.random() * window.innerHeight,
+        toX: Math.random() * window.innerWidth,
+        toY: Math.random() * window.innerHeight,
+        duration: 6 + Math.random() * 4,
+        delay: Math.random() * 3,
+      }))
+    );
+  }, []);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -332,25 +363,25 @@ const QuestSystem: React.FC = () => {
 
       {/* Floating Particles */}
       <div className="absolute inset-0 pointer-events-none">
-        {[...Array(20)].map((_, i) => (
+        {particles.map((particle, i) => (
           <motion.div
             key={i}
-            initial={{ 
+            initial={{
               opacity: 0,
               scale: 0,
-              x: Math.random() * window.innerWidth,
-              y: Math.random() * window.innerHeight
+              x: particle.fromX,
+              y: particle.fromY
             }}
-            animate={{ 
+            animate={{
               opacity: [0, 0.6, 0],
               scale: [0, 1, 0],
-              x: Math.random() * window.innerWidth,
-              y: Math.random() * window.innerHeight
+              x: particle.toX,
+              y: particle.toY
             }}
             transition={{
-              duration: 6 + Math.random() * 4,
+              duration: particle.duration,
               repeat: Infinity,
-              delay: Math.random() * 3,
+              delay: particle.delay,
               ease: "easeInOut"
             }}
             className="absolute w-2 h-2 bg-cyan-400 rounded-full"

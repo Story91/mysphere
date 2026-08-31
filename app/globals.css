@@ -3,27 +3,156 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ===========================================================================
+   SOFT SOCIAL - tokeny kierunku wizualnego
+   ===========================================================================
+   Zrodlo: projekt wlasciciela w Claude Design ("Mobilny widok - trzy style",
+   wariant 1b). Wartosci sa WYCIAGNIETE Z PROJEKTU, nie dobrane na oko - kazda
+   z nich wystepuje w tamtym pliku i policzylem, ile razy.
 
-/* Dodanie czcionki SF Pro Display */
-@font-face {
-  font-family: 'SF Pro Display';
-  src: local('SF Pro Display'),
-       local('.SFNSDisplay-Regular'),
-       local('.SFProDisplay-Regular');
-  font-weight: normal;
-  font-style: normal;
+   PO CO TO ISTNIEJE JAKO ZMIENNE, A NIE JAKO KLASY W KOMPONENTACH.
+   Poprzedni interfejs mial kolory wpisane na sztywno w kilkuset miejscach -
+   dlatego kazda zmiana wygladu byla operacja na wielkich plikach i konczyla sie
+   rozjazdem. Tutaj kierunek ma JEDNO miejsce. Zmiana odcienia to zmiana jednej
+   linii, a nie przeszukiwanie repo.
+
+   TA SEKCJA NICZEGO JESZCZE NIE ZMIENIA. Zmienne czekaja na uzycie; dopoki
+   komponent po nie nie siegnie, wyglada dokladnie jak przedtem. To celowe -
+   wdrazamy kierunek ekran po ekranie, a nie jednym ruchem przez cala aplikacje.
+   =========================================================================== */
+:root {
+  /* Powierzchnie. Tlo jest lawendowe, nie biale - biel zostaje dla kart,
+     zeby karta odcinala sie sama, bez ramki. */
+  --soft-bg: 241 237 250; /* #f1edfa */
+  --soft-surface: 255 255 255; /* #ffffff */
+  --soft-surface-sunken: 238 233 251; /* #eee9fb */
+
+  /* Tekst - cztery stopnie, od naglowka do znaku wodnego. */
+  --soft-ink: 46 42 68; /* #2e2a44 */
+  --soft-ink-muted: 107 100 134; /* #6b6486 */
+  --soft-ink-soft: 141 134 171; /* #8d86ab */
+  --soft-ink-faint: 162 155 192; /* #a29bc0 */
+
+  /* Fiolet marki. `deep` na tekst na jasnym tle - `primary` nie ma tam
+     kontrastu 4.5:1. */
+  --soft-primary: 124 107 218; /* #7c6bda */
+  --soft-primary-deep: 95 78 194; /* #5f4ec2 */
+  /* Tekst NA wypelnieniu fioletem (aktywna pigulka nawigacji). Biel, jak
+     dotad - ale osobnym tokenem, zeby motyw sieci mogl ja zamienic na ciemna
+     tam, gdzie wypelnienie robi sie jasnozielone. */
+  --soft-on-primary: 255 255 255;
+  --soft-line: 214 205 242; /* #d6cdf2 */
+  --soft-line-strong: 185 177 216; /* #b9b1d8 */
+
+  /* Pomaranczowy akcent. `deep` na tekst, `soft` na tlo pigulki. */
+  --soft-accent: 245 167 59; /* #f5a73b */
+  --soft-accent-soft: 253 228 204; /* #fde4cc */
+  --soft-accent-deep: 194 65 12; /* #c2410c */
+
+  /* Blekit informacyjny - linki i odznaki neutralne. */
+  --soft-info: 36 101 214; /* #2465d6 */
+  --soft-info-soft: 217 235 255; /* #d9ebff */
+
+  /* Cienie. Wszystkie fioletowe, nie czarne - czarny cien na lawendzie
+     wyglada jak brud. */
+  --soft-shadow-card: 0 6px 24px rgba(102, 86, 190, 0.10);
+  --soft-shadow-chip: 0 2px 10px rgba(102, 86, 190, 0.16);
+  --soft-shadow-float: 0 14px 38px rgba(74, 60, 150, 0.20);
+
+  --soft-radius-card: 26px;
+  --soft-radius-pill: 999px;
+
+  /* =========================================================================
+     PALETA STARTPADA (--sp-*)
+     =========================================================================
+     Launchpad byl jedynym ekranem pomalowanym KOLORAMI WPISANYMI WPROST -
+     `bg-white`, `#16141b`, `border-black/10`, okolo 350 razy w siedmiu plikach.
+     Dopoki tak bylo, motyw sieci (czarno-zielony Robinhood, patrz
+     app/startpad/networkTheme.ts) byl niewykonalny: nie bylo czego podmienic.
+
+     Wartosci ponizej to DOKLADNIE te kolory, ktore stoja w tych plikach dzis,
+     wiec jasny startpad nie zmienia sie o odcien. Podmienia je wylacznie blok
+     motywu, gdy na <html> pojawi sie `data-net-theme`.
+
+     `--sp-shade` wymaga slowa osobno: to jest baza WSZYSTKICH krawedzi i
+     przygaszonych tekstow pisanych z przezroczystoscia (`border-sp-shade/10`,
+     `text-sp-shade/45`). W jasnym motywie jest czernia, w ciemnym biela - i ta
+     jedna zmienna odwraca cala rodzine, nie ruszajac ani jednej wartosci
+     krycia.
+     ====================================================================== */
+  --sp-bg: 251 251 253; /* #fbfbfd - tlo sekcji pod kartami */
+  --sp-surface: 255 255 255; /* karty, pola, panele */
+  --sp-sunken: 250 250 253; /* #fafafd - naglowek tabeli, pasy zaglebione */
+  --sp-shade: 0 0 0; /* baza krawedzi i przygaszonego tekstu */
+  --sp-ink: 22 20 27; /* #16141b - tekst mocny */
+  --sp-ink-soft: 138 135 148; /* #8a8794 - tekst nieaktywny */
+  --sp-hover: 255 248 252; /* #fff8fc - podswietlenie wiersza */
+
+  --sp-brand: 124 107 218; /* #7c6bda */
+  /* Tekst LEZACY NA wypelnieniu marki (przycisk Trade, Launch). W jasnym
+     motywie biel, jak dotad. W ciemnym musi byc CIEMNY: biel na #00C805 daje
+     kontrast 2.3:1, czyli napis, ktorego nie widac - i dokladnie dlatego
+     Robinhood pisze po swojej zieleni czernia. */
+  --sp-on-brand: 255 255 255;
+  --sp-brand-deep: 95 78 194; /* #5f4ec2 - tekst marki na jasnym */
+  --sp-brand-soft: 244 241 255; /* #f4f1ff - tlo pigulki marki */
+  --sp-brand-strong: 143 69 223; /* #8f45df - akcent wyrozniony */
+
+  --sp-up: 11 154 81; /* #0b9a51 */
+  --sp-up-vivid: 24 189 100; /* #18bd64 - linia wzrostu */
+  --sp-up-soft: 237 255 244; /* #edfff4 */
+  --sp-up-line: 157 231 187; /* #9de7bb */
+
+  --sp-down: 199 107 18; /* #c76b12 */
+  --sp-down-deep: 163 75 8; /* #a34b08 */
+  --sp-down-soft: 255 248 237; /* #fff8ed */
+  --sp-down-line: 243 197 138; /* #f3c58a */
+
+  --sp-danger: 163 32 32; /* #a32020 */
+  --sp-danger-soft: 255 239 239; /* #ffefef */
+  --sp-info: 31 111 178; /* #1f6fb2 */
+  --sp-info-soft: 232 244 255; /* #e8f4ff */
 }
 
-@font-face {
-  font-family: 'SF Pro Display';
-  src: local('SF Pro Display Bold'),
-       local('.SFNSDisplay-Bold'),
-       local('.SFProDisplay-Bold');
-  font-weight: bold;
-  font-style: normal;
+/* ===========================================================================
+   KRZYWE I CZASY ANIMACJI
+   ===========================================================================
+   Wbudowane easingi CSS sa za slabe - brakuje im wyrazu, przez co ruch
+   wyglada na przypadkowy. Ponizsze krzywe sa mocniejszymi wariantami.
+
+   ease-in jest tu NIEOBECNY celowo: zaczyna wolno, czyli opoznia ruch
+   dokladnie w chwili, gdy uzytkownik patrzy najuwazniej. To samo 200 ms
+   z ease-in CZUJE sie wolniej niz z ease-out.
+   =========================================================================== */
+:root {
+  /* Wejscia i wyjscia - natychmiastowa reakcja, potem wyhamowanie. */
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+  /* Ruch po ekranie, morfowanie. */
+  --ease-in-out-strong: cubic-bezier(0.77, 0, 0.175, 1);
+  /* Szuflady - krzywa z Ionic, odpowiednik zachowania iOS. */
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+  --dur-press: 140ms;
+  --dur-tooltip: 160ms;
+  --dur-dropdown: 200ms;
+  --dur-sheet: 280ms;
 }
 
-/* Coinbase Display Font */
+/* Ruch ograniczony do niezbednego minimum, gdy uzytkownik o to prosi.
+   NIE zerujemy wszystkiego: przejscia koloru i przezroczystosci pomagaja
+   zrozumiec, co sie stalo, i nie wywoluja choroby lokomocyjnej. Znika
+   wylacznie RUCH - przesuniecia i skalowanie. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-press: 1ms;
+    --dur-tooltip: 1ms;
+    --dur-dropdown: 1ms;
+    --dur-sheet: 1ms;
+  }
+}
+
+
+/* Coinbase Display Font (uzywany w app/basechat/.../ProfileCard.css i w whitepaperze) */
 @font-face {
   font-family: 'Coinbase Display';
   src: url('/brand-kit/base/fonts/Coinbase-Display/Coinbase_Display-Regular-web-1.32.woff2') format('woff2');
@@ -64,78 +193,6 @@
   font-display: swap;
 }
 
-/* Efekty dla badge'y */
-.badge-glass {
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
-}
-
-.badge-glow {
-  box-shadow: 0 0 20px rgba(0, 82, 255, 0.2);
-  transition: all 0.3s ease;
-  border-radius: 16px;
-}
-
-.badge-glow:hover {
-  box-shadow: 0 0 30px rgba(0, 82, 255, 0.3);
-  transform: translateY(-2px) scale(1.02);
-}
-
-.badge-hover {
-  transition: all 0.3s ease;
-  border-radius: 16px;
-}
-
-.badge-hover:hover {
-  transform: translateY(-2px);
-}
-
-/* Animacja pulsu dla badge'y */
-@keyframes badgePulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(0, 82, 255, 0.4);
-  }
-  70% {
-    box-shadow: 0 0 0 10px rgba(0, 82, 255, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(0, 82, 255, 0);
-  }
-}
-
-.badge-pulse {
-  animation: badgePulse 2s infinite;
-  border-radius: 16px;
-}
-
-/* Efekt szkła */
-.backdrop-blur-lg {
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-}
-
-/* Hover efekt dla odznak */
-.badge-hover {
-  transition: all 0.3s ease;
-}
-
-.badge-hover:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 82, 255, 0.2);
-}
-
-/* Display font for NFT titles */
-@font-face {
-  font-family: 'ClashDisplay';
-  src: url('/fonts/ClashDisplay-Semibold.woff2') format('woff2');
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
-}
-
 @layer utilities {
   .scrollbar-hide {
     -ms-overflow-style: none;
@@ -169,27 +226,6 @@ html, body {
   .container, .max-w-6xl {
     max-width: 100vw !important;
     overflow-x: hidden;
-  }
-  
-  /* Mobile modal positioning */
-  .mobile-modal {
-    position: fixed !important;
-    bottom: 80px !important;
-    left: 50% !important;
-    transform: translateX(-50%) !important;
-    width: calc(100vw - 32px) !important;
-    max-width: 400px !important;
-    z-index: 10000 !important;
-  }
-  
-  /* Mobile success message */
-  .mobile-success {
-    position: fixed !important;
-    bottom: 16px !important;
-    left: 50% !important;
-    transform: translateX(-50%) !important;
-    max-width: calc(100vw - 32px) !important;
-    z-index: 10000 !important;
   }
 }
 
@@ -240,19 +276,6 @@ html {
   }
 }
 
-/* Klasy pomocnicze */
-.responsive-padding {
-  @apply px-4 sm:px-6 md:px-8 lg:px-12;
-}
-
-.responsive-text {
-  @apply text-sm sm:text-base md:text-lg lg:text-xl;
-}
-
-.responsive-heading {
-  @apply text-xl sm:text-2xl md:text-3xl lg:text-4xl;
-}
-
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -274,42 +297,13 @@ html {
     --popover-foreground: 0 0% 3.9%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
     --radius: 0.5rem;
-    --w3m-z-index: 1000;
-    --w3m-accent: #0052FF;
   }
-  .dark {
-    /* Nadpisanie dark mode - zawsze jasne kolory */
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-  }
+  /* Blok `.dark` usuniety: powielal :root co do wartosci (aplikacja jest
+     jasna), a klasy `dark` i tak nikt tu nie ustawia. Gdyby wrocil dark mode,
+     wraca razem z realnymi wartosciami.
+     --chart-1..5 usuniete: zaden komponent ich nie czytal (brak shadcn/chart).
+     --w3m-* usuniete: web3modal/appkit nie jest zaleznoscia tego projektu. */
 }
 
 body {
@@ -325,161 +319,13 @@ h1, h2, h3, h4, h5, h6 {
   letter-spacing: -0.5px;
 }
 
-.text-gradient {
-  background: linear-gradient(135deg, #3B82F6, #8B5CF6);
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.bg-gradient {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(139, 92, 246, 0.05));
-}
-
-.card {
-  background: #1E293B;
-  border: 1px solid #334155;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-}
-
-.stats-card {
-  background: #1E293B;
-  border: 1px solid #334155;
-}
-
-.sidebar {
-  background: #1E293B;
-  border-left: 1px solid #334155;
-}
-
-.post {
-  background: #1E293B;
-  border: 1px solid #334155;
-}
-
-.header {
-  background: #1E293B;
-  border-bottom: 1px solid #334155;
-}
-
-/* Dodatkowe style dla lepszej czytelności */
-.text-primary {
-  color: #F3F4F6;
-}
-
-.text-secondary {
-  color: #E5E7EB;
-}
-
-.text-muted {
-  color: #9CA3AF;
-}
-
-.link {
-  color: #60A5FA;
-  transition: color 0.2s ease;
-}
-
-.link:hover {
-  color: #3B82F6;
-}
-
-/* Style dla przycisków */
-.button {
-  background: #3B82F6;
-  color: #F3F4F6;
-  font-weight: 500;
-  transition: all 0.2s ease;
-}
-
-.button:hover {
-  background: #2563EB;
-  transform: translateY(-1px);
-}
-
-/* Style dla inputów */
-.input {
-  background: #0F172A;
-  border: 1px solid #334155;
-  color: #E5E7EB;
-}
-
-.input:focus {
-  border-color: #3B82F6;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-}
-
-/* Animacje dla tytułów w gridach */
-@keyframes cursor {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
-}
-
-.grid-title {
-  position: relative;
-  display: inline-block;
-  color: #0052FF;
-  font-family: 'Share Tech Mono', monospace;
-  text-shadow: 0 0 2px rgba(0, 82, 255, 0.3);
-}
-
-.grid-title::before {
-  content: '>';
-  margin-right: 8px;
-  color: #0052FF;
-  animation: cursor 1s infinite;
-}
-
-.grid-title:hover {
-  color: #4C8FFF;
-  text-shadow: 0 0 4px rgba(0, 82, 255, 0.4);
-}
-
-.grid-title:hover::before {
-  color: #4C8FFF;
-}
-
-/* Usuwam stare animacje glitch */
-@keyframes pulse-gradient {
-  0% {
-    background: linear-gradient(270deg, #0052FF 0%, #0039B3 100%);
-    background-size: 200% 100%;
-    background-position: 100% 0;
-  }
-  50% {
-    background: linear-gradient(270deg, #0052FF 0%, #0039B3 100%);
-    background-size: 200% 100%;
-    background-position: 0 0;
-  }
-  100% {
-    background: linear-gradient(270deg, #0052FF 0%, #0039B3 100%);
-    background-size: 200% 100%;
-    background-position: 100% 0;
-  }
-}
-
-.animate-pulse-gradient {
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
-  animation: pulse-gradient 3s ease infinite;
-}
-
-@keyframes glow-pulse {
-  0% {
-    text-shadow: 0 0 5px rgba(0, 82, 255, 0.5);
-  }
-  50% {
-    text-shadow: 0 0 20px rgba(0, 82, 255, 0.8);
-  }
-  100% {
-    text-shadow: 0 0 5px rgba(0, 82, 255, 0.5);
-  }
-}
-
-.animate-glow-pulse {
-  animation: glow-pulse 2s ease-in-out infinite;
-}
+/* Usunieta warstwa stylow z czasow ciemnego motywu (.card, .post, .header,
+   .sidebar, .stats-card, .button, .input, .link, .text-gradient, .bg-gradient,
+   .grid-title + @keyframes cursor, .animate-pulse-gradient, .animate-glow-pulse).
+   Zadna z tych klas nie wystepowala w kodzie, a .text-primary/.text-secondary/
+   .text-muted dodatkowo PRZESLANIALY utilities Tailwinda o tych samych nazwach
+   (ta sama specyficznosc, ale pozniej w pliku), wiec kolor z palety shadcn nigdy
+   by sie nie przebil. */
 
 @keyframes fadeIn {
   from {
@@ -496,29 +342,6 @@ h1, h2, h3, h4, h5, h6 {
   animation: fadeIn 0.5s ease-out forwards;
 }
 
-@keyframes badgeReveal {
-  0% { opacity: 0; transform: scale(0.8); }
-  50% { opacity: 1; transform: scale(1.1); }
-  100% { opacity: 1; transform: scale(1); }
-}
-
-@keyframes gradient-x {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
-}
-
-.animate-gradient-x {
-  animation: gradient-x 15s ease infinite;
-  background-size: 400% 400%;
-}
-
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
@@ -526,31 +349,6 @@ h1, h2, h3, h4, h5, h6 {
 
 .animate-blink {
   animation: blink 1s step-end infinite;
-}
-
-.badge-reveal {
-  animation: badgeReveal 0.5s ease-out forwards;
-}
-
-/* Opóźnienia animacji */
-.animate-delay-100 {
-  animation-delay: 100ms;
-}
-
-.animate-delay-200 {
-  animation-delay: 200ms;
-}
-
-.animate-delay-300 {
-  animation-delay: 300ms;
-}
-
-.animate-delay-400 {
-  animation-delay: 400ms;
-}
-
-.animate-delay-500 {
-  animation-delay: 500ms;
 }
 
 /* Nowoczesne suwaki */
@@ -578,56 +376,16 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
-/* Google Fonts Styles */
-/* 15 martwych rodzin fontow usunietych - klasy .font-* nie byly uzywane nigdzie,
-   a same fonty nigdy sie nie ladowaly (brak @font-face i brak importu). */
-
-/* Ikony w dropdownie portfela.
-
-   Wczesniej wymuszaly tu czern (#111111) pod biala powierzchnie. Powierzchnia
-   jest teraz ciemna, wiec ikony dziedzicza kolor z wiersza (`currentColor`),
-   dzieki czemu reaguja na hover razem z etykieta. OnchainKit wstrzykuje wlasne
-   kolory w niektore ikony - stad `!important` na dziedziczeniu. */
-.wallet-dropdown svg {
-  color: inherit !important;
-  stroke: currentColor !important;
-}
-
-/* Avatar w bloku tozsamosci to <img>/<svg> z wlasna paleta - nie nadpisujemy go. */
-.wallet-dropdown [data-testid='ockAvatar'] svg,
-.wallet-dropdown [data-testid='ockAvatar'] img {
-  color: revert !important;
-  stroke: revert !important;
-}
-
-/* Color Picker Styles */
-.react-colorful {
-  width: 100% !important;
-  height: 160px !important;
-  border-radius: 0.75rem;
-  background: transparent;
-}
-
-.react-colorful__saturation {
-  border-radius: 0.75rem;
-  border-bottom: none;
-  margin-bottom: 0.5rem;
-}
-
-.react-colorful__hue {
-  height: 24px !important;
-  border-radius: 0.75rem;
-}
-
-.react-colorful__pointer {
-  width: 20px;
-  height: 20px;
-  border-width: 2px;
-}
-
-.react-colorful__interactive:focus .react-colorful__pointer {
-  transform: translate(-50%, -50%) scale(1.1);
-}
+/* Usuniete reguly bez celu w DOM:
+   - 15 martwych rodzin fontow (klasy .font-* nieuzywane, fonty nigdy sie nie
+     ladowaly - brak @font-face i brak importu),
+   - `@font-face 'SF Pro Display'` : rodzina nie wystepuje w zadnym stylu,
+   - `@font-face 'ClashDisplay'` : plik /fonts/ClashDisplay-Semibold.woff2 nie
+     istnieje w public/, wiec kazde uzycie i tak spadalo na fallback,
+   - `.wallet-dropdown ...` : klasa `wallet-dropdown` nie wystepuje nigdzie w
+     repo, a selektor [data-testid='ockAvatar'] celowal w OnchainKit, ktorego
+     projekt juz nie uzywa (wlasna warstwa tozsamosci w app/components/identity),
+   - `.react-colorful*` : pakiet react-colorful nie jest zaleznoscia projektu. */
 
 @layer base {
   * {
@@ -638,22 +396,12 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
-appkit-button {
-  display: inline-block;
-}
+/* `appkit-button` (web3modal/reown) usuniete - ten custom element nie jest
+   nigdzie renderowany, projekt laczy portfel przez wagmi. */
 
-appkit-button::part(button) {
-  background: #FF4B26;
-  border-radius: 0.75rem;
-  padding: 0.5rem;
-  color: white;
-  transition: all 0.3s;
-}
-
-appkit-button::part(button):hover {
-  background: rgba(255, 75, 38, 0.9);
-}
-
+/* Sweep dla szkieletow ladowania. Klasa `animate-shimmer` (app/base/components/
+   BaseCard.tsx) wymaga wpisu w tailwind.config, ktorego tam nie ma - keyframes
+   zostaja, bo to jedyna definicja ruchu, ale sama animacja dzis nie startuje. */
 @keyframes shimmer {
   0% {
     transform: translateX(-100%);
@@ -663,30 +411,576 @@ appkit-button::part(button):hover {
   }
 }
 
-@keyframes pulse {
-  0%, 100% {
+/* Bylo tu wlasne `@keyframes pulse` (opacity 0 -> 1 -> 0). Nazwa jest zajeta
+   przez Tailwinda, a ta definicja stala PO jego utilities, wiec przejmowala
+   wszystkie ~60 uzyc `animate-pulse` w aplikacji i zmieniala delikatne
+   pulsowanie szkieletow w pelne mruganie do zera. Usuniete - `animate-pulse`
+   wraca do zachowania z frameworka. */
+
+/* Reguly dla `div[role="dialog"][data-testid="ockDialog"]` usuniete: testid
+   ockDialog pochodzil z OnchainKit, ktory nie jest juz zaleznoscia projektu
+   (brak w package.json i w node_modules), wiec selektor nic nie lapal. */
+
+/* Nazwa uzytkownika z gradientem.
+
+   Wczesniej robilismy to samymi klasami Tailwinda: `bg-gradient-to-r ...
+   text-transparent bg-clip-text`. Na Androidzie (zwlaszcza Samsung Internet)
+   ta kombinacja renderuje sie jako CZARNY PROSTOKAT z fragmentami koloru -
+   `color: transparent` nie skleja sie tam poprawnie z `background-clip: text`.
+
+   Tutaj: najpierw pelny, solidny kolor jako fallback, a gradient wlaczamy
+   dopiero, gdy przegladarka deklaruje obsluge -webkit-background-clip: text
+   i uzywamy -webkit-text-fill-color zamiast color. Silnik, ktory tego nie
+   ogarnia, pokazuje czytelny kolor zamiast czarnej plamy. */
+.username-gradient {
+  color: #7c3aed;
+  font-weight: 700;
+}
+
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .username-gradient {
+    background-image: linear-gradient(to right, #3b82f6, #a855f7, #ec4899);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
+
+/* Globalna lataka na artefakt Androida.
+
+   Tailwindowe `bg-clip-text` + `text-transparent` daje `background-clip: text`
+   razem z `color: transparent`. Silniki oparte na Chromium na Androidzie
+   (zwlaszcza Samsung Internet) potrafia w tej kombinacji narysowac czarny
+   prostokat zamiast tekstu w gradiencie. Wlasciwym sposobem wygaszenia koloru
+   przy background-clip jest -webkit-text-fill-color, nie color.
+
+   Wzorzec wystepuje w ~50 miejscach aplikacji, wiec zamiast przepisywac kazde
+   z osobna, wymuszamy poprawna wlasciwosc wszedzie tam, gdzie obie klasy
+   spotykaja sie na jednym elemencie. */
+.bg-clip-text.text-transparent {
+  -webkit-text-fill-color: transparent;
+}
+
+/* Tasma kursow w widoku Trends (app/basechat/soft/SoftTrends.tsx).
+   Przesuwamy o -50%, bo zawartosc jest zduplikowana - petla nie ma wtedy szwu.
+   linear jest tu jedynym poprawnym wyborem: przyspieszanie i zwalnianie tasmy
+   wyglada jak zacinanie, a nie jak ruch. */
+.soft-marquee {
+  animation: soft-marquee-scroll 32s linear infinite;
+}
+
+@keyframes soft-marquee-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* Dekoracja - przy ograniczonym ruchu znika bez straty informacji,
+   bo kursy sa nadal czytelne, tylko nieruchome. */
+@media (prefers-reduced-motion: reduce) {
+  .soft-marquee { animation: none; }
+}
+
+/* Orbita na ekranie logowania (app/basechat/soft/SoftSignInHero.tsx).
+   28 s na obrot i `linear` - ruch ciagly to jedyny przypadek, w ktorym
+   easing byloby bledem: przyspieszanie i zwalnianie orbity wyglada jak
+   zacinanie, a nie jak krazenie. */
+.soft-orbit {
+  animation: soft-orbit-spin 28s linear infinite;
+}
+
+/* Awatar odkreca sie o wlasny kat i o kat orbity, wiec zostaje pionowo
+   zamiast koziolkowac po drugiej stronie kola. */
+.soft-orbit-counter {
+  animation: soft-orbit-counter 28s linear infinite;
+  transform: rotate(var(--orbit-deg, 0deg));
+}
+
+@keyframes soft-orbit-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes soft-orbit-counter {
+  from { transform: translate(-50%, -50%) rotate(calc(var(--orbit-deg, 0deg) - 0deg)); }
+  to   { transform: translate(-50%, -50%) rotate(calc(var(--orbit-deg, 0deg) - 360deg)); }
+}
+
+/* Dekoracja - bezruch niczego nie odbiera, uklad zostaje ten sam. */
+@media (prefers-reduced-motion: reduce) {
+  .soft-orbit,
+  .soft-orbit-counter { animation: none; }
+}
+
+/* ===========================================================================
+   TASMA PARAGONOWA - element sygnaturowy strony Paid
+   ===========================================================================
+   Strona Paid jest publiczna osia czasu rozliczonych platnosci. Szukalem dla
+   niej formy z WLASNEGO swiata tematu, a nie kolejnej listy w kartach - i tym
+   przedmiotem jest rolka paragonowa: ciagly pas papieru, ktory przyrasta od
+   gory, z perforacja po bokach i oderwana krawedzia.
+
+   Perforacja jest zrobiona gradientem, nie obrazkiem - skaluje sie z dowolna
+   wysokoscia tasmy i nie kosztuje ani jednego zadania sieciowego.
+   =========================================================================== */
+.receipt-tape {
+  position: relative;
+  background: #fff;
+  /* Dziurki po obu stronach. Powtarzalny gradient radialny: kolko tla co 14px. */
+  background-image:
+    radial-gradient(circle at 7px 7px, rgb(var(--soft-bg)) 3.5px, transparent 3.6px),
+    radial-gradient(circle at calc(100% - 7px) 7px, rgb(var(--soft-bg)) 3.5px, transparent 3.6px);
+  background-size: 100% 14px, 100% 14px;
+  background-repeat: repeat-y, repeat-y;
+  background-position: left top, right top;
+}
+
+/* Oderwana krawedz. Trojkaty wyciete maska - papier nie konczy sie prosta
+   linia, bo nikt nie odrywa paragonu rownо. */
+.receipt-tear-top,
+.receipt-tear-bottom {
+  height: 10px;
+  background: #fff;
+  --tooth: 14px;
+}
+.receipt-tear-top {
+  -webkit-mask: conic-gradient(from -45deg at 50% 100%, #0000 90deg, #000 0) 50% / var(--tooth) 100% repeat-x;
+  mask: conic-gradient(from -45deg at 50% 100%, #0000 90deg, #000 0) 50% / var(--tooth) 100% repeat-x;
+}
+.receipt-tear-bottom {
+  -webkit-mask: conic-gradient(from 135deg at 50% 0, #0000 90deg, #000 0) 50% / var(--tooth) 100% repeat-x;
+  mask: conic-gradient(from 135deg at 50% 0, #0000 90deg, #000 0) 50% / var(--tooth) 100% repeat-x;
+}
+
+/* Wejscie wierszy tasmy: kaskada od gory, 45 ms odstepu.
+   Odstep jest KROTKI celowo - dluzszy zamienia kaskade w pokaz i kaze czekac
+   na tresc, po ktora sie przyszlo. Po ostatnim wierszu nic sie juz nie rusza. */
+.receipt-row {
+  opacity: 0;
+  transform: translateY(6px);
+  animation: receipt-row-in 320ms var(--ease-out-strong) forwards;
+}
+@keyframes receipt-row-in {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Najswiezsza platnosc dostaje jeden impuls obwodki - i tylko jeden.
+   Pulsowanie bez konca zamienia informacje w ozdobe i przestaje cokolwiek
+   znaczyc po trzeciej powtorce. */
+.receipt-fresh::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  border: 2px solid rgb(var(--soft-accent));
+  opacity: 0;
+  animation: receipt-fresh-pulse 1400ms var(--ease-out-strong) 200ms 1;
+  pointer-events: none;
+}
+@keyframes receipt-fresh-pulse {
+  0%   { opacity: 0.9; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.03); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .receipt-row { opacity: 1; transform: none; animation: none; }
+  .receipt-fresh::after { animation: none; opacity: 0; }
+}
+
+/* ===========================================================================
+   KREGOSLUP KWOT - element sygnaturowy strony Re-Definition
+   ===========================================================================
+   Manifest opisuje przeplyw JEDNEJ kwoty przez kolejne stany: zero (reputacja
+   za darmo) -> stawka -> 402 (zadanie zaplaty) -> rozliczona suma. Znaczniki
+   sekcji sa wiec KWOTAMI, nie numerami - numer 01/02/03 nie niesie tu zadnej
+   informacji, a kwota niesie cala teze.
+
+   Kregoslup to pionowa linia laczaca te znaczniki. Linia rysuje sie w miare
+   przewijania, wiec czytelnik widzi, ile drogi kwota juz przebyla. To jedyna
+   animacja na tej stronie sterowana pozycja - reszta jest nieruchoma, zeby
+   tekst dalo sie czytac.
+
+   `animation-timeline: view()` dziala natywnie w przegladarkach, ktore je maja;
+   gdzie indziej linia jest po prostu narysowana w calosci. Zaden JavaScript.
+   =========================================================================== */
+.spine-track {
+  position: absolute;
+  left: 5px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: rgb(var(--soft-line));
+}
+
+.spine-fill {
+  position: absolute;
+  left: 5px;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  background: linear-gradient(to bottom, rgb(var(--soft-primary)), rgb(var(--soft-accent)));
+  transform-origin: top;
+}
+
+@supports (animation-timeline: view()) {
+  .spine-fill {
+    transform: scaleY(0);
+    animation: spine-grow linear both;
+    animation-timeline: view();
+    animation-range: entry 20% cover 60%;
+  }
+  @keyframes spine-grow {
+    to { transform: scaleY(1); }
+  }
+}
+
+/* Znacznik kwoty siedzi NA linii, wiec musi miec tlo strony pod spodem -
+   inaczej linia przechodzi przez cyfry. */
+.spine-marker {
+  position: relative;
+  z-index: 1;
+  background: rgb(var(--soft-bg));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spine-fill { animation: none; transform: scaleY(1); }
+}
+
+/* ===========================================================================
+   ROZLICZENIE - element sygnaturowy ekranu powitalnego
+   ===========================================================================
+   (app/basechat/soft/SoftSignInHero.tsx)
+
+   Znak marki w srodku, wokol niego wszystkie sieci z konfiguracji, a od kazdej
+   sieci biegnie do srodka przewod. Po przewodach jedza pomaranczowe monety -
+   JEDNA NARAZ - i znikaja pod znakiem marki, gdy obwodka blysnie. To jest cala
+   teza produktu w jednym obrazku: pieniadz dociera tu z lancuchow i sie
+   rozlicza.
+
+   SKAD SIE BIERZE "JEDNA NARAZ" BEZ ZADNEGO JAVASCRIPTU. Kazdy przewod dostaje
+   od komponentu wlasne DODATNIE opoznienie o wielokrotnosc taktu (1600 ms),
+   a sam przejazd trwa 720 ms - krocej niz takt, wiec dwie monety nigdy nie sa
+   w ruchu naraz. Zaden timer, zaden stan, zero pracy na glownym watku.
+
+   PRZEJAZD JEST SKONCZONY. Kazdy lancuch wysyla RAZ, po kolei, a potem obrazek
+   zastyga w zlozonej klatce koncowej. Powody przy `soft-wire-rest` nizej -
+   w skrocie: petla bez konca twierdzi cos, czego nie da sie sprawdzic, a ten
+   ekran ma zasade "zero wymyslonych danych".
+
+   DLACZEGO PRZEJAZD JEST `linear`, A BLYSK NIE. Przejazd to ruch ciagly po
+   torze - easing zamienilby go w szarpanie. Blysk rozliczenia jest ZDARZENIEM
+   (cos wlasnie doszlo), wiec dostaje --ease-out-strong: mocno na starcie,
+   wyhamowanie na koncu.
+
+   Animowane sa wylacznie `transform` i `opacity`, wiec calosc idzie po stronie
+   kompozytora - zadnego przeliczania ukladu przy 60 klatkach na sekunde.
+   =========================================================================== */
+
+/* Dlugosc przewodu = promien kola wezlow. Trzymana jako zmienna, bo korzystaja
+   z niej i szerokosc przewodu, i droga monety - musza byc tej samej dlugosci
+   co do piksela, inaczej moneta startuje obok znaku sieci.
+
+   --coin-in: gdzie moneta KONCZY bieg. Nie w srodku sceny, tylko tuz PO
+   WEJSCIU POD tarcze znaku marki: promien tarczy minus promien monety minus
+   piksel zapasu. Patrz "JEDNO ZDARZENIE" nizej - to jest cala poprawka.
+
+   PROG 576px, NIE 640px. tailwind.config.ts:12 przestawia `sm` na 576px, wiec
+   przy tej szerokosci tarcza rosnie do 76px, znaki sieci do 30px, a kolo
+   prowadzace do 188px. Dlugosc przewodu jako jedyna czekala do 640px - przez
+   co w oknie 576-639px siedem znakow sieci wisialo 14px WEWNATRZ kola, na
+   ktorym mialy siedziec. To jedyne `min-width: 640px` w calym CSS tego repo
+   i bylo pomylka, nie decyzja. */
+.soft-settle-stage {
+  --rail-len: 80px;
+  --coin-in: 27px; /* tarcza r=33, moneta r=5 */
+  --beat: 1600ms; /* odstep miedzy przyjazdami */
+  --send-dur: 720ms; /* czas przejazdu jednej monety */
+}
+@media (min-width: 576px) {
+  .soft-settle-stage {
+    --rail-len: 94px;
+    --coin-in: 32px; /* tarcza r=38, moneta r=5 */
+  }
+}
+
+/* Prog `lg` z tailwind.config.ts (922px, nie 1024px). Ekran powitalny bierze
+   tu cala wysokosc pola pod nawigacja, wiec scena rosnie razem z nim - diagram
+   wielkosci znaczka w polu wysokim na caly ekran po prostu ginie.
+
+   TE DWIE LICZBY SA ZWIAZANE Z WYMIARAMI W SoftSignInHero.tsx i nie wolno
+   zmieniac ich osobno:
+     --rail-len = promien kola prowadzacego = 256px / 2
+     --coin-in  = promien tarczy (104px / 2) - promien monety (5px) - 1px luzu
+   Rozjechanie pierwszej wysadza monety obok znakow sieci, drugiej - zostawia
+   monete wystajaca spod tarczy w chwili, ktora ma znaczyc "rozliczone". */
+@media (min-width: 922px) {
+  .soft-settle-stage {
+    --rail-len: 128px;
+    --coin-in: 46px; /* tarcza r=52, moneta r=5 */
+  }
+}
+
+/* Ramie przewodu. Wysokosc 0 i transform-origin na lewej krawedzi, wiec obrot
+   odbywa sie dokladnie wokol srodka sceny. */
+.soft-wire {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--rail-len);
+  height: 0;
+  transform-origin: left center;
+}
+
+/* Sam przewod. Przerywany, bo to tor platnosci, a nie krawedz elementu -
+   ciagla linia czytalaby sie jak ramka ukladu. */
+.soft-wire-line {
+  position: absolute;
+  left: 0;
+  top: -1px;
+  width: 100%;
+  height: 0;
+  border-top: 1px dashed rgba(255, 255, 255, 0.3);
+}
+
+/* ===========================================================================
+   JEDNO ZDARZENIE: MONETA WJEZDZA POD ZNAK MARKI, OBWODKA BLYSKA W TEJ KLATCE
+   ===========================================================================
+   Tu byl prawdziwy blad, ukryty przez wlasny komentarz. Poprzednia wersja
+   twierdzila, ze "obwodka zapala sie w tej samej klatce, w ktorej moneta
+   wchodzi pod znak marki". Arytmetyka mowila co innego:
+
+     - moneta jechala do translateX(0), czyli do SRODKA sceny, a tarcza znaku
+       marki ma promien 33px i jest rysowana PO monecie - wiec moneta znikala
+       z oczu okolo 700 ms,
+     - blysk mial opoznienie 1120 ms.
+
+   Czterysta milisekund przerwy miedzy przyczyna a skutkiem. Oko nie laczy
+   dwoch rzeczy oddalonych o 0,4 sekundy w jedno zdarzenie, wiec zdanie
+   "pieniadz dociera i sie rozlicza" nie bylo wypowiadane. Byly wypowiadane
+   dwa osobne zdania, drugie do nikogo, bo bohater juz wyszedl z kadru.
+
+   Z czterech klatek kluczowych starego przejazdu TRZY renderowaly sie za
+   czyms: pop ze scale(0.5) do scale(1) przy 1,6% dzial sie pod znakiem sieci,
+   a zanik przezroczystosci na koncu - pod tarcza. Jedyne, co czlowiek kiedy-
+   kolwiek widzial, to liniowy translateX. Reszta byla praca wykonana w
+   ciemnosci.
+
+   TERAZ: moneta jedzie DO --coin-in, czyli tuz pod krawedz tarczy, i tam
+   zostaje. Zadnych klatek przezroczystosci - monete zaslaniaja PRAWDZIWE
+   OBIEKTY, ktore i tak stoja na jej drodze: znak sieci na starcie, tarcza
+   marki na mecie. To jest lepsze niz zanikanie, bo znaczy cos konkretnego:
+   platnosc wychodzi ze znaku lancucha i wchodzi pod znak MySphere.
+
+   Czas przejazdu i opoznienie blysku to teraz TA SAMA ZMIENNA (--send-dur).
+   Nie da sie ich rozjechac, nie zmieniajac obu naraz.
+
+   TEMPO BEZ ZMIAN: dawniej widoczne bylo 34px w 462 ms (74 px/s), teraz
+   widac cale 53px w 720 ms (74 px/s). Ten sam ruch, tylko w calosci widoczny -
+   udzial widocznego ruchu w takcie rosnie z 29% do 45%.
+   =========================================================================== */
+
+/* Moneta. Ujemne marginesy sadzaja ja na osi przewodu raz na zawsze, dzieki
+   czemu w klatkach zostaje sam translateX - bez mieszania z translate(-50%).
+
+   `opacity: 1` w stanie bazowym jest CELOWE, mimo ze przez wiekszosc czasu
+   monety nie widac. Chowaja ja obiekty, nie przezroczystosc. */
+.soft-wire-coin {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 999px;
+  background: rgb(var(--soft-accent));
+  box-shadow: 0 0 0 3px rgba(245, 167, 59, 0.22);
+  opacity: 1;
+  animation:
+    soft-wire-send var(--send-dur) linear var(--send-delay, 0ms) 1 both,
+    soft-wire-rest var(--dur-sheet) var(--ease-out-strong)
+      calc(var(--settle-count, 7) * var(--beat) - 160ms) 1 forwards;
+}
+
+@keyframes soft-wire-send {
+  from { transform: translateX(var(--rail-len)); }
+  to   { transform: translateX(var(--coin-in)); }
+}
+
+/* ===========================================================================
+   PRZEJAZD, NIE PETLA: KAZDY LANCUCH WYSYLA RAZ, POTEM OBRAZEK STOI
+   ===========================================================================
+   Bylo: osiem animacji `infinite`, w kolko, do konca zycia karty. Dwa powody,
+   zeby to skonczyc - oba wynikaja z tego pliku, nie z ogolnych zaleceń.
+
+   1. NIESKONCZONA PETLA TO ZMYSLONA LICZBA. Naglowek tego komponentu mowi
+      "ZERO WYMYSLONYCH DANYCH" i wyrzucilismy stad trzy fikcyjne posty
+      wlasnie dlatego, ze produkt obiecuje liczby sprawdzalne. Petla bez konca
+      twierdzi "2250 rozliczen na godzine, zawsze" - w aplikacji, ktora nie
+      pokazuje na tym ekranie ani jednej prawdziwej transakcji. Przejazd
+      twierdzi dokladnie tyle, ile jest prawda: TE lancuchy tu rozliczaja.
+
+   2. DLUGOSC BIERZE SIE Z DANYCH. Liczba taktow to dlugosc SOFT_NETWORKS -
+      ta sama tablica, ktora rysuje wezly. Dojdzie osmy lancuch, przejazd sam
+      sie wydluzy. Nigdzie nie ma wpisanej siodemki.
+
+   PRZY OKAZJI: stare ujemne opoznienia (-index * 1600ms) odtwarzaly liste
+   TYLEM (0, 6, 5, 4, 3, 2, 1) i przy skonczonej liczbie powtorzen w ogole by
+   nie zadzialaly - przewody 1-6 zaczynalyby PO swoim oknie ruchu i nigdy by
+   nie ruszyly. Dodatnie opoznienia naprawiaja jedno i drugie.
+
+   KLATKA KONCOWA JEST TA SAMA, CO PRZY OGRANICZONYM RUCHU: moneta na kazdym
+   przewodzie, obwodka przygaszona. Scena ma teraz dokladnie dwa stany - GRA
+   i STOI - a `prefers-reduced-motion` po prostu zaczyna od STOI. To mocniejsza
+   umowa niz "ograniczony ruch to przypadek szczegolny".
+
+   Klatka koncowa MUSI byc zlozona, a nie pusta. Gdyby monety znikaly, ktos,
+   kto wszedl w polowie przejazdu i odwrocil wzrok, zobaczylby martwy obrazek
+   i przeczytal to jako awarie. */
+@keyframes soft-wire-rest {
+  from { opacity: 0; transform: translateX(calc(var(--rail-len) * 0.55)); }
+  to   { opacity: 1; transform: translateX(calc(var(--rail-len) * 0.55)); }
+}
+
+/* Blysk rozliczenia. Opoznienie rowne czasowi przejazdu, okres rowny odstepowi
+   miedzy przyjazdami, liczba powtorzen rowna liczbie lancuchow - obwodka
+   zapala sie dokladnie tyle razy, ile monet dojedzie, i za kazdym razem w tej
+   samej klatce, w ktorej moneta wchodzi pod tarcze.
+
+   `forwards`, a NIE `both`: przy `both` wsteczne wypelnienie zapalaloby
+   obwodke na 0.9 juz w chwili 0 i trzymalo przez cale 720 ms, zanim
+   cokolwiek dojedzie - obwodka swiecilaby na pusto.
+
+   Szczyt przesuniety z 60% na 35%: blysk ma byc ZDARZENIEM, a rozciagniety na
+   960 ms przestawal nim byc. Skala konczy sie na 1.08 - wiecej robi z tego
+   falowanie, ktore przestaje znaczyc "rozliczone". */
+.soft-settle-ring {
+  opacity: 0;
+  animation:
+    soft-settle-flash var(--beat) var(--ease-out-strong) var(--send-dur)
+      var(--settle-count, 7) forwards,
+    soft-settle-rest var(--dur-sheet) var(--ease-out-strong)
+      calc(var(--settle-count, 7) * var(--beat) - 160ms) 1 forwards;
+}
+
+@keyframes soft-settle-flash {
+  0%   { opacity: 0.9; transform: translate(-50%, -50%) scale(1); }
+  35%  { opacity: 0; transform: translate(-50%, -50%) scale(1.08); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.08); }
+}
+
+@keyframes soft-settle-rest {
+  to { opacity: 0.45; }
+}
+
+/* Wejscie ekranu: scena, naglowek, zdanie i przyciski wchodza kaskada co 60 ms.
+   Odstep jest KROTKI celowo - dluzszy kaze czekac na przycisk, po ktory sie
+   przyszlo. Po ostatnim elemencie nie rusza sie juz nic poza rozliczeniem. */
+.soft-hero-rise {
+  opacity: 0;
+  transform: translateY(8px);
+  animation: soft-hero-rise-in 380ms var(--ease-out-strong) var(--rise-delay, 0ms) forwards;
+}
+
+@keyframes soft-hero-rise-in {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Komunikat pod przyciskami: "Signed in as 0x…" albo blad portfela.
+   To JEDYNY element tego ekranu, ktory nie mial zadnego ruchu - cala reszta
+   byla starannie ustawiona w czasie, a stan, ktory czlowiek czyta pod
+   stresem (anulowany passkey, odmowa portfela), po prostu wyskakiwal.
+
+   `@starting-style` zamiast `useEffect` z `mounted` - to jest wejscie
+   elementu, ktory dopiero co pojawil sie w drzewie, wiec nalezy do CSS,
+   a nie do stanu Reacta. Przegladarka bez wsparcia pokazuje komunikat od
+   razu, czyli dokladnie tak jak dzis - czyste ulepszenie stopniowe, bez
+   @supports.
+
+   PRZEJSCIE, a nie klatki kluczowe: komunikat potrafi zmienic sie w trakcie
+   (blad -> inny blad), a przejscia da sie przerwac i przekierowac w locie.
+
+   --dur-dropdown to 200ms i przy ograniczonym ruchu spada do 1ms samo
+   z siebie (patrz blok :root wyzej). To pierwsza rzecz w tym repo, ktora
+   naprawde korzysta z tamtego przelacznika. */
+.soft-note {
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity var(--dur-dropdown) var(--ease-out-strong),
+    transform var(--dur-dropdown) var(--ease-out-strong);
+}
+
+@starting-style {
+  .soft-note {
     opacity: 0;
+    transform: translateY(6px);
   }
-  50% {
+}
+
+/* Ograniczony ruch: zatrzymujemy WSZYSTKO, ale nic nie znika. Monety zostaja
+   zaparkowane na przewodach, obwodka rozliczenia zostaje widoczna, kaskada
+   wejscia oddaje gotowy uklad. Obrazek mowi to samo zdanie - tylko go nie
+   odgrywa. Gdyby monety znikaly, ekran stracilby swoja jedyna teze.
+
+   OD CZASU PRZEJSCIA NA SKONCZONY PRZEJAZD TO NIE JEST JUZ PRZYPADEK
+   SZCZEGOLNY. Wartosci ponizej sa CO DO PIKSELA tym samym, do czego
+   dochodza `soft-wire-rest` i `soft-settle-rest` po ostatnim przyjezdzie.
+   Scena ma dwa stany - GRA i STOI - a ten blok po prostu zaczyna od STOI.
+   Jesli kiedys zmieni sie klatka koncowa przejazdu, MUSI zmienic sie i tutaj:
+   inaczej dwie grupy ludzi zobacza dwa rozne obrazki tego samego produktu. */
+@media (prefers-reduced-motion: reduce) {
+  .soft-wire-coin {
+    animation: none;
     opacity: 1;
+    transform: translateX(calc(var(--rail-len) * 0.55));
+  }
+  .soft-settle-ring {
+    animation: none;
+    opacity: 0.45;
+  }
+  .soft-hero-rise {
+    animation: none;
+    opacity: 1;
+    transform: none;
   }
 }
 
-/* Modal Connect Wallet z OnchainKit.
+/* ===========================================================================
+   RYNEK B20 - wejscie wiersza listy
+   ===========================================================================
+   Lista ma do 60 wierszy naraz i odswieza sie sama co 45 s. Kaskada jest wiec
+   KROTKA i skonczona: 18 ms odstepu, obcięta na dwunastym wierszu (patrz
+   B20Board.tsx). Dluzszy odstep zamienilby liste tokenow w pokaz i kazal
+   czekac na tresc, po ktora czlowiek przyszedl.
 
-   Poprzednia wersja tej reguly celowala w `div[role="dialog"]`, czyli w KAZDY
-   dialog w aplikacji, i nadpisywala !importantem pozycjonowanie oraz animacje
-   cudzych modali. Wlasciwy hak to data-testid="ockDialog" - OnchainKit stawia
-   go na DialogContent, czyli na tym samym elemencie co role="dialog"
-   (`ockModalOverlay` to element WEWNATRZ dialogu, nie jego rodzic).
-
-   OnchainKit 1.1.2 centruje ten dialog samodzielnie
-   (ock:fixed ock:top-[50%] ock:left-[50%] ock:translate-x/y-[-50%]), wiec
-   nadpisywanie position/top/left/transform jest tu zbedne i tylko walczyloby
-   z jego wlasnymi animacjami. Zostaja same ograniczenia rozmiaru, zeby modal
-   nie wychodzil poza ekran na malych viewportach. */
-div[role="dialog"][data-testid="ockDialog"] {
-  max-height: 90vh;
-  max-width: 90vw;
+   Ruch idzie WYLACZNIE po transform i opacity, wiec nie przelicza ukladu
+   szescdziesieciu wierszy naraz - a to jedyny powod, dla ktorego ta animacja
+   jest w ogole dopuszczalna przy takiej liczbie elementow. */
+.b20-row {
+  opacity: 0;
+  transform: translateY(4px);
+  animation: b20-row-in 180ms var(--ease-out-strong) forwards;
+}
+@keyframes b20-row-in {
+  to { opacity: 1; transform: translateY(0); }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .b20-row { opacity: 1; transform: none; animation: none; }
+}
+
+/* Cienka tasma zdarzen Launchpada: ruch jest staly, ale znika po najechaniu,
+   zeby mozna bylo spokojnie przeczytac pojedynczy zakup. */
+.launchpad-marquee {
+  animation: launchpad-marquee 34s linear infinite;
+}
+.launchpad-ticker:hover .launchpad-marquee,
+.launchpad-ticker:focus-within .launchpad-marquee {
+  animation-play-state: paused;
+}
+@keyframes launchpad-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-25%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .launchpad-marquee { animation: none; }
+}

@@ -1,6 +1,6 @@
 'use client';
 
-import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
+import { motion } from 'framer-motion';
 import React, { useState, useMemo } from 'react';
 import './GooeyNav.css';
 
@@ -10,7 +10,7 @@ export type GooeyNavItem = {
   onClick: () => void;
   isActive?: boolean;
   color?: string;
-  specialStyle?: 'base' | 'world' | 'celo' | 'camp' | 'linea' | 'ethereum';
+  specialStyle?: 'base' | 'world' | 'celo' | 'camp' | 'linea' | 'ethereum' | 'robinhood';
 };
 
 export type GooeyNavProps = {
@@ -64,20 +64,29 @@ export default function GooeyNav({ items, className = '' }: GooeyNavProps) {
         </defs>
       </svg>
       
-      <div className="flex items-center justify-center gap-2 overflow-x-auto lg:overflow-x-visible lg:grid lg:grid-cols-6 lg:gap-2 scrollbar-hide gooey-nav">
+      {/* grid-cols-7: siedem sieci w rzedzie (doszla Robinhood Chain) */}
+      <div className="flex items-center justify-center gap-2 overflow-x-auto lg:overflow-x-visible lg:grid lg:grid-cols-7 lg:gap-2 scrollbar-hide gooey-nav">
         {items.map((item, index) => {
+          // Gradient wypelnienia bierze sie z pozycji AKTYWNEJ (gradientFrom/To
+          // wyzej); per-pozycja potrzebny jest juz tylko kolor obramowania.
           const itemColor = item.color || '#3b82f6';
-          const itemRgb = hexToRgb(itemColor);
-          const itemLightenedRgb = lightenColor(itemRgb, 0.3);
-          const itemGradientFrom = `rgb(${itemRgb[0]}, ${itemRgb[1]}, ${itemRgb[2]})`;
-          const itemGradientTo = `rgb(${itemLightenedRgb[0]}, ${itemLightenedRgb[1]}, ${itemLightenedRgb[2]})`;
-          
+
           return (
             <motion.button
               key={index}
+              type="button"
               onClick={item.onClick}
               onHoverStart={() => setHoveredIndex(index)}
               onHoverEnd={() => setHoveredIndex(null)}
+              // Etykieta tekstowa nie renderuje sie WCALE (patrz nizej), wiec
+              // aria-label jest jedyna nazwa dostepna tego przycisku. Bez niego
+              // czytnik ekranu przeczytalby "przycisk" i nic wiecej.
+              aria-label={item.label}
+              // Natywny dymek dla myszy. Znaki sieci nie sa powszechnie
+              // rozpoznawalne - ktos musi miec jak sprawdzic, ktora to, bez
+              // klikania na probe.
+              title={item.label}
+              aria-pressed={!!item.isActive}
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.95 }}
               className={`
@@ -93,7 +102,7 @@ export default function GooeyNav({ items, className = '' }: GooeyNavProps) {
             >
               {/* Background for non-active items */}
               {!item.isActive && (
-                <div className="absolute inset-0 rounded-2xl bg-gray-100 dark:bg-gray-700" />
+                <div aria-hidden="true" className="absolute inset-0 rounded-2xl bg-soft-sunken" />
               )}
               
               {/* Icon */}
@@ -101,12 +110,16 @@ export default function GooeyNav({ items, className = '' }: GooeyNavProps) {
                 {item.icon}
               </div>
               
-              {/* Label */}
-              <span className={`relative z-10 hidden sm:inline ${
-                item.specialStyle === 'celo' && item.isActive ? 'text-black' : ''
-              }`}>
-                {item.label}
-              </span>
+              {/* ETYKIETY TEKSTOWEJ NIE MA - celowo.
+
+                  Selektor ma siedem sieci. Z podpisami ("Camp Network",
+                  "World Chain", "Robinhood"...) rzad rozciagal sie na cala
+                  szerokosc kompozytora, spychal pole tekstowe w dol i tak czy
+                  owak konczyl sie zawijaniem. Same znaki sieci mieszcza sie
+                  w jednym rzedzie na kazdej szerokosci ekranu.
+
+                  Nazwa NIE ginie: siedzi w aria-label (czytnik ekranu) oraz
+                  w title (dymek przy najechaniu myszy). */}
               
               {/* Active background with dynamic colors - fills entire button */}
               {item.isActive && (
@@ -119,7 +132,7 @@ export default function GooeyNav({ items, className = '' }: GooeyNavProps) {
                       ? 'bg-white border'
                       : item.specialStyle === 'camp' || item.specialStyle === 'celo'
                       ? 'border'
-                      : item.specialStyle === 'linea' || item.specialStyle === 'ethereum'
+                      : item.specialStyle === 'linea' || item.specialStyle === 'ethereum' || item.specialStyle === 'robinhood'
                       ? 'border'
                       : ''
                   }`}
@@ -136,8 +149,10 @@ export default function GooeyNav({ items, className = '' }: GooeyNavProps) {
                       ? '#7FFFD4' // jasno seledynowa
                       : item.specialStyle === 'ethereum'
                       ? '#ADD8E6' // bladoniebieska
+                      : item.specialStyle === 'robinhood'
+                      ? '#00C805' // firmowa zielen Robinhooda
                       : 'transparent',
-                    borderWidth: item.specialStyle === 'base' ? '2px' : item.specialStyle === 'world' || item.specialStyle === 'celo' || item.specialStyle === 'camp' || item.specialStyle === 'linea' || item.specialStyle === 'ethereum' ? '1px' : '0px',
+                    borderWidth: item.specialStyle === 'base' ? '2px' : item.specialStyle === 'world' || item.specialStyle === 'celo' || item.specialStyle === 'camp' || item.specialStyle === 'linea' || item.specialStyle === 'ethereum' || item.specialStyle === 'robinhood' ? '1px' : '0px',
                     zIndex: 0
                   }}
                 />
@@ -149,7 +164,7 @@ export default function GooeyNav({ items, className = '' }: GooeyNavProps) {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="absolute inset-0 rounded-2xl bg-gray-200 dark:bg-gray-600"
+                  className="absolute inset-0 rounded-2xl bg-soft-line"
                   style={{ 
                     zIndex: 0
                   }}

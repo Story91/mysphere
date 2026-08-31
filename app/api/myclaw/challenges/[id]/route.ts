@@ -1,5 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
+import { disciplineForLessonId } from "@/app/utils/myclaw/certificationExams";
+import { recordChallengeResult } from "@/app/utils/myclaw/progress";
+import {
+  MYCLAW_PRICES,
+  getRequestParam,
+  paymentInfo,
+  setRequestParams,
+  withMyClawPayment,
+} from "@/app/utils/myclaw/x402";
 
+const EVM_ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+/**
+ * Trasa chroniona przez x402 v2 (@x402/next `withX402`): $0.005 USDC za
+ * wywolanie, siec eip155:8453. Bledy 4xx nie sa rozliczane - settlement
+ * zachodzi dopiero po odpowiedzi ze statusem < 400.
+ */
 const CHALLENGES: Record<string, { question: string; options: string[]; correct: number }[]> = {
   "trading-101": [
     {
@@ -56,11 +75,9 @@ const CHALLENGES: Record<string, { question: string; options: string[]; correct:
   ],
 };
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  const challenge = CHALLENGES[params.id];
+async function handleChallenge(request: NextRequest): Promise<NextResponse> {
+  const id = getRequestParam(request, "id") ?? "";
+  const challenge = CHALLENGES[id];
 
   if (!challenge) {
     return NextResponse.json(
@@ -73,7 +90,7 @@ export async function POST(
     );
   }
 
-  let body: { answers?: number[] };
+  let body: { answers?: number[]; agentAddress?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -108,19 +125,54 @@ export async function POST(
   const total = results.length;
   const passed = score === total;
 
+  // Zapis wyniku do postepu agenta. Adres OPCJONALNY - bez niego wyzwanie
+  // dziala jak dotad. Dyscypline bierzemy z prefiksu id ("sec-101" -> security).
+  const agentAddress = typeof body.agentAddress === "string" ? body.agentAddress : null;
+  const discipline = disciplineForLessonId(id);
+  let progressRecorded = false;
+  let progressNote =
+    "Pass agentAddress in the body to record this challenge result in your certification progress.";
+
+  if (agentAddress && !EVM_ADDRESS_RE.test(agentAddress)) {
+    progressNote = "agentAddress was ignored - it is not a valid Ethereum address.";
+  } else if (agentAddress && !discipline) {
+    progressNote = `Challenge id "${id}" does not map to a certification discipline - progress was not recorded.`;
+  } else if (agentAddress && discipline) {
+    progressRecorded = await recordChallengeResult(agentAddress, discipline, {
+      challengeId: id,
+      attemptedAt: Date.now(),
+      score,
+      total,
+      passed,
+    });
+    progressNote = progressRecorded
+      ? `Result recorded for ${agentAddress.toLowerCase()} in discipline "${discipline}".`
+      : "Progress store write failed - the challenge was graded but the result was not recorded.";
+  }
+
   return NextResponse.json({
-    lessonId: params.id,
+    lessonId: id,
+    discipline,
     score,
     total,
     passed,
     results,
-    payment: {
-      protocol: "x402",
-      amount: "0.005",
-      currency: "USDC",
-      network: "base",
-      status: "preview",
-      note: "x402 payment will be enforced when middleware is enabled",
+    progress: {
+      agentAddress: agentAddress ?? null,
+      recorded: progressRecorded,
+      note: progressNote,
     },
+    payment: paymentInfo(MYCLAW_PRICES.challenge, `MyClaw challenge: ${id}`),
+    note: "Challenge results are persisted per agent in agentProgress and are reported back by /api/myclaw/certify. They are informational - passing a challenge is not a precondition for the certification exam.",
   });
+}
+
+const protectedChallenge = withMyClawPayment(handleChallenge, {
+  price: MYCLAW_PRICES.challenge,
+  description: "MyClaw Academy challenge grading",
+});
+
+export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+  setRequestParams(request, { id: params.id });
+  return protectedChallenge(request);
 }

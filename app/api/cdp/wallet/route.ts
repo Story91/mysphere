@@ -38,6 +38,9 @@ export async function POST(request: NextRequest) {
   try {
     const { type, enableSpendPermissions } = await request.json();
     const cdpClient = getCdpClient();
+    // Jedna wartosc dla SDK i dla odpowiedzi. Wczesniej byly to dwie rozne
+    // sciezki i odpowiedz potrafila deklarowac uprawnienia, ktorych nie wlaczono.
+    const wantsSpendPermissions = Boolean(enableSpendPermissions);
     // Trasa serwerowa - prefiks NEXT_PUBLIC_ nie jest tu potrzebny.
     // W env istnieje NETWORK_ID, dlatego sprawdzamy go jako pierwszy;
     // NEXT_PUBLIC_NETWORK_ID zostaje tylko jako zgodnosc wsteczna.
@@ -58,12 +61,23 @@ export async function POST(request: NextRequest) {
       const ownerAccount = await cdpClient.evm.createAccount();
       
       // Then create smart account
+      // DLACZEGO nie ma tu adresu fabryki: `CreateSmartAccountOptions`
+      // w @coinbase/cdp-sdk 1.38 NIE MA pola `factoryAddress` - ma
+      // `enableSpendPermissions: boolean`, a fabryke wlasciwa dla sieci
+      // wybiera samo SDK. Stalo tu wpisane recznie 0x0222ffA0...b5B0c1 z
+      // komentarzem "Base Sepolia address" i bylo zle na dwa sposoby naraz:
+      // adres mial zla sume kontrolna EIP-55 (viem `isAddress` go odrzuca,
+      // wiec nie zostal skopiowany z eksploratora tylko przepisany z bledem),
+      // a pod jego kanoniczna postacia nie ma bajtkodu ANI na Base Sepolia
+      // (84532), ANI na Base (8453) - sprawdzone eth_getCode przez
+      // scripts/verifyOnchainInventory.js. Nie da sie ustalic, jaki adres
+      // mial tam byc, ale nie trzeba: pole i tak szlo przez spread, wiec
+      // TypeScript go nie lapal, a SDK cicho je ignorowalo. Efekt byl taki,
+      // ze przy `enableSpendPermissions: true` uprawnien NIGDY nie wlaczano,
+      // a odpowiedz i tak zwracala `supportsSpendPermissions: true`.
       const smartAccount = await cdpClient.evm.createSmartAccount({
         owner: ownerAccount,
-        // Enable spend permissions if requested
-        ...(enableSpendPermissions && {
-          factoryAddress: '0x0222ffA046596B3Abf7818cCBfef1cb6b3b5B0c1', // Base Sepolia address
-        }),
+        enableSpendPermissions: wantsSpendPermissions,
       });
 
       return NextResponse.json({
@@ -71,7 +85,7 @@ export async function POST(request: NextRequest) {
         type: 'smart',
         address: smartAccount.address,
         ownerAddress: ownerAccount.address,
-        supportsSpendPermissions: enableSpendPermissions || false,
+        supportsSpendPermissions: wantsSpendPermissions,
       });
     } else {
       return NextResponse.json(

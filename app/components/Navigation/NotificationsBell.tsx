@@ -16,12 +16,26 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({
   onNotificationsClick
 }) => {
   const { address } = useAccount();
-  const { unreadCount, loading } = useNotifications(address || null);
+  // lazyList: dzwonek wisi w globalnej nawigacji na kazdej trasie, a pokazuje
+  // wylacznie kropke z liczba. Bez tej opcji kazde wejscie na kazda strone
+  // czytalo 20 pelnych dokumentow powiadomien, ktorych nikt tu nie ogladal -
+  // pelna lista mieszka na /basechat?view=notifications i laduje sie tam.
+  const { unreadCount, loading } = useNotifications(address || null, { lazyList: true });
   const [isAnimating, setIsAnimating] = useState(false);
+
+  /**
+   * `unreadCount === null` znaczy, ze licznika NIE ODCZYTANO.
+   *
+   * Wczesniej padniete zapytanie dawalo zero, czyli dokladnie to samo, co
+   * czysta skrzynka - dzwonek milczal i nic nie sugerowalo, ze cos poszlo nie
+   * tak. Teraz kropka nie klamie liczba, ale nazwa dostepna mowi wprost, ze
+   * liczba jest nieznana.
+   */
+  const hasUnread = unreadCount !== null && unreadCount > 0;
 
   // Animacja gdy pojawią się nowe powiadomienia
   useEffect(() => {
-    if (unreadCount > 0) {
+    if (unreadCount !== null && unreadCount > 0) {
       setIsAnimating(true);
       const timer = setTimeout(() => setIsAnimating(false), 1000);
       return () => clearTimeout(timer);
@@ -31,22 +45,36 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({
   // Nie pokazuj dzwoneczka jeśli user nie jest zalogowany
   if (!address) return null;
 
+  // Reszta interfejsu jest po angielsku - tooltip i nazwa dostepna tez.
+  const label =
+    unreadCount === null
+      ? "Notifications, unread count couldn't be loaded"
+      : unreadCount > 0
+        ? `Notifications, ${unreadCount} unread`
+        : 'Notifications';
+
   return (
     <button
+      type="button"
       onClick={onNotificationsClick}
       className={`
-        relative p-2 rounded-xl transition-all duration-300 
-        text-gray-100 hover:text-white hover:bg-[#0052FF]/20
+        relative p-2 rounded-pill
+        transition-[background-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong
+        active:scale-[0.97] outline-none
+        focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface
+        hover:bg-soft-sunken
         ${isAnimating ? 'animate-bounce' : ''}
-        ${unreadCount > 0 ? 'text-blue-300' : 'text-gray-300'}
+        ${hasUnread ? 'text-soft-primary-deep' : 'text-soft-ink-muted hover:text-soft-ink'}
       `}
-      title={unreadCount > 0 ? `${unreadCount} nieprzeczytanych powiadomień` : 'Powiadomienia'}
+      title={label}
+      aria-label={label}
     >
       {/* Bell Icon (Ikonka dzwoneczka) */}
-      <svg 
-        className="w-6 h-6" 
-        fill="none" 
-        stroke="currentColor" 
+      <svg
+        aria-hidden="true"
+        className="w-6 h-6"
+        fill="none"
+        stroke="currentColor"
         viewBox="0 0 24 24"
       >
         <path 
@@ -58,15 +86,19 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({
       </svg>
 
       {/* Red Dot for Unread Notifications (Czerwona kropka dla nieprzeczytanych) */}
-      {unreadCount > 0 && (
-        <div className="absolute -top-1 -right-1 flex items-center justify-center">
-          {/* Pulsating background (Pulsujące tło) */}
-          <div className="absolute w-5 h-5 bg-red-500 rounded-full animate-ping opacity-75"></div>
-          
-          {/* Static red dot with count (Statyczna czerwona kropka z liczbą) */}
-          <div className="relative w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
-            <span className="text-white text-xs font-bold">
-              {unreadCount > 99 ? '99+' : unreadCount}
+      {hasUnread && (
+        // Liczba jest juz w nazwie dostepnej przycisku - powtorzona w drzewie
+        // dostepnosci czytalaby sie dwa razy.
+        <div aria-hidden="true" className="absolute -top-1 -right-1 flex items-center justify-center">
+          {/* Pulsating background (Pulsujące tło) - jasny pomarancz akcentu,
+              zeby pulsowanie bylo widac na bialej belce. */}
+          <div className="absolute w-5 h-5 bg-soft-accent rounded-full animate-ping opacity-75"></div>
+
+          {/* Statyczna kropka z liczba. Czerwien 500 na bieli miala 4.0:1 pod
+              bialym napisem; accent-deep ma 5.9:1 i nalezy do palety. */}
+          <div className="relative w-5 h-5 bg-soft-accent-deep rounded-full flex items-center justify-center">
+            <span className="text-white text-xs font-bold font-soft-display">
+              {unreadCount !== null && unreadCount > 99 ? '99+' : unreadCount}
             </span>
           </div>
         </div>
@@ -74,8 +106,8 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({
 
       {/* Loading indicator (Wskaźnik ładowania) */}
       {loading && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="w-3 h-3 border-2 border-blue-300 border-t-transparent rounded-full animate-spin"></div>
+        <div aria-hidden="true" className="absolute inset-0 flex items-center justify-center">
+          <div className="w-3 h-3 border-2 border-soft-primary border-t-transparent rounded-full animate-spin"></div>
         </div>
       )}
     </button>

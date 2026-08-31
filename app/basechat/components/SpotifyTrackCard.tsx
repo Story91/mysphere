@@ -88,7 +88,7 @@ export default function SpotifyTrackCard({
       }}
     >
       {/* Blurred Background Overlay */}
-      <div className={`absolute inset-0 rounded-lg backdrop-blur-md ${
+      <div className={`absolute inset-0 rounded-lg ${
         track?.album?.images?.[0]?.url 
           ? 'bg-black/40' 
           : 'bg-gradient-to-br from-green-900/30 to-emerald-800/30'
@@ -130,7 +130,7 @@ export default function SpotifyTrackCard({
                   className={`absolute inset-0 flex items-center justify-center rounded transition-opacity duration-200 disabled:opacity-50 ${
                     isPlaying && currentTrackUrl === track.preview_url 
                       ? 'bg-black/30 opacity-100' 
-                      : 'bg-black/50 backdrop-blur-sm opacity-0 group-hover:opacity-100'
+                      : 'bg-black/50 opacity-0 group-hover:opacity-100'
                   }`}
                   title={isPlaying && currentTrackUrl === track.preview_url ? 'Pause' : 'Play 30s preview'}
                 >
@@ -151,10 +151,10 @@ export default function SpotifyTrackCard({
               {/* No Preview Indicator */}
               {!track?.preview_url && showAudioPlayer && (
                 <div 
-                  className="absolute inset-0 flex items-center justify-center bg-gray-900/50 rounded transition-opacity duration-200 opacity-0 group-hover:opacity-100"
+                  className="absolute inset-0 flex items-center justify-center bg-soft-ink/50 rounded transition-opacity duration-200 opacity-0 group-hover:opacity-100"
                   title="No preview available for this track"
                 >
-                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 text-soft-ink-faint" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636" />
                   </svg>
                 </div>
@@ -182,7 +182,7 @@ export default function SpotifyTrackCard({
             )}
 
             {/* Artist & Album */}
-            <div className={`text-gray-300 ${isCompact ? 'text-xs' : 'text-xs'} truncate`}>
+            <div className={`text-soft-ink-faint ${isCompact ? 'text-xs' : 'text-xs'} truncate`}>
               {track?.artists?.map((artist, idx) => (
                 <span key={idx}>
                   {artist?.external_urls?.spotify ? (
@@ -227,7 +227,7 @@ export default function SpotifyTrackCard({
                     </svg>
                     <span className="text-yellow-400">
                       {track.popularity}/100 
-                      <span className="text-gray-400 ml-1">
+                      <span className="text-soft-ink-faint ml-1">
                         {track.popularity >= 70 ? 'Mainstream' : track.popularity >= 40 ? 'Popular' : 'Niche'}
                       </span>
                     </span>
@@ -242,7 +242,7 @@ export default function SpotifyTrackCard({
                     </svg>
                     <span className="text-blue-400">
                       {new Date(track.album.release_date).getFullYear()}
-                      <span className="text-gray-400 ml-1">
+                      <span className="text-soft-ink-faint ml-1">
                         {(() => {
                           const year = new Date(track.album.release_date).getFullYear();
                           const currentYear = new Date().getFullYear();

@@ -23,8 +23,56 @@ export const SESSION_COOKIE = 'mysphere_session';
 /** Nazwa cookie z jednorazowym nonce uzywanym w wiadomosci SIWE. */
 export const NONCE_COOKIE = 'mysphere_nonce';
 
-/** Czas zycia sesji w sekundach (7 dni). */
+/**
+ * Zywotnosc sesji: 7 dni, odnawiana przy aktywnosci (patrz shouldRollSession
+ * + GET /api/auth/session).
+ *
+ * BYLO 2 GODZINY I BYL TO BLAD PROJEKTOWY. Rozumowanie brzmialo: sesja jest
+ * BEZSTANOWA, wiec nie da sie jej uniewaznic zdalnie, a skradzione cookie
+ * dziala do konca TTL - im krocej, tym lepiej. Poprawne co do zasady, bledne
+ * co do proporcji. Skutek w praktyce: uzytkownik, ktory podpisal portfel rano,
+ * po poludniu dostawal to samo pytanie od nowa. Prosba o podpis pojawiajaca sie
+ * co dwie godziny uczy klikac "podpisz" bez czytania - czyli produkuje dokladnie
+ * ten nawyk, przed ktorym ta aplikacja ma chronic. Zaoszczedzilismy na ryzyku
+ * kradziezy cookie, placac gorsza moneta.
+ *
+ * Co ta sesja w ogole daje: potwierdzenie, ze adres nalezy do tej przegladarki.
+ * Otwiera odczyt kupionej tresci premium i przypisanie postow do autora.
+ * NIE porusza zadnych srodkow - kazda platnosc wymaga osobnego podpisu
+ * transakcji w portfelu. Skradzione cookie pozwala czytac cudza platna tresc,
+ * nie wydac cudzych pieniedzy. Przy tej stawce tydzien jest wlasciwa miara.
+ *
+ * Rollowanie sprawia, ze aktywny uzytkownik nie podpisuje sie ponownie NIGDY,
+ * a porzucona sesja wygasa w tydzien.
+ */
 export const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
+
+/**
+ * Sesje odnawiamy, gdy zuzyla juz polowe swojego zycia. Nie przy kazdym
+ * zadaniu - inaczej wysylalibysmy Set-Cookie bez przerwy.
+ */
+export const SESSION_ROLL_AFTER_SECONDS = SESSION_TTL_SECONDS / 2;
+
+/**
+ * Czy warto wystawic swiezy token dla tej sesji.
+ */
+export function shouldRollSession(session: SessionPayload, nowSeconds = Math.floor(Date.now() / 1000)): boolean {
+  return nowSeconds - session.issuedAt >= SESSION_ROLL_AFTER_SECONDS;
+}
+
+/**
+ * Nowy token dla juz zweryfikowanej sesji, z przesunietym oknem waznosci.
+ * Adres i chainId przenoszone bez zmian - rollowanie NIE jest ponownym
+ * uwierzytelnieniem, tylko przedluzeniem waznosci.
+ */
+export function rollSession(session: SessionPayload, nowSeconds = Math.floor(Date.now() / 1000)): string {
+  return createSession({
+    address: session.address,
+    chainId: session.chainId,
+    issuedAt: nowSeconds,
+    expiresAt: nowSeconds + SESSION_TTL_SECONDS,
+  });
+}
 
 /**
  * Zawartosc sesji. issuedAt / expiresAt sa w SEKUNDACH uniksowych,

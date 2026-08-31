@@ -1,9 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cleanupExpiredPaidPins } from '../../utils/firebase';
+import { cleanupExpiredPaidPins, ADMIN_ADDRESS } from '../../utils/firebase';
 
 /**
- * Cron job endpoint do automatycznego czyszczenia wygasłych paid pins
- * Uruchamiany co 5 minut przez Vercel Cron
+ * Czyszczenie wygaslych paid pins.
+ *
+ * === SPROSTOWANIE: TA TRASA NIE CHODZI CO 5 MINUT ===
+ * Stalo tu "Uruchamiany co 5 minut przez Vercel Cron". To bylo NIEPRAWDA od
+ * poczatku: w repozytorium nie bylo pliku vercel.json, wiec zaden harmonogram
+ * nie istnial i tej trasy NIKT NIGDY nie wolal. Wygasle przypiecia znikaly
+ * wylacznie przy recznym uruchomieniu przez admina (POST nizej).
+ *
+ * Sprawdzone przy dopisywaniu harmonogramu dla /api/curator-watch - to wtedy
+ * powstal pierwszy vercel.json w tym repozytorium.
+ *
+ * === DLACZEGO NIE DOPISALEM TU HARMONOGRAMU PRZY OKAZJI ===
+ * Dwa powody i oba sa decyzja wlasciciela, nie moja:
+ *   (a) Cykl pieciominutowy jest niedostepny na najnizszym planie Vercela,
+ *       ktory dopuszcza wylacznie harmonogramy dobowe. Wpisanie "*\/5 * * * *"
+ *       daloby blad wdrozenia, a nie dzialajace czyszczenie.
+ *   (b) Wlaczenie po raz pierwszy trasy, ktora od miesiecy nie chodzila, jest
+ *       zmiana zachowania produkcji - i nie ma prawa dziac sie przy okazji
+ *       zupelnie innego zadania. Ta trasa kasuje dane.
+ * Komentarz opisuje wiec stan faktyczny, zamiast opisywac zamiar sprzed roku.
+ *
+ * UWAGA na sprawdzanie sekretu nizej: jest WARUNKOWE (`if (cronSecret && ...)`),
+ * czyli przy nieustawionej zmiennej trasa wpuszcza kazdego. /api/curator-watch
+ * robi to odwrotnie - odmawia bez sekretu - bo tamta trasa zapisuje.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -57,8 +79,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { adminAddress } = body;
 
-    // Sprawdź czy użytkownik jest adminem
-    const ADMIN_ADDRESS = '0xF1fa20027b6202bc18e4454149C85CB01dC91Dfd'.toLowerCase();
+    // Sprawdź czy użytkownik jest adminem.
+    //
+    // ADMIN_ADDRESS importowany, a nie wpisany tu drugi raz na sztywno. Byla
+    // tu wlasna kopia tego samego adresu - czyli miejsce, ktore przy zmianie
+    // admina zostaloby po cichu przy starym wlascicielu, i to akurat w trasie
+    // API, gdzie nikt by tego nie zauwazyl. Stala z firebase.ts jest juz
+    // znormalizowana do malych liter.
     if (!adminAddress || adminAddress.toLowerCase() !== ADMIN_ADDRESS) {
       return NextResponse.json(
         { error: 'Only admins can trigger manual cleanup' },

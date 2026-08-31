@@ -1,16 +1,12 @@
-'use client';
-
+import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
-import { Space_Grotesk, Outfit } from 'next/font/google';
+import { Space_Grotesk, Outfit, Baloo_2, Nunito } from 'next/font/google';
 import './globals.css';
 import { Analytics } from '@vercel/analytics/react';
-import { SpeedInsights } from "@vercel/speed-insights/react"
-import { Toaster } from 'react-hot-toast';
-import { Providers } from './providers';
-import Navigation from './components/Navigation/Navigation';
-import { ThemeProvider } from './context/ThemeContext';
-import ClientOnly from './components/ClientOnly';
-import { usePathname } from 'next/navigation';
+import { SpeedInsights } from '@vercel/speed-insights/react';
+import AppShell from './components/AppShell';
+import { DEFAULT_LAUNCHPAD_CHAIN_ID } from './startpad/config';
+import { networkThemeCss, themeBootScript } from './startpad/networkTheme';
 
 // next/font hostuje fonty same-origin i wstrzykuje preload - zamiast
 // render-blokujacego @import z fonts.googleapis.com wewnatrz globals.css.
@@ -28,136 +24,234 @@ const headingFont = Outfit({
   variable: '--font-heading',
 });
 
+/**
+ * Kroje kierunku "Soft Social" (projekt wlasciciela, wariant 1b).
+ *
+ * Baloo 2 niesie naglowki i liczby - ma zaokraglone konce kresek i wysoka
+ * x-height, wiec kwota napisana nim czyta sie jak etykieta na produkcie,
+ * a nie jak dane w tabeli. Nunito jest tekstem: neutralny, ale nie zimny.
+ *
+ * Wczytujemy je przez next/font, a nie przez @import z fonts.googleapis.com -
+ * next/font hostuje pliki same-origin i wstrzykuje preload, wiec nie ma
+ * render-blokujacego zapytania do obcej domeny ani skoku typografii.
+ *
+ * Stare zmienne (--font-body / --font-heading) ZOSTAJA nietkniete: caly
+ * dotychczasowy interfejs stoi na nich i ma dzialac dalej bez zmian.
+ * Nowe kroje sa dostepne przez wlasne zmienne i wchodza tam, gdzie kierunek
+ * jest juz wdrozony.
+ */
+const softDisplayFont = Baloo_2({
+  subsets: ['latin'],
+  weight: ['500', '600', '700'],
+  display: 'swap',
+  variable: '--font-soft-display',
+});
+
+const softBodyFont = Nunito({
+  subsets: ['latin'],
+  weight: ['400', '600', '700', '800'],
+  display: 'swap',
+  variable: '--font-soft-body',
+});
+
+// Kanoniczny adres produkcyjny. Jedno miejsce, bo uzywaja go i metadane, i
+// embed miniappki, i musi sie zgadzac z domena podpisana w
+// public/.well-known/farcaster.json (accountAssociation -> domain).
+const APP_URL = 'https://mysphere.fun';
+
+// Miniapp embed. `fc:miniapp` to aktualny tag; `fc:frame` zostawiony dla
+// wstecznej zgodnosci ze starszymi klientami. W obu `version` musi byc
+// stringiem "1" - "next" jest przestarzale i klienci je odrzucaja.
+//
+// imageUrl wskazuje na app/miniapp-image/route.tsx, a NIE na karte OG.
+// Powod: embed miniappki wymaga proporcji 3:2, a karta OG ma 1200x630 (1.91:1);
+// klient przycinalby ja do kwadratowszego kadru i zjadal lewa krawedz, czyli
+// krecoslup i poczatki obu zdan. Wczesniej lezalo tu /SphereWhite.png, przez co
+// Base App i klienci Farcastera pokazywali statyczne logo zamiast karty.
+// Slash na koncu jest konieczny: projekt ma `trailingSlash: true`, wiec adres
+// bez niego dostaje 308 i nie kazdy klient podglądu za nim pojdzie.
 const MINIAPP_EMBED = JSON.stringify({
   version: '1',
-  imageUrl: 'https://mysphere.fun/SphereWhite.png',
+  imageUrl: `${APP_URL}/miniapp-image/`,
   button: {
-    title: 'Tip Creators',
+    // Limit Farcastera to 32 znaki; tu jest 22. Bez wiodacej spacji - klient
+    // nie przycina bialych znakow, wiec napis wjezdzalby na przycisku z wcieciem.
+    title: 'Ask. Answer. Get paid.',
     action: {
       type: 'launch_miniapp',
       name: 'MySphere',
-      url: 'https://mysphere.fun',
-      splashImageUrl: 'https://mysphere.fun/SPLASH.gif',
+      url: APP_URL,
+      splashImageUrl: `${APP_URL}/SPLASH.gif`,
       splashBackgroundColor: '#FFFFFF',
     },
   },
 });
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const pathname = usePathname();
-  const isHomepage = pathname === '/';
+/**
+ * === TYTUL I OPIS NIOSA TEZE, NIE KATEGORIE ===
+ * Stalo tu: "The onchain social Dapp on Base. Build, grow, and own your digital
+ * Sphere." - zdanie prawdziwe i zupelnie puste, bo pasuje do kazdego produktu
+ * spolecznosciowego z portfelem. Nie mowilo ani co tu sie robi, ani czym to
+ * miejsce rozni sie od pozostalych.
+ *
+ * Teza MySphere jest jedna: OSIA CZASU SA PIENIADZE, nie tresc. Opis mowi wiec
+ * dokladnie to i tylko to, co dziala DZIS: posty, napiwki w ETH i USDC na
+ * siedmiu sieciach oraz rynek Askow - budzet, zapieczetowane odpowiedzi,
+ * wyplata z hashem. Zadnej liczby uzytkownikow, zadnego czasu przyszlego.
+ *
+ * Liczba sieci wzieta z app/basechat/soft/SoftStoryRail.tsx (SOFT_NETWORKS):
+ * Base, Camp, Linea, Celo, Ethereum, World, Robinhood. SIEDEM. Jesli ta lista
+ * urosnie, to zdanie trzeba poprawic recznie - dlatego stoi tu ta notka.
+ *
+ * === DLACZEGO SLOWO "EVERY" PRZENIESLO SIE Z NAPIWKOW NA ASKI ===
+ * Stalo tu "every tip settles onchain with a hash anyone can open". To nie jest
+ * prawda: firestore.rules (blok tipow) mowi wprost, ze z 189 napiwkow hash ma
+ * 18 - reszta pochodzi ze sciezek, ktore go nie zapisuja, i /money pokazuje ten
+ * brak jako `withoutProof`. "Every" jest natomiast prawda O ASKACH, bo tam
+ * serwer odmawia przyjecia wyplaty bez hasha i sam sprawdza log Transfer na
+ * lancuchu (app/api/asks/[id]/accept/route.ts:84). Slowo stoi wiec teraz tam,
+ * gdzie da sie go bronic.
+ */
+const APP_DESCRIPTION =
+  'Post and tip in ETH or USDC across seven networks. Open an Ask with a budget, collect sealed answers, and pay the ones you pick - every Ask payout carries a transaction hash anyone can open.';
 
+/**
+ * Jeden tytul dla <title>, og:title i twitter:title.
+ *
+ * DLACZEGO NIE POWTARZA ZDAN Z KARTY. Karta obrazka niesie teraz zdarzenie
+ * ("An AI agent paid to ask...") i rynek Askow, a X pokazuje pod obrazkiem
+ * dokladnie jeden pasek tekstu - powtorzenie tych samych slow zmarnowaloby go
+ * w calosci. Na obrazku nie pada ani "social", ani "feed", ani "Base": to trzy
+ * rzeczy, ktore czlowiek musi wiedziec, zeby zrozumiec, na co patrzy, i one
+ * wlasnie sa tutaj. Obrazek i pasek skladaja sie na jedno zdanie.
+ *
+ * Poprzednik brzmial "MySphere - social on Base, scored by settled payments".
+ * Wymieniony razem z karta: mowil o mierzeniu pozycji platnosciami, czego nowy
+ * obrazek nie zapowiada ani slowem, wiec para przestala sie skladac.
+ *
+ * DLUGOSC MA ZNACZENIE: X urywa ten pasek w okolicach 70 znakow na pulpicie
+ * i wczesniej na telefonie. Ponizej jest 59 - nazwa i teza mieszcza sie przed
+ * kazdym mozliwym ucieciem.
+ */
+const SOCIAL_TITLE = 'MySphere - a social feed on Base where money is the timeline';
+
+/**
+ * Metadane generowane po stronie SERWERA.
+ *
+ * Wczesniej byly to surowe tagi <title>/<meta> w <head> klienckiego layoutu,
+ * czyli trafialy do dokumentu dopiero po hydracji - crawlery i podglady linkow
+ * (w tym embed miniappki Farcastera) widzialy pusty dokument.
+ */
+export const metadata: Metadata = {
+  // Bez metadataBase Next liczy adresy Open Graph wzgledem localhost i wypisuje
+  // ostrzezenie przy kazdym buildzie ("metadataBase property in metadata export
+  // is not set"), a podglady linkow dostaja wtedy wzgledne, nieklikalne URL-e.
+  metadataBase: new URL(APP_URL),
+  // `template` doklada marke do tytulow podstron, wiec podstrona pisze u siebie
+  // samo "Open asks", a nie "Open asks - MySphere". `default` obowiazuje tam,
+  // gdzie nikt tytulu nie ustawil - czyli m.in. na /basechat, ktore jest
+  // komponentem klienckim i wlasnych metadanych wyeksportowac nie moze.
+  title: {
+    default: SOCIAL_TITLE,
+    template: '%s · MySphere',
+  },
+  description: APP_DESCRIPTION,
+  manifest: '/manifest.json',
+  // Uwaga: to jest layout GLOWNY - kazde pole dziedzicza wszystkie podstrony,
+  // ktore go nie nadpisza. Dlatego nie ma tu ani `alternates.canonical`, ani
+  // `openGraph.url`: wpisane raz na gorze wskazywalyby strone glowna dla calego
+  // serwisu. Podstrona, ktora chce wlasny canonical/og:url, dodaje go u siebie.
+  openGraph: {
+    type: 'website',
+    siteName: 'MySphere',
+    title: SOCIAL_TITLE,
+    description: APP_DESCRIPTION,
+    // BRAK `images` JEST TU CELOWY - nie zapomnieniem.
+    // Obrazek podglądu daje plikowa konwencja: app/opengraph-image.tsx.
+    // Wpisana tutaj tablica `images` wygralaby z plikiem dla CALEGO serwisu,
+    // wiec generowana karta nigdy by sie nie pokazala - a trasy z wlasna karta
+    // (/leaderboard, /post, /tip, /u) straciłyby swoje. Poprzednio stalo tu
+    // /SphereWhite.png, czyli statyczne logo 15 kB przykrywalo wszystkie cztery.
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: SOCIAL_TITLE,
+    description: APP_DESCRIPTION,
+    // === DLACZEGO NIE MA TU `images` ANI PLIKU app/twitter-image.tsx ===
+    // Kuszace bylo dolozyc app/twitter-image.tsx dla pewnosci, ze `twitter:image`
+    // jest wypisane wprost. Napisane, ZMIERZONE W HTML-u i WYCOFANE: plik
+    // twitter-image w korzeniu dziedziczy KAZDA podstrona, a cztery trasy
+    // z wlasna karta maja tylko `opengraph-image`, nie `twitter-image`.
+    // Skutek byl taki, ze /leaderboard oddawalo `twitter:image` wskazujacy na
+    // karte strony glownej - ranking wrzucony na X pokazywalby teze produktu
+    // zamiast nazwisk i kwot. To samo spotkaloby paragony i profile.
+    //
+    // Bez tego pliku Next wyprowadza `twitter:image` z `opengraph-image` TEJ
+    // SAMEJ trasy, wiec kazda dostaje swoja wlasna karte. Zmierzone:
+    //   /            -> twitter:image = /opengraph-image
+    //   /leaderboard -> twitter:image = /leaderboard/opengraph-image
+    // Usuniecie `images: ['/SphereWhite.png']`, ktore stalo tu wczesniej, jest
+    // przy okazji NAPRAWA: statyczne logo przykrywalo dotad wszystkie cztery
+    // karty danych w podgladach na X.
+  },
+  icons: {
+    icon: [
+      { url: '/favicon_io (1)/favicon.ico', type: 'image/x-icon' },
+      { url: '/favicon_io (1)/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/favicon_io (1)/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+    ],
+    apple: [{ url: '/favicon_io (1)/apple-touch-icon.png', sizes: '180x180' }],
+  },
+  other: {
+    'fc:miniapp': MINIAPP_EMBED,
+    'fc:frame': MINIAPP_EMBED,
+  },
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: '#0052FF',
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pl" className={`${bodyFont.variable} ${headingFont.variable}`}>
-      <head>
-        {/* Usunięto skrypt reCAPTCHA - obciążał stronę */}
-        {/* <script src="https://www.google.com/recaptcha/enterprise.js?render=6LfNUMkqAAAAAKwvD-9Ow1vtA8aPwZFDSJ2nen47" /> */}
-        <title>MySphere.fun</title>
-        <meta name="description" content="The onchain social Dapp on Base. Your posts live onchain and stay yours." />
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-
-        {/* Link preview card. Swap the two image URLs to any file in /public/share
-            to change what X, Discord, Slack and iMessage show. All are 1200x630. */}
-        <meta property="og:type" content="website" />
-        <meta property="og:site_name" content="MySphere" />
-        <meta property="og:url" content="https://mysphere.fun" />
-        <meta property="og:title" content="MySphere - onchain social on Base" />
-        <meta property="og:description" content="The onchain social Dapp on Base. Your posts live onchain and stay yours." />
-        <meta property="og:image" content="https://mysphere.fun/share/share-no-admin.png" />
-        <meta property="og:image:width" content="1200" />
-        <meta property="og:image:height" content="630" />
-        <meta property="og:image:alt" content="Startpad contract surface: owner, pause, upgrade, blacklist and fee switch all listed as none." />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="MySphere - onchain social on Base" />
-        <meta name="twitter:description" content="The onchain social Dapp on Base. Your posts live onchain and stay yours." />
-        <meta name="twitter:image" content="https://mysphere.fun/share/share-no-admin.png" />
-        <meta name="twitter:image:alt" content="Startpad contract surface: owner, pause, upgrade, blacklist and fee switch all listed as none." />
-        
-        {/* Miniapp embed. `fc:miniapp` to aktualny tag; `fc:frame` zostawiony
-            dla wstecznej zgodnosci ze starszymi klientami. W obu `version` musi
-            byc stringiem "1" - "next" jest przestarzale i klienci je odrzucaja. */}
-        <meta name="fc:miniapp" content={MINIAPP_EMBED} />
-        <meta name="fc:frame" content={MINIAPP_EMBED} />
-        
-        <link rel="stylesheet" href="/vendor/onchainkit.css" />
-        <link rel="icon" type="image/x-icon" href="/favicon_io (1)/favicon.ico" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/favicon_io (1)/favicon-32x32.png" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/favicon_io (1)/favicon-16x16.png" />
-        <link rel="apple-touch-icon" sizes="180x180" href="/favicon_io (1)/apple-touch-icon.png" />
-        <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#0052FF" />
-      </head>
+    // lang="en": cala tresc interfejsu i metadanych jest po angielsku. Przy
+    // lang="pl" czytniki ekranu czytaly angielskie teksty polska fonetyka,
+    // a wyszukiwarki dostawaly zly jezyk strony.
+    <html
+      lang="en"
+      className={`${bodyFont.variable} ${headingFont.variable} ${softDisplayFont.variable} ${softBodyFont.variable}`}
+    >
       <body className="min-h-screen bg-white">
-        <ThemeProvider>
-          <Providers>
-              <ClientOnly fallback={
-                <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-white to-gray-50">
-                  <div className="relative">
-                    <div className="absolute -inset-6 rounded-full bg-blue-500/20 animate-pulse"></div>
-                    <div className="relative w-32 h-32 animate-spin">
-                      <img 
-                        src="/favicon_io (1)/apple-touch-icon.png" 
-                        alt="Loading" 
-                        className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]"
-                      />
-                    </div>
-                  </div>
-                </div>
-              }>
-                {!isHomepage && <Navigation />}
-                <main className="w-full">
-                  {children}
-                </main>
-              </ClientOnly>
-              
-              {/* Toast Notifications */}
-              <Toaster
-                position="top-right"
-                toastOptions={{
-                  duration: 4000,
-                  style: {
-                    background: '#1f2937',
-                    color: '#f9fafb',
-                    border: '1px solid #374151',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                  },
-                  success: {
-                    style: {
-                      background: '#10b981',
-                      color: '#ffffff',
-                    },
-                  },
-                  error: {
-                    style: {
-                      background: '#ef4444',
-                      color: '#ffffff',
-                    },
-                  },
-                  loading: {
-                    style: {
-                      background: '#3b82f6',
-                      color: '#ffffff',
-                    },
-                  },
-                }}
-              />
-              
-              <Analytics />
-              <SpeedInsights />
-              <Script
-                id="adsbygoogle"
-                async
-                src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3796065666088205"
-                crossOrigin="anonymous"
-                strategy="lazyOnload"
-              />
-            </Providers>
-        </ThemeProvider>
+        {/* ===== MOTYW SIECI STARTPADA =====
+            Dwa elementy, oba MUSZA stac przed trescia.
+
+            Styl niesie palety wszystkich sieci, ktore je maja (dzis jedna,
+            Robinhood). Jest nieaktywny, dopoki na <html> nie pojawi sie
+            `data-net-theme` - poza startpadem nie robi zatem nic.
+
+            Skrypt ustawia ten atrybut PRZED pierwszym malowaniem. Musi byc
+            wpisany wprost i synchronicznie: wybor sieci zyje w localStorage,
+            wiec serwer renderuje zawsze siec domyslna i kazde inne rozwiazanie
+            (efekt, provider, next/script) pokazaloby najpierw biala strone,
+            a dopiero potem czarna. Uzasadnienie calosci: startpad/networkTheme.ts. */}
+        <style dangerouslySetInnerHTML={{ __html: networkThemeCss() }} />
+        <script dangerouslySetInnerHTML={{ __html: themeBootScript(DEFAULT_LAUNCHPAD_CHAIN_ID) }} />
+
+        <AppShell>{children}</AppShell>
+
+        <Analytics />
+        <SpeedInsights />
+        <Script
+          id="adsbygoogle"
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3796065666088205"
+          crossOrigin="anonymous"
+          strategy="lazyOnload"
+        />
       </body>
     </html>
   );

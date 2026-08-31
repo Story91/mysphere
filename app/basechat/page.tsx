@@ -1,62 +1,46 @@
-// @ts-nocheck
 'use client';
 
-import { useState, useRef, useEffect, useCallback, PropsWithChildren, useMemo } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo, Suspense } from 'react';
 import dynamic from 'next/dynamic';
-import { useAccount, useSendTransaction, usePublicClient, useWalletClient, useChainId } from 'wagmi';
+import PremiumComposer, { EMPTY_PREMIUM, type PremiumComposerValue } from '../components/monetization/PremiumComposer';
+// @ts-ignore - config CommonJS wspoldzielony z next.config.js
+import { isRouteDisabled } from '@/config/routeStatus';
+import { useAccount, usePublicClient, useWalletClient, useChainId } from 'wagmi';
+import { useSiweAuth } from '../utils/auth/useSiweAuth';
 import { base, baseSepolia } from 'wagmi/chains';
-import { Identity, Name, Address, Avatar, IdentityCard, useName } from '@coinbase/onchainkit/identity';
-import { ConnectWallet } from '@coinbase/onchainkit/wallet';
-import { parseEther } from 'viem';
+// Warstwa tozsamosci na wagmi/viem - zamiennik @coinbase/onchainkit/identity
+import { Avatar, useName } from '../components/identity';
+// Zawezone do tego, co ta strona faktycznie wola. Wypadly importy po skasowanych
+// martwych handlerach (addComment, toggleLike, toggleCommentLike, editComment,
+// deleteComment, addCommentReply, deletePost) oraz takie, ktorych nikt tu nigdy
+// nie uzyl: updateUserName, getBulkUserNamesOptimized, getCachedActiveUsers,
+// clearPaginatedActiveUsersCache, getPaginatedActiveUsersCacheInfo,
+// getGlobalStats, refreshTop50UsersOnly, pinPost, unpinPost, isUserAdmin.
 import {
-  saveUserProfile, 
-  createPost, 
-  addComment, 
-  toggleLike,
-  toggleCommentLike,
+  saveUserProfile,
+  createPost,
   fetchPosts,
   fetchBaseNameFeedPosts, // Import nowej funkcji
   fetchUserProfile,
-  deletePost,
   db,
-  updateUserName,
-  getBulkUserNamesOptimized,
   getBulkUserNamesVisibleOnly,
   getUserNamesCacheStats,
   saveProfileName,
   getProfileName,
-  editComment,
-  deleteComment,
-  addCommentReply,
   ADMIN_ADDRESS,
-  getCachedActiveUsers,
   getTopActiveUsersPaginated, // 🚀 NOWA FUNKCJA PAGINOWANA
-  clearPaginatedActiveUsersCache,
-  getPaginatedActiveUsersCacheInfo,
-  // searchUsers,  // DISABLED
-  getGlobalStats,
-  refreshTop50UsersOnly,
-  // searchUsersUltraFast,  // DISABLED
-  // getCachedFullUsers,  // DISABLED
-  // preloadUserSearchCache,  // DISABLED
-  pinPost,
-  unpinPost,
-  isUserAdmin,
   clearUserNamesCache
 } from '../utils/firebase';
-import { useSocial } from './friendsystem/hooks';
-import { doc, updateDoc, serverTimestamp, getDoc, setDoc, query, where, Timestamp, orderBy, increment } from 'firebase/firestore';
-import { Post, Comment, UserProfile, Stats } from '../types';
-import { calculateRanking, UserRank, RANK_DESCRIPTIONS, BADGES } from '../utils/ranking';
-import { collection, getDocs, addDoc } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp, getDoc, setDoc, increment } from 'firebase/firestore';
+import { Post, Stats } from '../types';
+import { UserRank } from '../utils/ranking';
 import Script from 'next/script';
-import { put } from '@vercel/blob';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import BanMessage from '../admin/components/BanMessage';
 import { useBanStatus } from '../hooks/useBanStatus';
-const ReferralLeaderboard = dynamic(() => import('../utils/referrals/components/ReferralLeaderboard'), { ssr: false });
-import LinkPreview from './components/LinkPreview';
+// ReferralLeaderboard wylaczony w kolumnie bocznej (decyzja wlasciciela) -
+// import wroci razem z kafelkiem.
 import BuilderProfile from './components/BuilderProfile';
 const FollowingView = dynamic(() => import('./friendsystem/FollowingView'), { ssr: false });
 const FriendsView = dynamic(() => import('./friendsystem/FriendsView'), { ssr: false });
@@ -66,38 +50,62 @@ const NotificationsView = dynamic(() => import('./friendsystem/NotificationsView
 
 import { RefreshCw } from 'lucide-react';
 import TransactionButton from '../components/TransactionButton';
-import CommentTransactionButton from '../components/CommentTransactionButton';
 import { toast } from 'react-hot-toast';
-const YapsMetrics = dynamic(() => import('../yapscan/components/YapsMetrics'), { ssr: false });
-import { useAIGenerator } from './hooks/useAIGenerator';
-const AIPostGenerator = dynamic(() => import('./components/AIPostGenerator'), { ssr: false });
-import AIButton from './components/AIButton';
+// YapsMetrics (YapScan) wylaczony w kolumnie bocznej (decyzja wlasciciela) -
+// import wroci razem z kafelkiem.
 
 
 import PostList, { ExtendedPost } from './components/PostList';
-import ProfileCard from './components/ProfileCard';
 import PinnedPosts from './components/PinnedPosts';
-import { HomeIcon, UserIcon, ChartBarIcon, ChevronDownIcon, ChevronUpIcon, MagnifyingGlassIcon } from '@heroicons/react/24/solid';
+import LinkPreview from './components/LinkPreview';
+import LaunchTokenModal from '../startpad/LaunchTokenModal';
+import { LAUNCHPAD_CHAIN, type LaunchpadToken } from '../startpad/config';
+import { buildShareUrl } from '../startpad/shareText';
+import { suggestCoinFromPost } from './coinFromPost';
+import FeedAskRail, { ASKS_RAIL_CACHE_KEY } from './components/FeedAskRail';
+// Zakladanie Aska Z FEEDU. Kompozytor i karta sa te same, ktore stoja na
+// /asks - drugi formularz dotykajacy pieniedzy bylby drugim miejscem, w
+// ktorym trzeba naprawiac ten sam blad. Sciezka approve -> fund -> kwit ->
+// Firestore siedzi w `useCreateAsk` i tez jest wspolna.
+import AskComposer, { type AskDraft } from './components/AskComposer';
+import AskCard from './components/AskCard';
+import { useCreateAsk } from '../utils/asks/useCreateAsk';
+import { loadListedVaults } from '../utils/asks/listedVaults';
+import type { Ask } from '../utils/asks/types';
+// Bars3Icon jako MenuIcon: dolna zakladka otwiera liste przejsc, nie profil,
+// wiec sylwetka czlowieka byla tam obietnica innego ekranu.
+import { HomeIcon, Bars3Icon as MenuIcon, ChartBarIcon } from '@heroicons/react/24/solid';
 import { LayoutGrid, UserCircle, Rss, Eye, Users, Compass } from 'lucide-react';
-import GlassIcons from '../components/GlassIcons/GlassIcons';
+// GlassIcons juz tu nie wchodzi - nawigacja desktopu idzie przez
+// SoftSectionList (patrz komentarz przy liscie w kolumnie bocznej).
+// Sam komponent zostaje w repo nietkniety.
 import GooeyNav from '../components/GooeyNav/GooeyNav';
+import SoftFeedMobile from './soft/SoftFeedMobile';
+import { NameWithSuffix } from '../utils/nameSuffix';
+import { getGlobalStats, likesTotal, likesNote, likesDetail } from '../utils/stats/globalStats';
+import Link from 'next/link';
+import SoftSectionList from './soft/SoftSectionList';
+import SoftTabs from './soft/SoftTabs';
+import SoftTrendsPanel from './soft/SoftTrendsPanel';
 const MusicSelector = dynamic(() => import('./components/MusicSelector'), { ssr: false });
 import SpotifyTrackCard from './components/SpotifyTrackCard';
 // Import Zora SDK functions
 // Import Viem types
-import { Address as ViemAddress, Hex } from 'viem';
+import { Address as ViemAddress } from 'viem';
 const CreatePostBaseCamp = dynamic(() => import('./components/BaseCampPosts/CreatePostBaseCamp'), { ssr: false });
 import ClaimPortalBanner from './components/BaseCampPosts/ClaimPortalBanner';
 const CreatePostLinea = dynamic(() => import('./Linea/components/CreatePostLinea'), { ssr: false });
 const CreatePostCelo = dynamic(() => import('./Celo/components/CreatePostCelo'), { ssr: false });
 const CreatePostEthereum = dynamic(() => import('./ETH/components/CreatePostEthereum'), { ssr: false });
 const CreatePostWorldChain = dynamic(() => import('./World/components/CreatePostWorldChain'), { ssr: false });
+const CreatePostRobinhood = dynamic(() => import('./Robinhood/components/CreatePostRobinhood'), { ssr: false });
 import MockFeed from './prelogin/MockFeed';
 import { BASECAMP_CHAIN_ID } from '../contracts/BaseCampPostContract';
 import { LINEA_CHAIN_ID } from './Linea/config/LineaNetworkConfig';
 import { CELO_CHAIN_ID } from './Celo/config/CeloNetworkConfig';
 import { ETHEREUM_CHAIN_ID } from './ETH/config/EthereumNetworkConfig';
 import { WORLD_CHAIN_ID } from './World/config/WorldChainNetworkConfig';
+import { ROBINHOOD_CHAIN_ID } from './Robinhood/config/RobinhoodNetworkConfig';
 
 // Add global type declaration for CoinGecko widget
 declare global {
@@ -137,15 +145,9 @@ interface ActiveUser {
   lastActive: number;
 }
 
-const BASESCAN_API_KEY = 'YB9ZQ71MVDJU3CQQXFJ6GQ4Y17MPKEQCBN';
-// 🚨 USUNIĘTO: REFRESH_INTERVAL - już nie jest potrzebne bo usunęliśmy funkcję fetchData
-
-// Usuwamy animację gradientu która obciąża przeglądarkę
-const gradientAnimation = `
-  .static-gradient {
-    background-size: 200% 200%;
-  }
-`;
+// Usuniete jako martwe: BASESCAN_API_KEY (klucz wpisany na sztywno, ladowal do
+// publicznego bundle'a, a zadne zapytanie go nie uzywalo - fetchData skasowano
+// wczesniej) oraz `gradientAnimation` (string CSS, ktorego nikt nie wstrzykiwal).
 
 // Zaktualizuj funkcję sprawdzającą czy nazwa to BaseName
 const isBaseName = (name: string) => {
@@ -190,36 +192,9 @@ const toEthereumAddress = (address: string): EthereumAddress => {
   return address as `0x${string}`;
 };
 
-// Komponent odznaki BaseName
-const BaseNameBadge = () => (
-  <span className="inline-flex items-center px-2 py-0.5 ml-2 text-xs font-medium rounded-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white">
-    <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-      <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-    </svg>
-    BaseName
-  </span>
-);
-
-// Helper function to upload metadata JSON (replace with actual implementation)
-async function uploadMetadataJson(metadata: object): Promise<string> {
-  // Example: Upload to Vercel Blob or IPFS
-  console.log("Uploading metadata:", metadata);
-  // Use fetch to call an API route or directly upload to IPFS/Blob
-  const response = await fetch('/api/upload-metadata', { // Assuming an API route exists
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ metadata }),
-  });
-  if (!response.ok) {
-    throw new Error('Failed to upload metadata');
-  }
-  const data = await response.json();
-  if (!data.uri) {
-    throw new Error('Metadata URI not returned from upload');
-  }
-  console.log("Metadata URI:", data.uri);
-  return data.uri; // Should be like "ipfs://<hash>" or "https://<...>/metadata.json"
-}
+// Usuniete jako martwe: komponent BaseNameBadge (nigdzie nierenderowany) oraz
+// uploadMetadataJson() - helper strzelajacy do nieistniejacej trasy
+// /api/upload-metadata. Metadane Zory wysyla /api/upload w handleCreatePost.
 
 // 🚀 POSTS CACHE FUNCTIONS - localStorage cache z 5-minutowym TTL
 const POSTS_CACHE_DURATION = 5 * 60 * 1000; // 5 minut w ms
@@ -271,7 +246,135 @@ const clearPostsCache = () => {
   }
 };
 
-export default function BaseChat() {
+/**
+ * Dopisuje SWIEZO UTWORZONY post na gore kazdej zapisanej listy.
+ *
+ * PROBLEM, KTORY TO ROZWIAZUJE. Cache postow jest kluczowany per zakladka
+ * (`posts_forYou_<adres>`, `posts_all`, ...) i zyje 5 minut. Sciezka publikacji
+ * dopisywala post optymistycznie do stanu Reacta, ale NIE do cache'u - wiec po
+ * przejsciu na inna zakladke i powrocie widok odtwarzal sie z zapisanej listy
+ * SPRZED posta. Uzytkownik widzial wtedy, ze post zniknal. Odwrotnie tez:
+ * przelaczenie na zakladke, ktorej cache akurat wygasl, pokazywalo post - stad
+ * "musialem przeklikac na swoj feed i wrocic".
+ *
+ * DLACZEGO DOPISUJEMY, A NIE KASUJEMY. Kasowanie calego cache'u (clearPostsCache)
+ * dziala, ale kaze potem pobrac WSZYSTKIE listy od nowa - czyli placimy pelnym
+ * przeladowaniem feedu za jeden post, ktorego tresc i tak mamy juz w pamieci.
+ * Przy Firestore, ktory liczy za kazdy odczyt dokumentu, to jest czysta strata.
+ * Dopisanie kosztuje zero odczytow i daje ten sam efekt.
+ *
+ * Znacznik czasu cache'u zostaje NIETKNIETY: dopisanie posta nie jest powodem,
+ * zeby przedluzyc waznosc reszty listy.
+ */
+const prependPostToCache = (post: ExtendedPost) => {
+  try {
+    Object.keys(localStorage)
+      .filter((key) => key.startsWith('posts_') && !key.endsWith('_timestamp'))
+      .forEach((key) => {
+        const raw = localStorage.getItem(key);
+        if (!raw) return;
+
+        try {
+          const cached = JSON.parse(raw);
+          if (!Array.isArray(cached)) return;
+
+          // Idempotencja: ta sama funkcja bywa wolana po optymistycznym
+          // dopisaniu i ponownie po potwierdzeniu z Firestore.
+          if (cached.some((entry: ExtendedPost) => entry?.id === post.id)) return;
+
+          localStorage.setItem(key, JSON.stringify([post, ...cached]));
+        } catch {
+          // Uszkodzony wpis kasujemy - lepiej pobrac na nowo niz czytac smiec.
+          localStorage.removeItem(key);
+          localStorage.removeItem(`${key}_timestamp`);
+        }
+      });
+  } catch (error) {
+    console.error('Error prepending post to cache:', error);
+  }
+};
+
+/**
+ * Nanosi zmiane na JEDEN post we wszystkich zapisanych listach.
+ *
+ * PO CO. Polubienie zmienia stan w pamieci, ale po przejsciu na inna zakladke
+ * i powrocie widok odtwarza sie z localStorage - czyli serduszko wracaloby do
+ * poprzedniego stanu, mimo ze zapis w Firestore sie powiodl. Alternatywa
+ * byloby skasowanie cache'u i ponowne pobranie CALEJ listy, czyli placenie
+ * odczytem calego feedu za jedno klikniecie.
+ *
+ * Ta funkcja kosztuje ZERO odczytow: post jest juz w pamieci, wiec nanosimy na
+ * niego dokladnie te zmiane, ktora zobaczyl uzytkownik.
+ *
+ * Znacznik waznosci cache'u zostaje nietkniety - polubienie nie jest powodem,
+ * zeby przedluzac waznosc reszty listy.
+ */
+const patchPostInCache = (postId: string, patch: (post: ExtendedPost) => ExtendedPost) => {
+  try {
+    Object.keys(localStorage)
+      .filter((key) => key.startsWith('posts_') && !key.endsWith('_timestamp'))
+      .forEach((key) => {
+        const raw = localStorage.getItem(key);
+        if (!raw) return;
+        try {
+          const cached = JSON.parse(raw);
+          if (!Array.isArray(cached)) return;
+          if (!cached.some((entry: ExtendedPost) => entry?.id === postId)) return;
+          localStorage.setItem(
+            key,
+            JSON.stringify(
+              cached.map((entry: ExtendedPost) => (entry?.id === postId ? patch(entry) : entry))
+            )
+          );
+        } catch {
+          localStorage.removeItem(key);
+          localStorage.removeItem(`${key}_timestamp`);
+        }
+      });
+  } catch (error) {
+    console.error('Error patching post in cache:', error);
+  }
+};
+
+/**
+ * Podmienia tymczasowe ID posta na prawdziwe, gdy Firestore je odda.
+ *
+ * Bez tego w cache zostawalby wpis z ID "temp-...", ktory po odswiezeniu
+ * strony wygladalby jak istniejacy post, ale kazde klikniecie w niego
+ * prowadzilo by do nieistniejacej trasy /post/temp-...
+ */
+const replacePostIdInCache = (tempId: string, realId: string) => {
+  try {
+    Object.keys(localStorage)
+      .filter((key) => key.startsWith('posts_') && !key.endsWith('_timestamp'))
+      .forEach((key) => {
+        const raw = localStorage.getItem(key);
+        if (!raw) return;
+
+        try {
+          const cached = JSON.parse(raw);
+          if (!Array.isArray(cached)) return;
+          if (!cached.some((entry: ExtendedPost) => entry?.id === tempId)) return;
+
+          localStorage.setItem(
+            key,
+            JSON.stringify(
+              cached.map((entry: ExtendedPost) =>
+                entry?.id === tempId ? { ...entry, id: realId } : entry
+              )
+            )
+          );
+        } catch {
+          localStorage.removeItem(key);
+          localStorage.removeItem(`${key}_timestamp`);
+        }
+      });
+  } catch (error) {
+    console.error('Error replacing post id in cache:', error);
+  }
+};
+
+function BaseChatContent() {
   const [isMounted, setIsMounted] = useState(false);
   const [activeMobilePanel, setActiveMobilePanel] = useState<'left' | 'main' | 'right'>('main');
   const [activeMainPanel, setActiveMainPanel] = useState<'feed' | 'builders' | 'following' | 'friends' | 'discover' | 'notifications'>('feed');
@@ -311,24 +414,7 @@ export default function BaseChat() {
   } | null>(null);
   
   // Network filter state - renamed to activePostingNetwork to reflect its new purpose
-  const [activePostingNetwork, setActivePostingNetwork] = useState<'base' | 'basecamp' | 'optimism' | 'ethereum' | 'arbitrum' | 'monad' | 'linea' | 'celo' | 'worldchain'>('base');
-  
-  // AI Generator Hook
-  const aiGenerator = useAIGenerator();
-
-  // Update newPost when AI generates content for Base network.
-  // Deps musza byc surowym stanem - `getGeneratedContent('base')` w tablicy zaleznosci
-  // to wywolanie funkcji przy kazdym renderze, a `aiGenerator` to swiezy obiekt,
-  // wiec efekt odpalal sie w kolko.
-  const aiBaseContent = aiGenerator.aiGeneratedContentForBase;
-  useEffect(() => {
-    const baseContent = aiGenerator.getGeneratedContent('base');
-    if (baseContent && activePostingNetwork === 'base') {
-      setNewPost(baseContent);
-      aiGenerator.clearGeneratedContent('base');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aiBaseContent, activePostingNetwork]);
+  const [activePostingNetwork, setActivePostingNetwork] = useState<'base' | 'basecamp' | 'optimism' | 'ethereum' | 'arbitrum' | 'monad' | 'linea' | 'celo' | 'worldchain' | 'robinhood'>('base');
   
   // Globalne deklaracje stanów modalu przeniesione na początek funkcji
   const [modalMessage, setModalMessage] = useState('');
@@ -337,6 +423,36 @@ export default function BaseChat() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [posts, setPosts] = useState<ExtendedPost[]>([]);
   const [newPost, setNewPost] = useState('');
+  // Platna czesc posta. Domyslnie wylaczona - wiekszosc postow nie jest platna.
+  const [premium, setPremium] = useState<PremiumComposerValue>(EMPTY_PREMIUM);
+  const [isPremiumOpen, setIsPremiumOpen] = useState(false);
+  /**
+   * Platna czesc, ktora NIE zostala zapieczetowana, mimo ze post juz istnieje.
+   *
+   * Post w tym stanie jest zwyklym, darmowym postem - i tak tez wyglada dla
+   * wszystkich, lacznie z autorem. Szkic trzymamy, zeby autor mogl dokonczyc
+   * jednym klknieciem zamiast pisac tekst od nowa.
+   */
+  const [pendingPremium, setPendingPremium] = useState<{
+    postId: string;
+    draft: PremiumComposerValue;
+    /** Czy brakuje wylacznie podpisu - wtedy ponowienie zaczyna od logowania. */
+    needsSignIn: boolean;
+    /** Zdanie dla autora: co dokladnie sie nie udalo. */
+    reason: string;
+  } | null>(null);
+  const [isRetryingPremium, setIsRetryingPremium] = useState(false);
+  /**
+   * Publikacja zatrzymana przed powstaniem posta, bo platna czesc wymaga
+   * podpisu, a podpisu nie bylo. Trzymane jako STAN, nie jako toast: toast
+   * znika po kilku sekundach, a czlowiek zostaje z wypelnionym kompozytorem
+   * i bez odpowiedzi na pytanie "dlaczego nic sie nie stalo".
+   *
+   * Dokladny powod (odmowa w portfelu vs. niedzialajace logowanie serwerowe)
+   * zna useSiweAuth, ale dopiero PO przerysowaniu - dlatego tekst skladamy
+   * przy renderze, a nie tuz po `await signIn()`.
+   */
+  const [blockedOnPremiumSignIn, setBlockedOnPremiumSignIn] = useState(false);
   // 🎵 Stany dla funkcjonalności muzyki
   const [selectedMusic, setSelectedMusic] = useState<any>(null);
   const [showMusicSelector, setShowMusicSelector] = useState(false);
@@ -347,7 +463,8 @@ export default function BaseChat() {
     duration: string;
     expectedAt: number;
   }}>({});
-  const [newComments, setNewComments] = useState<{[key: string]: string}>({});
+  // `newComments` (tresci pol komentarzy) zniknelo razem z handleAddComment -
+  // pola komentarzy renderuje i trzyma PostList.
   const [userProfile, setUserProfile] = useState<LocalUserProfile>({
     name: '',
     postCount: 0,
@@ -363,37 +480,72 @@ export default function BaseChat() {
     nftPoints: 0,
     contractPoints: 0
   });
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const postFileInputRef = useRef<HTMLInputElement>(null);
+  // fileInputRef / postFileInputRef byly tworzone, ale nie podpiete do zadnego
+  // <input> - wybor pliku idzie przez document.getElementById('fileInput').
   const { address, isConnected } = useAccount();
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
+  /**
+   * Sesja SIWE - potrzebna WYLACZNIE do platnej czesci posta. Zwykly post nie
+   * wymaga tu niczego i nie ma prawa niczego wymagac.
+   *
+   * `siweAddressRef`, bo o sesje pytamy w srodku funkcji asynchronicznych,
+   * ktore moga przezyc kilka renderow - odczyt ze zmiennej z domkniecia
+   * pokazalby stan sprzed podpisu.
+   */
+  const { address: siweAddress, signIn: siweSignIn, error: siweError } = useSiweAuth();
+  const siweAddressRef = useRef<string | null>(siweAddress);
+  siweAddressRef.current = siweAddress;
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [postPreviewImage, setPostPreviewImage] = useState<string | null>(null);
   const [postPreviewVideo, setPostPreviewVideo] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
-  const [trendingTags, setTrendingTags] = useState<{tag: string, count: number}[]>([]);
   const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([]);
-         const [totalUsers, setTotalUsers] = useState(175708);
-    const [totalLikes, setTotalLikes] = useState(18817);
-    const [totalPosts, setTotalPosts] = useState(239961);
-    const [totalComments, setTotalComments] = useState(10972);
+  /**
+   * Liczniki startuja z `null`, nie z liczba.
+   *
+   * Byly tu wartosci poczatkowe 175708 / 18817 / 239961 / 10972 - czyli
+   * wymyslone liczby POKAZYWANE, zanim cokolwiek sie wczytalo. Przy pustym
+   * odczycie zostawaly na ekranie i nikt nie mial jak odroznic "policzone" od
+   * "wpisane". `null` renderuje sie jako kreska i takiej pomylki nie da sie
+   * zrobic.
+   */
+  const [totalUsers, setTotalUsers] = useState<number | null>(null);
+  const [totalLikes, setTotalLikes] = useState<number | null>(null);
+  const [totalPosts, setTotalPosts] = useState<number | null>(null);
+  const [totalComments, setTotalComments] = useState<number | null>(null);
+  const [totalTips, setTotalTips] = useState<number | null>(null);
+  /**
+   * Zastrzezenie pod liczba lajkow, np. "at least" albo "since Aug 6" - albo
+   * `undefined`, gdy liczba jest calkowita.
+   *
+   * Lajki nie maja wlasnej kolekcji i nie da sie ich zsumowac agregacja, wiec
+   * dopoki nikt nie policzyl stanu poczatkowego serwerowo, mamy tylko przyrost
+   * od wlaczenia licznika. Ta linijka jest cena za pokazanie takiej liczby -
+   * bez niej czesc sumy udaje calosc.
+   */
+  const [likesNoteText, setLikesNoteText] = useState<string | undefined>(undefined);
+  /**
+   * To samo zastrzezenie, ale calym zdaniem - idzie do dymka nad liczba.
+   *
+   * Osobny stan od `likesNoteText`, bo krotki podpis ma sie zmiescic w kaflu
+   * o polowie szerokosci panelu, a powod, dla ktorego liczba jest niepelna,
+   * w dwa slowa sie nie miesci. Oba zdania buduje globalStats.ts - tylko ono
+   * wie, ktorego rodzaju jest ta niepelnosc.
+   */
+  const [likesDetailText, setLikesDetailText] = useState<string | undefined>(undefined);
+  /** Kiedy policzono liczby wyzej. 0 = nie wiadomo. */
+  const [statsMeasuredAt, setStatsMeasuredAt] = useState<number>(0);
   const [expandedUsersList, setExpandedUsersList] = useState(false);
-  const [expandedTagsList, setExpandedTagsList] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
   const [customName, setCustomName] = useState('');
   const [selectedSuffix, setSelectedSuffix] = useState<'sphere' | 'camper' | 'celo' | 'world'>('sphere');
   const [userNames, setUserNames] = useState<{[key: string]: {name: string, avatar?: string}}>({});
-  const [editingPost, setEditingPost] = useState<string | null>(null);
-  const [editedContent, setEditedContent] = useState('');
-  const [editingComment, setEditingComment] = useState<{postId: string, commentId: string} | null>(null);
-  const [editedCommentContent, setEditedCommentContent] = useState('');
-  const [replyingTo, setReplyingTo] = useState<{postId: string, commentId: string} | null>(null);
-  const [replyContent, setReplyContent] = useState('');
-  const [expandedComments, setExpandedComments] = useState<{[key: string]: boolean}>({});
-  const [showOnlyUserPosts, setShowOnlyUserPosts] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  // Stany edycji posta i komentarza, tresci odpowiedzi, rozwinietych komentarzy,
+  // `showOnlyUserPosts` oraz `searchTerm` obslugiwaly wylacznie skasowane wyzej
+  // handlery. Zaden z nich nie byl czytany w renderze tej strony - komentarze,
+  // edycja i wyszukiwanie maja wlasne stany w PostList.
   const [selectedTag, setSelectedTag] = useState('');
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
   const [selectedAuthor, setSelectedAuthor] = useState('');
@@ -409,9 +561,209 @@ export default function BaseChat() {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [showMyFeed, setShowMyFeed] = useState(false);
   const [activeFeed, setActiveFeed] = useState<'forYou' | 'following' | 'baseName'>('forYou'); // Dodajemy 'baseName'
-  
+  /**
+   * Filtr sieci dla paska "stories" na telefonie. `null` = wszystkie lancuchy
+   * i taki jest stan poczatkowy: gdyby domyslnie wybrany byl Base, feed po
+   * wejsciu ukrywalby posty z siedmiu pozostalych sieci bez informacji dlaczego.
+   */
+  const [mobileNetwork, setMobileNetwork] = useState<string | null>(null);
+
+  /**
+   * Lista podawana do PostList, przefiltrowana o wybrana siec.
+   *
+   * === DLACZEGO useMemo, A NIE FILTR W MIEJSCU UZYCIA ===
+   * Stalo to inline w propsach: `mobileNetwork ? posts.filter(...) : posts`.
+   * Przy WLACZONYM filtrze `.filter()` tworzy NOWA TABLICE przy kazdym
+   * renderze rodzica - nawet gdy ani `posts`, ani `mobileNetwork` sie nie
+   * zmienily. PostList jest opakowany w React.memo wlasnie po to, zeby feed
+   * nie przerysowywal sie przy kazdym nacisnieciu klawisza w kompozytorze,
+   * a nowa tozsamosc tablicy przebijala to memo za kazdym razem.
+   *
+   * Gorszy skutek byl widoczny golym okiem: PostList synchronizuje swoj stan
+   * wewnetrzny z tym propsem, wiec swieza tablica KASOWALA optymistyczna
+   * zmiane. Na telefonie z wybrana siecia serduszko potrafilo wrocic do
+   * poprzedniego stanu MIMO udanego zapisu do Firestore - wygladalo jak
+   * nieudany lajk, a zapis byl w porzadku.
+   *
+   * Na desktopie `mobileNetwork` jest zawsze `null`, wiec przechodzi tu ta
+   * sama referencja `posts` co dotad - zero zmiany zachowania.
+   */
+  const visiblePosts = useMemo(
+    () =>
+      mobileNetwork
+        ? posts.filter((p) => (p.network ?? 'base') === mobileNetwork)
+        : posts,
+    [posts, mobileNetwork]
+  );
+
+  /**
+   * Adresy, ktore ten uzytkownik OBSERWUJE.
+   *
+   * === CO BYLO ===
+   * Zakladka "Follows" przekazywala do fetchPosts `authorFilter: address`,
+   * czyli WLASNY adres - i pokazywala wlasne posty. Komentarz przy drugim
+   * wywolaniu sam sie do tego przyznawal ("Pobierz tylko posty uzytkownika").
+   * Etykieta mowila "Follows", tresc byla "moje", a caly graf obserwowanych
+   * nie mial na feed zadnego wplywu.
+   *
+   * `null` znaczy "jeszcze nie wiem", pusta tablica - "nikogo nie obserwuje".
+   * To dwa rozne stany i feed ma je rozroznic: przy `null` nie ma sensu
+   * pytac o posty, bo nie wiadomo czyje.
+   */
+  const [followingIds, setFollowingIds] = useState<string[] | null>(null);
+
+  // Lista obserwowanych wczytywana TYLKO wtedy, gdy zakladka jej potrzebuje.
+  // Bezwarunkowe pobieranie kosztowaloby odczyt u kazdego, kto nigdy nie
+  // zajrzy do "Follows".
+  useEffect(() => {
+    if (activeFeed !== 'following' || !address) return;
+    let anulowane = false;
+
+    (async () => {
+      try {
+        const { fetchFollowingIdSet } = await import('../utils/friends/follows');
+        const zbior = await fetchFollowingIdSet(address);
+        if (!anulowane) setFollowingIds(Array.from(zbior));
+      } catch (blad) {
+        console.error('[feed] Nie udalo sie wczytac obserwowanych:', blad);
+        // NIE ustawiamy pustej tablicy: pusta znaczy "nikogo nie obserwuje",
+        // a to zupelnie inne zdanie niz "nie udalo sie sprawdzic".
+        if (!anulowane) setFollowingIds(null);
+      }
+    })();
+
+    return () => {
+      anulowane = true;
+    };
+  }, [activeFeed, address]);
+
+  /**
+   * Czy na TELEFONIE rozwiniety jest kompozytor.
+   *
+   * Wczesniej telefon pokazywal naraz: pasek sieci na gorze, zwinieta pigulke
+   * "What's happening onchain?" z plusem, PONIZEJ drugi wybor sieci i PONIZEJ
+   * pelny kompozytor z tym samym napisem. Czyli dwa pytania "co slychac?" i
+   * dwa rzedy logotypow sieci na jednym ekranie, zanim pojawil sie pierwszy
+   * post.
+   *
+   * Te dwa wybory sieci NIE sa tym samym: pasek na gorze filtruje feed, a ten
+   * pod spodem decyduje, na ktory lancuch POLECI POST. Wygladaly jednak
+   * identycznie, wiec czytaly sie jak pomylka. Wybor lancucha docelowego
+   * nalezy do kompozytora i teraz jest w srodku - widoczny dopiero wtedy, gdy
+   * ktos faktycznie pisze.
+   *
+   * Rozwijamy TEN SAM, JEDYNY kompozytor - nie budujemy drugiego. Drugi
+   * formularz pisania postu bylby drugim miejscem, w ktorym trzeba naprawiac
+   * ten sam blad, a ten obsluguje siedem lancuchow, tresc premium, PostCoin,
+   * zalaczniki i muzyke.
+   *
+   * Na DESKTOPIE bez zmian - tam nie ma pigulki i kompozytor stoi otwarty.
+   */
+  const [mobileComposerOpen, setMobileComposerOpen] = useState(false);
+  /** Czy otwarty jest szybki kreator tokena (dawny przycisk PostCoin). */
+  const [quickLaunchOpen, setQuickLaunchOpen] = useState(false);
+
+  /**
+   * ===================================================================
+   * CO WLASNIE PISZESZ: POST CZY ASK
+   * ===================================================================
+   * Zgloszenie: "panel na glownym feedzie powinien miec przycisk do
+   * przelaczania pomiedzy Post i Postcoin czyli to co teraz jest a ASK".
+   *
+   * === DLACZEGO DWIE PIGULKI, A NIE TRZY ===
+   * Kusi ulozyc to jako "Post / PostCoin / Ask", ale wybor miedzy Postem
+   * a PostCoinem NIE JEST DZIS TRYBEM i nie wolno go w tryb zamienic.
+   * To sa DWA PRZYCISKI WYSYLKI pod jednym szkicem: piszesz raz, a na koncu
+   * decydujesz, czy to leci jako zwykly post (TransactionButton), czy jako
+   * PostCoin. Trzecia pigulka wymusilaby te decyzje PRZED napisaniem
+   * czegokolwiek i zabralaby mozliwosc zmiany zdania na koncu - czyli
+   * zepsulaby dzialajacy uklad, zeby doloczyc do niego czwarta rzecz.
+   *
+   * Ask stoi na innej osi: to inny PRZEDMIOT (pytanie z budzetem, miejscami
+   * i terminem), a nie inny sposob wyslania posta. Dlatego przelacznik ma
+   * dwa stany - "co robisz" - a wewnatrz trybu Post zostaje nietkniety wybor
+   * "jak to wysylasz". Przy okazji: dwie pigulki miesza sie na 360px obok
+   * istniejacych ikon, trzy juz nie.
+   *
+   * Domyslnie 'post'. `AskComposer` jest ciezki (budzet, miejsca, termin,
+   * escrow), wiec dopoki nikt go nie wybral, NIE JEST W OGOLE MONTOWANY -
+   * tak samo jak platna sekcja, ktora czeka zwinieta.
+   */
+  const [composerMode, setComposerMode] = useState<'post' | 'ask'>('post');
+
+  /**
+   * Aski zalozone W TEJ SESJI, z tego urzadzenia.
+   *
+   * Sa OSOBNO od pasa `FeedAskRail`, bo pas ma wlasny cache i wlasny odczyt,
+   * a ten, kto wlasnie zablokowal budzet, musi zobaczyc kwit NATYCHMIAST -
+   * nie za piec minut i nie po przejsciu na /asks. Ta lista niczego nie
+   * dociaga: kazde pole pochodzi z tego, co poszlo do zapisu.
+   */
+  const [asksCreatedHere, setAsksCreatedHere] = useState<Ask[]>([]);
+
+  /**
+   * Cala sciezka pieniedzy Aska: approve -> fund -> kwit -> dopiero Firestore.
+   * Kolejnosc i komunikaty stoja w `app/utils/asks/useCreateAsk.ts`.
+   */
+  const askFlow = useCreateAsk();
+
+  /**
+   * Ask zalozony z feedu.
+   *
+   * Rzucony blad wraca do `AskComposer`, ktory pokazuje go nad przyciskiem i
+   * NIE czysci formularza - dlatego tutaj nie ma zadnego catch. Czyszczenie
+   * pol robi kompozytor sam, dopiero po udanym zapisie.
+   */
+  const handleCreateAskFromFeed = useCallback(
+    async (draft: AskDraft) => {
+      const created = await askFlow.submit(draft);
+      setAsksCreatedHere((previous) => [created, ...previous]);
+
+      /**
+       * ===== PAS NAD FEEDEM MA SIE DOWIEDZIEC, ZE COS DOSZLO =====
+       * `FeedAskRail` trzyma odpowiedz w localStorage na piec minut. Bez
+       * uniewaznienia wpisu autor po zalozeniu Aska widzialby nad feedem
+       * liste SPRZED wlasnego Aska - i to przez caly ten czas wygladaloby
+       * jak nieudany zapis.
+       *
+       * Czyscimy WPIS, a nie przerysowujemy pasa. Wymuszony ponowny odczyt
+       * (remount przez `key`) kosztowalby dodatkowe zapytanie natychmiast po
+       * zapisie, pokazalby tego samego Aska DWA RAZY - raz w pasie, raz w
+       * kwicie ponizej - a przy nieudanym odczycie zamienilby potwierdzenie
+       * sukcesu w komunikat awarii. Pas i tak pobierze swieza liste przy
+       * najblizszym wejsciu na feed.
+       *
+       * Klucz jest IMPORTOWANY, nie przepisany. Przez chwile stal tu literal
+       * skopiowany z `FeedAskRail.tsx` - dwie kopie jednego napisu, ktore
+       * rozjezdzaja sie przy pierwszej zmianie nazwy, a rozjazd nie wywala
+       * buildu: uniewaznienie po prostu przestaje trafiac w cache i autor
+       * znowu widzi liste sprzed wlasnego Aska. Cichy blad, ktory wroci jako
+       * "zalozylem Aska i go nie ma".
+       *
+       * Znacznik czasu chodzi za kluczem (`${key}_timestamp`) - ta konwencja
+       * nalezy do pasa i jest w nim zapisana w readCachedAsks/writeCachedAsks.
+       *
+       * Uniewazniamy WYLACZNIE otwarte. Historia (`_resolved`) ma osobny wpis
+       * i zalozenie nowego Aska jej nie zmienia, wiec nie ma powodu kasowac
+       * odpowiedzi, za ktora ktos juz zaplacil odczytem.
+       */
+      try {
+        localStorage.removeItem(ASKS_RAIL_CACHE_KEY);
+        localStorage.removeItem(`${ASKS_RAIL_CACHE_KEY}_timestamp`);
+      } catch (error) {
+        // Brak dostepu do localStorage nie moze przewrocic zalozonego Aska -
+        // on juz istnieje, a to jest tylko sprzatanie cache'u.
+        console.error('[asks] Uniewaznienie cache pasa Askow nie powiodlo sie:', error);
+      }
+    },
+    // Sam `submit` jest stabilny miedzy renderami, a caly `askFlow` nie -
+    // to nowy obiekt przy kazdym przerysowaniu feedu, czyli useCallback bez
+    // zadnego efektu.
+    [askFlow.submit]
+  );
+
   // Hook do sprawdzania BaseName
-  const { data: baseName, isLoading: isBaseNameLoading } = useName(
+  const { data: baseName } = useName(
     { address: (address || '0x0000000000000000000000000000000000000000') as `0x${string}`, chain: base },
     { enabled: Boolean(address) }
   );
@@ -419,26 +771,111 @@ export default function BaseChat() {
   // Funkcja sprawdzająca czy użytkownik może tworzyć posty - dostępne dla wszystkich
   const canCreatePosts = true; // Zmieniono z Boolean(baseName) na true, aby wszyscy mogli tworzyć posty
 
-  // Sprawdzenie czy użytkownik ma BaseName (do wyróżnienia w UI)
-  const userHasBaseName = Boolean(baseName);
-
   // Dodaj nowy stan dla tooltipa
   const [hoveredUser, setHoveredUser] = useState<string | null>(null);
 
-  // Social features hook (Hook funkcji społecznościowych)
-  const socialFeatures = useSocial(address || null);
+  // useSocial() bylo tu wolane, ale wynik nie byl czytany ani razu. Hook przy
+  // kazdym wejsciu na strone robil siedem zapytan do Firestore (followers 50,
+  // following 50, friends 50, notifications 20 + trzy statystyki) i zakladal
+  // subskrypcje czasu rzeczywistego. Widoki, ktore tych danych faktycznie
+  // uzywaja - FollowingView, FriendsView, DiscoverView, NotificationsView,
+  // BuilderProfile - wolaja useSocial samodzielnie i sa ladowane leniwie.
 
   // URL params for navigation (Parametry URL do nawigacji)
   const searchParams = useSearchParams();
   const router = useRouter();
   const urlView = searchParams.get('view');
   const welcomeParam = searchParams.get('welcome');
+  /**
+   * Tresc wstawiona z zewnatrz - dzis wylacznie z sekcji B20 ("Share to feed"
+   * na stronie tokena i po jego utworzeniu).
+   *
+   * DLACZEGO PRZEZ ADRES, A NIE PRZEZ STAN: te dwie strony sa SERWEROWE
+   * i nie dziela stanu z feedem. Adres jest jedynym kanalem, ktory laczy
+   * dwie osobne trasy bez wciagania globalnego magazynu dla jednej rzeczy.
+   */
+  const shareParam = searchParams.get('share');
+  /**
+   * Gotowa tresc posta z innej trasy - dzis ze startpada (`composeParam` w
+   * app/startpad/shareText.ts).
+   *
+   * Osobny parametr obok `share`, bo tamten sklada zdanie TUTAJ i doklada link
+   * `mysphere.fun/b20/<adres>`. Dla tokena z krzywej startpada to zly adres:
+   * strona b20 czyta cene z GeckoTerminala, ktory tokena bez puli nie zna.
+   * Przy `compose` tresc powstaje po stronie startpada, raz, ta sama we
+   * wszystkich kanalach udostepniania.
+   */
+  const composeParamValue = searchParams.get('compose');
   const [userStats, setUserStats] = useState<{[key: string]: Stats & { totalPoints: number }}>({});
-  const [hoveredElement, setHoveredElement] = useState<string | null>(null);
+  // `hoveredElement` bylo ustawiane przy kazdym najechaniu na nazwe uzytkownika w
+  // feedzie, ale nikt tej wartosci nie czytal - podpowiedz "Click to view profile"
+  // robi CSS (group-hover). Efektem byl pelny re-render tej ~4000-liniowej strony
+  // na kazde wejscie i zejscie kursora z dowolnego nicku. Stan usuniety.
   const [showWelcomeMessage, setShowWelcomeMessage] = useState(false);
 
   const chainId = useChainId();
   
+  /**
+   * ===== TOKEN WRZUCONY NA FEED Z SEKCJI B20 =====
+   *
+   * Ktos tworzy token na /b20/create albo oglada go na /b20/[adres] i chce
+   * o nim powiedziec. Dotad musialby przepisac adres recznie - a adres B20 ma
+   * czterdziesci znakow i nikt tego nie robi. Przycisk "Share to feed" przynosi
+   * gotowa tresc tutaj.
+   *
+   * TRESC JEST SZKICEM, NIE WPISEM: ladue do pola, ktore czlowiek widzi i moze
+   * zmienic, a nie do gotowego posta. Nic nie zostaje wyslane bez jego reki.
+   *
+   * Nadpisujemy TYLKO puste pole. Kto zaczal juz cos pisac i trafil tu z linkiem,
+   * nie ma prawa stracic swojego tekstu - to ta sama zasada, ktora rzadzi
+   * zaczatkami Askow (znikaja, gdy tylko ktos zacznie pisac).
+   *
+   * Parametr znika z adresu po zuzyciu (`replace`, nie `push`), inaczej
+   * odswiezenie strony wstawialoby ten sam szkic drugi raz, a przycisk "wstecz"
+   * wracalby do stanu, ktorego juz nie ma.
+   */
+  const shareUsedRef = useRef(false);
+  useEffect(() => {
+    if (!shareParam || shareUsedRef.current) return;
+    shareUsedRef.current = true;
+
+    // Format: "SYMBOL|Nazwa|0xadres". Rozbijamy recznie, bo nazwa moze zawierac
+    // spacje i przecinki, a kreska pionowa w nazwie tokena sie nie zdarza.
+    const parts = shareParam.split('|');
+    const symbol = (parts[0] || '').trim();
+    const name = (parts[1] || '').trim();
+    const tokenAddress = (parts[2] || '').trim();
+
+    if (/^0x[0-9a-fA-F]{40}$/.test(tokenAddress)) {
+      const label = symbol ? `$${symbol}` : 'this token';
+      const title = name && symbol ? `${name} (${label})` : label;
+      setNewPost((current) =>
+        current.trim() === ''
+          ? `${title} is live on Base.\n\nmysphere.fun/b20/${tokenAddress.toLowerCase()}`
+          : current
+      );
+      setMobileComposerOpen(true);
+    }
+
+    router.replace('/basechat', { scroll: false });
+  }, [shareParam, router]);
+
+  // Tresc gotowa z innej trasy. Wstawiamy TYLKO do pustego pola - nadpisanie
+  // czyjegos niedokonczonego posta parametrem z adresu byloby kradzieza tekstu.
+  const composeUsedRef = useRef(false);
+  useEffect(() => {
+    if (!composeParamValue || composeUsedRef.current) return;
+    composeUsedRef.current = true;
+
+    const draft = composeParamValue.slice(0, 600);
+    if (draft.trim()) {
+      setNewPost((current) => (current.trim() === '' ? draft : current));
+      setMobileComposerOpen(true);
+    }
+
+    router.replace('/basechat', { scroll: false });
+  }, [composeParamValue, router]);
+
   // Obsługa komunikatu powitalnego dla użytkowników z linku referalowego
   useEffect(() => {
     if (welcomeParam === 'true' && address) {
@@ -502,40 +939,31 @@ export default function BaseChat() {
               <Avatar address={toEthereumAddress(userAddress)} className="w-10 h-10 rounded-full mr-2" />
             )
           )}
-          <div 
+          {/* Klikalny div, a nie <button>, bo w srodku siedzi pozycjonowana
+              podpowiedz - <div> w <button> to niepoprawne zagniezdzenie. Stad
+              rola, focus z klawiatury i obsluga Enter/Spacji, zeby profil dalo
+              sie otworzyc bez myszy. */}
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label={`View profile of ${userName}`}
             className="cursor-pointer group relative"
             onClick={() => handleViewBuilderProfile(userAddress)}
-            onMouseEnter={() => {
-              setHoveredElement(elementId);
-            }}
-            onMouseLeave={() => {
-              setHoveredElement(null);
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleViewBuilderProfile(userAddress);
+              }
             }}
           >
-            <span className={`${hasBaseName ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-transparent bg-clip-text font-bold' : 'text-gray-900 dark:text-white'} text-base`}>
-              {userName.endsWith('.sphere') ? (
-                <>
-                  <span className="text-gray-900 dark:text-white">{userName.replace('.sphere', '')}</span>
-                  <span className="text-blue-500">.sphere</span>
-                </>
-              ) : userName.endsWith('.camper') ? (
-                <>
-                  <span className="text-gray-900 dark:text-white">{userName.replace('.camper', '')}</span>
-                  <span className="text-orange-500">.camper🏕️</span>
-                </>
-              ) : userName.endsWith('.celo') ? (
-                <>
-                  <span className="text-gray-900 dark:text-white">{userName.replace('.celo', '')}</span>
-                  <span className="!text-yellow-500">.celo</span>
-                </>
-              ) : userName.endsWith('.world') ? (
-                <>
-                  <span className="text-gray-900 dark:text-white">{userName.replace('.world', '')}</span>
-                  <span className="text-green-500">.world</span>
-                </>
-              ) : (
-                userName
-              )}
+            <span className={`${hasBaseName ? 'username-gradient' : 'text-gray-900 dark:text-white'} text-base`}>
+              {/* Koncowka trzyma kolor swojej sieci. Bylo tu piec galezi
+                  `endsWith(...)` z kolorami wpisanymi recznie - w tym
+                  `!text-yellow-500` dla `.celo`, czyli zolty na bialym,
+                  praktycznie nieczytelny. Lista koncowek zyje teraz w
+                  app/utils/nameSuffix.tsx, wiec Trends i to miejsce nie
+                  moga sie juz rozjechac. */}
+              <NameWithSuffix name={userName} className="text-gray-900 dark:text-white" />
             </span>
             {/* Base logo removed as requested */}
             {/* Podpowiedź nad nazwą zamiast pod nią */}
@@ -598,20 +1026,20 @@ export default function BaseChat() {
         
         // Pokaż komunikat o bonusie punktów za wybraną domenę
         if (selectedSuffix === 'sphere') {
-          alert('🎉 Congratulations! You earned 1500 bonus points for choosing .sphere!');
+          alert('🎉 You earned 1500 bonus points for picking .sphere!');
         } else if (selectedSuffix === 'camper') {
-          alert('🎉 Congratulations! You earned 1000 bonus points for choosing .camper!');
+          alert('🎉 You earned 1000 bonus points for picking .camper!');
         } else if (selectedSuffix === 'celo') {
-          alert('🎉 Congratulations! You earned 1250 bonus points for choosing .celo!');
+          alert('🎉 You earned 1250 bonus points for picking .celo!');
         } else if (selectedSuffix === 'world') {
-          alert('🎉 Congratulations! You earned 1250 bonus points for choosing .world!');
+          alert('🎉 You earned 1250 bonus points for picking .world!');
         }
       } else {
-        alert('Wystąpił błąd podczas zapisywania nazwy. Spróbuj ponownie.');
+        toast.error('Could not save your name. Try again.');
       }
     } catch (error) {
       console.error('Error saving custom name:', error);
-      alert('Wystąpił błąd podczas zapisywania nazwy. Spróbuj ponownie.');
+      toast.error('Could not save your name. Try again.');
     }
   };
 
@@ -646,44 +1074,96 @@ export default function BaseChat() {
   // Dodaj nowy stan isLoadingPosts do głównego komponentu, niedaleko innych deklaracji stanów
   const [isLoadingPosts, setIsLoadingPosts] = useState(false);
 
+  /**
+   * ODCZYT PADL to NIE jest to samo, co "nie ma postow".
+   *
+   * Dotad `catch` konczyl sie na console.error: stan zostawal pusty,
+   * `isLoadingPosts` schodzilo do false i PostList pokazywal "No posts found".
+   * Awaria Firestore wygladala wiec dokladnie tak samo jak pusty feed - a to
+   * dwa rozne zdania i dwie rozne reakcje po drugiej stronie ekranu.
+   */
+  const [postsError, setPostsError] = useState<string | null>(null);
+  // Podbicie licznika odpala efekt ponizej jeszcze raz - to cale "Try again".
+  const [feedReloadNonce, setFeedReloadNonce] = useState(0);
+
   // Zmodyfikuj useEffect, który pobiera posty, aby obsługiwał stan ładowania
   useEffect(() => {
-    if (isConnected && address) {
-      const loadPosts = async () => {
-        try {
-          setIsLoadingPosts(true);
-          
-          const cacheKey = `${activeFeed}_${address}`;
-          
-          const cachedPosts = getCachedPosts(cacheKey);
-          if (cachedPosts) {
+    // CZYTANIE JEST DARMOWE.
+    //
+    // Stalo tu `if (!isConnected || !address) return;`, wiec niezalogowany
+    // gosc nie pobieral ANI JEDNEGO posta. Ta bramka niczego nie chronila:
+    // te same posty sa jawne pod /post/[id] i /u/[address] - komponenty
+    // serwerowe, publiczne, w sitemapie. Chowalismy przed gosciem tresc,
+    // ktora sami publikujemy gdzie indziej, i placilismy za to wyjsciem
+    // kazdego, kto trafil tu z linku.
+    //
+    // ZAPIS SIE NIE ZMIENIA: kompozytor stoi dalej za `isConnected`, a lajki,
+    // komentarze, tipy i przypinanie maja wlasne bramki w PostList.
+
+    // Straznik wyscigu: przelaczenie zakladki feedu albo zmiana portfela w trakcie
+    // pobierania konczyla sie tym, ze wolniejsza, JUZ NIEAKTUALNA odpowiedz
+    // wpisywala sie do stanu po tej wlasciwej - feed pokazywal posty z poprzednio
+    // wybranej zakladki.
+    let cancelled = false;
+
+    const loadPosts = async () => {
+      try {
+        setIsLoadingPosts(true);
+        setPostsError(null);
+
+        // Gosc ma WLASNY klucz cache'u zamiast `..._undefined`. Sama mechanika
+        // cache'u (TTL, zapis, czyszczenie) zostaje nietknieta - zmienia sie
+        // tylko to, jak powstaje klucz.
+        const cacheKey = `${activeFeed}_${address ?? 'guest'}`;
+
+        const cachedPosts = getCachedPosts(cacheKey);
+        if (cachedPosts) {
+          if (!cancelled) {
             setPosts(cachedPosts);
             setIsLoadingPosts(false);
-            return;
           }
+          return;
+        }
 
-          let fetchedResult;
-          if (activeFeed === 'baseName') {
-            fetchedResult = await fetchBaseNameFeedPosts({});
-          } else {
-            fetchedResult = await fetchPosts({ 
-              userId: address,
-              ...(activeFeed === 'following' ? { authorFilter: address } : {})
-            });
-          }
-          
-          setCachedPosts(cacheKey, fetchedResult.posts);
-          setPosts(fetchedResult.posts);
-          
-        } catch (error) {
-          console.error('Error fetching posts:', error);
-        } finally {
+        let fetchedResult;
+        if (activeFeed === 'baseName') {
+          fetchedResult = await fetchBaseNameFeedPosts({});
+        } else {
+          fetchedResult = await fetchPosts({
+            userId: address,
+            // Posty OBSERWOWANYCH, nie wlasne. `followingIds` null znaczy
+            // "jeszcze nie wiem" - wtedy nie zawezamy niczym, zamiast
+            // pokazywac cudzy albo wlasny feed pod ta etykieta.
+            ...(activeFeed === 'following' && followingIds?.length
+              ? { authorsIn: followingIds }
+              : {})
+          });
+        }
+
+        if (cancelled) return;
+
+        setCachedPosts(cacheKey, fetchedResult.posts);
+        setPosts(fetchedResult.posts);
+
+      } catch (error) {
+        console.error('Error fetching posts:', error);
+        if (!cancelled) {
+          // Zapisujemy fakt awarii, zeby nizej nie udawac pustego feedu.
+          setPostsError('feed-read-failed');
+        }
+      } finally {
+        if (!cancelled) {
           setIsLoadingPosts(false);
         }
-      };
-      loadPosts();
-    }
-  }, [isConnected, address, activeFeed]);
+      }
+    };
+
+    loadPosts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isConnected, address, activeFeed, feedReloadNonce]);
 
   // Handle URL params for navigation (Obsługa parametrów URL do nawigacji)
   useEffect(() => {
@@ -711,21 +1191,59 @@ export default function BaseChat() {
           const existingIds = new Set(currentPosts.map(p => p.id));
           const hasExistingIds = newPosts.some(p => existingIds.has(p.id));
           
-          if (hasExistingIds) {
+          const wynik = hasExistingIds
             // To jest optymistyczny update - całkowicie zastąp posty
-            return newPosts;
-          } else {
+            ? newPosts
             // To są nowe posty z infinite scroll - dodaj je do istniejących
-            const uniqueNewPosts = newPosts.filter(p => !existingIds.has(p.id));
-            return [...currentPosts, ...uniqueNewPosts];
+            : [...currentPosts, ...newPosts.filter(p => !existingIds.has(p.id))];
+
+          /**
+           * ZAPIS DO CACHE'U - BEZ TEGO KOMENTARZ ZNIKAL PO ODSWIEZENIU.
+           *
+           * === OBJAW ===
+           * "na feedzie lajki i komentarze nie zapisuja sie jak odswieze
+           * strone albo przejde gdzies indziej, odswiezaja sie odrazu jak
+           * przejde na my feed".
+           *
+           * === PRZYCZYNA ===
+           * Ta galaz aktualizowala WYLACZNIE stan Reacta. Do localStorage
+           * pisaly tylko sciezki pobierajace z Firestore (`setCachedPosts`
+           * po `fetchPosts`). Czyli: dodajesz komentarz, widzisz go, bo stan
+           * sie zmienil - odswiezasz strone, a `getCachedPosts` oddaje wpis
+           * SPRZED komentarza i komentarz "znika".
+           *
+           * Dane w Firestore byly przez caly czas poprawne - dlatego wejscie
+           * w "My Feed" pokazywalo je natychmiast: tamten widok ma inny klucz
+           * cache'a, wiec trafial w pustke i szedl po swieze dane.
+           *
+           * === DLACZEGO TU, A NIE W KAZDYM HANDLERZE ===
+           * Lajki laty juz `patchPostInCache`, ale komentarze, edycje i
+           * kasowanie ida wlasnie tedy. Zapis w JEDNYM miejscu obejmuje kazda
+           * optymistyczna zmiane naraz - i kazda przyszla, ktora ktos tu doda,
+           * nie pamietajac o cache'u.
+           *
+           * Piszemy tylko przy optymistycznym update (`hasExistingIds`).
+           * Doklejanie stron z infinite scrolla do cache'u rozdymaloby go
+           * bez granicy - a te posty i tak przyjda z Firestore przy nastepnym
+           * wejsciu.
+           */
+          if (hasExistingIds) {
+            setCachedPosts(`${activeFeed}_${address ?? 'guest'}`, wynik);
           }
+
+          return wynik;
         });
       } else {
         // ✅ OPTYMALIZACJA: Przypadek 2 - tylko gdy rzeczywiście potrzebujemy odświeżenia
         // Większość wywołań będzie używać optimistic update (newPosts)
         
         // 🎯 Unikalna kombinacja dla cache'a (adres + tryb)
-        const cacheKey = `${activeFeed}_${address}`;
+        // Ten sam ksztalt klucza co przy wczytywaniu (linia ~852). Bylo tu
+        // `${address}` bez zapasowej wartosci, wiec bez portfela wychodzil
+        // klucz `forYou_undefined`, podczas gdy wczytywanie pisalo do
+        // `forYou_guest`. Dwa klucze na te sama liste znaczyly, ze odswiezenie
+        // nigdy nie trafialo w to, co przed chwila zapisano.
+        const cacheKey = `${activeFeed}_${address ?? 'guest'}`;
         
         // 🚀 Sprawdź cache najpierw
         const cachedPosts = getCachedPosts(cacheKey);
@@ -737,7 +1255,9 @@ export default function BaseChat() {
           console.log(`🔥 Refresh fetching fresh posts from Firebase for: ${cacheKey}`);
         const { posts: refreshedPosts } = await fetchPosts({ 
             userId: address,
-            ...(activeFeed === 'following' ? { authorFilter: address } : {}) // Pobierz tylko posty użytkownika gdy showMyFeed=true
+            ...(activeFeed === 'following' && followingIds?.length
+              ? { authorsIn: followingIds }
+              : {})
         });
           
           // 💾 Zapisz do cache'a dla przyszłych użyć
@@ -752,10 +1272,336 @@ export default function BaseChat() {
     }
   }, [address, activeFeed]); // Dodano showMyFeed do dependencies
 
-  // Dodaj stan dla przechowywania hash transakcji i flagi blokującej wielokrotne tworzenie postów
-  const [storedTxHash, setStoredTxHash] = useState<string | null>(null);
+  // Flaga blokujaca wielokrotne tworzenie postow
   const [isCreatingPost, setIsCreatingPost] = useState(false);
-  
+
+  // ---------------------------------------------------------------------------
+  // Wspolne czesci sciezki tworzenia posta.
+  //
+  // Ponizsze cztery pomocnicze funkcje byly wczesniej wklejone osobno w kazdym
+  // z trzech handlerow tworzacych post (onchain, Zora, awaryjny zwykly post),
+  // a czesc premium az szesc razy. Roznice miedzy kopiami byly przypadkowe -
+  // np. sciezka awaryjna gubila zdjecie. Jedno zrodlo prawdy sprawia, ze
+  // dolozenie kolejnego wariantu nie oznacza kolejnej kopii.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * === PLATNA TRESC NIE IDZIE JUZ DO DOKUMENTU POSTA ===
+   *
+   * Ta funkcja zwracala `premiumContent` razem z cena, a wynik trafial prosto
+   * do `createPost`. Kolekcja `posts` jest CZYTELNA DLA WSZYSTKICH, wiec
+   * platna tresc lezala tam otwartym tekstem - wystarczylo otworzyc konsole
+   * przegladarki, zeby przeczytac ja bez placenia. Paywall byl zaslona na
+   * danych, ktore i tak sa jawne.
+   *
+   * Trasa, ktora robi to poprawnie, ISTNIALA PRZEZ CALY CZAS i nie miala ANI
+   * JEDNEGO WYWOLANIA: POST /api/premium zapisuje tresc do kolekcji
+   * `premiumContent` (reguly: `allow read, write: if false`, czyli klient nie
+   * ma tam wstepu wcale), a dopiero potem oznacza post jako platny i KASUJE
+   * jawne pole z dokumentu.
+   *
+   * Dlatego tutaj nie zostaje nic. Znacznik `hasPremium` i cene ustawia
+   * serwer - PO udanym zapisie tresci. Odwrotna kolejnosc dawalaby paywall
+   * nad pustka: cena jest, tresci nie ma.
+   *
+   * Zostawiam funkcje zamiast usuwac jej wywolania: trzy sciezki tworzenia
+   * posta rozjechalyby sie przy nastepnej zmianie, a tak dalej maja jeden
+   * wspolny punkt.
+   */
+  const buildPremiumWriteFields = () => ({});
+
+  /**
+   * Kopia platnej czesci na czas publikacji - albo `null`, gdy autor jej nie
+   * wypelnil.
+   *
+   * Snapshot, a nie odczyt `premium` w kazdym miejscu: pieczetowanie dzieje sie
+   * po transakcji i po zapisie do Firestore, czyli dlugo po tym, jak
+   * `resetComposer()` wyczyscil pole. Szkic ma przezyc te droge w calosci,
+   * takze na potrzeby ponowienia.
+   */
+  const takePremiumDraft = (): PremiumComposerValue | null =>
+    isPremiumOpen && premium.premiumContent.trim().length > 0
+      ? { ...premium, premiumContent: premium.premiumContent.trim() }
+      : null;
+
+  /**
+   * PODPIS PRZED PUBLIKACJA, NIE PO.
+   *
+   * === CO BYLO ZLE ===
+   * O braku sesji autor dowiadywal sie dopiero z nieudanego pieczetowania,
+   * czyli PO tym, jak post juz istnial (a na sciezce onchain - po zaplaceniu
+   * za transakcje). Zostawal wtedy z wpisem, ktory wygladal na platny
+   * wylacznie jemu, bo znacznik `hasPremium` istnial tylko w stanie Reacta.
+   *
+   * Teraz o podpis prosimy, dopoki nic jeszcze nie powstalo: odmowa nie
+   * zostawia po sobie zadnego sladu, a szkic czeka w kompozytorze.
+   *
+   * Post BEZ platnej czesci nie przechodzi tedy w ogole - zwykle pisanie nie
+   * ma prawa wymagac logowania.
+   *
+   * @returns czy wolno publikowac
+   */
+  const ensurePremiumSession = async (): Promise<boolean> => {
+    if (!takePremiumDraft()) return true;
+
+    setBlockedOnPremiumSignIn(false);
+    if (siweAddressRef.current) return true;
+
+    const toastId = toast.loading(
+      'One signature first - a paid post has to be provably yours. No gas, no transaction.'
+    );
+
+    let signedIn = false;
+    try {
+      signedIn = await siweSignIn();
+    } catch (error) {
+      console.error('[premium] logowanie SIWE przed publikacja nie powiodlo sie:', error);
+    } finally {
+      toast.dismiss(toastId);
+    }
+
+    // Nic nie powstalo - powod zostaje na ekranie przy kompozytorze, bo tam
+    // jest szkic i tam czlowiek patrzy.
+    if (!signedIn) setBlockedOnPremiumSignIn(true);
+
+    return signedIn;
+  };
+
+  /**
+   * Nanosi znacznik platnosci na post, ktory WLASNIE zostal zapieczetowany.
+   *
+   * Wczesniej te pola byly doklejane OPTYMISTYCZNIE, przed zapisem - i wlasnie
+   * stad brala sie glowna skarga: gdy pieczetowanie padalo, autor dalej widzial
+   * blok premium (stan Reacta plus cache w localStorage), a czytelnik widzial
+   * zwykly post. Znacznik pojawia sie teraz WYLACZNIE po potwierdzeniu z
+   * serwera, czyli dokladnie wtedy, gdy to samo zobaczy kazdy inny.
+   */
+  const markPostAsPremium = (postId: string, draft: PremiumComposerValue) => {
+    const apply = (post: ExtendedPost): ExtendedPost => ({
+      ...post,
+      hasPremium: true,
+      unlockPrice: draft.unlockPrice,
+      unlockToken: draft.unlockToken,
+    });
+
+    setPosts(currentPosts => currentPosts.map(post => (post.id === postId ? apply(post) : post)));
+    patchPostInCache(postId, apply);
+  };
+
+  /**
+   * Zapieczetowanie platnej tresci PO powstaniu posta.
+   *
+   * Kolejnosc jest wymuszona przez trase: sprawdza ona autorstwo po prawdziwym
+   * dokumencie, wiec post musi juz istniec. Sesja jest za to zalatwiona
+   * WCZESNIEJ (ensurePremiumSession), zeby ta funkcja nie byla pierwszym
+   * miejscem, w ktorym autor slyszy o podpisie.
+   *
+   * AWARIA NIE MOZE BYC CICHA ANI KOSMETYCZNA. Gdy zapis padnie, post zostaje
+   * zwyklym, darmowym postem - i tak tez wyglada dla autora. Szkic ladujemy do
+   * `pendingPremium`, zeby dalo sie dokonczyc jednym klknieciem.
+   *
+   * @returns czy platna czesc jest zapisana
+   */
+  const sealPremiumContent = async (
+    postId: string,
+    draft: PremiumComposerValue | null
+  ): Promise<boolean> => {
+    // Brak platnej czesci to nie jest porazka - nie ma czego pieczetowac.
+    if (!draft || !postId || postId.startsWith('temp-')) return true;
+
+    try {
+      const response = await fetch('/api/premium', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          postId,
+          content: draft.premiumContent,
+          unlockPrice: draft.unlockPrice,
+          unlockToken: draft.unlockToken,
+        }),
+      });
+
+      if (response.ok) {
+        markPostAsPremium(postId, draft);
+        setPendingPremium(null);
+        return true;
+      }
+
+      const data = await response.json().catch(() => ({}));
+      console.error('[premium] nie udalo sie zapieczetowac tresci:', response.status, data);
+
+      // Brak sesji to jedyny blad, ktory autor moze naprawic sam i od razu.
+      const needsSignIn = response.status === 401;
+      const reason = needsSignIn
+        ? 'We could not confirm it was you, so the paid text was not stored.'
+        : data?.code === 'store_unavailable'
+          ? 'Paid content is switched off on this deployment, so nothing was hidden.'
+          : 'The paid text did not reach our storage.';
+
+      setPendingPremium({ postId, draft, needsSignIn, reason });
+      toast.error('Your post is up as a free post - its paid part did not save. You can finish it below.');
+      return false;
+    } catch (error) {
+      console.error('[premium] blad sieci przy pieczetowaniu:', error);
+      setPendingPremium({
+        postId,
+        draft,
+        needsSignIn: false,
+        reason: 'We could not reach the server, so the paid text was not stored.',
+      });
+      toast.error('Your post is up as a free post - its paid part did not save. You can finish it below.');
+      return false;
+    }
+  };
+
+  /**
+   * Dokonczenie platnej czesci dla posta, ktory juz istnieje. Zaczyna od
+   * podpisu, gdy to jego brakowalo - inaczej pierwsza proba skonczylaby sie
+   * tym samym 401.
+   */
+  const retryPremiumSeal = async () => {
+    if (!pendingPremium || isRetryingPremium) return;
+
+    setIsRetryingPremium(true);
+    try {
+      if (!siweAddressRef.current) {
+        const toastId = toast.loading(
+          'One signature - it proves this post is yours. No gas, no transaction.'
+        );
+        let signedIn = false;
+        try {
+          signedIn = await siweSignIn();
+        } catch (error) {
+          console.error('[premium] logowanie SIWE przed ponowieniem nie powiodlo sie:', error);
+        } finally {
+          toast.dismiss(toastId);
+        }
+        if (!signedIn) {
+          toast.error('Still not signed in, so the paid part stays unsaved. Your text is kept here.');
+          return;
+        }
+      }
+
+      const sealed = await sealPremiumContent(pendingPremium.postId, pendingPremium.draft);
+      if (sealed) toast.success('Paid part saved. Readers can buy it now.');
+    } finally {
+      setIsRetryingPremium(false);
+    }
+  };
+
+  // Hashtagi i wzmianki z tresci posta.
+  const extractTagsAndMentions = (content: string) => ({
+    tags: Array.from(new Set((content.match(/#(\w+)/g) || []).map(tag => tag.slice(1)))),
+    mentions: Array.from(new Set((content.match(/@(\w+)/g) || []).map(mention => mention.slice(1)))),
+  });
+
+  // Wyslanie zalacznika na /api/upload. Zwraca URL pod wlasciwym kluczem oraz typ
+  // MIME (potrzebny metadanym Zory). Brak zalacznika = same nulle, bez zapytania.
+  const uploadPostMedia = async (): Promise<{
+    imageUrl: string | null;
+    videoUrl: string | null;
+    mediaMimeType: string | undefined;
+  }> => {
+    const mediaContent = postPreviewImage || postPreviewVideo;
+    if (!mediaContent) return { imageUrl: null, videoUrl: null, mediaMimeType: undefined };
+
+    setUploadProgress(0);
+    const base64Response = await fetch(mediaContent);
+    const blob = await base64Response.blob();
+
+    const isVideo = postPreviewVideo !== null;
+    const fileExtension = blob.type.split('/')[1] || (isVideo ? 'mp4' : 'jpg');
+    const fileName = `post-media-${Date.now()}.${fileExtension}`;
+
+    const formData = new FormData();
+    formData.append('file', blob, fileName);
+
+    const response = await fetch('/api/upload', { method: 'POST', body: formData });
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`Failed to upload media: ${errorData.error || response.statusText}`);
+    }
+
+    const data = await response.json();
+    setUploadProgress(100);
+
+    return {
+      imageUrl: isVideo ? null : data.url,
+      videoUrl: isVideo ? data.url : null,
+      mediaMimeType: blob.type,
+    };
+  };
+
+  // Czyszczenie formularza po udanej publikacji.
+  /**
+   * Token wystartowal - publikujemy post, ktory o nim mowi.
+   *
+   * Do tresci autora doklejamy LINK DO TOKENA, a nie surowy adres kontraktu:
+   * link renderuje sie pod postem jako karta z logo, cena z krzywej i
+   * przyciskiem Trade, a goly adres wygladalby jak wklejony przypadkiem.
+   *
+   * Tresc bierzemy z argumentu, nie ze stanu: `setNewPost` jest asynchroniczne,
+   * wiec czytanie `newPost` tuz po jego ustawieniu oddaloby STARA wartosc.
+   */
+  const publishLaunchPost = async (token: LaunchpadToken) => {
+    // Bez adresu tokena nie ma o czym pisac posta - a `address` w
+    // `LaunchpadToken` jest opcjonalny, bo ten typ obsluguje tez wiersze
+    // podgladowe tablicy, ktore adresu nie maja.
+    if (!address || !token.address) return;
+    const link = buildShareUrl({ address: token.address, chainId: LAUNCHPAD_CHAIN.id });
+    const content = `${newPost.trim()}\n\n${link}`.trim();
+
+    try {
+      const postId = await createPost({
+        author: address,
+        content,
+        timestamp: Date.now(),
+        network: 'base' as const,
+      });
+      // Post na gorze listy OD RAZU, ta sama sciezka co przy publikacji
+      // onchain - bez tego autor po udanym starcie widzi pusty kompozytor i
+      // zadnego sladu po tym, co wlasnie zrobil.
+      setPosts((current) => [
+        {
+          id: postId,
+          author: address,
+          content,
+          timestamp: Date.now(),
+          likes: 0,
+          likedBy: [],
+          comments: [],
+          network: 'base' as const,
+          isPinned: false,
+        } as ExtendedPost,
+        ...current,
+      ]);
+      resetComposer();
+      setQuickLaunchOpen(false);
+    } catch (error) {
+      // Token JUZ ISTNIEJE na lancuchu - nieudany zapis posta nie moze
+      // wygladac jak nieudany start. Zostawiamy tresc z linkiem w polu, zeby
+      // dalo sie kliknac Post jeszcze raz.
+      setNewPost(content);
+      setQuickLaunchOpen(false);
+      console.error('Coin launched, but the post was not saved:', error);
+    }
+  };
+
+  const resetComposer = () => {
+    setNewPost('');
+    setPremium(EMPTY_PREMIUM);
+    setIsPremiumOpen(false);
+    // Ostrzezenie "nic nie zostalo opublikowane" dotyczy PRZERWANEJ proby -
+    // po udanej publikacji nie ma prawa zostac na ekranie.
+    setBlockedOnPremiumSignIn(false);
+    setPostPreviewImage(null);
+    setPostPreviewVideo(null);
+    setUploadProgress(0);
+    setSelectedMusic(null);
+  };
+
+
   // Obsługa sukcesu transakcji
   const handleTransactionSuccess = (txHash: string) => {
     // Jeśli już trwa tworzenie posta, nie wywołuj ponownie
@@ -785,56 +1631,25 @@ export default function BaseChat() {
     setIsCreatingPost(true);
     const toastId = toast.loading("Creating post...");
 
+    // Szkic platnej czesci bierzemy TERAZ - `resetComposer()` nizej wyczysci
+    // pole, a pieczetowanie dzieje sie dopiero po zapisie w Firestore.
+    const premiumDraft = takePremiumDraft();
+
     try {
-      // Sprawdzenie czy użytkownik jest adminem
-      const isAdmin = address.toLowerCase() === ADMIN_ADDRESS;
-
-
-
-      let imageUrl: string | null = null;
-      let videoUrl: string | null = null;
-
       // 1. Handle media upload (image or video) - jeśli istnieje
-      if (postPreviewImage || postPreviewVideo) {
-        setUploadProgress(0);
-        const mediaContent = postPreviewImage || postPreviewVideo;
-        if (!mediaContent) throw new Error('No media content');
-
-        const base64Response = await fetch(mediaContent);
-        const blob = await base64Response.blob();
-
-        const isVideo = postPreviewVideo !== null;
-        const fileExtension = isVideo ? (blob.type.split('/')[1] || 'mp4') : (blob.type.split('/')[1] || 'jpg');
-        const fileName = `post-media-${Date.now()}.${fileExtension}`;
-
-        const formData = new FormData();
-        formData.append('file', blob, fileName);
-
-        const response = await fetch('/api/upload', { method: 'POST', body: formData });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(`Failed to upload media: ${errorData.error || response.statusText}`);
-        }
-
-        const data = await response.json();
-        if (isVideo) {
-          videoUrl = data.url;
-        } else {
-          imageUrl = data.url;
-        }
-        setUploadProgress(100);
-      }
+      const { imageUrl, videoUrl } = await uploadPostMedia();
 
       // Extract hashtags and mentions
-      const tags = Array.from(new Set((newPost.match(/#(\w+)/g) || []).map(tag => tag.slice(1))));
-      const mentions = Array.from(new Set((newPost.match(/@(\w+)/g) || []).map(mention => mention.slice(1))));
+      const { tags, mentions } = extractTagsAndMentions(newPost);
 
       // 2. ✅ OPTIMISTIC UPDATE: Dodaj post na górę NATYCHMIAST (zamiast 15 Firebase reads)
       const tempPostId = 'temp-' + Date.now();
       const newPostObject = {
         id: tempPostId,
         author: address,
+        // Znacznika platnosci TU NIE MA celowo. Post jest platny dopiero po
+        // udanym zapisie tresci (markPostAsPremium w sealPremiumContent) -
+        // inaczej autor ogladalby paywall, ktorego nikt inny nie widzi.
         content: newPost,
         timestamp: Date.now(),
         image: imageUrl,
@@ -852,11 +1667,16 @@ export default function BaseChat() {
 
       // Dodaj post na górę listy NATYCHMIAST
       setPosts(currentPosts => [newPostObject, ...currentPosts]);
+      // ...oraz do ZAPISANYCH list. Bez tego post istnial tylko w stanie
+      // Reacta i znikal po przejsciu na inna zakladke i powrocie, bo widok
+      // odtwarzal sie z cache'u sprzed publikacji.
+      prependPostToCache(newPostObject as ExtendedPost);
 
       // 3. Save to Firebase w tle (bez czekania na UI)
       createPost({
         author: address,
         content: newPost,
+        ...buildPremiumWriteFields(),
         timestamp: Date.now(),
         image: imageUrl,
         video: videoUrl,
@@ -868,37 +1688,53 @@ export default function BaseChat() {
         musicTrack: selectedMusic // 🎵 Dodaj wybrany utwór
       }).then((realPostId) => {
         // Zaktualizuj tempPost z prawdziwym ID z Firebase
-        setPosts(currentPosts => 
-          currentPosts.map(post => 
+        setPosts(currentPosts =>
+          currentPosts.map(post =>
             post.id === tempPostId ? { ...post, id: realPostId } : post
           )
         );
+        // To samo w cache - inaczej po odswiezeniu strony zostawalby wpis
+        // z ID "temp-...", ktory wyglada jak post, ale prowadzi donikad.
+        replacePostIdInCache(tempPostId, realPostId);
+
+        // Platna czesc DOPIERO TERAZ - trasa sprawdza autorstwo po prawdziwym
+        // dokumencie, wiec musi istniec. Celowo bez `await`: post jest juz
+        // widoczny, a pieczetowanie samo dopisze znacznik platnosci albo
+        // powie, ze go nie ma.
+        void sealPremiumContent(realPostId, premiumDraft);
       }).catch((error) => {
         console.error('Error saving post to Firebase:', error);
-        // W przypadku błędu, usuń optimistic post
+        // W przypadku błędu, usuń optimistic post - RAZEM z cache'em, inaczej
+        // nieudany post przezylby odswiezenie strony.
         setPosts(currentPosts => currentPosts.filter(post => post.id !== tempPostId));
+        clearPostsCache();
         toast.error('Failed to save post');
       });
 
       // 4. Update UI
-      toast.success('Post created successfully!', { id: toastId });
-      setNewPost('');
-      setPostPreviewImage(null);
-      setPostPreviewVideo(null);
-      setSelectedMusic(null); // 🎵 Wyczyść wybraną muzykę
-      
+      toast.success('Your post is up!', { id: toastId });
+      resetComposer();
+
       // ✅ OPTYMALIZACJA: Usunięto refreshPosts() - oszczędność 15 Firebase reads po każdym poście!
-      
-      // 5. Increment daily count
-      await updateDoc(doc(db, 'users', address), {
-        [`dailyPosts.${today}`]: increment(1)
-      });
-      
-      // 6. Update user stats
-      await updateDoc(doc(db, 'users', address), {
-        postCount: increment(1)
-      });
-      
+
+      // 5-8. Liczniki i punkty. Post jest juz zapisany, wiec bledy tych zapisow
+      // NIE moga cofnac komunikatu sukcesu - wczesniej wyjatek z licznika
+      // dziennego albo postCount leczial do glownego catch i pokazywal
+      // "Failed to create post" nad postem, ktory wlasnie sie udal.
+      try {
+        // 5. Increment daily count
+        await updateDoc(doc(db, 'users', address), {
+          [`dailyPosts.${today}`]: increment(1)
+        });
+
+        // 6. Update user stats
+        await updateDoc(doc(db, 'users', address), {
+          postCount: increment(1)
+        });
+      } catch (error) {
+        console.log("Error updating user counters, but post was created:", error);
+      }
+
       // 7. Update global stats
       try {
         await setDoc(doc(db, 'stats', 'global'), {
@@ -908,7 +1744,7 @@ export default function BaseChat() {
         console.log("Error updating global stats, but post was created:", error);
         // Nie przerywamy procesu tworzenia posta, tylko logujemy błąd
       }
-      
+
       // 8. Calculate and update BaseChatPoints
       try {
         await calculateAndSaveBaseChatPoints();
@@ -948,67 +1784,38 @@ export default function BaseChat() {
       return;
     }
 
+    // PODPIS PRZED CZYMKOLWIEK. Dalej jest wgrywanie mediow, transakcja Zory
+    // i zapis do Firestore - kazde z tych trzech zostawia slad, ktorego nie da
+    // sie cofnac. Post bez platnej czesci przechodzi tedy bez pytania.
+    if (!(await ensurePremiumSession())) return;
+
+    // Szkic bierzemy po podpisie, a przed `resetComposer()` na koncu sciezki.
+    const premiumDraft = takePremiumDraft();
+
     // Ustaw flagę blokującą wielokrotne tworzenie postów
     setIsCreatingPost(true);
     const toastId = toast.loading("Creating post token..."); // Store toast ID
     
-    // Declare variables outside try block so they're accessible in catch
+    // Zadeklarowane PRZED `try`, zeby sciezka awaryjna w `catch` (zwykly post
+    // zamiast tokena) widziala juz wgrane media. Wczesniej byly tu deklarowane
+    // po raz drugi wewnatrz `try` - przeslanialy te zmienne, wiec post awaryjny
+    // zawsze gubil zdjecie albo wideo.
     let imageUrl: string | null = null;
     let videoUrl: string | null = null;
     let mediaMimeType: string | undefined = undefined;
 
     try {
-      // Sprawdzenie czy użytkownik jest adminem
-      const isAdmin = address.toLowerCase() === ADMIN_ADDRESS;
-
-      // Sprawdzenie limitu postów dziennie (tylko dla zwykłych użytkowników)
-
-      // Optimistically update count, handle potential failure later if needed
-      // setDailyPostCount(prev => prev + 1); // Moved after successful creation
-
       console.log('🚀 Starting Zora coin creation for post...');
 
-      // Declare variables for media URLs
-      let imageUrl: string | null = null;
-      let videoUrl: string | null = null;
-      let mediaMimeType: string | undefined = undefined;
-
       // 1. Handle media upload (image or video)
-      if (postPreviewImage || postPreviewVideo) {
-        setUploadProgress(0); // Start progress indication
-        const mediaContent = postPreviewImage || postPreviewVideo;
-        if (!mediaContent) throw new Error('No media content');
-
-        const base64Response = await fetch(mediaContent);
-        const blob = await base64Response.blob();
-        mediaMimeType = blob.type; // Store mime type
-
-        const isVideo = postPreviewVideo !== null;
-        const fileExtension = isVideo ? (blob.type.split('/')[1] || 'mp4') : (blob.type.split('/')[1] || 'jpg');
-        const fileName = `post-media-${Date.now()}.${fileExtension}`;
-
-        const formData = new FormData();
-        formData.append('file', blob, fileName);
-
-        const response = await fetch('/api/upload', { method: 'POST', body: formData });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(`Failed to upload media: ${errorData.error || response.statusText}`);
-        }
-
-        const data = await response.json();
-        if (isVideo) {
-          videoUrl = data.url;
-        } else {
-          imageUrl = data.url;
-        }
-        setUploadProgress(100); // Finish progress indication
-        console.log("Media uploaded:", isVideo ? videoUrl : imageUrl);
+      ({ imageUrl, videoUrl, mediaMimeType } = await uploadPostMedia());
+      if (imageUrl || videoUrl) {
+        console.log("Media uploaded:", videoUrl || imageUrl);
       }
 
       // 2. Generate Metadata
       const postContentExcerpt = newPost.length > 100 ? newPost.substring(0, 97) + "..." : newPost;
+      const { tags: contentTags, mentions: contentMentions } = extractTagsAndMentions(newPost);
       const metadata = {
         name: `Post by ${userProfile.name || address.slice(0,6)}: ${postContentExcerpt}`, // Example name
         description: newPost,
@@ -1024,8 +1831,8 @@ export default function BaseChat() {
           category: "social", // Example property
           author: address,
           createdAt: new Date().toISOString(),
-          tags: Array.from(new Set((newPost.match(/#(\w+)/g) || []).map(tag => tag.slice(1)))),
-          mentions: Array.from(new Set((newPost.match(/@(\w+)/g) || []).map(mention => mention.slice(1))))
+          tags: contentTags,
+          mentions: contentMentions
         }
       };
 
@@ -1061,14 +1868,42 @@ export default function BaseChat() {
         const firstWord = newPost.trim().split(/\s+/)[0];
         const cleanSymbol = firstWord.replace(/[^A-Z0-9]/gi, '').substring(0, 10).toUpperCase() || 'POST';
         
+        // SDK Zory ladowany na zadanie - uzywany tylko w tym jednym handlerze,
+        // a na topie pliku szedlby do initial chunka kazdej sesji basechatu.
+        // Musi stac PRZED budowaniem parametrow: CreateConstants sa im potrzebne.
+        const { createCoin, getCoinCreateFromLogs, CreateConstants } = await import('@zoralabs/coins-sdk');
+
+        /**
+         * Parametry wg AKTUALNEGO API @zoralabs/coins-sdk 0.8 (docs.zora.co).
+         *
+         * Poprzednia wersja uzywala podpisu 0.x - trzy argumenty pozycyjne,
+         * pola `uri`, `owners`, `payoutRecipient` - przez co przycisk "PostCoin"
+         * NIE MOGL zadzialac od czasu podbicia zaleznosci. Blad byl niewidoczny,
+         * bo caly plik mial wtedy `@ts-nocheck`.
+         *
+         * DWIE DECYZJE PRODUKTOWE, ktorych nowe API wymaga:
+         *
+         * `currency: ETH` - a nie ZORA ani CREATOR_COIN. Powod jest prosty:
+         * ETH ma kazdy, kto w ogole doszedl do tego przycisku, bo placi nim za
+         * gaz. Wymaganie ZORA znaczyloby, ze zanim ktokolwiek wybije monete
+         * ze swojego posta, musi najpierw kupic obcy token - czyli sciezka
+         * konczy sie porazka dla wiekszosci ludzi. Jako jedyna z czterech opcji
+         * ETH dziala tez na Base Sepolia, wiec da sie ja przetestowac bez
+         * wydawania prawdziwych pieniedzy.
+         *
+         * `startingMarketCap: LOW` - najnizszy prog wejscia. HIGH ustawia
+         * wysoka wycene startowa, co przy poscie w feedzie spolecznosciowym
+         * nie ma uzasadnienia: to nie jest zbiorka, tylko slad po tresci.
+         */
         const coinParams = {
+          creator: address as ViemAddress,
           name: cleanName,
           symbol: cleanSymbol,
-          uri: metadataUri, // Use the URL from Vercel Blob
-          payoutRecipient: address as ViemAddress, // Creator receives earnings
-          owners: [address as ViemAddress], // Required: specify owners array
-          platformReferrer: "0x9fb014812e5c22643640a5885866f499b1bbb5e0" as ViemAddress, // Referral fees recipient
-          // Remove problematic parameters that cause poolConfig issues
+          metadata: { type: 'RAW_URI' as const, uri: metadataUri },
+          currency: CreateConstants.ContentCoinCurrencies.ETH,
+          chainId: base.id,
+          startingMarketCap: CreateConstants.StartingMarketCaps.LOW,
+          platformReferrer: "0x9fb014812e5c22643640a5885866f499b1bbb5e0" as ViemAddress,
         };
               console.log("Zora coin parameters:", coinParams);
         
@@ -1079,20 +1914,22 @@ export default function BaseChat() {
         if (!coinParams.symbol || coinParams.symbol.length === 0) {
           throw new Error("Token symbol cannot be empty"); 
         }
-        if (!coinParams.uri || !coinParams.uri.startsWith('http')) {
+        if (!metadataUri || !metadataUri.startsWith('http')) {
           throw new Error("Invalid metadata URI - must be a valid HTTP/HTTPS URL");
         }
         
-        // 5. Call createCoin
-      // SDK Zory ladowany na zadanie - uzywany tylko w tym jednym handlerze,
-      // a na topie pliku szedl do initial chunka kazdej sesji basechatu.
-      const { createCoin, getCoinCreateFromLogs } = await import('@zoralabs/coins-sdk');
+        // 5. Call createCoin (SDK zaladowany wyzej, razem z CreateConstants)
       console.log("Calling createCoin via Zora SDK...");
       // Make sure walletClient is not null/undefined before calling createCoin
       if (!walletClient) {
           throw new Error("Wallet client is not available.");
       }
-      const result = await createCoin(coinParams, walletClient, publicClient);
+      // Dwuetapowe API 0.8: jeden obiekt `call` plus oba klienty.
+      const result = await createCoin({
+        call: coinParams,
+        walletClient,
+        publicClient,
+      });
 
       console.log("Zora coin creation transaction sent:", result.hash);
       toast.loading("Waiting for transaction confirmation...", { id: toastId });
@@ -1116,10 +1953,13 @@ export default function BaseChat() {
 
       // 7. Save to Firebase (including the new zoraCoinAddress)
       console.log("Saving post data to Firebase...");
-      const visibilityValue = 'public'; // Use simple string type
+      // `as const`, inaczej typ rozszerza sie do `string`, a createPost przyjmuje
+      // tylko 'public' | 'followers' | 'private'.
+      const visibilityValue = 'public' as const;
       const postDataForFirebase = {
         author: address,
         content: newPost,
+        ...buildPremiumWriteFields(),
         timestamp: Date.now(),
         image: imageUrl,
         video: videoUrl,
@@ -1127,13 +1967,15 @@ export default function BaseChat() {
         mentions: mentions,
         visibility: visibilityValue, // Use simple string
         zoraCoinAddress: zoraCoinAddress, // <-- Save the Zora Coin address
-        txHash: result.hash // <-- Save the Zora creation tx hash
+        txHash: result.hash, // <-- Save the Zora creation tx hash
+        musicTrack: selectedMusic // 🎵 Dodaj wybrany utwór
       };
 
       // Optimistic UI update (Add temporary post)
       const tempPost: ExtendedPost = {
         id: `temp-${Date.now()}`,
         author: address,
+        // Bez znacznika platnosci - dokleja go dopiero udane pieczetowanie.
         content: newPost,
         timestamp: Date.now(),
         image: imageUrl ?? undefined, // Ensure undefined if null
@@ -1149,42 +1991,41 @@ export default function BaseChat() {
       };
       setPosts(currentPosts => [tempPost, ...currentPosts]);
 
-      // Actual Firebase save
-      // Assuming createPost in firebase.ts can handle the new zoraCoinAddress field
-      await createPost({
-          author: address,
-          content: newPost,
-          timestamp: Date.now(),
-          image: imageUrl,
-          video: videoUrl,
-          tags: tags,
-          mentions: mentions,
-          visibility: visibilityValue,
-          zoraCoinAddress: zoraCoinAddress,
-          txHash: result.hash,
-          musicTrack: selectedMusic // 🎵 Dodaj wybrany utwór
-      });
+      // Actual Firebase save - dokladnie ten sam obiekt, ktory zostal zlozony wyzej.
+      // Wczesniej byl skladany drugi raz recznie i obie kopie zdazyly sie rozjechac.
+      const zoraPostId = await createPost(postDataForFirebase);
       console.log("Post saved to Firebase.");
 
-      // Successfully created, now increment daily count
+      // Dopisujemy post do zapisanych list zamiast kasowac caly cache.
+      // Kasowanie dzialalo, ale kazalo potem pobrac WSZYSTKIE listy od nowa -
+      // czyli placilismy pelnym przeladowaniem feedu za jeden post, ktorego
+      // tresc i tak mamy w pamieci. Firestore liczy za kazdy odczyt dokumentu.
+      //
+      // MUSI STAC PRZED PIECZETOWANIEM: znacznik platnosci nanosi
+      // markPostAsPremium po ID, wiec post musi juz byc w stanie i w cache'u
+      // pod PRAWDZIWYM identyfikatorem. Inaczej cache trzymalby przez pieć
+      // minut wersje "darmowa" posta, ktory w bazie jest platny.
+      setPosts(currentPosts =>
+        currentPosts.map(post => (post.id === tempPost.id ? { ...post, id: zoraPostId } : post))
+      );
+      prependPostToCache({ ...tempPost, id: zoraPostId } as ExtendedPost);
 
-      // 🗑️ Wyczyść cache bo mamy nowy post
-      clearPostsCache();
+      // Platna czesc idzie do zapieczetowanej kolekcji, nie do dokumentu posta -
+      // patrz sealPremiumContent. Z `await`, bo kilka linii nizej ta sciezka
+      // NADPISUJE cala liste swiezym odczytem z Firestore: bez czekania wyscig
+      // konczyl sie postem, ktory jest platny w bazie, a wyglada na darmowy.
+      await sealPremiumContent(zoraPostId, premiumDraft);
 
       // Refresh posts list from Firebase to get the real ID
       const { posts: updatedPosts } = await fetchPosts({ userId: address });
       setPosts(updatedPosts);
 
       // Reset form
-      setNewPost('');
-      setPostPreviewImage(null);
-      setPostPreviewVideo(null);
-      setUploadProgress(0);
-      setSelectedMusic(null); // 🎵 Wyczyść wybraną muzykę
+      resetComposer();
 
       // Show success message
       toast.dismiss(toastId);
-      toast.success('Post created successfully as a Zora token!');
+      toast.success('Your post is up as a Zora token!');
 
 
 
@@ -1192,28 +2033,34 @@ export default function BaseChat() {
       console.error('Error creating Zora coin post:', error);
       toast.dismiss(toastId); // Ensure loading toast is dismissed on error
       
-      // Determine the specific error type and show appropriate message
+      // Determine the specific error type and show appropriate message.
+      // `rawMessage` zamiast `error.message`: rzucone moze byc cokolwiek (string,
+      // obiekt bez `message`), a wtedy samo `error.message.includes(...)` rzucalo
+      // TypeError wewnatrz catch - sciezka awaryjna nie startowala, toast
+      // "trwa tworzenie" zostawal na ekranie na zawsze, a `finally` nie zdazyl
+      // odblokowac przycisku w czytelny sposob.
+      const rawMessage = typeof error?.message === 'string' ? error.message : String(error ?? '');
       let errorMessage = 'Unknown error occurred while creating post';
       let shouldFallback = false;
-      
-      if (error.message.includes('execution reverted') || error.message.includes('ContractFunctionExecutionError')) {
+
+      if (rawMessage.includes('execution reverted') || rawMessage.includes('ContractFunctionExecutionError')) {
         errorMessage = 'Token creation failed due to contract error. Creating as regular post instead.';
         shouldFallback = true;
-      } else if (error.message.includes('Missing or invalid parameters')) {
+      } else if (rawMessage.includes('Missing or invalid parameters')) {
         errorMessage = 'Invalid token parameters. Creating as regular post instead.';
         shouldFallback = true;
-      } else if (error.message.includes('insufficient funds')) {
-        errorMessage = 'Not enough funds to create the token. Make sure you have enough ETH for gas.';
-      } else if (error.message.includes('user rejected')) {
-        errorMessage = 'Transaction was rejected by user.';
-      } else if (error.message.includes('Failed to upload')) {
+      } else if (rawMessage.includes('insufficient funds')) {
+        errorMessage = 'Not enough ETH for gas, so the token was not created. Top up and try again.';
+      } else if (rawMessage.includes('user rejected')) {
+        errorMessage = 'You cancelled the transaction in your wallet.';
+      } else if (rawMessage.includes('Failed to upload')) {
         errorMessage = 'Failed to upload media or metadata. Please try again.';
-      } else if (error.message.includes('Token name cannot be empty') || 
-                 error.message.includes('Token symbol cannot be empty') ||
-                 error.message.includes('Invalid metadata URI')) {
-        errorMessage = error.message;
-      } else if (error.message) {
-        errorMessage = error.message.substring(0, 100);
+      } else if (rawMessage.includes('Token name cannot be empty') ||
+                 rawMessage.includes('Token symbol cannot be empty') ||
+                 rawMessage.includes('Invalid metadata URI')) {
+        errorMessage = rawMessage;
+      } else if (rawMessage) {
+        errorMessage = rawMessage.substring(0, 100);
       }
       
       // Try fallback to regular post if token creation failed
@@ -1222,14 +2069,14 @@ export default function BaseChat() {
           console.log('Attempting fallback to regular post...');
           toast.loading('Creating as regular post...', { id: toastId });
           
-          // Extract hashtags and mentions  
-          const tags = Array.from(new Set((newPost.match(/#(\w+)/g) || []).map(tag => tag.slice(1))));
-          const mentions = Array.from(new Set((newPost.match(/@(\w+)/g) || []).map(mention => mention.slice(1))));
-          
+          // Extract hashtags and mentions
+          const { tags, mentions } = extractTagsAndMentions(newPost);
+
           // Create regular post without token
-          await createPost({
+          const fallbackPostId = await createPost({
             author: address,
             content: newPost,
+            ...buildPremiumWriteFields(),
             timestamp: Date.now(),
             image: imageUrl ?? undefined,
             video: videoUrl ?? undefined,
@@ -1239,19 +2086,28 @@ export default function BaseChat() {
             network: 'base', // Identify as a Base network post without token
             musicTrack: selectedMusic // 🎵 Dodaj wybrany utwór do fallback post
           });
-          
+
+          // TA SCIEZKA TEZ PIECZETUJE. Jest ratunkiem po nieudanym tworzeniu
+          // monety, ale platna czesc autora nie ma z tym nic wspolnego -
+          // pominiecie jej tutaj gubiloby ja po cichu dokladnie wtedy, gdy
+          // cos juz poszlo nie tak.
+          await sealPremiumContent(fallbackPostId, premiumDraft);
+
           // Update UI
-          toast.success('Post created successfully!', { id: toastId });
-          setNewPost('');
-          setPostPreviewImage(null);
-          setPostPreviewVideo(null);
-          setSelectedMusic(null); // 🎵 Wyczyść wybraną muzykę w fallback
-          
+          toast.success('Your post is up!', { id: toastId });
+          resetComposer();
+
+          // Tutaj KASUJEMY cache, zamiast dopisywac - inaczej niz w sciezkach
+          // powyzej. Powod: ta galaz nie zbudowala obiektu posta (jest
+          // ratunkiem po nieudanym tworzeniu monety), wiec nie ma czego
+          // dopisac, a loadPosts czyta cache PRZED siegnieciem do Firestore
+          // i bez tego pokazalby liste sprzed posta. To sciezka awaryjna,
+          // wiec pelne przeladowanie jest tu akceptowalna cena.
+          clearPostsCache();
+
           // Refresh posts
           await refreshPosts();
-          
-          // Increment daily count
-          
+
         } catch (fallbackError) {
           console.error('Fallback post creation also failed:', fallbackError);
           toast.error('Failed to create post. Please try again.', { id: toastId });
@@ -1262,10 +2118,10 @@ export default function BaseChat() {
       
       // Log detailed error for debugging
       console.error('Detailed error:', {
-        message: error.message,
-        stack: error.stack,
-        name: error.name,
-        cause: error.cause
+        message: rawMessage,
+        stack: error?.stack,
+        name: error?.name,
+        cause: error?.cause
       });
     } finally {
       // Zawsze resetuj flagę blokującą, nawet w przypadku błędu
@@ -1273,128 +2129,8 @@ export default function BaseChat() {
     }
   };
 
-  const handleAddComment = async (postId: string, txHash?: string) => {
-    if (!isConnected || !address || !newComments[postId]?.trim()) return;
-
-    try {
-      // Wykryj wzmianki w treści
-      const mentionRegex = /@(\w+)/g;
-      const mentions = Array.from(
-        new Set((newComments[postId].match(mentionRegex) || []).map(m => m.slice(1)))
-      );
-
-      // Określ network na podstawie chainId
-      let network: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | undefined = undefined;
-      if (chainId === base.id || chainId === baseSepolia.id) {
-        network = 'base';
-      } else if (chainId === BASECAMP_CHAIN_ID) {
-        network = 'basecamp';
-      } else if (chainId === LINEA_CHAIN_ID) {
-        network = 'linea';
-      } else if (chainId === CELO_CHAIN_ID) {
-        network = 'celo';
-      } else if (chainId === ETHEREUM_CHAIN_ID) {
-        network = 'ethereum';
-      } else if (chainId === WORLD_CHAIN_ID) {
-        network = 'worldchain';
-      }
-
-      const comment = {
-        postId,
-        author: address,
-        content: newComments[postId],
-        timestamp: Date.now(),
-        likes: 0,
-        likedBy: [],
-        mentions: mentions,
-        txHash: txHash || null, // Dodajemy hash transakcji, jeśli istnieje
-        network: network // Dodajemy network komentarza
-      };
-
-      await addComment(postId, comment);
-      
-      // Clear comment input
-      setNewComments(prev => ({...prev, [postId]: ''}));
-      
-      // ✅ OPTYMALIZACJA: Usunięto fetchPosts - optimistic update w PostList już pokazuje komentarz
-      // Oszczędność: 50 Firebase reads po każdym komentarzu
-      
-      toast.success('Comment added successfully!');
-    } catch (error) {
-      console.error('Error adding comment:', error);
-      toast.error('Failed to add comment');
-    }
-  };
-
-  // Funkcja do obsługi polubienia
-  const handleToggleLike = async (postId: string) => {
-    if (!isConnected || !address) return;
-    
-    try {
-      // Optymistyczna aktualizacja UI - natychmiastowa reakcja
-      const updatedPosts = posts.map(post => {
-        if (post.id === postId) {
-          const isLiked = post.likedBy?.includes(address);
-          return {
-            ...post,
-            likes: (post.likes || 0) + (isLiked ? -1 : 1),
-            likedBy: isLiked 
-              ? (post.likedBy || []).filter(id => id !== address)
-              : [...(post.likedBy || []), address]
-          };
-        }
-        return post;
-      });
-      
-      // Aktualizuj stan natychmiast, aby użytkownik widział efekt od razu
-      setPosts(updatedPosts);
-      
-      // Wykonaj rzeczywistą operację w tle
-      await toggleLike(postId, address);
-      
-      // ✅ OPTYMALIZACJA: Usunięto fetchPosts - optimistic update już zaktualizował UI
-      // Oszczędność: 50 Firebase reads po każdym like
-      await fetchUserStats(address);
-    } catch (error) {
-      console.error('Error toggling like:', error);
-      // W przypadku błędu, przywróć dane z serwera
-      try {
-        // 🗑️ Wyczyść cache bo może być niespójny po błędzie
-        clearPostsCache();
-        const { posts: refreshedPosts } = await fetchPosts({ userId: address });
-        setPosts(refreshedPosts);
-      } catch {
-        console.error('Failed to restore posts state after like error');
-      }
-    }
-  };
-
-  const formatTimestamp = (timestamp: number) => {
-    const diff = Date.now() - timestamp;
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-
-    if (days > 0) return `${days}d ago`;
-    if (hours > 0) return `${hours}h ago`;
-    if (minutes > 0) return `${minutes}m ago`;
-    return 'just now';
-  };
-
-  const handleSendCrypto = async (toAddress: string, amount: string = "0.01") => {
-    if (!isConnected) return;
-    
-    try {
-      const { sendTransaction } = useSendTransaction();
-      
-      await sendTransaction({
-        to: toAddress as `0x${string}`,
-        value: parseEther(amount)
-      });
-    } catch (error) {
-      console.error('Error sending crypto:', error);
-    }
-  };
+  // Usuniete jako martwe: handleAddComment, handleToggleLike i formatTimestamp.
+  // Komentarze, polubienia i format czasu obsluguje PostList wlasnymi funkcjami.
 
   // Funkcja do pobierania trendujących hashtagów z postów
   const getTrendingTags = (posts: Post[]) => {
@@ -1448,81 +2184,79 @@ export default function BaseChat() {
 
   // 🚀 ZOPTYMALIZOWANA funkcja getActiveUsers została przeniesiona za deklaracje zmiennych stanu
 
-  // Dodaj useEffect do aktualizacji trendujących tagów
-  useEffect(() => {
-    const trending = getTrendingTags(posts);
-    setTrendingTags(trending);
-  }, [posts]);
-
-  // useEffect do ustawienia isMounted i wczytania cache'u
+  // useEffect do ustawienia isMounted i wczytania cache'u.
+  // Sprzatanie nie ustawia juz isMounted na false - to zapis do stanu
+  // odmontowanego komponentu, ktory nic nie dawal, bo komponent i tak znikal.
   useEffect(() => {
     setIsMounted(true);
     loadInitialData(); // Załaduj cache od razu
-    return () => {
-      setIsMounted(false);
-      // Cleanup search timeout
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
   }, [loadInitialData]);
 
-  // Dodaj funkcję do tworzenia grupy
-  const handleCreateGroup = async () => {
-    if (!address) return;
-    const groupName = prompt('Enter group name:');
-    if (!groupName) return;
+  // Usuniete jako martwe: handleCreateGroup - grupy nie maja zadnego UI.
 
-    try {
-      const groupRef = collection(db, 'groups');
-      await addDoc(groupRef, {
-        name: groupName,
-        creator: address,
-        members: [address],
-        createdAt: serverTimestamp()
-      });
-      alert('Group created successfully!');
-    } catch (error) {
-      console.error('Error creating group:', error);
-    }
-  };
 
   // ⚠️ OPTIMIZED - 12h cache per user for global stats using same system as main page
+  /**
+   * Globalne liczniki - JEDEN odczyt prawdziwego dokumentu.
+   *
+   * === CO TU BYLO ===
+   * Ta funkcja nie czytala NICZEGO. Zwracala liczby wpisane na sztywno
+   * (userCount: 175708, postsCount: 239961, ...) i mnozyla kazda przez losowy
+   * wspolczynnik +/-1% z komentarzem "dla realizmu" - czyli licznik zmienial
+   * sie na oczach czytelnika przy kazdym wejsciu, zeby wygladac na zywy,
+   * bedac wymyslonym.
+   *
+   * Zmierzone tego samego dnia na produkcyjnej bazie: 184 064 uzytkownikow
+   * (na ekranie 175 708), 263 613 postow (239 961), 13 492 komentarze
+   * (10 972). Na produkcie o sprawdzalnych liczbach pierwsze cztery liczby
+   * na ekranie byly nabite.
+   *
+   * Teraz czytamy jeden dokument, ktory zapisuje panel admina po swoim
+   * przeliczeniu. Jeden odczyt na wejscie zamiast 467, liczby prawdziwe,
+   * a przy braku pomiaru pokazujemy PUSTKE, nie wymyslona wartosc.
+   *
+   * === LAJKI SA SKLADANE, NIE CZYTANE Z JEDNEGO POLA ===
+   * Bylo tu `setTotalLikes(stats.likes)`, a pola `likes` w tym dokumencie NIE
+   * MA i dlugo nie bedzie: panel admina zapisuje je jawnie jako `null`, bo
+   * lajkow nie da sie policzyc agregacja (siedza jako pole na 263 613 postach).
+   * Odczytany dokument mial `likesSince: 6` i zadnego `likes` - czyli jedyna
+   * istniejaca liczba lajkow byla po prostu POMIJANA przy odczycie. Kafel
+   * dostawal potem `String(null)`, czyli napis "null".
+   *
+   * `likesTotal()` sklada to, co wiadomo: stan poczatkowy (gdy ktos go policzyl
+   * skryptem) plus licznik przyrostowy. Gdy suma nie jest dokladna, `likesNote()`
+   * i `likesDetail()` daja gotowe zastrzezenie - krotkie na kafel, pelne do
+   * dymka. Strona ich NIE SKLADA i nie ma prawa: to warstwa danych wie, czy
+   * brakuje poczatku, czy srodka, a to sa dwa rozne zdania.
+   */
   const fetchGlobalStats = async () => {
-    try {
-      // ✅ ULTRA-CHEAP: Statyczne dane zamiast Firebase (oszczędność $15,000+/dzień!)
-      const stats = {
-        userCount: 175708,
-        postsCount: 239961,
-        likesCount: 18817,
-        commentsCount: 10972,
-        transactionsCount: 40818
-      };
-      
-      // 📊 Opcjonalnie: Dodaj losowe fluktuacje dla realizmu (takie same jak strona główna)
-      const variance = 0.02; // 2% losowa zmiana
-      const randomizedStats = {
-        userCount: Math.round(stats.userCount * (1 + (Math.random() - 0.5) * variance)),
-        postsCount: Math.round(stats.postsCount * (1 + (Math.random() - 0.5) * variance)),
-        likesCount: Math.round(stats.likesCount * (1 + (Math.random() - 0.5) * variance)),
-        commentsCount: Math.round(stats.commentsCount * (1 + (Math.random() - 0.5) * variance)),
-        transactionsCount: Math.round(stats.transactionsCount * (1 + (Math.random() - 0.5) * variance))
-      };
-      
-      setTotalUsers(randomizedStats.userCount);
-      setTotalLikes(randomizedStats.likesCount);
-      setTotalPosts(randomizedStats.postsCount);
-      setTotalComments(randomizedStats.commentsCount);
-      
-      console.log('✅ BaseChat global stats loaded with ZERO Firebase reads - saved $15,000+/day!');
-    } catch (error) {
-      console.error('Error fetching BaseChat global stats:', error);
-      // Fallback values
-      setTotalUsers(175708);
-      setTotalLikes(18817);
-      setTotalPosts(239961);
-      setTotalComments(10972);
+    const { stats, failed } = await getGlobalStats();
+
+    if (failed || !stats) {
+      // Brak pomiaru i nieudany odczyt to dwa rozne zdania, ale dla licznika
+      // skutek jest ten sam: NIE WIEMY. `null` renderuje sie jako kreska,
+      // a nie jako zero ani jako zmyslona liczba.
+      setTotalUsers(null);
+      setTotalLikes(null);
+      setLikesNoteText(undefined);
+      setLikesDetailText(undefined);
+      setTotalPosts(null);
+      setTotalComments(null);
+      setTotalTips(null);
+      setStatsMeasuredAt(0);
+      return;
     }
+
+    const likes = likesTotal(stats);
+
+    setTotalUsers(stats.users);
+    setTotalLikes(likes.value);
+    setLikesNoteText(likesNote(likes));
+    setLikesDetailText(likesDetail(likes));
+    setTotalPosts(stats.posts);
+    setTotalComments(stats.comments);
+    setTotalTips(stats.tips);
+    setStatsMeasuredAt(stats.measuredAt);
   };
 
   // ⚠️ OPTIMIZED: Global stats loaded immediately on component mount
@@ -1554,35 +2288,7 @@ export default function BaseChat() {
     // No auto-refresh - cache lasts 12h per user
   }, [address]);
 
-  // Dodaj funkcję do obsługi usuwania posta
-  const handleDeletePost = async (postId: string) => {
-    if (!isConnected || !address) return;
-
-    try {
-      if (confirm('Are you sure you want to delete this post?')) {
-        // ✅ OPTIMISTIC UPDATE: Usuń post z UI natychmiast
-        const updatedPosts = posts.filter(post => post.id !== postId);
-        setPosts(updatedPosts);
-        
-        // Wykonaj rzeczywistą operację w tle
-        await deletePost(postId, address);
-        
-        // ✅ OPTYMALIZACJA: Usunięto fetchPosts - optimistic update już usunął post
-        // Oszczędność: 50 Firebase reads po każdym usunięciu posta
-      }
-    } catch (error) {
-      console.error('Error deleting post:', error);
-      // W przypadku błędu, przywróć dane z serwera
-      try {
-        // 🗑️ Wyczyść cache bo może być niespójny po błędzie
-        clearPostsCache();
-        const { posts: refreshedPosts } = await fetchPosts({ userId: address });
-        setPosts(refreshedPosts);
-      } catch {
-        console.error('Failed to restore posts state after delete error');
-      }
-    }
-  };
+  // Usuniete jako martwe: handleDeletePost - kasowanie posta obsluguje PostList.
 
   // useEffect do pobierania profilu użytkownika
   const savedNameWrittenRef = useRef<string | null>(null);
@@ -1679,9 +2385,12 @@ export default function BaseChat() {
     const file = event.target.files[0];
     const isAdmin = address.toLowerCase() === ADMIN_ADDRESS;
     
-    // Sprawdź rozmiar pliku - admin bez limitów, użytkownicy max 3MB
-    if (!isAdmin && file.size > 3 * 1024 * 1024) {
-      setModalMessage('Maximum file size is 3MB');
+    // Upload idzie przez /api/upload (twardy sufit trasy: 5MB), wiec admin
+    // tez ma limit - "bez limitu" bylo mozliwe tylko przy uploadzie wprost
+    // z przegladarki tokenem zapisu w bundlu, ktory wlasnie wycielismy.
+    const maxUploadBytes = (isAdmin ? 5 : 3) * 1024 * 1024;
+    if (file.size > maxUploadBytes) {
+      setModalMessage(`Maximum file size is ${isAdmin ? 5 : 3}MB`);
       setModalType('error');
       setShowModal(true);
       return;
@@ -1715,7 +2424,7 @@ export default function BaseChat() {
     }
 
     setSelectedFile(file);
-    const maxSizeText = isAdmin ? 'No file size limit for admin' : 'Maximum file size: 3MB';
+    const maxSizeText = isAdmin ? 'Maximum file size: 5MB' : 'Maximum file size: 3MB';
     const timeRestrictionText = isAdmin ? 'Admin can change anytime.' : 'Next change will be possible in one month.';
     setModalMessage(`Are you sure you want to change your profile picture?\n${timeRestrictionText}\n${maxSizeText}`);
     setModalType('confirm');
@@ -1728,12 +2437,16 @@ export default function BaseChat() {
     
     try {
       setIsUploading(true);
-      
-      // Upload do Vercel Blob
-      const { url } = await put(selectedFile.name, selectedFile, {
-        access: 'public',
-        token: process.env.NEXT_PUBLIC_BLOB_READ_WRITE_TOKEN
-      });
+
+      // Upload przez /api/upload, jak kazdy inny plik w aplikacji. Wczesniej
+      // szedl tu put() prosto z przegladarki tokenem NEXT_PUBLIC_* - czyli
+      // token ZAPISU Bloba lezal w publicznym bundlu JS i kazdy mogl nim
+      // pisac po naszym magazynie. Serwerowa trasa trzyma token u siebie.
+      const form = new FormData();
+      form.append('file', selectedFile);
+      const uploadResponse = await fetch('/api/upload', { method: 'POST', body: form });
+      if (!uploadResponse.ok) throw new Error('Upload failed');
+      const { url } = (await uploadResponse.json()) as { url: string };
 
       // Aktualizuj profil użytkownika
       const userRef = doc(db, 'users', address);
@@ -1752,7 +2465,7 @@ export default function BaseChat() {
       setShowModal(false);
     } catch (error) {
       console.error('Error updating avatar:', error);
-      setModalMessage('Wystąpił błąd podczas zapisywania zdjęcia. Spróbuj ponownie.');
+      setModalMessage('Could not save the image. Try again.');
       setModalType('error');
       setShowModal(true);
     } finally {
@@ -1761,15 +2474,9 @@ export default function BaseChat() {
     }
   };
 
-  // Dodaj funkcję do pobierania danych z BaseScan
-  useEffect(() => {
-    // 🚨 USUNIĘTO: Funkcja fetchData - generowała ogromne koszty Firebase!
-    // Była wywoływana co 5 sekund dla każdego użytkownika i wykonywała:
-    // - getDoc(userRef) - 1 Firebase READ
-    // - updateDoc(userRef) - 1 Firebase WRITE
-    // = 144,000 Firebase operations/godzinę dla 100 użytkowników = $6,892/dzień!
-    // ✅ OSZCZĘDNOŚĆ: Brak niepotrzebnych Firebase reads/writes na stronie BaseChat
-  }, [address, isConnected, baseName]);
+  // Stal tu useEffect z PUSTYM cialem i zaleznoscia [address, isConnected, baseName]
+  // - pozostalosc po skasowanej funkcji fetchData (odpytywala Firebase co 5 sekund).
+  // Sam efekt nic juz nie robil, wiec zniknal razem z komentarzem-nagrobkiem.
 
   // 🚀 ULTRA-CHEAP Funkcja do pobierania nazw użytkowników (95% oszczędności!)
   const fetchUserNames = async (posts: Post[]) => {
@@ -1810,279 +2517,21 @@ export default function BaseChat() {
     }));
   }, []);
 
-  // Simplified post filtering - show all posts since we removed search and "My Posts"
-  const searchFilteredPosts = posts;
+  // Sortowanie, filtr postow przypietych i lazy loading zyly tu w drugiej kopii:
+  // `searchFilteredPosts` -> `nonPinnedPosts` -> `sortedPosts` -> `displayedPosts`
+  // plus `displayLimit` i IntersectionObserver na znaczniku 1px na koncu strony.
+  // Nic z tego nie trafialo do renderu - do PostList idzie surowe `posts`, a
+  // PostList ma wlasny, kompletny lazy loading (`displayLimit`, przycisk "load
+  // more", ten sam limit 150). Jedynym efektem tej kopii bylo dobijanie
+  // `displayLimit` o 15 przy kazdym przecieciu znacznika, czyli przerenderowanie
+  // calej strony bez zadnej zmiany na ekranie. Zostalo usuniete w calosci
+  // razem ze znacznikiem.
 
-  // Filtruj posty przypięte z głównego feeda (są już w sekcji PinnedPosts)
-  const nonPinnedPosts = useMemo(
-    () => searchFilteredPosts.filter(post => !post.isPinned),
-    [searchFilteredPosts]
-  );
-  
-  const sortedPosts = useMemo(() => {
-    return [...nonPinnedPosts].sort((a, b) => {
-      // Sortuj normalnie według timestamp (bez logiki dla postów przypiętych)
-      if (sortOrder === 'newest') {
-        return b.timestamp - a.timestamp;
-      } else {
-        return a.timestamp - b.timestamp;
-      }
-    });
-  }, [nonPinnedPosts, sortOrder]);
-
-  // ⚡ OPTYMALIZACJA: Lazy loading - start z 25, maksymalnie 250 postów
-  const [displayLimit, setDisplayLimit] = useState(15);
-  const loadMoreTriggerRef = useRef<HTMLDivElement | null>(null);
-  const MAX_DISPLAY_LIMIT = 150; // Maksymalnie 150 postów (zmniejszono dla oszczędności)
-
-  // Wczesniej stal tu warunek na `expandedPosts` - mapie {postId: bool}, ktora jest
-  // zawsze truthy, wiec slice nigdy nie dzialal. Stan byl przy tym martwy (nikt go
-  // nie ustawial ani nie czytal), wiec zostal usuniety razem z warunkiem.
-  const displayedPosts = useMemo(
-    () => sortedPosts.slice(0, Math.min(displayLimit, MAX_DISPLAY_LIMIT)),
-    [sortedPosts, displayLimit]
-  );
-
-  // Swieza dlugosc listy przez ref, zeby observer nie byl odtwarzany przy kazdej zmianie postow
-  const sortedPostsLengthRef = useRef(sortedPosts.length);
-  sortedPostsLengthRef.current = sortedPosts.length;
-
-  useEffect(() => {
-    const observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && sortedPostsLengthRef.current > displayLimit && displayLimit < MAX_DISPLAY_LIMIT) {
-        setDisplayLimit(prev => Math.min(prev + 15, MAX_DISPLAY_LIMIT)); // ⚡ OPTYMALIZACJA: Ładuj po 15 postów (-40% Firebase reads)
-      }
-    }, { threshold: 1.0 });
-
-    const trigger = loadMoreTriggerRef.current;
-    if (trigger) {
-      observer.observe(trigger);
-    }
-    return () => {
-      if (trigger) {
-        observer.unobserve(trigger);
-      }
-    };
-  }, [displayLimit]);
-
-  // Funkcja do obsługi edycji posta
-  const handleEditPost = async (postId: string, newContent: string) => {
-    if (!address) return;
-    
-    try {
-      // ✅ OPTIMISTIC UPDATE: Zaktualizuj post w UI natychmiast
-      const updatedPosts = posts.map(post => {
-        if (post.id === postId) {
-          return {
-            ...post,
-        content: newContent,
-            lastEdited: Date.now()
-          };
-        }
-        return post;
-      });
-      
-      setPosts(updatedPosts);
-      setEditingPost(null);
-      setEditedContent('');
-      
-      // Wykonaj rzeczywistą operację w tle
-      const postRef = doc(db, 'posts', postId);
-      await updateDoc(postRef, {
-        content: newContent,
-        lastEdited: serverTimestamp()
-      });
-      
-      // ✅ OPTYMALIZACJA: Usunięto fetchPosts - optimistic update już zaktualizował post
-      // Oszczędność: 50 Firebase reads po każdej edycji posta
-      
-    } catch (error) {
-      console.error('Error editing post:', error);
-      alert('Wystąpił błąd podczas edycji posta. Spróbuj ponownie.');
-      
-      // W przypadku błędu, przywróć dane z serwera
-      try {
-        const { posts: refreshedPosts } = await fetchPosts({ userId: address });
-        setPosts(refreshedPosts);
-      } catch {
-        console.error('Failed to restore posts state after edit error');
-      }
-    }
-  };
-
-  // Funkcja do obsługi edycji komentarza
-  const handleEditComment = async (postId: string, commentId: string, newContent: string) => {
-    if (!address) return;
-    
-    try {
-      // ✅ OPTIMISTIC UPDATE: Zaktualizuj komentarz w UI natychmiast
-      const updatedPosts = posts.map(post => {
-        if (post.id === postId) {
-          const updatedComments = post.comments?.map(comment => {
-            if (comment.id === commentId) {
-              return {
-                ...comment,
-                content: newContent,
-                lastEdited: Date.now()
-              };
-            }
-            return comment;
-          });
-          return { ...post, comments: updatedComments };
-        }
-        return post;
-      });
-      
-      setPosts(updatedPosts);
-      setEditingComment(null);
-      setEditedCommentContent('');
-      
-      // Wykonaj rzeczywistą operację w tle
-      await editComment(postId, commentId, newContent);
-      
-      // ✅ OPTYMALIZACJA: Usunięto fetchPosts - optimistic update już zaktualizował komentarz
-      // Oszczędność: 50 Firebase reads po każdej edycji komentarza
-      
-    } catch (error) {
-      console.error('Error editing comment:', error);
-      alert('An error occurred while editing the comment. Please try again.');
-      
-      // W przypadku błędu, przywróć dane z serwera
-      try {
-        const { posts: refreshedPosts } = await fetchPosts({ userId: address });
-        setPosts(refreshedPosts);
-      } catch {
-        console.error('Failed to restore posts state after comment edit error');
-      }
-    }
-  };
-
-  // Funkcja do obsługi usuwania komentarza
-  const handleDeleteComment = async (postId: string, commentId: string) => {
-    if (!isConnected || !address) return;
-    
-    try {
-      if (confirm('Are you sure you want to delete this comment?')) {
-        // ✅ OPTIMISTIC UPDATE: Usuń komentarz z UI natychmiast
-        const updatedPosts = posts.map(post => {
-          if (post.id === postId) {
-            const updatedComments = post.comments?.filter(comment => comment.id !== commentId);
-            return { ...post, comments: updatedComments };
-          }
-          return post;
-        });
-        
-        setPosts(updatedPosts);
-        
-        // Wykonaj rzeczywistą operację w tle
-        await deleteComment(postId, commentId, address);
-        
-        // ✅ OPTYMALIZACJA: Usunięto fetchPosts - optimistic update już usunął komentarz
-        // Oszczędność: 50 Firebase reads po każdym usunięciu komentarza
-      }
-    } catch (error) {
-      console.error('Error deleting comment:', error);
-      alert('An error occurred while deleting the comment. Please try again.');
-      
-      // W przypadku błędu, przywróć dane z serwera
-      try {
-        const { posts: refreshedPosts } = await fetchPosts({ userId: address });
-        setPosts(refreshedPosts);
-      } catch {
-        console.error('Failed to restore posts state after comment delete error');
-      }
-    }
-  };
-
-  // Dodaj funkcję do obsługi polubienia komentarza
-  const handleToggleCommentLike = async (postId: string, commentId: string) => {
-    if (!address) return;
-    
-    try {
-      // ✅ OPTIMISTIC UPDATE: Aktualizuj UI natychmiast
-      const updatedPosts = posts.map(post => {
-        if (post.id === postId) {
-          const updatedComments = post.comments?.map(comment => {
-            if (comment.id === commentId) {
-              const isLiked = comment.likedBy?.includes(address);
-              return {
-                ...comment,
-                likes: (comment.likes || 0) + (isLiked ? -1 : 1),
-                likedBy: isLiked
-                  ? (comment.likedBy || []).filter(id => id !== address)
-                  : [...(comment.likedBy || []), address]
-              };
-            }
-            return comment;
-          });
-          return { ...post, comments: updatedComments };
-        }
-        return post;
-      });
-      
-      // Zaktualizuj UI natychmiast
-      setPosts(updatedPosts);
-      
-      // Wykonaj rzeczywistą operację w tle
-      await toggleCommentLike(postId, commentId, address);
-      
-      // ✅ OPTYMALIZACJA: Usunięto fetchPosts - optimistic update już zaktualizował UI
-      // Oszczędność: 50 Firebase reads po każdym like komentarza
-      
-    } catch (error) {
-      console.error('Error toggling comment like:', error);
-      // W przypadku błędu, przywróć dane z serwera
-      try {
-        const { posts: refreshedPosts } = await fetchPosts({ userId: address });
-        setPosts(refreshedPosts);
-      } catch {
-        console.error('Failed to restore posts state after comment like error');
-      }
-    }
-  };
-
-  // Dodaj funkcję obsługi odpowiedzi
-  const handleAddReply = async (postId: string, commentId: string, txHash?: string) => {
-    if (!address || !replyContent.trim() || !canCreatePosts) return;
-    
-    try {
-      // Określ network na podstawie chainId
-      let network: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | undefined = undefined;
-      if (chainId === base.id || chainId === baseSepolia.id) {
-        network = 'base';
-      } else if (chainId === BASECAMP_CHAIN_ID) {
-        network = 'basecamp';
-      } else if (chainId === LINEA_CHAIN_ID) {
-        network = 'linea';
-      } else if (chainId === CELO_CHAIN_ID) {
-        network = 'celo';
-      } else if (chainId === ETHEREUM_CHAIN_ID) {
-        network = 'ethereum';
-      } else if (chainId === WORLD_CHAIN_ID) {
-        network = 'worldchain';
-      }
-
-      // Wyczyść formularz natychmiast
-      setReplyingTo(null);
-      setReplyContent('');
-      
-      // Wykonaj rzeczywistą operację
-      await addCommentReply(postId, commentId, {
-        author: address,
-        content: replyContent.trim(),
-        txHash: txHash || null,
-        network: network
-      });
-      
-      // ✅ OPTYMALIZACJA: Usunięto fetchPosts - reply pojawi się po odświeżeniu strony
-      // Oszczędność: 50 Firebase reads po każdym reply
-      // (Alternatywnie: użytkownik może odświeżyć stronę aby zobaczyć reply)
-      
-    } catch (error) {
-      console.error('Error adding reply:', error);
-      alert('An error occurred while adding the reply. Please try again.');
-    }
-  };
+  // Usuniete jako martwe: handleEditPost, handleEditComment, handleDeleteComment,
+  // handleToggleCommentLike i handleAddReply. Zadna z tych piatki nie byla nigdzie
+  // wywolywana ani przekazywana w dol - edycja i kasowanie postow oraz komentarzy
+  // maja wlasne, uzywane implementacje w PostList. Kazda kopia trzymala przy tym
+  // wlasny optymistyczny update i wlasna sciezke ratunkowa z fetchPosts.
 
   // Dodaj nową funkcję do obliczania i zapisywania BaseChat Points
   const calculateAndSaveBaseChatPoints = async () => {
@@ -2144,18 +2593,11 @@ export default function BaseChat() {
   // Dodaj nowe stany dla modalu
   const [currentPage, setCurrentPage] = useState(1);
   const [totalUsersPages, setTotalUsersPages] = useState(5); // 🚀 LIMIT: Maksymalnie 5 stron
-  const [showAllUsers, setShowAllUsers] = useState(false);
-  const usersPerPage = 10;
 
-  // Stany dla wyszukiwarki użytkowników
-  const [userSearchQuery, setUserSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  // ✅ USUNIĘTO: State dla BaseChatPoints - przeniesiono do BuilderProfile
-  // Removed isSearchingAll - now using hybrid search by default
-
-  // Ref dla debounce timer
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Usunieta martwa wyszukiwarka uzytkownikow: `userSearchQuery`, `searchResults`,
+  // `isSearching`, `searchTimeoutRef`, `showAllUsers`, `usersPerPage` oraz
+  // handleUserSearch(). Sama funkcja byla wylaczona (natychmiastowy `return`,
+  // reszta zakomentowana), a zaden z tych stanow nie mial pola ani wyniku w UI.
 
   // 🚀 ZOPTYMALIZOWANA funkcja getActiveUsers - używa nowej paginowanej funkcji
   const getActiveUsers = useCallback(async (forceRefresh: boolean = false) => {
@@ -2191,7 +2633,13 @@ export default function BaseChat() {
 
       // Aktualizuj stan komponentu
       setActiveUsers(result.users);
-      setTotalUsersPages(5); // 🚀 LIMIT: Zawsze 5 stron maksymalnie
+      // RZECZYWISTA liczba stron, nie stala. Bylo tu `setTotalUsersPages(5)`
+      // z komentarzem "zawsze 5 stron maksymalnie" - czyli stopka oglaszala
+      // piec stron takze wtedy, gdy danych starczylo na jedna. Dokladnie ten
+      // sam blad naprawialem pietro nizej, w getTopActiveUsersPaginated:
+      // funkcja raportowala 5 stron i 50 osob, majac w reku 12 rekordow.
+      // Skoro zrodlo mowi juz prawde, nie ma powodu jej tutaj nadpisywac.
+      setTotalUsersPages(result.totalPages);
       setIsLoadingUsers(false);
       setInitialRefreshDone(true);
       
@@ -2238,10 +2686,12 @@ export default function BaseChat() {
   // pobranie zrobione juz przy mouncie. Dane sa odswiezane interwalem ponizej
   // oraz recznie przyciskiem Refresh.
   
-  // Regularne odświeżanie co 10 minut (zwiększono z 2 minut)
+  // Regularne odświeżanie co 30 minut. Bylo 10, dokladnie tyle co TTL cache'u,
+  // wiec kazde tykniecie trafialo w wygasly cache i szlo do Firestore po 60
+  // dokumentow. Lista "najaktywniejszych" nie zmienia sie w tempie minut.
   useEffect(() => {
     if (isMounted) {
-      const refreshInterval = setInterval(() => getActiveUsers(false), 10 * 60 * 1000); // Co 10 minut, używa cache'u
+      const refreshInterval = setInterval(() => getActiveUsers(false), 30 * 60 * 1000);
       
       // Cleanup dla interwału
       return () => {
@@ -2260,68 +2710,6 @@ export default function BaseChat() {
     prevPageRef.current = currentPage;
     getActiveUsers(false);
   }, [currentPage, getActiveUsers, initialRefreshDone]);
-
-  // ===============================================
-  // 🚫 DISABLED: USER SEARCH to save Firebase reads
-  // ===============================================
-  // Funkcja do wyszukiwania użytkowników - WYŁĄCZONA
-  const handleUserSearch = useCallback(async (query: string) => {
-    console.log('🚫 User search DISABLED - saving Firebase reads');
-    setUserSearchQuery(query);
-    setSearchResults([]);
-    setIsSearching(false);
-    
-    // Original search code disabled to save Firebase costs
-    // 💰 Saving: 1000 reads per user visit × 20k users = $1,200/day
-    return;
-    
-    /* DISABLED CODE:
-    if (!query.trim()) {
-      setSearchResults([]);
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-      return;
-    }
-    
-    if (query.length < 2) {
-      setSearchResults([]);
-      return;
-    }
-    
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-    
-    searchTimeoutRef.current = setTimeout(async () => {
-      try {
-        setIsSearching(true);
-        
-        const results = await searchUsersUltraFast(query, 50);
-        
-        const formattedResults = results.map(user => ({
-          address: user.a,
-          name: user.n,
-          avatar: undefined,
-          totalPoints: user.p || 0,
-          postsCount: 0,
-          likesReceived: 0
-        }));
-        
-        setSearchResults(formattedResults.slice(0, 50));
-        console.log(`⚡ Ultra-fast search completed: ${formattedResults.length} results (0 Firebase reads)`);
-        
-      } catch (error) {
-        console.error('❌ Ultra-fast search failed:', error);
-        setSearchResults([]);
-      } finally {
-        setIsSearching(false);
-      }
-    }, 200);
-    */
-  }, []);
-
-  // Removed toggleSearchMode - now using unified hybrid search
 
   // Funkcja renderująca pusty element listy
   const renderEmptyItem = (index: number) => (
@@ -2403,12 +2791,17 @@ export default function BaseChat() {
       </div>
       <div className="flex-1 min-w-0 px-2">
         <div className="flex items-center">
-          <span className={`text-[11px] font-medium truncate ${
+          {/* Tekst z gradientem (bg-clip-text) poszedl: na Androidzie potrafi
+              dac czarne prostokaty zamiast liter (ten sam powod, dla ktorego
+              zniknal z PinnedPosts.tsx), a przy 11px roznica miedzy trzema
+              gradientami i tak byla nieczytelna. Wyroznienie zostaje, tylko
+              robi je waga i kolor tekstu. */}
+          <span className={`truncate text-[11px] ${
             isVitalik
-              ? 'bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-600 text-transparent bg-clip-text font-bold'
-              : userNames[user.address]?.name?.includes('.base.eth') 
-                ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-transparent bg-clip-text' 
-                : 'text-gray-900 dark:text-white'
+              ? 'font-bold text-soft-accent-deep'
+              : userNames[user.address]?.name?.includes('.base.eth')
+                ? 'font-bold text-soft-primary-deep'
+                : 'font-medium text-soft-ink'
           }`}>
             <span>
           {userNames[user.address]?.name?.endsWith('.sphere') ? (
@@ -2453,37 +2846,27 @@ export default function BaseChat() {
           {displayPoints.toLocaleString()} pts
         </div>
       </div>
-      <div 
-        onTouchStart={() => handleViewBuilderProfile(user.address)} 
+      {/* Bylo <div> z onTouchStart ORAZ onClick - na dotyku odpalaly sie oba,
+          wiec profil ladowal sie dwa razy (dwa odczyty z Firestore i dwa
+          ustawienia stanu na jedno tkniecie). Zostal sam onClick, ktory
+          przegladarka wywoluje takze po dotknieciu, a <button> daje focus
+          i obsluge klawiatury za darmo. */}
+      <button
+        type="button"
         onClick={() => handleViewBuilderProfile(user.address)}
+        aria-label={`View profile of ${userNames[user.address]?.name || user.address}`}
         className="text-[11px] px-2 py-1 rounded-md bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 transition-colors cursor-pointer"
       >
         View
-      </div>
+      </button>
     </div>
   )};
 
 
 
-  // Helper function to check if network supports AI
-  const isAINetwork = (network: string): network is 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' => {
-    return ['base', 'basecamp', 'linea', 'celo', 'ethereum', 'worldchain'].includes(network);
-  };
-
-  // AI Generation Handler
-  const handleAIGenerate = () => {
-    if (isAINetwork(activePostingNetwork)) {
-      aiGenerator.generateAIPost(activePostingNetwork);
-    }
-  };
-
-  // Efekt uruchamiany przy montowaniu komponentu
-  useEffect(() => {
-    if (!isMounted) {
-      setIsMounted(true);
-      // Usunięto automatyczne wykonanie funkcji naprawiających strukturę baseChatPoints i dodających bonus BaseName
-    }
-  }, [isMounted]);
+  // Drugi efekt ustawiajacy isMounted zostal usuniety - robil dokladnie to samo,
+  // co ten przy loadInitialData, tyle ze z zaleznoscia [isMounted], czyli sam
+  // wyzwalal wlasne ponowne uruchomienie.
 
   // Wykrywanie urządzeń Apple i naprawianie vh
   useEffect(() => {
@@ -2492,14 +2875,59 @@ export default function BaseChat() {
     const isApple = /iphone|ipad|macintosh|mac os x/.test(userAgent) && !('MSStream' in window);
     setIsAppleDevice(isApple);
     
-    // Naprawianie problemu z vh na iOS
+    /**
+     * ===== DLACZEGO --vh NIE IDZIE ZA KAZDYM `resize` =====
+     *
+     * Feed zacinal sie przy przewijaniu w aplikacji mobilnej i to bylo zrodlo.
+     *
+     * Na telefonie pasek adresu chowa sie i wraca W TRAKCIE przewijania, a
+     * kazde takie drgniecie to zdarzenie `resize`. Poprzednia wersja pisala
+     * przy kazdym z nich `--vh` na <html>. Zmienne CSS SA DZIEDZICZONE, wiec
+     * zapis na korzeniu uniewaznia style KAZDEGO elementu w dokumencie -
+     * przy dlugim feedzie to pelne przeliczenie stylow na klatke przewijania.
+     * W webview miniappki boli to najbardziej, bo ta warstwa i tak zmienia
+     * wysokosc czesciej niz zwykla przegladarka.
+     *
+     * Gorsze: to bylo sprzeczne z samym celem tej sztuczki. `--vh` istnieje po
+     * to, zeby uklad mial STALA wysokosc odniesienia i NIE skakal, gdy pasek
+     * adresu znika. Przeliczanie go przy kazdej zmianie wysokosci sprawialo, ze
+     * uklad skakal dokladnie wtedy, kiedy mial nie skakac.
+     *
+     * Teraz liczymy tylko wtedy, gdy zmienila sie SZEROKOSC (obrot ekranu,
+     * zmiana okna). Zmiana samej wysokosci to pasek adresu i ma byc zignorowana.
+     * Zapis jest dodatkowo pomijany, gdy wartosc wychodzi ta sama, i wpuszczony
+     * w `requestAnimationFrame`, zeby nigdy nie liczyc dwa razy w jednej klatce.
+     */
+    let ostatniaSzerokosc = window.innerWidth;
+    let ostatnieVh = '';
+    let ramka = 0;
+
     const setVh = () => {
-      const vh = window.innerHeight * 0.01;
-      document.documentElement.style.setProperty('--vh', `${vh}px`);
+      const vh = `${window.innerHeight * 0.01}px`;
+      if (vh === ostatnieVh) return; // ten sam wynik - zapis nic nie zmieni, a kosztuje przeliczenie
+      ostatnieVh = vh;
+      document.documentElement.style.setProperty('--vh', vh);
     };
-    
+
+    const onResize = () => {
+      // Sama wysokosc = pasek adresu. Nie ruszamy niczego.
+      if (window.innerWidth === ostatniaSzerokosc) return;
+      ostatniaSzerokosc = window.innerWidth;
+      if (ramka) cancelAnimationFrame(ramka);
+      ramka = requestAnimationFrame(setVh);
+    };
+
+    // Obrot ekranu zmienia wysokosc RAZEM z szerokoscia, ale kolejnosc zdarzen
+    // bywa odwrotna - stad osobny nasluch, ktory liczy bezwarunkowo.
+    const onOrientation = () => {
+      ostatniaSzerokosc = window.innerWidth;
+      if (ramka) cancelAnimationFrame(ramka);
+      ramka = requestAnimationFrame(setVh);
+    };
+
     setVh();
-    window.addEventListener('resize', setVh);
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onOrientation);
     
     // Dodanie styli CSS dla urządzeń Apple
     if (isApple) {
@@ -2530,7 +2958,9 @@ export default function BaseChat() {
     }
     
     return () => {
-      window.removeEventListener('resize', setVh);
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('orientationchange', onOrientation);
+      if (ramka) cancelAnimationFrame(ramka);
     };
   }, []);
 
@@ -2645,25 +3075,20 @@ export default function BaseChat() {
   const handleBackToFeed = () => {
     setActiveMainPanel('feed');
     setSelectedBuilderProfile(null);
+    // Panel edycji mieszka teraz nad wlasnym Builder Profile - wyjscie
+    // z profilu ma go zamykac, inaczej otworzylby sie sam przy nastepnym
+    // wejsciu.
+    setIsEditingProfile(false);
     // Resetowanie tooltipów
-    setHoveredElement(null);
     setHoveredUser(null);
   };
 
   // Na początku pliku po inicjalizacji wszystkich stanów, dodajmy funkcję refreshPosts i zmienną today
   const today = new Date().toISOString().split('T')[0];
 
-  // Pending Pin management functions
-
-  const handlePinConfirmed = (postId: string) => {
-    setPendingPins(prev => {
-      const updated = { ...prev };
-      delete updated[postId];
-      return updated;
-    });
-    
-    console.log(`✅ BaseChat: Post ${postId} pin confirmed, removing pending state`);
-  };
+  // handlePinConfirmed() usuniete jako martwe - nic go nie wywolywalo, wiec wpis
+  // w `pendingPins` nie byl kasowany po potwierdzeniu przypiecia z tego miejsca.
+  // Czysci go PostList, ktory jako jedyny dostaje `pendingPins` i `onPinPending`.
 
   // Funkcja do odświeżania postów
   const refreshPosts = async () => {
@@ -2671,6 +3096,60 @@ export default function BaseChat() {
       await onRefreshPosts();
     }
   };
+
+  /* ===== ZAWARTOSC PANELU TRENDS - JEDNO ZRODLO =====
+     Ten sam blok stoi w dwoch miejscach: w kolumnie bocznej (do progu 2xl
+     i na mobilnej zakladce "Trends") oraz w osobnej prawej kolumnie na
+     najszerszych ekranach - uklad jak w duzych feedach spolecznosciowych:
+     nawigacja i profil po lewej, tresc na srodku, trendy po prawej.
+     Definicja jest jedna, zeby zadna kopia nie rozjechala sie z druga. */
+  const trendsColumnContent = (
+    <>
+      <SoftTrendsPanel
+        stats={[
+          /* Bez String() - `null` ma dojsc do kafla JAKO null.
+             String(null) daje napis "null", ktory compact()
+             przepuszcza bez zmian, wiec kafel z niezmierzona liczba
+             pokazywal slowo "null" zamiast kreski. Znak "nie wiem"
+             wstawia SoftTrendsPanel. */
+          { label: 'Users', value: totalUsers, tone: 'purple' },
+          { label: 'Likes', value: totalLikes, tone: 'amber', note: likesNoteText, detail: likesDetailText },
+          { label: 'Posts', value: totalPosts, tone: 'green' },
+          { label: 'Comments', value: totalComments, tone: 'pink' },
+        ]}
+        /* Cala strona, nie pierwsza piatka. Backend oddaje 10 na
+           stronie i do 5 stron (1-50) - `slice(0, 5)` obcinal to
+           w polowie i kasowal sens stronicowania, bo strona druga
+           pokazywalaby pozycje 11-15 zamiast 11-20. */
+        activeUsers={(activeUsers || []).map((user: any) => ({
+          address: user.address,
+          name: user.name || `${String(user.address).slice(0, 6)}…${String(user.address).slice(-4)}`,
+          points: user.totalPoints ?? user.points ?? 0,
+          avatar: user.avatar ?? null,
+        }))}
+        onOpenUser={(userAddress) => handleViewBuilderProfile(userAddress)}
+        page={currentPage}
+        totalPages={totalUsersPages}
+        onPageChange={setCurrentPage}
+        isLoadingPage={isLoadingUsers}
+      />
+
+      {/* Yaps Stats Widget - ukryty, gdy /yapscan jest wylaczony
+          (config/routeStatus.js). Bez tego kafelek prowadzilby
+          w przekierowanie z powrotem na /basechat. */}
+      <div className={`mt-4 ${isRouteDisabled('/yapscan') ? 'hidden' : ''}`}>
+        <a
+          href="/yapscan"
+          className="flex items-center justify-between rounded-card bg-soft-surface p-4 shadow-card transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+        >
+          <span className="font-soft-display text-[15px] font-bold text-soft-ink">YapScan</span>
+          <svg className="h-4 w-4 text-soft-primary" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <path d="M5 12h14M13 6l6 6-6 6" />
+          </svg>
+        </a>
+      </div>
+    </>
+  );
 
   return (
     <>
@@ -2694,33 +3173,37 @@ export default function BaseChat() {
               </svg>
               <div>
                 <p className="font-semibold text-lg">Welcome to BaseChat! 🎉</p>
-                <p className="text-sm opacity-90">You&apos;re in. Your referral signup went through.</p>
+                <p className="text-sm opacity-90">Your sign-up through the referral link went through</p>
               </div>
             </div>
           </motion.div>
         )}
         
         <div className="min-h-screen relative">
-          {/* Prosty gradient w tle zamiast skomplikowanych efektów */}
-          <div className="fixed inset-0 bg-[#050B20] z-0">
-            {/* Usuwamy wszystkie skomplikowane tła i efekty */}
-            <div className="fixed inset-0 bg-gradient-to-b from-[#050B20] via-[#071030] to-[#050B20] z-0"></div>
-          </div>
+          {/* ===== TLO STRONY - kierunek Soft Social =====
+              Bylo tu prawie czarne #050B20 z gradientem. Na telefonie feed
+              chodzil juz na jasnym `bg-soft-bg` (klasa max-lg: nizej), wiec ta
+              sama aplikacja miala dwa rozne swiaty w zaleznosci od szerokosci
+              ekranu - a na desktopie biale karty swiecily na czerni jak
+              prostokaty podswietlone od tylu. Jedno tlo na obu szerokosciach.
+              Ekran powitalny (SoftSignInHero) byl juz jasny, wiec dopiero
+              teraz reszta strony do niego pasuje. */}
+          <div className="fixed inset-0 bg-soft-bg z-0" />
 
           {/* Dodajemy klasę reduce-animation do elementów z animacjami dla urządzeń Apple */}
           <div className={`relative z-10 ${isAppleDevice ? 'reduce-animation' : ''}`}>
             {/* Widgets */}
             <div className="w-full space-y-1">
-              <div className="w-full bg-white/[.02] backdrop-blur-sm py-1">
-                <gecko-coin-price-marquee-widget 
-                  locale="en" 
+              <div className="w-full bg-soft-surface border-b border-soft-line py-1">
+                <gecko-coin-price-marquee-widget
+                  locale="en"
                   outlined="true"
-                  coin-ids="bitcoin,ethereum,binancecoin,ripple,cardano,solana,polkadot,dogecoin" 
+                  coin-ids="bitcoin,ethereum,binancecoin,ripple,cardano,solana,polkadot,dogecoin"
                   initial-currency="usd"
                 />
               </div>
               {/* Second marquee disabled
-              <div className="w-full bg-white/[.02] backdrop-blur-sm py-1">
+              <div className="w-full bg-white/[.02] py-1">
                 <gecko-coin-price-marquee-widget 
                   locale="en" 
                   outlined="true"
@@ -2731,724 +3214,467 @@ export default function BaseChat() {
               */}
             </div>
 
-            {/* Main content with panels */}
+            {/* ===== UKLAD DESKTOP: DWIE KOLUMNY, NIE TRZY =====
+                Bylo: panel lewy 380px | feed | panel prawy 380px.
+
+                Prawa kolumna nie miala CO pokazywac na desktopie: jedyny
+                komponent w niej, SoftTrendsPanel, byl `lg:hidden`, "Global
+                Statistics" i "Trending Hashtags" zniknely w poprzednim kroku,
+                a kafelek YapScan chowa sie sam, bo /yapscan jest wylaczone
+                w config/routeStatus.js. Zostawalo 380px bialej pustki
+                dosunietej do prawej krawedzi - i zaden desktopowy uzytkownik
+                nie widzial juz ZADNYCH statystyk. `lg:hidden` z Trends poszlo
+                (patrz SoftTrendsPanel), a panel wrocil - w tej kolumnie.
+
+                Teraz jedna kolumna boczna trzyma wszystko, co nie jest feedem
+                (nawigacja, profil, Trends, ranking polecen), a feed dostaje
+                cala reszte szerokosci i wlasna miare czytania. Zawartosc
+                obu paneli zmiescila sie w jednej bez straty - nic nie
+                wypadlo, patrz komentarze przy przeniesionych blokach.
+
+                NA TELEFONIE NIC SIE NIE ZMIENIA W NAWIGACJI: trzy zakladki na
+                dole dalej prowadza do trzech osobnych ekranow. Ten sam
+                kontener obsluguje teraz dwie z nich ('left' i 'right'), a o
+                tym, ktora tresc widac, decyduja dwa opakowania nizej. */}
             <div className="flex h-screen overflow-hidden">
-              {/* Left panel (Profile & Stats) */}
+              {/* Kolumna boczna: nawigacja + profil + Trends */}
               <div className={`${
-                activeMobilePanel === 'left' ? 'fixed inset-0 z-30 pt-[120px] pb-24' : 'hidden'
-              } lg:block lg:relative lg:w-[380px] lg:pt-0 lg:pb-0 bg-white dark:bg-gray-800 overflow-y-auto p-4 mobile-scroll-container`}
+                activeMobilePanel === 'left' || activeMobilePanel === 'right'
+                  ? 'fixed inset-0 z-30 pt-[120px] pb-24'
+                  : 'hidden'
+              } ${
+                /* Niezalogowany desktop: kolumna schodzi z drogi i cala szerokosc
+                   bierze kolumna glowna - a tam stoi teraz ekran powitalny NAD
+                   feedem, nie zamiast niego. Kolumna boczna bez portfela ma do
+                   pokazania wylacznie kartke-zaslepke ("MySphere User",
+                   0x0000...0000, awatar-duch), wiec jej powrot niczego by nie
+                   dolozyl. Na telefonie zostaje - stamtad prowadza do niej
+                   zakladki na dole. */
+                isConnected ? 'lg:block' : 'lg:hidden'
+              } lg:relative lg:w-[352px] xl:w-[280px] 2xl:w-[320px] lg:flex-none lg:pt-6 lg:pb-24 lg:border-r lg:border-soft-line bg-soft-bg overflow-y-auto p-4 lg:px-5 mobile-scroll-container`}
                                  style={{
                    WebkitOverflowScrolling: 'touch',
                    overscrollBehavior: 'contain'
                  }}
                >
-                 {/* Invisible scroll trigger areas for mobile */}
-                 <div className="lg:hidden pointer-events-none absolute inset-0 z-0">
-                   <div className="absolute left-0 top-0 w-8 h-full pointer-events-auto" 
-                        style={{ touchAction: 'pan-y' }}></div>
-                   <div className="absolute right-0 top-0 w-8 h-full pointer-events-auto"
-                        style={{ touchAction: 'pan-y' }}></div>
-                 </div>
-                <div className="mb-8">
-                  {isConnected ? (
-                    <div className="space-y-4">
-                      {/* ProfileCard at the top */}
-                      {address && (
-                        <div className="mb-4 lg:mb-4 -mt-8 lg:mt-0">
-                                                      <div className="relative z-10 flex justify-center items-start w-full">
-                              <ProfileCard
-                                name={userProfile.name || 'MySphere User'}
-                                handle={userProfile.name?.replace('.sphere', '').replace('.camper', '').replace('.celo', '').replace('.world', '') || address.slice(0, 6) + '...' + address.slice(-4)}
-                                status={address.slice(0, 6) + '...' + address.slice(-4)}
-                                fullAddress={address}
-                                contactText="Edit"
-                                avatarUrl={userProfile.avatar || `/favicon_io (1)/android-chrome-192x1921.png`}
-                                miniAvatarUrl={userProfile.avatar}
-                                socialLinks={userProfile.socialLinks}
-                                showUserInfo={true}
-                                enableTilt={true}
-                                onContactClick={() => {
-                                  setIsEditingProfile(!isEditingProfile);
-                                }}
-                                className="w-full max-w-sm"
-                              />
-                            </div>
-                        </div>
-                      )}
+                 {/* Niewidzialne paski "pan-y" przy krawedziach byly obejsciem
+                     karty z tiltem, ktora lapala dotyk i wstrzymywala
+                     przewijanie zakladki Profile. Karta nie renderuje sie juz
+                     na telefonie (patrz ProfileCard nizej), wiec obejscie
+                     zniklo razem z problemem. */}
 
+              {/* ===== PROFIL I NAWIGACJA =====
+                  Na telefonie to zawartosc zakladki "Profile". Na desktopie -
+                  gorna czesc jedynej kolumny bocznej. Opakowanie chowa ja
+                  tylko wtedy, gdy telefon stoi na zakladce "Trends". */}
+              <div className={activeMobilePanel === 'right' ? 'hidden lg:block' : ''}>
 
+                {/* ===== NAWIGACJA NA DESKTOPIE =====
+                    Te szesc pozycji stalo dotad NAD FEEDEM jako siatka
+                    <GlassIcons/>. Handlery sa przeniesione JEDEN DO JEDNEGO,
+                    razem z warunkiem `isConnected` i z galezia `address ? ...`,
+                    ktora dokladala trzy ostatnie pozycje tylko po podlaczeniu
+                    portfela.
 
-                      {/* Modern Edit Profile Panel */}
-                      {isEditingProfile && address && (
-                        <div className="mb-3 relative">
-                          <div className="bg-gradient-to-br from-blue-50/80 via-white/50 to-purple-50/80 dark:from-blue-900/20 dark:via-gray-800/40 dark:to-purple-900/20 backdrop-blur-xl rounded-xl border border-blue-200/50 dark:border-blue-700/30 p-4 shadow-xl">
-                            {/* Header */}
-                            <div className="flex items-center justify-between mb-4">
-                              <div className="flex items-center space-x-2">
-                                <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
-                                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                  </svg>
-                                </div>
-                                <div>
-                                  <h3 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                                    Edit Profile
-                                  </h3>
-                                  <p className="text-xs text-gray-500 dark:text-gray-400">Customize your MySphere identity</p>
-                                </div>
-                              </div>
-                              <button
-                                onClick={() => setIsEditingProfile(false)}
-                                className="w-6 h-6 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center justify-center transition-colors"
-                              >
-                                <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                              </button>
-                            </div>
+                    Dlaczego inna oprawa, skoro zasada brzmi "przemalowac, nie
+                    podmieniac": GlassIcons rysuje sie w siatce `lg:grid-cols-6`
+                    i zaklada CIEMNE tlo (kafle `bg-white/10`, tekst
+                    `text-gray-700`, aktywny gradient niebiesko-fioletowy).
+                    W kolumnie 352px to sie nie miesci, a na jasnym tle aktywny
+                    kafel schodzi ponizej czytelnego kontrastu. Zamiast tego
+                    ta sama lista, ktora telefon ma juz dzis - jedna nawigacja
+                    na obu szerokosciach zamiast dwoch roznych.
 
-                            {/* Profile Picture Section */}
-                            {/* Profile Section - Grid Layout */}
-                            <div className="mb-4 grid grid-cols-2 gap-3">
-                              {/* Profile Picture */}
-                              <div className="bg-white/80 dark:bg-gray-800/80 rounded-lg p-3 border border-gray-200/50 dark:border-gray-600/50">
-                                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center space-x-2">
-                                  <svg className="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                  </svg>
-                                  <span>Profile Picture</span>
-                                </label>
-                                <div className="flex flex-col items-center space-y-2">
-                                  <div className="w-12 h-12 rounded-lg overflow-hidden border-2 border-blue-200 dark:border-blue-700">
-                                    {userProfile.avatar ? (
-                                      <img
-                                        src={userProfile.avatar}
-                                        alt="Current profile"
-                                        className="w-full h-full object-cover"
-                                      />
-                                    ) : (
-                                      <div className="w-full h-full bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900 to-purple-900 flex items-center justify-center">
-                                        <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                        </svg>
-                                      </div>
-                                    )}
-                                  </div>
-                                  <div className="flex flex-col items-center">
-                                    <input
-                                      type="file"
-                                      accept="image/*"
-                                      onChange={async (e) => {
-                                        if (!e.target.files || !e.target.files[0] || !address) return;
-                                        
-                                        const file = e.target.files[0];
-                                        const isAdmin = address.toLowerCase() === ADMIN_ADDRESS;
-                                        
-                                        if (!isAdmin && file.size > 3 * 1024 * 1024) {
-                                          alert('Maximum file size is 3MB');
-                                          return;
-                                        }
-
-                                        // Sprawdź ograniczenia czasowe tylko dla zwykłych użytkowników
-                                        if (!isAdmin) {
-                                        const userRef = doc(db, 'users', address);
-                                        const userDoc = await getDoc(userRef);
-                                        const userData = userDoc.data();
-
-                                        if (userData?.lastImageUpdate) {
-                                          const lastUpdate = userData.lastImageUpdate.toDate();
-                                          const oneMonthAgo = new Date();
-                                          oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-                                          
-                                          if (lastUpdate > oneMonthAgo) {
-                                            const timeToWait = new Date(lastUpdate.getTime() + 30 * 24 * 60 * 60 * 1000);
-                                            const now = new Date();
-                                            const diff = timeToWait.getTime() - now.getTime();
-                                            
-                                            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-                                            const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                                            
-                                            alert(`You can change your profile picture once a month.\nTime remaining: ${days} days and ${hours} hours`);
-                                            return;
-                                            }
-                                          }
-                                        }
-
-                                        setSelectedFile(file);
-                                        const maxSizeText = isAdmin ? 'No file size limit for admin' : 'Maximum file size: 3MB';
-                                        const timeRestrictionText = isAdmin ? 'Admin can change anytime.' : 'Next change will be possible in one month.';
-                                        setModalMessage(`Are you sure you want to change your profile picture?\n${timeRestrictionText}\n${maxSizeText}`);
-                                        setModalType('confirm');
-                                        setShowModal(true);
-                                      }}
-                                      className="hidden"
-                                      id="profile-picture-input"
-                                    />
-                                    <label
-                                      htmlFor="profile-picture-input"
-                                      className="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg hover:from-blue-600 hover:to-purple-600 transition-all cursor-pointer text-xs font-medium shadow-md"
-                                    >
-                                      <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                                      </svg>
-                                      Upload
-                                    </label>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                      Max 3MB
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Upgrade Your Card */}
-                              <div className="bg-white/80 dark:bg-gray-800/80 rounded-lg p-3 border border-gray-200/50 dark:border-gray-600/50">
-                                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center space-x-2">
-                                  <svg className="w-3 h-3 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                                  </svg>
-                                  <span>Card Upgrade</span>
-                                </label>
-                                <div className="flex flex-col items-center space-y-2">
-                                  <div className="w-12 h-12 rounded-lg overflow-hidden border-2 border-orange-200 dark:border-orange-700 bg-gradient-to-br from-orange-100 to-yellow-100 dark:from-orange-900 dark:to-yellow-900 flex items-center justify-center">
-                                    <svg className="w-6 h-6 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                                    </svg>
-                                  </div>
-                                  <div className="flex flex-col items-center">
-                                    <div className="relative group">
-                                      <button
-                                        className="inline-flex items-center px-3 py-1.5 bg-gradient-to-r from-orange-500 to-yellow-500 text-white rounded-lg hover:from-orange-600 hover:to-yellow-600 transition-all cursor-pointer text-xs font-medium shadow-md opacity-75 cursor-not-allowed"
-                                        disabled
-                                      >
-                                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                                        </svg>
-                                        Upgrade Your Card
-                                      </button>
-                                      {/* Tooltip */}
-                                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
-                                        soon
-                                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
-                                      </div>
-                                    </div>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 text-center">
-                                      Premium features
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Username Section - only if no baseName */}
-                            {!baseName && (
-                              <div className="mb-4">
-                                <div className="bg-white/80 dark:bg-gray-800/80 rounded-lg p-3 border border-gray-200/50 dark:border-gray-600/50">
-                                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center space-x-2">
-                                    <svg className="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                    </svg>
-                                    <span>Username</span>
-                                  </label>
-                                  <div className="space-y-3">
-                                    <div className="space-y-2">
-                                      <input
-                                        type="text"
-                                        value={customName}
-                                        onChange={(e) => setCustomName(e.target.value)}
-                                        placeholder="Enter username"
-                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                      />
-                                      <div className="flex items-center space-x-2">
-                                        <span className="text-gray-500 text-sm">Choose domain:</span>
-                                        <select
-                                          value={selectedSuffix}
-                                          onChange={(e) => setSelectedSuffix(e.target.value as 'sphere' | 'camper' | 'celo' | 'world')}
-                                          className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        >
-                                          <option value="sphere">.sphere (+1500 pts!)</option>
-                                          <option value="camper">.camper (+1000 pts!)</option>
-                                          <option value="celo">.celo (+1250 pts!)</option>
-                                          <option value="world">.world (+1250 pts!)</option>
-                                        </select>
-                                      </div>
-                                    </div>
-                                    <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg p-2 border border-blue-200/30 dark:border-purple-700/30">
-                                      <div className="text-center text-xs text-gray-600 dark:text-gray-400">
-                                        Preview: <span className="font-medium text-gray-900 dark:text-white">{customName || 'username'}</span>.
-                                        <span className={
-                                          selectedSuffix === 'sphere' ? 'text-blue-500 font-medium' :
-                                          selectedSuffix === 'camper' ? 'text-orange-500 font-medium' :
-                                          selectedSuffix === 'celo' ? 'text-yellow-500 font-medium' :
-                                          'text-green-500 font-medium'
-                                        }>
-                                          {selectedSuffix}
-                                        </span>
-                                        {selectedSuffix === 'sphere' && <span className="text-blue-600 ml-1">+1500 pts!</span>}
-                                        {selectedSuffix === 'camper' && <span className="text-orange-600 ml-1">🏕️ +1000 pts!</span>}
-                                        {selectedSuffix === 'celo' && <span className="text-yellow-600 ml-1">+1250 pts!</span>}
-                                        {selectedSuffix === 'world' && <span className="text-green-600 ml-1">+1250 pts!</span>}
-                                      </div>
-                                    </div>
-                                    <button
-                                      onClick={handleSaveCustomName}
-                                      className="w-full px-3 py-1.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all font-medium text-xs"
-                                    >
-                                      Save Username
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Social Links Section */}
-                            <div className="mb-4">
-                              <div className="bg-white/80 dark:bg-gray-800/80 rounded-lg p-3 border border-gray-200/50 dark:border-gray-600/50">
-                                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center space-x-2">
-                                  <svg className="w-3 h-3 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                                  </svg>
-                                  <span>Social Links</span>
-                                </label>
-                                <div className="space-y-2">
-                                  {/* Twitter */}
-                                  <div className="flex items-center space-x-2">
-                                    <div className="w-8 h-8 bg-blue-500/10 dark:bg-blue-500/20 rounded-lg flex items-center justify-center">
-                                      <svg className="w-4 h-4 text-blue-500" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                                      </svg>
-                                    </div>
-                                    <div className="flex-1">
-                                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">X (Twitter)</label>
-                                      <input
-                                        type="text"
-                                        value={userProfile.socialLinks?.twitter || ''}
-                                        onChange={(e) => setUserProfile(prev => ({
-                                          ...prev,
-                                          socialLinks: {
-                                            ...prev.socialLinks,
-                                            twitter: e.target.value
-                                          }
-                                        }))}
-                                        placeholder="username"
-                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                      />
-                                    </div>
-                                  </div>
-
-                                  {/* Farcaster */}
-                                  <div className="flex items-center space-x-2">
-                                    <div className="w-8 h-8 bg-purple-500/10 dark:bg-purple-500/20 rounded-lg flex items-center justify-center">
-                                      <img src="/icon.png" alt="Farcaster" className="w-4 h-4" />
-                                    </div>
-                                    <div className="flex-1">
-                                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Farcaster/Warpcast</label>
-                                      <input
-                                        type="text"
-                                        value={userProfile.socialLinks?.farcaster || ''}
-                                        onChange={(e) => setUserProfile(prev => ({
-                                          ...prev,
-                                          socialLinks: {
-                                            ...prev.socialLinks,
-                                            farcaster: e.target.value
-                                          }
-                                        }))}
-                                        placeholder="username"
-                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                      />
-                                    </div>
-                                  </div>
-
-                                  {/* Discord */}
-                                  <div className="flex items-center space-x-2">
-                                    <div className="w-8 h-8 bg-indigo-500/10 dark:bg-indigo-500/20 rounded-lg flex items-center justify-center">
-                                      <svg className="w-4 h-4 text-indigo-500" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M19.27 5.33C17.94 4.71 16.5 4.26 15 4a.09.09 0 0 0-.07.03c-.18.33-.39.76-.53 1.09a16.09 16.09 0 0 0-4.8 0c-.14-.34-.35-.76-.54-1.09-.01-.02-.04-.03-.07-.03-1.5.26-2.93.71-4.27 1.33-.01 0-.02.01-.03.02-2.72 4.07-3.47 8.03-3.1 11.95 0 .02.01.04.03.05 1.8 1.32 3.53 2.12 5.24 2.65.03.01.06 0 .07-.02.4-.55.76-1.13 1.07-1.74.02-.04 0-.08-.04-.09-.57-.22-1.11-.48-1.64-.78-.04-.02-.04-.08-.01-.11.11-.08.22-.17.33-.25.02-.02.05-.02.07-.01 3.44 1.57 7.15 1.57 10.55 0 .02-.01.05-.01.07.01.11.09.22.17.33.26.04.03.04.09-.01.11-.52.31-1.07.56-1.64.78-.04.01-.05.06-.04.09.32.61.68 1.19 1.07 1.74.03.01.06.02.09.01 1.72-.53 3.45-1.33 5.25-2.65.02-.01.03-.03.03-.05.44-4.53-.73-8.46-3.1-11.95-.01-.01-.02-.02-.04-.02zM8.52 14.91c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12 0 1.17-.84 2.12-1.89 2.12zm6.97 0c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12 0 1.17-.83 2.12-1.89 2.12z"/>
-                                      </svg>
-                                    </div>
-                                    <div className="flex-1">
-                                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Discord</label>
-                                      <input
-                                        type="text"
-                                        value={userProfile.socialLinks?.discord || ''}
-                                        onChange={(e) => setUserProfile(prev => ({
-                                          ...prev,
-                                          socialLinks: {
-                                            ...prev.socialLinks,
-                                            discord: e.target.value
-                                          }
-                                        }))}
-                                        placeholder="username"
-                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                                      />
-                                    </div>
-                                  </div>
-
-                                  <button
-                                    onClick={async () => {
-                                      if (!address) return;
-                                      
-                                      try {
-                                        const userRef = doc(db, 'users', address);
-                                        await updateDoc(userRef, {
-                                          socialLinks: userProfile.socialLinks || {},
-                                          lastUpdated: serverTimestamp()
-                                        });
-                                        
-                                        alert('Social links saved successfully!');
-                                      } catch (error) {
-                                        console.error('Error saving social links:', error);
-                                        alert('Error saving social links. Please try again.');
-                                      }
-                                    }}
-                                    className="w-full px-3 py-1.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all font-medium text-xs"
-                                  >
-                                    Save Social Links
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Action Buttons */}
-                            <div className="flex space-x-2">
-                              <button
-                                onClick={() => setIsEditingProfile(false)}
-                                className="flex-1 px-3 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all font-medium text-xs flex items-center justify-center space-x-1"
-                              >
-                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                </svg>
-                                <span>Done</span>
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-
-
-
-
-                      {/* YapYap Integration - moved outside About Me */}
-                      {address && (
-                        <div className="mb-4">
-                          <div className="bg-white dark:bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                            <YapsMetrics address={address} />
-                            <div className="mt-3 pt-2 border-t border-gray-100 flex items-center justify-center">
-                              <div className="flex items-center">
-                                <div className="text-xs text-gray-400 mr-1">Powered by</div>
-                                <div className="text-xs font-medium text-blue-600 flex items-center">
-                                  <svg className="w-4 h-4 mx-1" viewBox="0 0 24 24" fill="currentColor">
-                                    <circle cx="12" cy="12" r="10" fill="currentColor" />
-                                    <path d="M12 8v4M12 16h.01" stroke="white" strokeWidth="2" strokeLinecap="round" />
-                                  </svg>
-                                  Kaito.ai
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Bio Section - Moved and restyled */}
-                      <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl mt-4">
-                        <div className="flex justify-between items-center mb-3">
-                          <div className="flex items-center space-x-2">
-                            <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                            </svg>
-                            <div className="text-lg font-semibold bg-gradient-to-r from-blue-500 to-purple-500 text-transparent bg-clip-text">About Me</div>
-                          </div>
-                          <button
-                            onClick={async () => {
-                              if (!address) return;
-                              
-                              // Sprawdź ostatnią edycję bio
-                              const userRef = doc(db, 'users', address);
-                              const userDoc = await getDoc(userRef);
-                              const lastBioUpdate = userDoc.data()?.lastBioUpdate?.toDate() || new Date(0);
-                              const now = new Date();
-                              
-                              // Sprawdź czy minęło 24h od ostatniej edycji
-                              if (now.getTime() - lastBioUpdate.getTime() < 24 * 60 * 60 * 1000) {
-                                const nextUpdate = new Date(lastBioUpdate.getTime() + 24 * 60 * 60 * 1000);
-                                const hoursLeft = Math.ceil((nextUpdate.getTime() - now.getTime()) / (1000 * 60 * 60));
-                                alert(`You can edit your bio once per day. ${hoursLeft} hours remaining.`);
-                                return;
-                              }
-
-                              const newBio = prompt('Enter your bio (max 90 characters):', userProfile.bio);
-                              if (newBio && newBio.length <= 90) {
-                                await updateDoc(userRef, { 
-                                  bio: newBio,
-                                  lastBioUpdate: serverTimestamp()
+                    NIC NIE UBYLO: szesc akcji = szesc akcji, ta sama tresc
+                    etykiet, to samo `isActive`. */}
+                {isConnected && (
+                  <SoftSectionList
+                    className="mb-6 hidden lg:flex"
+                    ariaLabel="Browse"
+                    variant="compact"
+                    sections={[
+                      {
+                        id: 'desktop-feed',
+                        label: 'All Posts',
+                        description: 'Everything, newest first',
+                        icon: <LayoutGrid className="w-5 h-5" />,
+                        isActive: activeMainPanel === 'feed',
+                        onSelect: () => {
+                          setSelectedTag('');
+                          setSelectedAuthor('');
+                          setActiveMainPanel('feed');
+                          clearViewParams();
+                        },
+                      },
+                      {
+                        id: 'desktop-profile',
+                        label: 'My Profile',
+                        description: 'Your builder profile',
+                        icon: <UserCircle className="w-5 h-5" />,
+                        isActive: activeMainPanel === 'builders',
+                        onSelect: () => {
+                          if (address) {
+                            handleViewBuilderProfile(address);
+                            clearViewParams();
+                          } else {
+                            toast.error('Connect your wallet to view builder profiles');
+                          }
+                        },
+                      },
+                      {
+                        id: 'desktop-myfeed',
+                        label: showMyFeed ? 'All Posts' : 'My Feed',
+                        description: 'Only your own posts',
+                        icon: <Rss className="w-5 h-5" />,
+                        isActive: showMyFeed,
+                        onSelect: () => {
+                          setShowMyFeed(!showMyFeed);
+                          clearViewParams();
+                          if (isConnected && address) {
+                            const loadPosts = async () => {
+                              try {
+                                setIsLoadingPosts(true);
+                                const { posts: fetchedPosts } = await fetchPosts({
+                                  userId: address,
+                                  ...(!showMyFeed ? { authorFilter: address } : {})
                                 });
-                                setUserProfile(prev => ({ ...prev, bio: newBio }));
+                                setPosts(fetchedPosts);
+                              } catch (error) {
+                                console.error('Error fetching posts:', error);
+                              } finally {
+                                setIsLoadingPosts(false);
                               }
-                            }}
-                            className="flex items-center space-x-1 text-sm text-blue-500 hover:text-blue-600 transition-colors duration-200"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                            <span>Edit</span>
-                          </button>
-                        </div>
-                        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-inner">
-                          <div className="text-gray-600 dark:text-gray-300 leading-relaxed">
-                            {userProfile.bio || 
-                              <span className="text-gray-400 italic flex items-center justify-center space-x-2">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                <span>Click Edit to add your bio</span>
-                              </span>
-                            }
-                          </div>
-                        </div>
-                      </div>
+                            };
+                            loadPosts();
+                          }
+                        },
+                      },
+                      ...(address ? [
+                        {
+                          id: 'desktop-following',
+                          label: 'Follows',
+                          description: 'Only people you follow',
+                          icon: <Eye className="w-5 h-5" />,
+                          isActive: activeMainPanel === 'following',
+                          onSelect: () => {
+                            setActiveMainPanel('following');
+                            clearViewParams();
+                          },
+                        },
+                        {
+                          id: 'desktop-friends',
+                          label: 'Friends',
+                          description: 'People you both follow',
+                          icon: <Users className="w-5 h-5" />,
+                          isActive: activeMainPanel === 'friends',
+                          onSelect: () => {
+                            setActiveMainPanel('friends');
+                            clearViewParams();
+                          },
+                        },
+                        {
+                          id: 'desktop-discover',
+                          label: 'Discover',
+                          description: 'Find people to follow',
+                          icon: <Compass className="w-5 h-5" />,
+                          isActive: activeMainPanel === 'discover',
+                          onSelect: () => {
+                            setActiveMainPanel('discover');
+                            clearViewParams();
+                          },
+                        }
+                      ] : [])
+                    ]}
+                  />
+                )}
 
-                      {/* Base Tracking Identity Link */}
-                      <div className="mt-4">
-                        <a
-                          href="/profile"
-                          className="block w-full p-6 bg-gradient-to-r from-gray-900 via-blue-900 to-black rounded-xl text-center hover:from-black hover:via-blue-800 hover:to-gray-800 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
-                        >
-                          <div className="flex items-center justify-center mb-3">
-                            <svg className="w-8 h-8 text-white mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-                            </svg>
-                            <div className="flex items-center">
-                              <span className="text-white text-xl font-bold mr-2">Sphere Identity</span>
-                              <div className="flex items-center gap-1 px-2 py-1 bg-white/10 rounded-full">
-                                <svg className="w-4 h-4" viewBox="0 0 146 146" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                  <circle cx="73" cy="73" r="73" fill="#0052FF"/>
-                                  <path d="M73.323 123.729C101.617 123.729 124.553 100.832 124.553 72.5875C124.553 44.343 101.617 21.4463 73.323 21.4463C46.4795 21.4463 24.4581 42.0558 22.271 68.2887H89.9859V76.8864H22.271C24.4581 103.119 46.4795 123.729 73.323 123.729Z" fill="white"/>
-                                </svg>
-                                <span className="text-white text-xs font-medium">Base</span>
-                              </div>
-                            </div>
-                          </div>
-                          <p className="text-blue-200 text-sm mb-2">
-                            See your on-chain identity and activity in one place
-                          </p>
-                          <div className="flex items-center justify-center text-blue-300 text-xs">
-                            <span>Transactions • Tokens • NFTs • Contracts</span>
-                            <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                            </svg>
-                          </div>
-                        </a>
-                      </div>
+                {/* ===== LEWA KOLUMNA TO JUZ TYLKO NAWIGACJA =====
+                    Staly tu jeszcze: naglowek profilu na telefonie
+                    (SoftProfileHeader), karta ProfileCard z tiltem na
+                    desktopie, sekcja "About Me" z edycja bio, socjale
+                    i kafel Sphere Identity. Wszystkie cztery mowily o TOBIE,
+                    czyli o tym samym, co Builder Profile - a Builder Profile
+                    jest osobnym, pelnym ekranem, do ktorego prowadzi pozycja
+                    "My Profile" tej samej listy nizej.
 
-                      {/* Referral Leaderboard */}
-                      <div className="mb-4">
-                        <ReferralLeaderboard />
-                      </div>
-                  </div>
-                ) : (
-                  <div className="space-y-4 pointer-events-none">
-                    {/* ProfileCard at the top */}
-                    <div className="mb-4 lg:mb-4 -mt-8 lg:mt-0">
-                      <div className="relative z-10 flex justify-center items-start w-full">
-                        <ProfileCard
-                          name={'MySphere User'}
-                          handle={'mysphere-user'}
-                          status={'0x0000...0000'}
-                          fullAddress={'0x0000000000000000000000000000000000000000'}
-                          contactText="Edit"
-                          avatarUrl={`/ghostavatar.png`}
-                          miniAvatarUrl={`/ghostavatar.png`}
-                          socialLinks={{}}
-                          showUserInfo={true}
-                          enableTilt={true}
-                          onContactClick={() => {}}
-                          className="w-full max-w-sm"
-                        />
-                      </div>
-                    </div>
+                    Przez to "My Profile" znaczylo dwie rozne rzeczy zaleznie od
+                    szerokosci: na desktopie przelaczalo kolumne glowna na
+                    Builder Profile, a na telefonie dolna zakladka o tej samej
+                    nazwie otwierala TEN panel. Jedna nazwa, dwa ekrany, i pelny
+                    profil praktycznie nieosiagalny z telefonu.
 
-                    {/* Referral Leaderboard */}
-                    <div className="mb-4">
-                      <ReferralLeaderboard />
-                    </div>
+                    NIC NIE ZGINELO: bio wraz z ta sama regula "raz na dobe"
+                    oraz socjale sa juz w BuilderProfile.tsx (patrz saveBio
+                    i <ProfileSocials/> tam), a kafel Sphere Identity zostal
+                    tam przeniesiony w tej samej zmianie. Kafel YapScan i tak
+                    sie nie rysowal, bo /yapscan jest wylaczony
+                    w config/routeStatus.js. */}
+                <div className="mb-8">
+                  {isConnected && (
+                      /* ===== PRZELACZNIK WIDOKOW - TYLKO NA TELEFONIE =====
+                          "All Posts / My Profile / Follows / Friends / Discover"
+                          siedzialy dotad na gorze glownego feedu, jako rzad
+                          kolorowych kafli. Zabieraly pierwszy ekran telefonu
+                          i konkurowaly z trescia, po ktora ludzie tu przychodza
+                          - a wiekszosc pozycji to wcale nie jest feed, tylko
+                          osobne widoki.
 
-                    {/* YapYap Integration */}
-                    <div className="mb-4">
-                      <div className="bg-white dark:bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                        <YapsMetrics address={''} />
-                        <div className="mt-3 pt-2 border-t border-gray-100 flex items-center justify-center">
-                          <div className="flex items-center">
-                            <div className="text-xs text-gray-400 mr-1">Powered by</div>
-                            <div className="text-xs font-medium text-blue-600 flex items-center">
-                              <svg className="w-4 h-4 mx-1" viewBox="0 0 24 24" fill="currentColor">
-                                <circle cx="12" cy="12" r="10" fill="currentColor" />
-                                <path d="M12 8v4M12 16h.01" stroke="white" strokeWidth="2" strokeLinecap="round" />
-                              </svg>
-                              Kaito.ai
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                          Tak samo rozwiazuje to Twitter: os czasu jest sama,
+                          a wszystko "moje" siedzi za profilem.
 
-                    {/* Bio Section */}
-                    <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl mt-4">
-                      <div className="flex justify-between items-center mb-3">
-                        <div className="flex items-center space-x-2">
-                          <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                          </svg>
-                          <div className="text-lg font-semibold bg-gradient-to-r from-blue-500 to-purple-500 text-transparent bg-clip-text">About Me</div>
-                        </div>
-                        <button className="flex items-center space-x-1 text-sm text-blue-500 hover:text-blue-600 transition-colors duration-200">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                          <span>Edit</span>
-                        </button>
-                      </div>
-                      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-inner">
-                        <div className="text-gray-600 dark:text-gray-300 leading-relaxed">
-                          Building DeFi stuff on Base 🚀 Into Web3 and NFTs. Always learning, always building! 💙
-                        </div>
-                      </div>
-                    </div>
+                          Na desktopie nic sie nie zmienia - tam jest miejsce
+                          w bok i rzad kafli nikomu nie przeszkadza. */
+                    <SoftSectionList
+                        className="mb-4 lg:hidden"
+                        sections={[
+                          {
+                            id: 'feed',
+                            label: 'All Posts',
+                            description: 'Everything, newest first',
+                            icon: <LayoutGrid className="w-5 h-5" />,
+                            isActive: activeMainPanel === 'feed',
+                            onSelect: () => {
+                              setSelectedTag('');
+                              setSelectedAuthor('');
+                              setActiveMainPanel('feed');
+                              clearViewParams();
+                              setActiveMobilePanel('main');
+                            },
+                          },
+                          {
+                            // Telefon nie mial ZADNEJ drogi do wlasnego Builder
+                            // Profile - pozycja "My Profile" istniala tylko w
+                            // liscie desktopowej. Ten sam handler co tam;
+                            // handleViewBuilderProfile sam przelacza na panel
+                            // glowny ponizej progu lg.
+                            id: 'profile',
+                            label: 'My Profile',
+                            description: 'Your builder profile',
+                            icon: <UserCircle className="w-5 h-5" />,
+                            isActive: activeMainPanel === 'builders',
+                            onSelect: () => {
+                              if (address) {
+                                handleViewBuilderProfile(address);
+                                clearViewParams();
+                              } else {
+                                toast.error('Connect your wallet to view builder profiles');
+                              }
+                            },
+                          },
+                          {
+                            id: 'following',
+                            label: 'Follows',
+                            description: 'Only people you follow',
+                            // Ikony sa teraz TAKIE SAME jak w liscie desktopowej
+                            // nizej. Wczesniej Rss oznaczalo tu "Follows",
+                            // a na desktopie "My Feed" - ten sam znak dwie
+                            // rozne rzeczy, w zaleznosci od szerokosci ekranu.
+                            icon: <Eye className="w-5 h-5" />,
+                            isActive: activeMainPanel === 'following',
+                            onSelect: () => {
+                              setActiveMainPanel('following');
+                              setActiveMobilePanel('main');
+                            },
+                          },
+                          {
+                            id: 'friends',
+                            label: 'Friends',
+                            description: 'People you both follow',
+                            icon: <Users className="w-5 h-5" />,
+                            isActive: activeMainPanel === 'friends',
+                            onSelect: () => {
+                              setActiveMainPanel('friends');
+                              setActiveMobilePanel('main');
+                            },
+                          },
+                          {
+                            id: 'discover',
+                            label: 'Discover',
+                            description: 'Find people to follow',
+                            icon: <Compass className="w-5 h-5" />,
+                            isActive: activeMainPanel === 'discover',
+                            onSelect: () => {
+                              setActiveMainPanel('discover');
+                              setActiveMobilePanel('main');
+                            },
+                          },
+                        ]}
+                      />
+                  )}
+                </div>
+              </div>
 
-                    {/* Base Tracking Identity Link */}
-                    <div className="mt-4">
-                      <div className="block w-full p-6 bg-gradient-to-r from-gray-900 via-blue-900 to-black rounded-xl text-center hover:from-black hover:via-blue-800 hover:to-gray-800 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl">
-                        <div className="flex items-center justify-center mb-3">
-                          <svg className="w-8 h-8 text-white mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-                          </svg>
-                          <div className="flex items-center">
-                            <span className="text-white text-xl font-bold mr-2">Sphere Identity</span>
-                            <div className="flex items-center gap-1 px-2 py-1 bg-white/10 rounded-full">
-                              <svg className="w-4 h-4" viewBox="0 0 146 146" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <circle cx="73" cy="73" r="73" fill="#0052FF"/>
-                                <path d="M73.323 123.729C101.617 123.729 124.553 100.832 124.553 72.5875C124.553 44.343 101.617 21.4463 73.323 21.4463C46.4795 21.4463 24.4581 42.0558 22.271 68.2887H89.9859V76.8864H22.271C24.4581 103.119 46.4795 123.729 73.323 123.729Z" fill="white"/>
-                              </svg>
-                              <span className="text-white text-xs font-medium">Base</span>
-                            </div>
-                          </div>
-                        </div>
-                        <p className="text-blue-200 text-sm mb-2">
-                          See your on-chain identity and activity in one place
-                        </p>
-                        <div className="flex items-center justify-center text-blue-300 text-xs">
-                          <span>Transactions • Tokens • NFTs • Contracts</span>
-                          <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                          </svg>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-          )}
+              {/* ===== TRENDS - PRZENIESIONE Z PRAWEGO PANELU =====
+                  Ten sam <SoftTrendsPanel/> z tymi samymi propsami i ten sam
+                  kafelek YapScan. Nie ma tu drugiego zrodla liczb ani drugiego
+                  komponentu - blok zostal przeniesiony, nie odtworzony.
+
+                  NA TELEFONIE: zakladka "Trends" na dole dalej otwiera dokladnie
+                  to i tylko to (blok wyzej jest wtedy schowany), wiec trzy
+                  zakladki nadal prowadza do trzech roznych ekranow.
+                  NA DESKTOPIE: siedzi pod profilem w tej samej kolumnie,
+                  oddzielony linia - dlatego przestal byc potrzebny osobny
+                  panel po prawej. */}
+              {/* Tresc panelu jest zdefiniowana raz, w `trendsColumnContent`
+                  nad returnem. Historia bloku (usuniete "Global Statistics"
+                  i "Trending Hashtags") - patrz komentarz przy tej definicji
+                  oraz git log; kafelek YapScan chowa sie sam, gdy /yapscan
+                  jest wylaczony w config/routeStatus.js.
+
+                  `xl:hidden`: od 1280px ten sam blok stoi w osobnej prawej
+                  kolumnie, wiec kopia w kolumnie bocznej schodzi - inaczej
+                  Trends widnialoby dwa razy naraz. Prog byl wczesniej `2xl`
+                  i przez to na typowym laptopie (1280-1535px) trzeciej
+                  kolumny w ogole nie bylo. */}
+              <div
+                className={`${
+                  activeMobilePanel === 'right' ? 'block' : 'hidden lg:block'
+                } xl:hidden lg:mt-8 lg:border-t lg:border-soft-line lg:pt-6`}
+              >
+                {trendsColumnContent}
               </div>
             </div>
 
-            {/* Middle panel (Feed) */}
-            <div className={`flex-1 p-4 overflow-y-auto ${
+            {/* ===== KOLUMNA GLOWNA: SAM FEED =====
+                Stala tu wczesniej nawigacja (szesc kafli GlassIcons) nad
+                trescia. Poszla do kolumny bocznej - zostal kompozytor i lista
+                postow, czyli to, po co ludzie tu wchodza.
+
+                MIARA CZYTANIA. Kolumna bierze cala wolna szerokosc, ale tresc
+                w srodku konczy sie na 640px i stoi na srodku. Bez tego na
+                szerokim monitorze linia tekstu w poscie ciagnela sie przez
+                cala reszte ekranu i oko gubilo poczatek nastepnej. */}
+            <div className={`flex-1 overflow-y-auto bg-soft-bg p-4 lg:px-8 lg:pt-6 lg:pb-24 ${
               activeMobilePanel === 'main' ? 'block w-full' : 'hidden lg:block'
             }`}>
-              {/* Post switcher and network selection - only for logged in users */}
-              {isConnected && (
-              <div className="bg-white dark:bg-gray-800 rounded-xl p-3 shadow-sm mb-4">
-                <div className="flex flex-col gap-3">
-                  {/* Main filters row - Glass Icons */}
-                  <div className="relative">
-                    <GlassIcons
-                      items={[
-                        {
-                          icon: <LayoutGrid className="w-5 h-5" />,
-                          label: 'All Posts',
-                          onClick: () => {
-                            setSelectedTag('');
-                            setSelectedAuthor('');
-                            setActiveMainPanel('feed');
-                            clearViewParams();
-                          },
-                          isActive: activeMainPanel === 'feed'
-                        },
-                        {
-                          icon: <UserCircle className="w-5 h-5" />,
-                          label: 'My Profile',
-                          onClick: () => {
-                            if (address) {
-                              handleViewBuilderProfile(address);
-                              clearViewParams();
-                            } else {
-                              toast.error('Connect your wallet to view builder profiles');
-                            }
-                          },
-                          isActive: activeMainPanel === 'builders'
-                        },
-                        {
-                          icon: <Rss className="w-5 h-5" />,
-                          label: showMyFeed ? 'All Posts' : 'My Feed',
-                          onClick: () => {
-                            setShowMyFeed(!showMyFeed);
-                            clearViewParams();
-                            if (isConnected && address) {
-                              const loadPosts = async () => {
-                                try {
-                                  setIsLoadingPosts(true);
-                                  const { posts: fetchedPosts } = await fetchPosts({ 
-                                    userId: address,
-                                    ...(!showMyFeed ? { authorFilter: address } : {})
-                                  });
-                                  setPosts(fetchedPosts);
-                                } catch (error) {
-                                  console.error('Error fetching posts:', error);
-                                } finally {
-                                  setIsLoadingPosts(false);
-                                }
-                              };
-                              loadPosts();
-                            }
-                          },
-                          isActive: showMyFeed
-                        },
-                        ...(address ? [
-                          {
-                            icon: <Eye className="w-5 h-5" />,
-                            label: 'Follows',
-                            onClick: () => {
-                              setActiveMainPanel('following');
-                              clearViewParams();
-                            },
-                            isActive: activeMainPanel === 'following'
-                          },
-                          {
-                            icon: <Users className="w-5 h-5" />,
-                            label: 'Friends',
-                            onClick: () => {
-                              setActiveMainPanel('friends');
-                              clearViewParams();
-                            },
-                            isActive: activeMainPanel === 'friends'
-                          },
-                          {
-                            icon: <Compass className="w-5 h-5" />,
-                            label: 'Discover',
-                            onClick: () => {
-                              setActiveMainPanel('discover');
-                              clearViewParams();
-                            },
-                            isActive: activeMainPanel === 'discover'
-                          }
-                        ] : [])
-                      ]}
-                    />
-                  </div>
-                 </div>
-              </div>
-              )}
+              {/* ===== EKRAN POWITALNY: SAM, POZA KOLUMNA FEEDU =====
+                  DLA NIEZALOGOWANEGO GOSCIA TO JEST CALA STRONA. Nic pod nim
+                  nie stoi.
 
-              {/* Network Filter tabs - Gooey Nav */}
+                  Byla tu przez chwile wersja z feedem pod spodem - argument
+                  brzmial, ze te same posty sa i tak jawne pod /post/[id]
+                  oraz /u/[address], wiec bramka niczego nie chroni. Argument
+                  jest prawdziwy i nadal obowiazuje (linki z zewnatrz otwieraja
+                  sie normalnie), ale nie o to tu chodzi: pierwszy ekran ma
+                  postawic JEDNA teze i dac JEDEN przycisk. Lista cudzych postow
+                  pod zaproszeniem robila z tego dwa poczatki naraz i rozmywala
+                  oba. Decyzja wlasciciela produktu, i jest sluszna.
+
+                  PELNA SZEROKOSC NA DESKTOPIE ZOSTAJE. Blok stal kiedys
+                  wewnatrz `max-w-[640px]`, wiec na szerokim ekranie byl waska
+                  kartka z pustym lawendowym tlem po obu stronach - wygladal jak
+                  zagubione okno dialogowe, a nie jak ekran powitalny produktu.
+                  Stoi WYZEJ, obok tamtej kolumny, i bierze cala szerokosc
+                  kolumny glownej (kolumna boczna dla goscia jest `lg:hidden`,
+                  wiec to praktycznie caly ekran).
+
+                  BEZ `w-screen` I UJEMNYCH MARGINESOW - 100vw liczy sie razem
+                  z paskiem przewijania i dokladalo poziomy scroll. To zwykly
+                  blok w kontenerze, ktory juz ma cala szerokosc.
+
+                  NA TELEFONIE NIC SIE NIE ZMIENIA: ponizej 640px tamta kolumna
+                  i tak niczego nie zwezala, a padding `p-4` jest ten sam. */}
+              {!isConnected && <MockFeed />}
+
+              {/* CALA RESZTA SRODKOWEJ KOLUMNY ZA `isConnected`.
+                  Nie tylko lista postow: siedza tu takze kompozytor, oprawa
+                  mobilna z paskiem sieci i zakladkami oraz przelacznik paneli
+                  (builders / following / friends / discover / notifications).
+                  Zadna z tych rzeczy nie ma sensu bez portfela, a przy wejsciu
+                  goscia doklada tylko pusta ramke pod ekranem powitalnym. */}
               {isConnected && (
-              <div className="bg-white dark:bg-gray-800 rounded-xl p-3 shadow-sm mb-4 border border-gray-200 dark:border-gray-700">
+              <div className="mx-auto w-full max-w-[640px]">
+              {/* ===== OPRAWA MOBILNA - kierunek Soft Social =====
+                  Wymienia WYLACZNIE oprawe feedu ponizej progu `lg`: tlo, pasek
+                  sieci jako "stories", zakladki-pigulki i zwiniety kompozytor.
+                  LISTA POSTOW ZOSTAJE TA SAMA - to jest poprawka po realnej
+                  regresji, ktora sam wprowadzilem: podmiana kart postow na
+                  wlasne zabrala na telefonie tipy, przypinanie, przyciski
+                  transakcji per siec, tresc premium, odznaki agentow i muzyke.
+                  Wyglad wolno wymieniac tylko tam, gdzie nic za soba nie ciagnie. */}
+              {/* TYLKO NA FEEDZIE.
+                  Pasek sieci, zakladki "All Posts / Follows / Basenames"
+                  i pigulka "What's happening onchain?" to oprawa LISTY POSTOW.
+                  Renderowaly sie jednak nad KAZDYM widokiem srodkowej kolumny:
+                  wchodzisz w Powiadomienia albo Discover i dostajesz nad nimi
+                  trzy filtry feedu oraz zaproszenie do napisania posta - w
+                  miejscu, gdzie zaden post nie powstanie i nic sie nie
+                  odfiltruje. Zakladki byly przy tym CZYNNE, wiec klikniecie
+                  "Follows" na ekranie powiadomien przelaczalo niewidoczny feed
+                  pod spodem.
+
+                  `activeMainPanel === 'feed'` to ta sama galaz, ktora nizej
+                  renderuje liste postow - oprawa i tresc wlaczaja sie razem. */}
+              <div className={activeMainPanel === 'feed' ? 'lg:hidden' : 'hidden'}>
+                <SoftFeedMobile
+                  currentAddress={address}
+                  avatarUrl={userProfile?.avatar}
+                  activeFeed={activeFeed}
+                  activeNetwork={mobileNetwork}
+                  onNetworkChange={setMobileNetwork}
+                  onFeedChange={(id) => setActiveFeed(id as 'forYou' | 'following' | 'baseName')}
+                  composerOpen={mobileComposerOpen}
+                  onOpenComposer={() => {
+                    // Rozwijamy PRAWDZIWY kompozytor zamiast budowac drugi.
+                    // Druga implementacja pisania postu bylaby drugim miejscem,
+                    // w ktorym trzeba naprawiac ten sam blad - a ten formularz
+                    // obsluguje siedem lancuchow, tresc premium, PostCoin,
+                    // zalaczniki i muzyke.
+                    setMobileComposerOpen(true);
+                    // Focus dopiero po tym, jak React wstawi rozwiniety blok do
+                    // drzewa - inaczej szukamy pola, ktorego jeszcze nie ma.
+                    requestAnimationFrame(() => {
+                      const composer = document.querySelector('textarea');
+                      composer?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      (composer as HTMLTextAreaElement | null)?.focus();
+                    });
+                  }}
+                />
+              </div>
+
+              {/* ===== NAWIGACJA WYPROWADZONA Z FEEDU =====
+                  Staly tu kafle "All Posts / My Profile / My Feed / Follows /
+                  Friends / Discover" (GlassIcons). Cztery z szesciu w ogole
+                  nie sa feedem, tylko osobnymi widokami - a mimo to zajmowaly
+                  pierwszy ekran nad trescia, po ktora ludzie tu przychodza.
+
+                  Te same szesc akcji, z handlerami przepisanymi jeden do
+                  jednego (razem z warunkiem `isConnected` i z galezia
+                  `...(address ? [...])`, ktora dokladala trzy ostatnie pozycje
+                  dopiero po podlaczeniu portfela), stoi teraz na gorze kolumny
+                  bocznej - w tej samej liscie SoftSectionList, ktora telefon ma
+                  juz dzis. Jedna nawigacja na obu szerokosciach zamiast dwoch
+                  roznych. Szczegoly przy samej liscie. */}
+
+              {/* Wybor sieci. To NIE jest filtr feedu - steruje tym, ktory
+                  kompozytor sie pokazuje i na ktorym lancuchu wyladuje post.
+                  Dlatego zostaje w kolumnie glownej, tuz nad kompozytorem,
+                  a nie w kolumnie bocznej. Podpis dodany, bo sam rzad logotypow
+                  nie mowil, co robi klikniecie.
+
+                  W TRYBIE ASK ZNIKA. Ask ma jedna siec i jeden token: budzet
+                  jest w USDC, a kontrakt escrow stoi na Base (patrz
+                  ASK_ESCROW_CHAIN_ID). Siedem logotypow nad formularzem, ktory
+                  i tak poprosi o Base, obiecywaloby wybor, ktorego nie ma -
+                  a na 360px zabieraloby caly rzad na nic.
+
+                  POZA FEEDEM TEZ ZNIKA. Rzad stal nad KAZDYM widokiem
+                  srodkowej kolumny: wchodzisz we wlasny profil, w Discover
+                  albo w powiadomienia i dostajesz nad nimi karte z siedmioma
+                  logotypami sieci, ktora steruje kompozytorem stojacym gdzie
+                  indziej. Na desktopie zabierala pierwsze 110 pikselow profilu,
+                  czyli dokladnie miejsce zdjecia i nazwy. `activeMainPanel`
+                  to ta sama galaz, ktora nizej renderuje kompozytor - oprawa
+                  i tresc wlaczaja sie razem. */}
+              {isConnected && activeMainPanel === 'feed' && composerMode === 'post' && (
+              <div
+                className={`mb-4 rounded-card bg-soft-surface p-3 shadow-card lg:block ${
+                  mobileComposerOpen ? '' : 'hidden'
+                }`}
+              >
+                <div className="mb-2 px-1 font-soft text-[11.5px] font-bold uppercase tracking-[0.08em] text-soft-ink-faint">
+                  Network
+                </div>
                 <GooeyNav
                   items={[
                     {
@@ -3524,7 +3750,7 @@ export default function BaseChat() {
                     {
                       icon: (
                         <img 
-                          src="/logotypy/logo-symbol.svg"
+                          src="/logotypy/world-symbol-dark.svg"
                           alt="World Chain"
                           className="w-5 h-5 rounded-none"
                         />
@@ -3534,6 +3760,20 @@ export default function BaseChat() {
                       isActive: activePostingNetwork === 'worldchain',
                       color: '#9333EA',
                       specialStyle: 'world'
+                    },
+                    {
+                      icon: (
+                        <img
+                          src="/robin.webp"
+                          alt="Robinhood Chain"
+                          className="w-5 h-5 rounded-none"
+                        />
+                      ),
+                      label: 'Robinhood',
+                      onClick: () => setActivePostingNetwork('robinhood'),
+                      isActive: activePostingNetwork === 'robinhood',
+                      color: '#00C805',
+                      specialStyle: 'robinhood'
                     }
                   ]}
                 />
@@ -3542,7 +3782,274 @@ export default function BaseChat() {
 
               {/* Main content switcher based on activeMainPanel (Przełącznik głównej zawartości) */}
               {activeMainPanel === 'builders' ? (
-                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg mb-4 overflow-hidden border border-blue-100 dark:border-blue-900">
+                <>
+                  {/* Pasek edycji tylko nad WLASNYM profilem. Cudzy profil
+                      nie ma czego edytowac, wiec przycisk sie nie renderuje. */}
+                  {address && selectedBuilderProfile && selectedBuilderProfile.address.toLowerCase() === address.toLowerCase() && (
+                    <div className="mb-4">
+                      {/* Przycisk "Edit profile" stal TUTAJ, samotnie nad cala
+                          kolumna, i byl trzecim wejsciem w to samo miejsce
+                          obok aparatu przy zdjeciu i olowka przy bio.
+                          Przeniesiony do rzedu z powrotem, wewnatrz profilu
+                          (BuilderProfile) - ten sam `isEditingProfile`. */}
+                      {/* ===== EDYCJA PROFILU MIESZKA W BUILDER PROFILE =====
+                          Awatar, nazwa i linki spolecznosciowe zmienialy sie
+                          dotad w kolumnie bocznej, w dwoch miejscach naraz:
+                          naglowek mobilny i ProfileCard otwieraly ten sam
+                          formularz, kazdy w innym punkcie ekranu. Teraz panel
+                          stoi w jednym miejscu, nad wlasnym Builder Profile,
+                          a oba tamte przyciski prowadza tutaj. */}
+                      {isEditingProfile && address && (
+                        <div className="mb-3 relative">
+                          <div className="rounded-card bg-soft-surface p-4 shadow-card">
+                            {/* Header */}
+                            <div className="flex items-center justify-between mb-4">
+                              <div className="flex items-center space-x-2">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-soft-primary">
+                                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                  </svg>
+                                </div>
+                                <div>
+                                  <h3 className="font-soft-display text-[17px] font-bold text-soft-ink">
+                                    Edit Profile
+                                  </h3>
+                                  <p className="font-soft text-[11.5px] text-soft-ink-soft">Customize your MySphere identity</p>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => setIsEditingProfile(false)}
+                                className="flex h-7 w-7 items-center justify-center rounded-pill bg-soft-sunken transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.94] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                              >
+                                <svg className="h-3.5 w-3.5 text-soft-ink-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            </div>
+
+                            {/* Profile Picture Section */}
+                            {/* Profile Section - Grid Layout */}
+                            <div className="mb-4 grid grid-cols-2 gap-3">
+                              {/* Profile Picture */}
+                              <div className="rounded-card border border-soft-line bg-soft-sunken p-3">
+                                <label className="mb-2 flex items-center gap-1.5 font-soft text-[11px] font-bold uppercase tracking-[0.07em] text-soft-ink-soft">
+                                  <svg className="w-3 h-3 text-soft-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                  </svg>
+                                  <span>Profile Picture</span>
+                                </label>
+                                <div className="flex flex-col items-center space-y-2">
+                                  <div className="h-12 w-12 overflow-hidden rounded-xl border-2 border-soft-line">
+                                    {userProfile.avatar ? (
+                                      <img
+                                        src={userProfile.avatar}
+                                        alt="Current profile"
+                                        className="w-full h-full object-cover"
+                                      />
+                                    ) : (
+                                      <div className="flex h-full w-full items-center justify-center bg-soft-sunken">
+                                        <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                        </svg>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex flex-col items-center">
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      onChange={async (e) => {
+                                        if (!e.target.files || !e.target.files[0] || !address) return;
+                                        
+                                        const file = e.target.files[0];
+                                        const isAdmin = address.toLowerCase() === ADMIN_ADDRESS;
+                                        
+                                        if (!isAdmin && file.size > 3 * 1024 * 1024) {
+                                          alert('Maximum file size is 3MB');
+                                          return;
+                                        }
+
+                                        // Sprawdź ograniczenia czasowe tylko dla zwykłych użytkowników
+                                        if (!isAdmin) {
+                                        const userRef = doc(db, 'users', address);
+                                        const userDoc = await getDoc(userRef);
+                                        const userData = userDoc.data();
+
+                                        if (userData?.lastImageUpdate) {
+                                          const lastUpdate = userData.lastImageUpdate.toDate();
+                                          const oneMonthAgo = new Date();
+                                          oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+                                          
+                                          if (lastUpdate > oneMonthAgo) {
+                                            const timeToWait = new Date(lastUpdate.getTime() + 30 * 24 * 60 * 60 * 1000);
+                                            const now = new Date();
+                                            const diff = timeToWait.getTime() - now.getTime();
+                                            
+                                            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                                            const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                                            
+                                            alert(`You can change your profile picture once a month.\nTime remaining: ${days} days and ${hours} hours`);
+                                            return;
+                                            }
+                                          }
+                                        }
+
+                                        setSelectedFile(file);
+                                        const maxSizeText = isAdmin ? 'Maximum file size: 5MB' : 'Maximum file size: 3MB';
+                                        const timeRestrictionText = isAdmin ? 'Admin can change anytime.' : 'Next change will be possible in one month.';
+                                        setModalMessage(`Are you sure you want to change your profile picture?\n${timeRestrictionText}\n${maxSizeText}`);
+                                        setModalType('confirm');
+                                        setShowModal(true);
+                                      }}
+                                      className="hidden"
+                                      id="profile-picture-input"
+                                    />
+                                    <label
+                                      htmlFor="profile-picture-input"
+                                      className="inline-flex cursor-pointer items-center rounded-pill bg-soft-primary px-3.5 py-1.5 font-soft-display text-[12px] font-bold text-white transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97]"
+                                    >
+                                      <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                      </svg>
+                                      Upload
+                                    </label>
+                                    <p className="font-soft text-[11.5px] text-soft-ink-soft mt-1">
+                                      Max 3MB
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Upgrade Your Card */}
+                              <div className="rounded-card border border-soft-line bg-soft-sunken p-3">
+                                <label className="mb-2 flex items-center gap-1.5 font-soft text-[11px] font-bold uppercase tracking-[0.07em] text-soft-ink-soft">
+                                  <svg className="w-3 h-3 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                                  </svg>
+                                  <span>Card Upgrade</span>
+                                </label>
+                                <div className="flex flex-col items-center space-y-2">
+                                  <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl border-2 border-soft-accent-soft bg-soft-accent-soft">
+                                    <svg className="w-6 h-6 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                                    </svg>
+                                  </div>
+                                  <div className="flex flex-col items-center">
+                                    <div className="relative group">
+                                      <button
+                                        className="inline-flex cursor-not-allowed items-center rounded-pill bg-soft-accent px-3.5 py-1.5 font-soft-display text-[12px] font-bold text-[#1a1f3a] opacity-75"
+                                        disabled
+                                      >
+                                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                                        </svg>
+                                        Upgrade Your Card
+                                      </button>
+                                      {/* Tooltip */}
+                                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
+                                        soon
+                                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                                      </div>
+                                    </div>
+                                    <p className="font-soft text-[11.5px] text-soft-ink-soft mt-1 text-center">
+                                      Premium features
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Username Section - only if no baseName */}
+                            {!baseName && (
+                              <div className="mb-4">
+                                <div className="rounded-card border border-soft-line bg-soft-sunken p-3">
+                                  <label className="mb-2 flex items-center gap-1.5 font-soft text-[11px] font-bold uppercase tracking-[0.07em] text-soft-ink-soft">
+                                    <svg className="w-3 h-3 text-soft-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                    </svg>
+                                    <span>Username</span>
+                                  </label>
+                                  <div className="space-y-3">
+                                    <div className="space-y-2">
+                                      <input
+                                        type="text"
+                                        value={customName}
+                                        onChange={(e) => setCustomName(e.target.value)}
+                                        placeholder="Enter username"
+                                        className="w-full rounded-xl border border-soft-line bg-soft-surface px-3 py-2 font-soft text-[13.5px] text-soft-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                                      />
+                                      <div className="flex items-center space-x-2">
+                                        <span className="font-soft text-[13px] text-soft-ink-soft">Choose domain:</span>
+                                        <select
+                                          value={selectedSuffix}
+                                          onChange={(e) => setSelectedSuffix(e.target.value as 'sphere' | 'camper' | 'celo' | 'world')}
+                                          className="flex-1 rounded-xl border border-soft-line bg-soft-surface px-3 py-2 font-soft text-[13.5px] text-soft-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                                        >
+                                          <option value="sphere">.sphere (+1500 pts!)</option>
+                                          <option value="camper">.camper (+1000 pts!)</option>
+                                          <option value="celo">.celo (+1250 pts!)</option>
+                                          <option value="world">.world (+1250 pts!)</option>
+                                        </select>
+                                      </div>
+                                    </div>
+                                    <div className="rounded-xl border border-soft-line bg-soft-surface p-2">
+                                      <div className="text-center font-soft text-[11.5px] text-soft-ink-soft">
+                                        Preview: <span className="font-bold text-soft-ink">{customName || 'username'}</span>.
+                                        <span className={
+                                          selectedSuffix === 'sphere' ? 'text-soft-primary font-medium' :
+                                          selectedSuffix === 'camper' ? 'text-orange-500 font-medium' :
+                                          selectedSuffix === 'celo' ? 'text-yellow-500 font-medium' :
+                                          'text-soft-primary font-medium'
+                                        }>
+                                          {selectedSuffix}
+                                        </span>
+                                        {selectedSuffix === 'sphere' && <span className="text-blue-600 ml-1">+1500 pts!</span>}
+                                        {selectedSuffix === 'camper' && <span className="text-orange-600 ml-1">🏕️ +1000 pts!</span>}
+                                        {selectedSuffix === 'celo' && <span className="text-yellow-600 ml-1">+1250 pts!</span>}
+                                        {selectedSuffix === 'world' && <span className="text-green-600 ml-1">+1250 pts!</span>}
+                                      </div>
+                                    </div>
+                                    <button
+                                      onClick={handleSaveCustomName}
+                                      className="w-full rounded-pill bg-soft-primary px-3 py-2 font-soft-display text-[12px] font-bold text-white transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97]"
+                                    >
+                                      Save Username
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* ===== LINKI SPOLECZNOSCIOWE MAJA JEDNO MIEJSCE =====
+                                Stala tu druga edycja X, Farcastera i Discorda,
+                                z wlasnym przyciskiem "Save Social Links"
+                                piszacym do tego samego dokumentu. Ta sama
+                                robota siedzi w <ProfileSocials/> na samym
+                                profilu, nizej - i to ona zostaje, bo jest tam,
+                                gdzie te linki widac.
+
+                                Dwa formularze do jednego pola to dwa miejsca,
+                                w ktorych trzeba naprawiac ten sam blad, i dwa
+                                stany, ktore potrafia sie rozjechac w jednej
+                                sesji. Tutaj zostaje wylacznie to, czego profil
+                                nie ma u siebie: zdjecie i system nazw. */}
+                            {/* Action Buttons */}
+                            <button
+                              onClick={() => setIsEditingProfile(false)}
+                              className="w-full rounded-pill bg-soft-primary px-3 py-2.5 font-soft-display text-[13px] font-bold text-white transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface"
+                            >
+                              Done editing
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                {/* Bez bialej karty dookola. Profil ma wlasne sekcje z wlasnymi
+                    kartami, wiec ta ramka byla pudelkiem na pudelka: dawala
+                    drugie biale tlo pod trescia, ktora sama juz jest biala,
+                    i `overflow-hidden` przycinajace to, co z niej wystawalo. */}
+                <div className="mb-4">
                   {/* Builder Profile Content */}
                   {selectedBuilderProfile ? (
                     <BuilderProfile 
@@ -3550,6 +4057,9 @@ export default function BaseChat() {
                       currentUserAddress={address}
                       profile={selectedBuilderProfile}
                       onBackToFeed={handleBackToFeed}
+                      // Aparat przy awatarze otwiera TEN SAM panel edycji, ktory
+                      // stoi nad profilem - jedno miejsce zapisu zdjecia.
+                      onEditProfile={() => setIsEditingProfile(true)}
                       onSocialLinksUpdate={(newLinks) => {
                         setSelectedBuilderProfile(prev => ({
                           ...prev!,
@@ -3568,9 +4078,13 @@ export default function BaseChat() {
                     </div>
                   )}
                 </div>
+                </>
               ) : activeMainPanel === 'following' ? (
                 /* 👥 FOLLOWING VIEW (Widok obserwowanych) */
-                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg mb-4 overflow-hidden">
+                /* Bez ramki dookola: widok sam rysuje swoje karty i naglowek,
+                   a druga biala plyta pod spodem dawala pudelko w pudelku
+                   i `overflow-hidden` przycinajace to, co z niej wystawalo. */
+                <div className="mb-4">
                   <FollowingView 
                     currentUserAddress={address || ''}
                     onUserClick={handleViewBuilderProfile}
@@ -3578,7 +4092,10 @@ export default function BaseChat() {
                 </div>
               ) : activeMainPanel === 'friends' ? (
                 /* 🤝 FRIENDS VIEW (Widok znajomych) */
-                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg mb-4 overflow-hidden">
+                /* Bez ramki dookola: widok sam rysuje swoje karty i naglowek,
+                   a druga biala plyta pod spodem dawala pudelko w pudelku
+                   i `overflow-hidden` przycinajace to, co z niej wystawalo. */
+                <div className="mb-4">
                   <FriendsView 
                     currentUserAddress={address || ''}
                     onUserClick={handleViewBuilderProfile}
@@ -3586,7 +4103,10 @@ export default function BaseChat() {
                 </div>
               ) : activeMainPanel === 'discover' ? (
                 /* 🔍 DISCOVER VIEW (Widok odkrywania) */
-                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg mb-4 overflow-hidden">
+                /* Bez ramki dookola: widok sam rysuje swoje karty i naglowek,
+                   a druga biala plyta pod spodem dawala pudelko w pudelku
+                   i `overflow-hidden` przycinajace to, co z niej wystawalo. */
+                <div className="mb-4">
                   <DiscoverView 
                     currentUserAddress={address || ''}
                     onUserClick={handleViewBuilderProfile}
@@ -3594,7 +4114,10 @@ export default function BaseChat() {
                 </div>
               ) : activeMainPanel === 'notifications' ? (
                 /* 🔔 NOTIFICATIONS VIEW (Widok powiadomień) */
-                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg mb-4 overflow-hidden">
+                /* Bez ramki dookola: widok sam rysuje swoje karty i naglowek,
+                   a druga biala plyta pod spodem dawala pudelko w pudelku
+                   i `overflow-hidden` przycinajace to, co z niej wystawalo. */
+                <div className="mb-4">
                   <NotificationsView 
                     currentUserAddress={address || ''}
                     onUserClick={handleViewBuilderProfile}
@@ -3602,11 +4125,147 @@ export default function BaseChat() {
                 </div>
               ) : (
                 <>
-                  {/* New post creation */}
-                  {isConnected ? (
+                  {/* New post creation.
+
+                      Ekranu powitalnego NIE MA juz w tej galezi - wyszedl
+                      o poziom wyzej, nad cala kolumne feedu (szukaj
+                      "EKRAN POWITALNY: NAD FEEDEM I POZA JEGO KOLUMNA"),
+                      zeby na desktopie zajmowal pelna szerokosc zamiast stac
+                      jako waska kartka w srodku 640-pikselowej kolumny.
+
+                      Tutaj zostal sam kompozytor - dalej za `isConnected`,
+                      bo czytanie jest darmowe, a pisanie nie. */}
+                  {isConnected && (
                     <>
-                      {canCreatePosts ? (
-                        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow mb-6">
+                      {/* ===== POST ALBO ASK =====
+                          Dwie pigulki, nie trzy - pelne uzasadnienie stoi przy
+                          deklaracji `composerMode`. W skrocie: PostCoin nie jest
+                          trybem, tylko drugim przyciskiem wysylki pod tym samym
+                          szkicem, i tak zostaje.
+
+                          Pigulki dziela widocznosc z kompozytorem: na telefonie
+                          pojawiaja sie dopiero po dotknieciu plusa
+                          (`mobileComposerOpen`), na desktopie stoja zawsze.
+                          Inaczej nad zwinietym feedem wisialby wybor, ktory nie
+                          ma pod soba niczego do wybrania.
+
+                          `role="group"` + `aria-pressed`, a nie zakladki: to nie
+                          jest nawigacja i nic tu nie zmienia adresu - podmienia
+                          formularz w miejscu. */}
+                      {/* ===== JEDEN PASEK: CO CZYTAM | CO PISZE =====
+                          Zakladki feedu (All Posts / Follows / Basenames) staly
+                          dotad POD kompozytorem, jako osobny rzad pigulek. Nad
+                          nimi byl drugi rzad pigulek (Post / Ask), a miedzy nimi
+                          cala karta kompozytora - trzy rzedy pigulek na jednym
+                          ekranie, w trzech roznych miejscach, i zaden nie mowil,
+                          ktory czym steruje.
+
+                          Teraz stoja w jednej linii, rozdzielone pionowa
+                          wlosowa linia: po lewej WIDOK (co pokazuje lista pod
+                          spodem), po prawej TRYB PISANIA (co robi kompozytor
+                          tuz pod paskiem). Linia jest jedynym rozdzielnikiem,
+                          bo dwie grupy pigulek bez niej czytaja sie jak jedna
+                          o szesciu pozycjach.
+
+                          PRZYKLEJENIA JUZ NIE MA i to jest swiadome cofniecie.
+                          Stalo tu `lg:sticky lg:top-0 lg:z-20` z uzasadnieniem
+                          "przelaczenie widoku bez przewijania na gore kolumny".
+                          Brzmi rozsadnie i w praktyce dzialalo zle: pasek
+                          jechal przez cala dlugosc feedu, przykrywajac posty i
+                          zostawiajac nad soba scinek tego, co wlasnie pod niego
+                          wjechalo. Przelacznik widoku jest potrzebny RAZ, przy
+                          wejsciu - a nie na kazdym ekranie przewijania. */}
+                      <div className="mb-3 flex items-center gap-3">
+                        {!showMyFeed && (
+                          <>
+                            <div className="hidden min-w-0 flex-1 lg:block">
+                              <SoftTabs
+                                tabs={[
+                                  { id: 'forYou', label: 'All Posts' },
+                                  { id: 'following', label: 'Follows' },
+                                  { id: 'baseName', label: 'Basenames' },
+                                ]}
+                                activeTab={activeFeed}
+                                onSelect={(id) =>
+                                  setActiveFeed(id as 'forYou' | 'following' | 'baseName')
+                                }
+                                className="!px-0 !py-0"
+                              />
+                            </div>
+                            <span
+                              aria-hidden="true"
+                              className="hidden h-7 w-px flex-none bg-soft-line lg:block"
+                            />
+                          </>
+                        )}
+
+                      <div
+                        role="group"
+                        aria-label="What are you posting"
+                        className={`flex-none gap-2 lg:flex ${
+                          mobileComposerOpen ? 'flex' : 'hidden'
+                        }`}
+                      >
+                        {([
+                          { id: 'post', label: 'Post' },
+                          { id: 'ask', label: 'Ask' },
+                        ] as const).map((mode) => {
+                          const isActive = composerMode === mode.id;
+                          return (
+                            <button
+                              key={mode.id}
+                              type="button"
+                              onClick={() => setComposerMode(mode.id)}
+                              aria-pressed={isActive}
+                              className={`flex-none whitespace-nowrap rounded-pill px-4 py-2 font-soft text-[12.5px] transition-[background-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-bg ${
+                                isActive
+                                  ? 'bg-soft-primary font-bold text-white shadow-chip'
+                                  : 'bg-soft-surface font-semibold text-soft-ink-muted'
+                              }`}
+                            >
+                              {mode.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      </div>
+
+                      {composerMode === 'ask' ? (
+                        /* Ten sam kompozytor, ktory stoi na /asks: budzet,
+                           miejsca, termin, wybor escrow i walidacja kwoty za
+                           odpowiedz. Druga implementacja tego formularza bylaby
+                           drugim miejscem, w ktorym trzeba naprawiac ten sam
+                           blad - a ten formularz dotyka pieniedzy.
+
+                           `mb-6` i zwijanie na telefonie - jak kompozytor postu
+                           obok, zeby przelaczenie trybu nie przesuwalo feedu. */
+                        <AskComposer
+                          onSubmit={handleCreateAskFromFeed}
+                          className={`mb-6 lg:block ${mobileComposerOpen ? '' : 'hidden'}`}
+                          disabled={!askFlow.walletConnected}
+                          disabledReason="Connect your wallet to post an Ask."
+                          escrowAvailable={askFlow.escrowAvailable}
+                          escrowUnavailableReason={askFlow.escrowUnavailableReason}
+                          escrowFeeBps={askFlow.feeBps}
+                          progressNote={askFlow.progressNote}
+                          // Ten sam wybor skarbca co na /asks i z tego samego
+                          // powodu: adres przepisany recznie wiaze Aska z niczym.
+                          // Odczyt idzie dopiero po wybraniu trybu "Ask", bo
+                          // kompozytor montuje sie dopiero wtedy.
+                          loadVaults={loadListedVaults}
+                          // Bez `onCancel`: wyjsciem z tego formularza jest
+                          // pigulka "Post" tuz nad nim. Drugi przycisk robiacy
+                          // to samo kazalby zgadywac, ktory z nich czysci szkic.
+                        />
+                      ) : canCreatePosts ? (
+                        /* Na telefonie zwiniety, dopoki ktos nie tknie plusa w
+                           pigulce - patrz `mobileComposerOpen`. Na desktopie
+                           (`lg:block`) stoi otwarty jak dotad. */
+                        <div
+                          className={`rounded-card bg-soft-surface p-4 shadow-card mb-6 lg:block ${
+                            mobileComposerOpen ? '' : 'hidden'
+                          }`}
+                        >
                           {/* Show Base post form conditionally */}
                           {activePostingNetwork === 'base' && (
                             <>
@@ -3621,13 +4280,133 @@ export default function BaseChat() {
                               <Avatar address={address} className="w-10 h-10 rounded-full" />
                             )}
                             <div className="flex-1">
+                              {/* Pole ROSNIE Z TRESCIA, a nie przewija sie w
+                                  trzech linijkach. Post z linkiem (np.
+                                  udostepniony token ze startpada) nie miescil
+                                  sie w calosci: adres byl przeciety w polowie i
+                                  trzeba bylo scrollowac wewnatrz pola, zeby
+                                  zobaczyc, co sie wysyla. Sufit jest po to, zeby
+                                  dluga tresc nie zepchnela przyciskow poza
+                                  ekran. */}
                               <textarea
                                 value={newPost}
                                 onChange={(e) => setNewPost(e.target.value)}
-                                placeholder="Add any photo, first letters of your post will be a $ticker, and launch your PostCoin or just Post your thoughts onchain."
-                                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                                rows={3}
+                                placeholder="What's happening onchain?"
+                                className="max-h-[320px] min-h-[112px] w-full resize-y overflow-auto rounded-card bg-soft-sunken px-4 py-3 font-soft text-[14px] leading-[1.5] text-soft-ink placeholder-soft-ink-soft focus:outline-none focus:ring-2 focus:ring-soft-primary"
+                                rows={4}
                               />
+
+                              {/* Podglad linku - to samo, co zobacza inni pod
+                                  postem. Bez niego wysylalo sie w ciemno: sam
+                                  adres w polu nie mowi, czy karta w ogole
+                                  powstanie i co bedzie na niej widac.
+                                  Komponent sam wyciaga link z tresci i sam
+                                  milczy, gdy go nie ma. */}
+                              {newPost.trim() !== '' && <LinkPreview content={newPost} />}
+
+                              {/* Ta sama informacja, ktora byla wczesniej
+                                  UPCHNIETA W PLACEHOLDER ("Add any photo, first
+                                  letters of your post will be a $ticker, and
+                                  launch your PostCoin or just Post your thoughts
+                                  onchain."). Placeholder znika w chwili, gdy
+                                  zaczynasz pisac - czyli zasada dzialania
+                                  $tickera znikala dokladnie wtedy, kiedy byla
+                                  potrzebna. Nic nie ubylo, tresc stoi na stale
+                                  pod polem. */}
+                              {/* Zdanie o $tickerze PostCoina znikneło razem z
+                                  PostCoinem. Opisywalo regule cudzego produktu
+                                  i stalo pod polem na stale, takze dla kogos,
+                                  kto nigdy nie zamierzal wybijac monety. Co
+                                  robi przycisk startu, mowi teraz sam
+                                  przycisk. */}
+
+                              <PremiumComposer
+                                value={premium}
+                                onChange={setPremium}
+                                isOpen={isPremiumOpen}
+                                onToggle={() => {
+                                  const next = !isPremiumOpen;
+                                  setIsPremiumOpen(next);
+                                  // Zamkniecie sekcji czysci tresc, zeby nie zapisac
+                                  // platnej czesci, ktorej autor juz nie widzi.
+                                  // Razem z nia znika powod, dla ktorego prosilismy
+                                  // o podpis - post bez platnej czesci nie wymaga go
+                                  // wcale.
+                                  if (!next) {
+                                    setPremium(EMPTY_PREMIUM);
+                                    setBlockedOnPremiumSignIn(false);
+                                  }
+                                }}
+                              />
+
+                              {/* ===== POST JEST, PLATNEJ CZESCI NIE MA =====
+                                  Nieudane pieczetowanie zostawialo po sobie sam
+                                  toast - znikal po kilku sekundach, a post
+                                  zostawal platny WYLACZNIE w oczach autora.
+                                  Teraz stan "nie na sprzedaz" jest widoczny tak
+                                  dlugo, jak dlugo trwa, i ma wyjscie: szkic
+                                  czeka, wystarczy jedno klikniecie.
+
+                                  Bez pomaranczowego: to nie jest kwota, tylko
+                                  informacja o stanie. */}
+                              {/* ===== ZATRZYMANE PRZED PUBLIKACJA =====
+                                  Post NIE powstal, wiec nie ma tu zadnej
+                                  straty do odkrecenia - jest tylko powod
+                                  i szkic, ktory czeka nietkniety. */}
+                              {blockedOnPremiumSignIn && (
+                                <div
+                                  role="alert"
+                                  className="mt-2 rounded-card border border-soft-line bg-soft-sunken p-3 font-soft text-[12px] leading-[1.5] text-soft-ink-muted"
+                                >
+                                  <p>
+                                    Nothing was posted.{' '}
+                                    {siweError ||
+                                      'We could not confirm this wallet is yours, and a paid post has to be provably yours before it goes out.'}
+                                  </p>
+                                  <p className="mt-1 text-soft-ink-faint">
+                                    Your draft is untouched - press the post button again to retry, or
+                                    remove the paid section to post it for free.
+                                  </p>
+                                </div>
+                              )}
+
+                              {pendingPremium && (
+                                <div
+                                  role="alert"
+                                  className="mt-2 rounded-card border border-soft-line bg-soft-sunken p-3 font-soft text-[12px] leading-[1.5] text-soft-ink-muted"
+                                >
+                                  <p>
+                                    Your last post went out as a free post. {pendingPremium.reason} Nobody
+                                    was charged, and nobody sees a paywall on it.
+                                  </p>
+                                  <p className="mt-1 text-soft-ink-faint">
+                                    Your paid text is still here. If you leave this page it is gone, so
+                                    finish it now or copy it somewhere safe.
+                                  </p>
+                                  <div className="mt-2 flex flex-wrap items-center gap-3">
+                                    <button
+                                      type="button"
+                                      onClick={retryPremiumSeal}
+                                      disabled={isRetryingPremium}
+                                      aria-busy={isRetryingPremium}
+                                      className="rounded-pill bg-soft-primary px-4 py-2 font-soft-display text-xs font-semibold text-white shadow-chip transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100"
+                                    >
+                                      {isRetryingPremium
+                                        ? 'Working…'
+                                        : pendingPremium.needsSignIn
+                                          ? 'Sign in and finish it'
+                                          : 'Try saving it again'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setPendingPremium(null)}
+                                      className="rounded-pill px-1 font-soft-display text-xs font-semibold text-soft-ink-muted underline transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                                    >
+                                      Leave it free
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
 
@@ -3706,10 +4485,6 @@ export default function BaseChat() {
                                 <span className="hidden sm:inline font-medium text-blue-600 dark:text-blue-400">Photo</span>
                               </button>
 
-                              <AIButton
-                                onClick={() => aiGenerator.setShowAIModal(true)}
-                              />
-
                               <button
                                 onClick={() => setShowMusicSelector(true)}
                                 className="flex items-center space-x-1 sm:space-x-2 text-gray-500 hover:text-green-600 dark:hover:text-green-400 text-xs sm:text-sm bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors"
@@ -3724,14 +4499,70 @@ export default function BaseChat() {
                               </button>
                             </div>
                             
+                            {/* ===== PRZYCISK MILCZAL, ZAMIAST MOWIC, CZEGO BRAKUJE =====
+                                Zgloszenie wlasciciela: "jesli tworze post Paid Section
+                                i wpisuje tresc to jak go wrzucic, bo przycisk post nie
+                                dziala".
+
+                                Przycisk jest wylaczony przez `!newPost.trim()`, czyli
+                                wymaga tresci PUBLICZNEJ. Kto rozwinal platna sekcje
+                                i wpisal tekst TAM, zostawiajac gorne pole puste, widzi
+                                wylacznie wyszarzony przycisk bez slowa wyjasnienia -
+                                i sluszne jest wtedy wrazenie, ze aplikacja jest zepsuta.
+
+                                Wymog zostaje, bo jest sensowny: platna czesc bez
+                                publicznej to zamknieta skrzynka bez etykiety, ktorej
+                                nikt nie ma powodu kupic. Ale ma byc POWIEDZIANY.
+
+                                To samo z siec: warunek na base/baseSepolia tez wyszarzal
+                                przycisk po cichu.
+
+                                `aria-live` - komunikat pojawia sie w odpowiedzi na to,
+                                co czlowiek wlasnie zrobil, wiec czytnik ekranu ma go
+                                przeczytac bez przenoszenia fokusu. */}
+                            {(() => {
+                              const zlaSiec = chainId !== base.id && chainId !== baseSepolia.id;
+                              const brakPublicznej = !newPost.trim();
+                              const maPlatna = isPremiumOpen && premium.premiumContent.trim().length > 0;
+                              if (isCreatingPost) return null;
+                              if (!zlaSiec && !brakPublicznej) return null;
+                              return (
+                                <p
+                                  aria-live="polite"
+                                  className="mb-2 font-soft text-[12px] leading-[1.5] text-soft-ink-muted"
+                                >
+                                  {zlaSiec
+                                    ? 'Switch to Base to post.'
+                                    : maPlatna
+                                      ? 'Add something above the paywall first: a line everyone can read, so people know what they are paying for.'
+                                      : 'Write something to post.'}
+                                </p>
+                              );
+                            })()}
+
                             <div className="flex space-x-2">
-                            <button 
-                              onClick={handleCreatePost}
-                                    disabled={!newPost.trim() || isCreatingPost || (chainId !== base.id && chainId !== baseSepolia.id)} 
-                              className={`px-3 py-0.5 text-sm font-medium rounded-lg transition-colors duration-200 flex items-center justify-center h-[32px] ${ 
-                                      (!newPost.trim() || isCreatingPost || (chainId !== base.id && chainId !== baseSepolia.id))
+                            {/* ===== START TOKENA ZAMIAST POSTCOINA =====
+                                Ten przycisk wolal `handleCreatePost`, czyli
+                                Zore. Teraz otwiera SZYBKI START na naszej
+                                krzywej: oplata z krzywej i plynnosc po
+                                graduacji zostaja w naszych kontraktach, a caly
+                                lejek (post -> karta tokena -> strona tokena ->
+                                handel) jest u nas.
+
+                                Istniejace PostCoiny pod starymi postami
+                                renderuja sie dalej i dalej da sie nimi
+                                handlowac - kasowanie ich zabraloby ludziom to,
+                                co juz wybili. Znika sam sposob tworzenia
+                                nowych. */}
+                            <button
+                              type="button"
+                              onClick={() => setQuickLaunchOpen(true)}
+                              disabled={!newPost.trim() || isCreatingPost}
+                              title="Launch a coin for this post on Startpad"
+                              className={`px-3 py-0.5 text-sm font-medium rounded-lg transition-colors duration-200 flex items-center justify-center h-[32px] ${
+                                !newPost.trim() || isCreatingPost
                                   ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
-                                    : 'bg-white text-[#0052FF] border border-[#0052FF]'
+                                  : 'bg-white text-[#0052FF] border border-[#0052FF]'
                               }`}
                             >
                               {isCreatingPost ? (
@@ -3744,21 +4575,27 @@ export default function BaseChat() {
                                 </>                                  
                               ) : (
                                   <>
-                                    <img 
+                                    <img
                                       src="/android-chrome-512x512.png"
                                       alt="Sphere"
                                       className="w-4 h-4 mr-1.5"
                                     />
-                                    <span className="leading-tight">PostCoin</span>
+                                    <span className="leading-tight">Launch coin</span>
                                   </>
                               )}
                             </button>
                               
-                              <TransactionButton 
+                              <TransactionButton
                                 content={newPost}
                                 onTransactionSuccess={handleTransactionSuccess}
                                 disabled={isCreatingPost}
                                 autoPost={true}
+                                /* Podpis PRZED transakcja. Na tej sciezce post
+                                   powstaje po zaplaceniu za gaz, wiec pytanie
+                                   o sesje dopiero potem znaczylo, ze autor
+                                   placi za publikacje, ktora i tak nie moze
+                                   stac sie platna. */
+                                beforeTransaction={ensurePremiumSession}
                               />
                             </div>
                           </div>
@@ -3782,54 +4619,36 @@ export default function BaseChat() {
                           {/* Add BaseCamp post form conditionally */}
                           {activePostingNetwork === 'basecamp' && (
                             <div>
-                              <CreatePostBaseCamp
-                                onPostCreated={refreshPosts}
-                                setShowAIModal={aiGenerator.setShowAIModal}
-                                aiGeneratedContent={aiGenerator.getGeneratedContent('basecamp')}
-                                onAiContentUsed={() => aiGenerator.clearGeneratedContent('basecamp')}
-                              />
+                              <CreatePostBaseCamp onPostCreated={refreshPosts} />
                               <ClaimPortalBanner />
                             </div>
                           )}
 
                           {/* Add Linea post form conditionally */}
                           {activePostingNetwork === 'linea' && (
-                            <CreatePostLinea
-                              onPostCreated={refreshPosts}
-                              setShowAIModal={aiGenerator.setShowAIModal}
-                              aiGeneratedContent={aiGenerator.getGeneratedContent('linea')}
-                              onAiContentUsed={() => aiGenerator.clearGeneratedContent('linea')}
-                            />
+                            <CreatePostLinea onPostCreated={refreshPosts} />
                           )}
 
                           {/* Add Celo post form conditionally */}
                           {activePostingNetwork === 'celo' && (
-                            <CreatePostCelo
-                              onPostCreated={refreshPosts}
-                              setShowAIModal={aiGenerator.setShowAIModal}
-                              aiGeneratedContent={aiGenerator.getGeneratedContent('celo')}
-                              onAiContentUsed={() => aiGenerator.clearGeneratedContent('celo')}
-                            />
+                            <CreatePostCelo onPostCreated={refreshPosts} />
                           )}
 
                           {/* Add Ethereum post form conditionally */}
                           {activePostingNetwork === 'ethereum' && (
-                            <CreatePostEthereum
-                              onPostCreated={refreshPosts}
-                              setShowAIModal={aiGenerator.setShowAIModal}
-                              aiGeneratedContent={aiGenerator.getGeneratedContent('ethereum')}
-                              onAiContentUsed={() => aiGenerator.clearGeneratedContent('ethereum')}
-                            />
+                            <CreatePostEthereum onPostCreated={refreshPosts} />
                           )}
 
                           {/* Add World Chain post form conditionally */}
                           {activePostingNetwork === 'worldchain' && (
-                            <CreatePostWorldChain
-                              onPostCreated={refreshPosts}
-                              setShowAIModal={aiGenerator.setShowAIModal}
-                              aiGeneratedContent={aiGenerator.getGeneratedContent('worldchain')}
-                              onAiContentUsed={() => aiGenerator.clearGeneratedContent('worldchain')}
-                            />
+                            <CreatePostWorldChain onPostCreated={refreshPosts} />
+                          )}
+
+                          {/* Add Robinhood Chain post form conditionally.
+                              Kontrakt postow nie jest jeszcze wdrozony - komponent sam
+                              pokazuje baner i wylacza przycisk wysylki. */}
+                          {activePostingNetwork === 'robinhood' && (
+                            <CreatePostRobinhood onPostCreated={refreshPosts} />
                           )}
                         </div>
                       ) : (
@@ -3873,18 +4692,110 @@ export default function BaseChat() {
                           </div>
                     </div>
                   )}
+                      {/* ===== KWIT ZA ZALOZONEGO ASKA =====
+                          Po zalozeniu Aska z feedu czlowiek ma zobaczyc, ze cos
+                          POWSTALO, i to bez odsylania go na /asks. Pas nad
+                          feedem czyta z cache'u (piec minut), wiec sam by tego
+                          nie pokazal - dlatego karta stoi tutaj, zlozona z
+                          tego, co naprawde poszlo do zapisu.
 
-                      {/* Pinned Posts Section - ukryj w trybie My Feed */}
-                      {!showMyFeed && (
-                      <PinnedPosts
-                        displayUserName={displayUserName}
-                        userNames={userNames}
-                          onUserNamesUpdate={handleUserNamesUpdate}
-                      />
+                          Zostaje na ekranie takze po powrocie na pigulke
+                          "Post": to potwierdzenie czegos, co juz sie stalo,
+                          a nie czesc formularza. Znika dopiero z odswiezeniem
+                          strony - wtedy Ask jest juz w pasie wyzej.
+
+                          Przycisk karty prowadzi na /asks, bo TAM stoi panel
+                          odpowiedzi, przyjmowania i rozstrzygania. Feed nie
+                          dubluje tamtej mechaniki. */}
+                      {asksCreatedHere.length > 0 && (
+                        <section className="mb-6" aria-label="Asks you posted from this device">
+                          <h2 className="mb-2.5 px-0.5 font-soft text-[11px] font-semibold uppercase tracking-[0.14em] text-soft-ink-faint">
+                            Posted from this device
+                          </h2>
+                          <div className="flex flex-col gap-4">
+                            {asksCreatedHere.map((ask) => (
+                              <AskCard key={ask.id} ask={ask} isAuthor href="/asks" />
+                            ))}
+                          </div>
+                        </section>
                       )}
+                    </>
+                  )}
 
-                      {/* Tutaj zastępuję kod wyświetlający posty komponentem PostList */}
-                      <PostList 
+                  {/* Zakladki feedu na desktopie stoja teraz w pasku NAD
+                      kompozytorem, razem z wyborem Post/Ask - szukaj
+                      "JEDEN PASEK: CO CZYTAM | CO PISZE". Ten sam stan
+                      `activeFeed`, te same trzy pozycje, ta sama zasada
+                      "w My Feed ich nie ma". */}
+
+                  {/* Pinned Posts Section - ukryj w trybie My Feed */}
+                  {!showMyFeed && (
+                    <PinnedPosts
+                      displayUserName={displayUserName}
+                      userNames={userNames}
+                      onUserNamesUpdate={handleUserNamesUpdate}
+                    />
+                  )}
+
+                  {/* ===== ASKI W FEEDZIE =====
+                      Osobny pas NAD lista postow, a nie karty wplecione miedzy
+                      posty. Pelne uzasadnienie tej decyzji (dwa kursory przy
+                      dociaganiu stron, memo i stan optymistyczny PostList,
+                      tykajacy zegar Aska, rozdzielenie awarii) stoi w naglowku
+                      FeedAskRail.tsx.
+
+                      DLA TEGO PLIKU najwazniejsze jest jedno: pas NIE DOTYKA
+                      `posts` ani `visiblePosts`. PostList dostaje dokladnie te
+                      sama referencje co przedtem, wiec optymistyczne zmiany
+                      (serduszko, komentarz) nie maja jak zostac skasowane -
+                      patrz komentarz przy deklaracji `visiblePosts`.
+
+                      Pas ma wlasny stan i wlasny cache, wiec nieudany odczyt
+                      Askow nie ma drogi do listy postow, a nieudany odczyt
+                      postow nie zabiera Askow.
+
+                      W "My Feed" pasa nie ma: tam patrzacy oglada WLASNE posty,
+                      a cudze otwarte Aski nie sa czescia tej odpowiedzi. */}
+                  {/* Od 1280px ten sam pas stoi w prawej kolumnie, w ukladzie
+                      kolumnowym - `xl:hidden` pilnuje, zeby Aski nie byly na
+                      ekranie dwa razy naraz. Ponizej 1280px i na telefonie
+                      wszystko zostaje tak, jak bylo. */}
+                  {!showMyFeed && (
+                    <FeedAskRail viewer={address ?? null} className="mb-4 xl:hidden" />
+                  )}
+
+                  {/* ===== ODCZYT PADL != PUSTY FEED =====
+                      PostList na pustej liscie pisze "No posts found". Gdy
+                      Firestore nie odpowiedzial, to zdanie jest nieprawda -
+                      posty sa, tylko ich nie dostalismy. Dlatego awaria ma
+                      wlasny komunikat i wlasne wyjscie, zamiast podszywac sie
+                      pod pusty feed. */}
+                  {postsError && posts.length === 0 && !isLoadingPosts ? (
+                    <div
+                      role="alert"
+                      className="rounded-card bg-soft-surface p-6 sm:p-8 shadow-card text-center"
+                    >
+                      <svg className="mx-auto mb-4 h-10 w-10 text-soft-ink-faint" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                      </svg>
+                      <h3 className="font-soft-display text-lg font-bold text-soft-ink mb-2">
+                        Couldn&apos;t load the feed
+                      </h3>
+                      <p className="font-soft text-soft-ink-muted leading-[1.55] mb-4">
+                        The posts are there, we just didn&apos;t get them. Check your
+                        connection and try again.
+                      </p>
+                      <button
+                        onClick={() => setFeedReloadNonce((value) => value + 1)}
+                        className="rounded-pill bg-soft-primary px-5 py-2 font-soft text-[14px] font-bold text-white transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                      >
+                        Try again
+                      </button>
+                    </div>
+                  ) : (
+                  <>
+                  {/* Tutaj zastępuję kod wyświetlający posty komponentem PostList */}
+                  <PostList
 
                         sortOrder={sortOrder}
                         selectedTag={selectedTag}
@@ -3892,169 +4803,51 @@ export default function BaseChat() {
                         onRefreshPosts={onRefreshPosts}
                         displayUserName={displayUserName}
                         userNames={userNames}
-                        posts={posts} // Dodajemy przekazywanie postów jako prop
+                        // Filtr sieci z paska "stories" na telefonie. Na
+                        // desktopie mobileNetwork jest zawsze null, wiec lista
+                        // idzie w calosci - dokladnie jak przedtem.
+                        // Zapamietana referencja, NIE filtr w miejscu - powod
+                        // przy deklaracji `visiblePosts`.
+                        posts={visiblePosts}
                         isLoading={isLoadingPosts} // Przekaż stan ładowania do PostList
                         showMyFeed={showMyFeed} // Przekaż stan My Feed do PostList
                         getCachedPosts={getCachedPosts} // Przekaż funkcje cache'owania
                         setCachedPosts={setCachedPosts}
                         clearPostsCache={clearPostsCache}
+                        patchPostInCache={patchPostInCache}
                         pendingPins={pendingPins} // Przekaż pending pins state
                         onPinPending={handlePinPending} // Przekaż pending pin handler
                       />
-                                </>
-                              ) : (
-                                <div>
-                                  <MockFeed />
-                    </div>
+                  </>
                   )}
                 </>
               )}
+              </div>
+              )}
             </div>
 
-            {/* Right panel (Trends & Global Statistics) */}
-            <div className={`${
-              activeMobilePanel === 'right' ? 'fixed inset-0 z-30 pt-[120px] pb-24' : 'hidden'
-            } lg:block lg:relative lg:w-[380px] lg:pt-0 lg:pb-0 bg-white dark:bg-gray-800 overflow-y-auto p-4`}>
-              {/* Global Statistics */}
-              <div className="mb-4">
-                <h2 className="text-lg font-semibold mb-3 bg-gradient-to-r from-blue-500 to-purple-500 text-transparent bg-clip-text flex items-center">
-                    Global Statistics
-                    <div className="ml-2 text-2xl">🔥</div>
-                </h2>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
-                    <div className="text-green-500 text-2xl font-bold">{totalUsers}</div>
-                    <div className="text-sm text-gray-500">Users</div>
-                  </div>
-                  <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
-                    <div className="text-pink-500 text-2xl font-bold">{totalLikes}</div>
-                    <div className="text-sm text-gray-500">Likes</div>
-                  </div>
-                  <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
-                    <div className="text-blue-500 text-2xl font-bold">{totalPosts}</div>
-                    <div className="text-sm text-gray-500">Posts</div>
-                  </div>
-                  <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
-                    <div className="text-purple-500 text-2xl font-bold">{totalComments}</div>
-                    <div className="text-sm text-gray-500">Comments</div>
-                  </div>
-                </div>
-              </div>
-
-
-
-              {/* Most Active Users */}
-              <div className="mb-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm">
-                <div className="flex justify-between items-center mb-3">
-                  <h2 className="text-lg font-semibold mb-0 bg-gradient-to-r from-blue-500 to-purple-500 text-transparent bg-clip-text flex items-center">
-                    Most Active Users
-                    <div className="ml-2 text-2xl">👥</div>
-                  </h2>
-                  <div className="flex items-center gap-2">
-                    {address && address.toLowerCase() === ADMIN_ADDRESS.toLowerCase() && (
-                      <button 
-                        onClick={handleClearNamesCache}
-                        className="text-xs text-orange-500 hover:text-orange-700 flex items-center"
-                        title="Clear user names cache to see updated names (Admin only)"
-                      >
-                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                        Clear Cache
-                      </button>
-                    )}
-                  <button 
-                    onClick={handleManualRefresh} 
-                    disabled={!canManuallyRefresh}
-                    className={`text-xs ${canManuallyRefresh ? 'text-blue-500 hover:text-blue-700' : 'text-gray-400 cursor-not-allowed'} flex items-center`}
-                  >
-                    <RefreshCw className={`w-3 h-3 mr-1 ${isLoadingUsers ? 'animate-spin' : ''}`} />
-                    {isLoadingUsers ? 'Refreshing...' : 'Refresh'}
-                  </button>
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  {renderUserList()}
-                  <div className="mt-4">
-                    <div className="flex justify-center items-center gap-1 mb-3">
-                      <div className="bg-gray-100 dark:bg-gray-700 rounded-full p-1 flex items-center">
-                        <button
-                          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                          disabled={currentPage === 1}
-                          className="px-3 py-1 text-[11px] bg-gray-800 dark:bg-gray-600 text-white rounded-l-full disabled:opacity-50"
-                        >
-                          Prev
-                        </button>
-                        <span className="text-[11px] text-gray-600 dark:text-gray-300 px-3">
-                          {currentPage}/{totalUsersPages}
-                        </span>
-                        <button
-                          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalUsersPages))}
-                          disabled={currentPage >= totalUsersPages}
-                          className="px-3 py-1 text-[11px] bg-gray-800 dark:bg-gray-600 text-white rounded-r-full disabled:opacity-50"
-                        >
-                          Next
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Trending Hashtags */}
-              <div className="mb-6 bg-gray-50 dark:bg-gray-700 rounded-xl p-4">
-                <div className="flex justify-between items-center mb-3">
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center">
-                    Trending Hashtags
-                    <div className="ml-2 text-2xl">🔥</div>
-                  </h2>
-                  {trendingTags.length > 5 && (
-                    <button
-                      onClick={() => setExpandedTagsList(!expandedTagsList)}
-                      className="text-sm text-blue-500 hover:text-blue-600 transition-colors"
-                    >
-                      {expandedTagsList ? 'Show Less' : 'Show More'}
-                </button>
+              {/* ===== PRAWA KOLUMNA: ASKI I TRENDS =====
+                  Od progu xl uklad przechodzi na trzy kolumny, jak w duzych
+                  feedach spolecznosciowych: nawigacja i profil po lewej,
+                  posty na srodku, Trends po prawej. Ponizej xl ten sam blok
+                  stoi w kolumnie bocznej (tam ma `xl:hidden`), wiec zawsze
+                  widac dokladnie jedna kopie. Dla goscia kolumny nie ma,
+                  tak samo jak lewej. */}
+              {isConnected && (
+                <div className="hidden xl:block xl:w-[320px] xl:flex-none 2xl:w-[360px] overflow-y-auto border-l border-soft-line bg-soft-bg px-5 pt-6 pb-24">
+                  {/* Aski stoja NAD statystykami, bo jako jedyne w tej kolumnie
+                      sa czyms do zrobienia, a nie czyms do przeczytania.
+                      W "My Feed" ich nie ma - z tego samego powodu co
+                      w feedzie: patrzacy oglada wtedy wlasne posty, a cudze
+                      otwarte Aski nie sa czescia tej odpowiedzi. */}
+                  {!showMyFeed && (
+                    <FeedAskRail viewer={address ?? null} layout="column" className="mb-4" />
                   )}
+                  {trendsColumnContent}
                 </div>
-                <div className="space-y-2">
-                  {trendingTags
-                    .slice(0, expandedTagsList ? undefined : 5)
-                    .map(({ tag, count }) => (
-                      <div
-                        key={tag} 
-                        className="flex items-center justify-between p-2 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg transition-all duration-300 group"
-                      >
-                        <span className="text-blue-500 hover:text-blue-600 cursor-pointer flex items-center group-hover:translate-x-1 transition-transform">
-                          <span className="text-sm mr-2">#</span>
-                          {tag}
-                        </span>
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm text-gray-500">{count}</span>
-                          <span className="text-xs text-gray-400">posts</span>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </div>
-
-              {/* Yaps Stats Widget */}
-              <div className="mb-4">
-                <a 
-                  href="/yapscan" 
-                  className="block bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-blue-600 font-medium">YapScan</span>
-                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                    </svg>
-                  </div>
-                </a>
-              </div>
+              )}
             </div>
-              </div>
-            </div>
+          </div>
           </div>
 
       {/* Animowany modal */}
@@ -4127,79 +4920,198 @@ export default function BaseChat() {
       <div className="pb-8">
         {/* ... rest of the content ... */}
       </div>
-      <div ref={loadMoreTriggerRef} style={{ height: '1px' }} />
+
+      {/* ===== SZYBKI START TOKENA Z FEEDU =====
+          TEN SAM kreator, co na startpadzie, tylko w trybie szybkim: nazwa,
+          symbol, obrazek, opis i pre-buy. Nie budujemy drugiego formularza -
+          drugi formularz startu tokena bylby drugim miejscem, w ktorym trzeba
+          naprawiac walidacje pre-buy, limity na portfel i obsluge sieci.
+
+          Siec jest ta, ktora wybrano na startpadzie (kreator czyta ja przy
+          ladowaniu modulu). Kto chce inna, przelacza ja tam - odnosnik do
+          pelnego kreatora stoi pod formularzem. */}
+      <LaunchTokenModal
+        open={quickLaunchOpen}
+        quickOnly
+        initialName={suggestCoinFromPost(newPost).name}
+        initialSymbol={suggestCoinFromPost(newPost).symbol}
+        // Zdjecie dolaczone do posta staje sie logo tokena. Kto je wgral i
+        // zaraz startuje token, ma na mysli to zdjecie - proszenie o nie drugi
+        // raz byloby pytaniem o cos, co juz powiedzial.
+        initialLogo={postPreviewImage}
+        onClose={() => setQuickLaunchOpen(false)}
+        onLaunched={(token) => void publishLaunchPost(token)}
+      />
 
 
-      {/* Mobile footer */}
-      <div className="fixed bottom-0 left-0 right-0 lg:hidden bg-[#0052FF] bg-opacity-10 backdrop-blur-xl border-t border-[#0052FF]/20 z-40">
-        <div className="flex items-center justify-around p-4">
+      {/* ===== PASEK ZAKLADEK NA TELEFONIE =====
+          Ten sam mechanizm co dotad: trzy przyciski ustawiaja activeMobilePanel
+          na 'left' | 'main' | 'right'. Zmieniona jest wylacznie oprawa.
+
+          Co bylo nie tak: pasek stal na polprzezroczystym niebieskim
+          (#0052FF/10), a NIEAKTYWNE ikony dostawaly kolor #172554 - prawie
+          czarny granat. Na jasnym tle strony ikona nieaktywna byla ciemniejsza
+          niz aktywna, wiec pasek pokazywal odwrotnie, gdzie sie stoi. Do tego
+          podpisy szly w #60A5FA na jasnym tle, czyli na granicy czytelnosci.
+
+          Teraz: bialy pasek, aktywna zakladka w fiolecie interfejsu i na
+          podkladce, nieaktywne w spokojnym szarofiolecie. Doszlo aria-current,
+          bo dotad czytnik ekranu nie mial skad wiedziec, ktora zakladka jest
+          otwarta. */}
+      <nav
+        aria-label="Sections"
+        className="fixed bottom-0 left-0 right-0 lg:hidden bg-soft-surface/95 border-t border-soft-line z-40"
+      >
+        {/* items-end + wypukly StartPad w srodku - ten sam wzor co w globalnym
+            MobileBottomNav (app/components/MobileBottomNav.tsx): podniesiony
+            fioletowy krazek z rakieta wystaje ponad pasek. Tam piec etykiet
+            miesci sie przy 320px w tych samych rozmiarach, wiec i tutaj sie
+            zmieszcza. */}
+        <div className="flex items-end justify-around px-2 pb-3 pt-2">
+          {/* ===== "MENU", A NIE "PROFILE" =====
+              Ten przycisk otwiera lewy panel, w ktorym stoi teraz WYLACZNIE
+              nawigacja. Podpisany "Profile" obiecywal profil, a dawal liste
+              przejsc - i konkurowal nazwa z pozycja "My Profile" w srodku tej
+              listy, ktora prowadzi do prawdziwego, pelnego profilu. Jedna
+              nazwa nie moze znaczyc dwoch roznych ekranow. */}
           <button
             onClick={() => setActiveMobilePanel('left')}
-            className={`flex flex-col items-center p-2 rounded-xl transition-all duration-300 ${
-              activeMobilePanel === 'left' 
-                ? 'bg-blue-500/10 text-[#0052FF] font-medium' 
-                : 'text-gray-100 hover:bg-blue-500/5'
-            }`}
+            aria-current={activeMobilePanel === 'left' ? 'page' : undefined}
+            className="flex min-h-[44px] min-w-[44px] flex-col items-center rounded-card p-1.5 transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
           >
-            <div className={`p-1 rounded-full ${activeMobilePanel === 'left' ? 'bg-blue-500/20' : ''}`}>
-              <UserIcon 
-                className="w-6 h-6" 
-                color={activeMobilePanel === 'left' ? '#0052FF' : '#172554'} 
+            <div className={`p-1 rounded-full ${activeMobilePanel === 'left' ? 'bg-soft-sunken' : ''}`}>
+              <MenuIcon
+                className="w-6 h-6"
+                color={activeMobilePanel === 'left' ? '#7C6BDA' : '#8D86AB'}
               />
             </div>
-            <span className={`text-xs mt-1 font-medium ${activeMobilePanel === 'left' ? 'text-[#0052FF]' : 'text-[#60A5FA]'}`}>Profile</span>
+            <span className={`mt-1 font-soft text-[11.5px] font-bold ${activeMobilePanel === 'left' ? 'text-soft-primary-deep' : 'text-soft-ink-soft'}`}>Menu</span>
           </button>
           <button
             onClick={() => setActiveMobilePanel('main')}
-            className={`flex flex-col items-center p-2 rounded-xl transition-all duration-300 ${
-              activeMobilePanel === 'main' 
-                ? 'bg-blue-500/10 text-[#0052FF] font-medium' 
-                : 'text-gray-100 hover:bg-blue-500/5'
-            }`}
+            aria-current={activeMobilePanel === 'main' ? 'page' : undefined}
+            className="flex min-h-[44px] min-w-[44px] flex-col items-center rounded-card p-1.5 transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
           >
-            <div className={`p-1 rounded-full ${activeMobilePanel === 'main' ? 'bg-blue-500/20' : ''}`}>
-              <HomeIcon 
-                className="w-6 h-6" 
-                color={activeMobilePanel === 'main' ? '#0052FF' : '#172554'} 
+            <div className={`p-1 rounded-full ${activeMobilePanel === 'main' ? 'bg-soft-sunken' : ''}`}>
+              <HomeIcon
+                className="w-6 h-6"
+                color={activeMobilePanel === 'main' ? '#7C6BDA' : '#8D86AB'}
               />
             </div>
-            <span className={`text-xs mt-1 font-medium ${activeMobilePanel === 'main' ? 'text-[#0052FF]' : 'text-[#60A5FA]'}`}>Feed</span>
+            <span className={`mt-1 font-soft text-[11.5px] font-bold ${activeMobilePanel === 'main' ? 'text-soft-primary-deep' : 'text-soft-ink-soft'}`}>Feed</span>
           </button>
+
+          {/* ===== STARTPAD W SRODKU - JAK W GLOBALNYM PASKU =====
+              Ten sam podniesiony przycisk co w MobileBottomNav: feed byl
+              jedyna strona bez drogi do launchpada w zasiegu kciuka.
+              To <Link>, nie przycisk panelu - /startpad to osobna trasa,
+              wiec ma dzialac srodkowym przyciskiem myszy i w nowej karcie. */}
+          <Link
+            href="/startpad"
+            aria-label="StartPad - new"
+            className="relative -mt-6 flex flex-col items-center"
+          >
+            <span className="relative flex h-14 w-14 items-center justify-center rounded-full bg-soft-primary text-white shadow-[0_10px_28px_rgba(124,107,218,0.55)] ring-4 ring-soft-surface transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-95">
+              <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" />
+                <path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" />
+                <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" />
+                <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
+              </svg>
+              <span className="absolute -right-1.5 -top-1.5 rounded-full bg-[#ff4d7d] px-1.5 py-0.5 text-[8px] font-extrabold uppercase leading-none text-white shadow-[0_2px_6px_rgba(255,77,125,0.5)]">
+                New
+              </span>
+            </span>
+            <span className="mt-1 font-soft text-[11px] font-extrabold text-soft-primary-deep">StartPad</span>
+          </Link>
+
           <button
             onClick={() => setActiveMobilePanel('right')}
-            className={`flex flex-col items-center p-2 rounded-xl transition-all duration-300 ${
-              activeMobilePanel === 'right' 
-                ? 'bg-blue-500/10 text-[#0052FF] font-medium' 
-                : 'text-gray-100 hover:bg-blue-500/5'
-            }`}
+            aria-current={activeMobilePanel === 'right' ? 'page' : undefined}
+            className="flex min-h-[44px] min-w-[44px] flex-col items-center rounded-card p-1.5 transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
           >
-            <div className={`p-1 rounded-full ${activeMobilePanel === 'right' ? 'bg-blue-500/20' : ''}`}>
-              <ChartBarIcon 
-                className="w-6 h-6" 
-                color={activeMobilePanel === 'right' ? '#0052FF' : '#172554'} 
+            <div className={`p-1 rounded-full ${activeMobilePanel === 'right' ? 'bg-soft-sunken' : ''}`}>
+              <ChartBarIcon
+                className="w-6 h-6"
+                color={activeMobilePanel === 'right' ? '#7C6BDA' : '#8D86AB'}
               />
             </div>
-            <span className={`text-xs mt-1 font-medium ${activeMobilePanel === 'right' ? 'text-[#0052FF]' : 'text-[#60A5FA]'}`}>Trends</span>
+            <span className={`mt-1 font-soft text-[11.5px] font-bold ${activeMobilePanel === 'right' ? 'text-soft-primary-deep' : 'text-soft-ink-soft'}`}>Trends</span>
           </button>
+
+          {/* ===== CZWARTA POZYCJA: ASKS =====
+              Powstala strona /asks, trasy API, karta i kompozytor - i NIC do
+              nich nie prowadzilo. Na telefonie w ogole nie bylo drogi: dolny
+              pasek mial trzy przyciski i zaden nie wychodzil poza feed.
+
+              To NIE jest `SoftDock`, tylko recznie napisany <nav> - i wlasnie
+              dlatego czwarty przycisk dodany kiedys do SoftDock nie pojawil sie
+              w produkcji. SoftDock uzywa tylko trasa prototypowa /basechat/soft.
+
+              Dlaczego Asks, a nie Follows (pierwotny pomysl): Ask ma byc
+              JEDNOSTKA tego produktu, a nie widokiem pobocznym. Follows
+              prowadzi do tresci, ktora i tak jest w feedzie pod zakladka;
+              Asks prowadzi do jedynej rzeczy, ktorej nie da sie zobaczyc
+              nigdzie indziej.
+
+              To <Link>, nie przycisk panelu: Asks to osobna trasa, wiec ma
+              dzialac srodkowym przyciskiem myszy i w nowej karcie.
+
+              Piata pozycja (StartPad) stoi w srodku jako wypukly krazek -
+              ten sam wzor i rozmiary co w globalnym MobileBottomNav, ktory
+              miesci piec etykiet przy 320px. */}
+          <Link
+            href="/asks"
+            aria-label="Asks"
+            className="flex min-h-[44px] min-w-[44px] flex-col items-center rounded-card p-1.5 transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+          >
+            <div className="p-1 rounded-full">
+              {/* Znak zapytania w kolku - Ask to pytanie z kwota. Wektor,
+                  nie emoji: emoji renderuje sie inaczej na kazdym systemie. */}
+              <svg
+                className="w-6 h-6"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#8D86AB"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="9" />
+                <path d="M9.5 9a2.5 2.5 0 1 1 3.2 2.4c-.6.2-.9.7-.9 1.3v.3" />
+                <path d="M12 16.5h.01" />
+              </svg>
+            </div>
+            <span className="mt-1 font-soft text-[11.5px] font-bold text-soft-ink-soft">Asks</span>
+          </Link>
         </div>
-      </div>
+      </nav>
 
       {/* Padding for mobile footer */}
       <div className="h-20 lg:h-0" />
-
-      {/* AI Post Generator Modal */}
-      {isAINetwork(activePostingNetwork) && (
-        <AIPostGenerator
-          isOpen={aiGenerator.showAIModal}
-          onClose={() => aiGenerator.setShowAIModal(false)}
-          activeNetwork={activePostingNetwork}
-          aiPrompt={aiGenerator.aiPrompt}
-          setAiPrompt={aiGenerator.setAiPrompt}
-          isGeneratingAI={aiGenerator.isGeneratingAI}
-          onGenerate={handleAIGenerate}
-        />
-      )}
     </BanPage>
   </>
+  );
+}
+
+/**
+ * Granica Suspense wokol calej strony.
+ *
+ * BaseChatContent wola useSearchParams(), a ten hook nie ma prawa dzialac
+ * podczas statycznego prerenderu - Next przerywa wtedy render bledem
+ * "useSearchParams() should be wrapped in a suspense boundary". Wczesniej nie
+ * bylo tego widac, bo root layout owijal cala aplikacje w ClientOnly i strona w
+ * ogole nie renderowala sie na serwerze.
+ *
+ * Fallback to pusty <div>, czyli dokladnie to, co BaseChatContent i tak zwraca
+ * dopoki nie ustawi sie isMounted - wyjscie na serwerze jest identyczne jak
+ * wczesniej, wiec nic sie wizualnie nie zmienia.
+ */
+export default function BaseChat() {
+  return (
+    <Suspense fallback={<div></div>}>
+      <BaseChatContent />
+    </Suspense>
   );
 }

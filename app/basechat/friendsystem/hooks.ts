@@ -40,7 +40,17 @@ export interface UseSocialResult {
   followStats: FollowStats | null;
   friendsStats: FriendsStats | null;
   notificationsSummary: NotificationSummary | null;
-  unreadCount: number;
+  /**
+   * Nazwy sekcji, ktorych NIE UDALO SIE odczytac ('followers', 'following',
+   * 'friends', 'notifications', 'followStats', 'friendsStats',
+   * 'notificationsSummary').
+   *
+   * Widok musi to odroznic od pustki: pusta lista obserwujacych znaczy "nikt
+   * cie nie obserwuje", a to zdanie o czlowieku, nie o naszym zapytaniu.
+   */
+  failedSections: string[];
+  /** `null` = liczby NIE ODCZYTANO. Zero znaczy "nic nowego" i jest inna informacja. */
+  unreadCount: number | null;
   
   // Actions
   followUser: (targetUserId: string) => Promise<boolean>;
@@ -62,8 +72,7 @@ export interface UseSocialResult {
  */
 export const useSocial = (currentUserAddress: string | null): UseSocialResult => {
   const [socialAPI, setSocialAPI] = useState<SocialAPI | null>(null);
-  const [subscriptionManager, setSubscriptionManager] = useState<SocialSubscriptionManager | null>(null);
-  
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -77,20 +86,29 @@ export const useSocial = (currentUserAddress: string | null): UseSocialResult =>
   const [followStats, setFollowStats] = useState<FollowStats | null>(null);
   const [friendsStats, setFriendsStats] = useState<FriendsStats | null>(null);
   const [notificationsSummary, setNotificationsSummary] = useState<NotificationSummary | null>(null);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadCount, setUnreadCount] = useState<number | null>(null);
+  const [failedSections, setFailedSections] = useState<string[]>([]);
 
   // Refs to prevent stale closures
   const socialAPIRef = useRef<SocialAPI | null>(null);
   const subscriptionManagerRef = useRef<SocialSubscriptionManager | null>(null);
+  // Numer biezacego wczytania. Odpowiedz ze starego adresu (albo po odmontowaniu)
+  // nie moze juz nic wpisac do stanu.
+  const loadTokenRef = useRef(0);
+
+  useEffect(() => {
+    return () => { loadTokenRef.current += 1; };
+  }, []);
 
   // ===============================================
   // 🚀 INITIALIZATION
   // ===============================================
 
   useEffect(() => {
+    const token = ++loadTokenRef.current;
+
     if (!currentUserAddress) {
       setSocialAPI(null);
-      setSubscriptionManager(null);
       socialAPIRef.current = null;
       subscriptionManagerRef.current = null;
       setLoading(false);
@@ -105,9 +123,8 @@ export const useSocial = (currentUserAddress: string | null): UseSocialResult =>
         // Initialize API and subscription manager
         const api = createSocialAPI(currentUserAddress);
         const subManager = createSubscriptionManager();
-        
+
         setSocialAPI(api);
-        setSubscriptionManager(subManager);
         socialAPIRef.current = api;
         subscriptionManagerRef.current = subManager;
 
@@ -119,11 +136,12 @@ export const useSocial = (currentUserAddress: string | null): UseSocialResult =>
         );
 
         // Load initial data
-        await loadAllData(api);
+        await loadAllData(api, token);
 
       } catch (err) {
+        if (loadTokenRef.current !== token) return;
         console.error('Error initializing social features:', err);
-        setError('Błąd inicjalizacji funkcji społecznościowych');
+        setError("Social features couldn't be loaded.");
         setLoading(false);
       }
     };
@@ -140,41 +158,66 @@ export const useSocial = (currentUserAddress: string | null): UseSocialResult =>
   // 📊 DATA LOADING
   // ===============================================
 
-  const loadAllData = async (api: SocialAPI) => {
-    try {
-      const [
-        followersData,
-        followingData,
-        friendsData,
-        notificationsData,
-        followStatsData,
-        friendsStatsData,
-        notificationsSummaryData
-      ] = await Promise.all([
-        api.getFollowers(50),
-        api.getFollowing(50),
-        api.getFriends(50),
-        api.getNotifications(20),
-        api.getFollowStats(),
-        api.getFriendsStats(),
-        api.getNotificationsSummary()
-      ]);
+  /**
+   * KAZDY ODCZYT NIESIE WLASNA AWARIE.
+   *
+   * Wczesniej stalo tu jedno `Promise.all` w jednym `try`: padniecie
+   * ktoregokolwiek z siedmiu zapytan kasowalo WSZYSTKIE - lista obserwujacych
+   * znikala, bo nie udalo sie policzyc powiadomien. Teraz kazde zapytanie ma
+   * wlasny `catch`: liczniki, ktorych nie odczytano, sa `null` (czyli "nie
+   * wiem", a nie "zero"), a nazwy padnietych sekcji ida do `failedSections`,
+   * zeby widok napisal o nich prawde zamiast pokazac pustke. Ten sam podzial
+   * na osobne awarie co w getAskUserStats.
+   */
+  const loadAllData = async (api: SocialAPI, token = loadTokenRef.current) => {
+    const failed: string[] = [];
+    const attempt = async <T,>(label: string, run: () => Promise<T>): Promise<T | null> => {
+      try {
+        return await run();
+      } catch (err) {
+        console.error(`Error loading social data (${label}):`, err);
+        failed.push(label);
+        return null;
+      }
+    };
 
-      setFollowers(followersData);
-      setFollowing(followingData);
-      setFriends(friendsData);
-      setNotifications(notificationsData);
-      setFollowStats(followStatsData);
-      setFriendsStats(friendsStatsData);
-      setNotificationsSummary(notificationsSummaryData);
-      setUnreadCount(notificationsSummaryData.unread);
-      
-      setLoading(false);
-    } catch (err) {
-      console.error('Error loading social data:', err);
-      setError('Błąd wczytywania danych społecznościowych');
-      setLoading(false);
-    }
+    const [
+      followersData,
+      followingData,
+      friendsData,
+      notificationsData,
+      followStatsData,
+      friendsStatsData,
+      notificationsSummaryData
+    ] = await Promise.all([
+      attempt('followers', () => api.getFollowers(50)),
+      attempt('following', () => api.getFollowing(50)),
+      attempt('friends', () => api.getFriends(50)),
+      attempt('notifications', () => api.getNotifications(20)),
+      attempt('followStats', () => api.getFollowStats()),
+      attempt('friendsStats', () => api.getFriendsStats()),
+      attempt('notificationsSummary', () => api.getNotificationsSummary())
+    ]);
+
+    if (loadTokenRef.current !== token) return;
+
+    // Listy, ktorych nie udalo sie odczytac, zostaja przy poprzedniej
+    // zawartosci - nadpisanie ich pusta tablica bylo tym samym klamstwem
+    // ("nikogo nie obserwujesz") co zero w liczniku.
+    if (followersData) setFollowers(followersData);
+    if (followingData) setFollowing(followingData);
+    if (friendsData) setFriends(friendsData);
+    if (notificationsData) setNotifications(notificationsData);
+
+    setFollowStats(followStatsData);
+    setFriendsStats(friendsStatsData);
+    setNotificationsSummary(notificationsSummaryData);
+    setUnreadCount(notificationsSummaryData ? notificationsSummaryData.unread : null);
+
+    // Awaria czesciowa NIE gasi calego panelu: sekcje, ktore przyszly, zostaja
+    // na ekranie, a te, ktore padly, powiedza to same przez `failedSections`.
+    setFailedSections(failed);
+    setLoading(false);
   };
 
   // ===============================================
@@ -183,7 +226,9 @@ export const useSocial = (currentUserAddress: string | null): UseSocialResult =>
 
   const handleNewNotification = useCallback((notification: Notification) => {
     setNotifications(prev => [notification, ...prev.slice(0, 19)]);
-    setUnreadCount(prev => prev + 1);
+    // Przyszlo nowe powiadomienie. Gdy licznika nie udalo sie odczytac, nie
+    // udajemy, ze znamy sume - zostaje `null`.
+    setUnreadCount(prev => (prev === null ? null : prev + 1));
     
     // Update notifications summary
     setNotificationsSummary(prev => prev ? {
@@ -299,7 +344,7 @@ export const useSocial = (currentUserAddress: string | null): UseSocialResult =>
         setNotifications(prev => prev.map(n => 
           n.id === notificationId ? { ...n, isRead: true } : n
         ));
-        setUnreadCount(prev => Math.max(0, prev - 1));
+        setUnreadCount(prev => (prev === null ? null : Math.max(0, prev - 1)));
         return true;
       }
       return false;
@@ -374,6 +419,7 @@ export const useSocial = (currentUserAddress: string | null): UseSocialResult =>
     followStats,
     friendsStats,
     notificationsSummary,
+    failedSections,
     unreadCount,
     followUser,
     unfollowUser,
@@ -392,62 +438,120 @@ export const useSocial = (currentUserAddress: string | null): UseSocialResult =>
 // 🔔 NOTIFICATIONS HOOK
 // ===============================================
 
+export interface UseNotificationsOptions {
+  /**
+   * Dzwonek w globalnej nawigacji montuje sie na KAZDEJ trasie, a na start
+   * potrzebuje wylacznie licznika nieprzeczytanych (1 tani odczyt licznika
+   * z dokumentu usera). Pelna lista to 20 pelnych dokumentow subkolekcji -
+   * pobierana bezwarunkowo na mount kosztowala ~21 odczytow za sama kropke,
+   * na kazde wejscie na kazda strone. Z lazyList mount czyta tylko licznik,
+   * a lista dociera dopiero po jawnym loadNotificationsList().
+   */
+  lazyList?: boolean;
+}
+
 export interface UseNotificationsResult {
   notifications: Notification[];
-  unreadCount: number;
+  /** `null` = liczby NIE ODCZYTANO. Zero znaczy "nic nowego". */
+  unreadCount: number | null;
   loading: boolean;
+  /** Doczytywanie listy na zadanie (tryb lazyList) - osobno od `loading`,
+   *  zeby kropka z licznikiem nie migala spinnerem, gdy dogrywa sie lista. */
+  listLoading: boolean;
   error: string | null;
   markAsRead: (notificationId: string) => Promise<boolean>;
   markAllAsRead: () => Promise<boolean>;
   deleteNotification: (notificationId: string) => Promise<boolean>;
+  /**
+   * Doczytuje liste, gdy user naprawde chce ja zobaczyc (np. otwarcie
+   * dropdownu). Wynik siedzi w stanie hooka jako cache sesyjny - ponowne
+   * wywolanie nie czyta bazy drugi raz. Wymuszone odswiezenie to
+   * refreshNotifications().
+   */
+  loadNotificationsList: () => Promise<void>;
   refreshNotifications: () => Promise<void>;
 }
 
 /**
  * Hook do zarządzania powiadomieniami
  */
-export const useNotifications = (userAddress: string | null): UseNotificationsResult => {
+export const useNotifications = (
+  userAddress: string | null,
+  options?: UseNotificationsOptions
+): UseNotificationsResult => {
+  // Prymityw zamiast obiektu opcji w zaleznosciach efektu - konsumenci
+  // podaja opcje inline, wiec obiekt jest nowy co render i restartowalby
+  // efekt (czyli i odczyty) przy kazdym przerysowaniu.
+  const lazyList = options?.lazyList ?? false;
+
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  // `null` = nie odczytano. Zero to twierdzenie "nic nowego" i nie wolno go
+  // wpisac po padnietym zapytaniu.
+  const [unreadCount, setUnreadCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [listLoading, setListLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   const socialAPIRef = useRef<SocialAPI | null>(null);
+  // Czy lista TEGO uzytkownika juz jest w stanie. Ref, nie stan - to czysty
+  // strażnik przed powtornym odczytem 20 dokumentow, nic nie renderuje.
+  const listLoadedRef = useRef(false);
 
   useEffect(() => {
     if (!userAddress) {
       setNotifications([]);
+      // Bez zalogowanego adresu naprawde nie ma zadnych powiadomien.
       setUnreadCount(0);
       setLoading(false);
       socialAPIRef.current = null;
+      listLoadedRef.current = false;
       return;
     }
 
     const api = createSocialAPI(userAddress);
     socialAPIRef.current = api;
+    // Nowy adres = cache listy poprzedniego uzytkownika przestaje byc prawda.
+    listLoadedRef.current = false;
+
+    // Po zmianie adresu (albo odmontowaniu) stara odpowiedz nie moze nadpisac stanu.
+    let cancelled = false;
 
     const loadNotifications = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        const [notificationsData, unreadCountData] = await Promise.all([
-          api.getNotifications(20),
-          api.getUnreadNotificationsCount()
-        ]);
+        if (lazyList) {
+          // Lista poprzedniego uzytkownika nie moze wisiec w stanie do czasu,
+          // az ktos zawola loadNotificationsList().
+          setNotifications([]);
+          const unreadCountData = await api.getUnreadNotificationsCount();
+          if (cancelled) return;
+          setUnreadCount(unreadCountData);
+        } else {
+          const [notificationsData, unreadCountData] = await Promise.all([
+            api.getNotifications(20),
+            api.getUnreadNotificationsCount()
+          ]);
+          if (cancelled) return;
 
-        setNotifications(notificationsData);
-        setUnreadCount(unreadCountData);
+          setNotifications(notificationsData);
+          setUnreadCount(unreadCountData);
+          listLoadedRef.current = true;
+        }
         setLoading(false);
       } catch (err) {
+        if (cancelled) return;
         console.error('Error loading notifications:', err);
-        setError('Błąd wczytywania powiadomień');
+        setError("Notifications couldn't be loaded.");
         setLoading(false);
       }
     };
 
     loadNotifications();
-  }, [userAddress]);
+
+    return () => { cancelled = true; };
+  }, [userAddress, lazyList]);
 
   const markAsRead = useCallback(async (notificationId: string): Promise<boolean> => {
     if (!socialAPIRef.current) return false;
@@ -458,7 +562,7 @@ export const useNotifications = (userAddress: string | null): UseNotificationsRe
         setNotifications(prev => prev.map(n => 
           n.id === notificationId ? { ...n, isRead: true } : n
         ));
-        setUnreadCount(prev => Math.max(0, prev - 1));
+        setUnreadCount(prev => (prev === null ? null : Math.max(0, prev - 1)));
       }
       return success;
     } catch (error) {
@@ -472,10 +576,18 @@ export const useNotifications = (userAddress: string | null): UseNotificationsRe
 
     try {
       const count = await socialAPIRef.current.markAllNotificationsAsRead();
-      if (count > 0) {
-        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-        setUnreadCount(0);
-      }
+      /**
+       * Stan czyscimy ZAWSZE, nie tylko przy `count > 0`.
+       *
+       * Zero znaczy "nie bylo czego oznaczac", a nie "nie udalo sie" - i po tej
+       * akcji nic nie jest nieprzeczytane tak samo, jak przy dziesieciu
+       * poprawionych dokumentach. Warunek zostawial zapalona kropke dokladnie
+       * w tym przypadku, ktory ja utrzymywal przy zyciu: licznik rozjechany
+       * z dokumentami (pelne uzasadnienie przy markAllNotificationsAsRead
+       * w utils/friends/notifications.ts).
+       */
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+      setUnreadCount(0);
       return count > 0;
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
@@ -493,7 +605,7 @@ export const useNotifications = (userAddress: string | null): UseNotificationsRe
         // Optionally decrease unread count if the notification was unread
         const wasUnread = notifications.find(n => n.id === notificationId && !n.isRead);
         if (wasUnread) {
-          setUnreadCount(prev => Math.max(0, prev - 1));
+          setUnreadCount(prev => (prev === null ? null : Math.max(0, prev - 1)));
         }
       }
       return success;
@@ -502,6 +614,30 @@ export const useNotifications = (userAddress: string | null): UseNotificationsRe
       return false;
     }
   }, [notifications]);
+
+  const loadNotificationsList = useCallback(async (): Promise<void> => {
+    const api = socialAPIRef.current;
+    if (!api) return;
+    // Cache sesyjny: drugie otwarcie dropdownu nie placi drugi raz za 20
+    // dokumentow. Kto chce swiezej listy, wola refreshNotifications().
+    if (listLoadedRef.current) return;
+
+    try {
+      setListLoading(true);
+      const notificationsData = await api.getNotifications(20);
+      // Jesli w trakcie pobierania zmienil sie adres, ta odpowiedz nalezy do
+      // starego uzytkownika i nie wolno jej wpisac w stan nowego.
+      if (socialAPIRef.current !== api) return;
+
+      setNotifications(notificationsData);
+      listLoadedRef.current = true;
+    } catch (error) {
+      console.error('Error loading notifications list:', error);
+      setError("Notifications couldn't be loaded.");
+    } finally {
+      setListLoading(false);
+    }
+  }, []);
 
   const refreshNotifications = useCallback(async (): Promise<void> => {
     if (!socialAPIRef.current) return;
@@ -514,6 +650,9 @@ export const useNotifications = (userAddress: string | null): UseNotificationsRe
 
       setNotifications(notificationsData);
       setUnreadCount(unreadCountData);
+      // Swiezo pobrana lista jest w stanie, wiec lazy-loader nie musi
+      // czytac jej jeszcze raz.
+      listLoadedRef.current = true;
     } catch (error) {
       console.error('Error refreshing notifications:', error);
     }
@@ -523,10 +662,12 @@ export const useNotifications = (userAddress: string | null): UseNotificationsRe
     notifications,
     unreadCount,
     loading,
+    listLoading,
     error,
     markAsRead,
     markAllAsRead,
     deleteNotification,
+    loadNotificationsList,
     refreshNotifications
   };
 };
@@ -571,15 +712,20 @@ export const useRelationship = (
     const api = createSocialAPI(currentUserAddress);
     socialAPIRef.current = api;
 
+    // Odpowiedz dla poprzedniej pary adresow nie moze wygrac z biezaca.
+    let cancelled = false;
+
     const loadRelationship = async () => {
       try {
         setLoading(true);
         setError(null);
 
         const relationshipData = await api.getRelationshipWith(targetUserAddress);
+        if (cancelled) return;
         setRelationship(relationshipData);
         setLoading(false);
       } catch (err) {
+        if (cancelled) return;
         console.error('Error loading relationship:', err);
         setError('Błąd wczytywania relacji');
         setLoading(false);
@@ -587,6 +733,8 @@ export const useRelationship = (
     };
 
     loadRelationship();
+
+    return () => { cancelled = true; };
   }, [currentUserAddress, targetUserAddress]);
 
   const follow = useCallback(async (): Promise<boolean> => {

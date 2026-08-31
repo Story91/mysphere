@@ -22,6 +22,9 @@ node_modules
 
 # Hardhat files
 **/cache/solidity-files-cache.json
+# Forkowany stan Base potrafi urosnac do setek megabajtow i jest odtwarzalny
+# jednym `npm run launchpad:fork:base` - nie ma po co siedziec w historii.
+/cache/
 **/artifacts/
 
 # TypeChain files
@@ -213,10 +216,13 @@ wallet_data.txt
 next-env.d.ts
 .env*.local
 
-# claude code local state (contains git worktrees - must never be committed)
-.claude/
+# Ustawienia Claude Code per maszyna - nie do repo.
+.claude/settings.local.json
+# Worktree'y Claude Code: katalog roboczy gita w srodku repo. Reszta .claude/
+# (skille, launch.json) jest wersjonowana celowo, wiec ignorujemy punktowo.
+.claude/worktrees/
 
-# raw json-rpc dumps kept from debugging sessions
+# Surowe zrzuty json-rpc z debugowania, nie sa wejsciem do buildu.
 base_pm.json
 cctp_recent.json
 impl.txt

@@ -1,7 +1,16 @@
 // Simple IP NFT Marketplace configuration for Camp Network
 // This is the main marketplace contract with all required functions
+//
+// UWAGA: OBA adresy w tym pliku nie maja bajtkodu na Camp Network (484) -
+// eth_getCode zwraca 0x, sprawdzone przez scripts/verifyOnchainInventory.js
+// i opisane w app/utils/ops/registry.ts. Konfiguracja wskazuje na nic, wiec
+// kazdy readContract stad odpada. Trasa /marketplace jest dzis zaparkowana w
+// config/routeStatus.js. Komentarze mowily "deployed on Camp Network" - to
+// bylo nieprawda i dlatego znikly; jesli kontrakty kiedys wstana, zamien tu
+// adresy, a nie same zdania.
 
-export const MARKETPLACE_ADDRESS = '0xf528f920d0ce1d1ea230b0ec10f0f64b8f43cbac'; // SimpleIPNFTMarketplace deployed on Camp Network
+// Adres targu wg konfiguracji. NIE POTWIERDZONY lancuchowo - brak kodu na 484.
+export const MARKETPLACE_ADDRESS = '0xf528f920d0ce1d1ea230b0ec10f0f64b8f43cbac';
 
 // Full ABI from deployed contract V3
 export const MARKETPLACE_ABI = [
@@ -1649,7 +1658,8 @@ export const MARKETPLACE_ABI = [
   }
 ] as const;
 
-// Default IP NFT contract used for listing (main IP collection)
+// Default IP NFT contract used for listing (main IP collection).
+// NIE POTWIERDZONY lancuchowo - brak kodu na 484, patrz naglowek pliku.
 export const DEFAULT_IP_NFT_CONTRACT = '0xF90733b9eCDa3b49C250B2C3E3E42c96fC93324E';
 
 // License presets for quick selection

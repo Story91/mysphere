@@ -11,6 +11,13 @@ export interface Post {
   likes: number;
   likedBy: string[];
   comments: Comment[];
+  /**
+   * Licznik komentarzy utrzymywany przy zapisie. Nowe komentarze NIE rosna
+   * juz w tablicy `comments` dokumentu posta (leza w kolekcji `comments`),
+   * wiec liczby nie wolno brac z `comments.length` - dla starych postow bez
+   * tego pola mapPostDoc liczy fallback z tablicy.
+   */
+  commentsCount?: number;
   tags?: string[];
   mentions?: string[];
   visibility?: PostVisibility;
@@ -18,7 +25,7 @@ export interface Post {
   txHash?: string;
   zoraCoinAddress?: string;
   lastEdited?: any;
-  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain';
+  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood';
   isPinned?: boolean;
   pinnedAt?: number;
   pinnedBy?: string;
@@ -29,6 +36,22 @@ export interface Post {
   pinOwner?: string;
   pinAmountPaid?: string;
   pinTxHash?: string;
+  // 💰 Tip-to-unlock: wszystkie pola OPCJONALNE, wiec istniejace posty bez nich
+  // renderuja sie dokladnie jak dotad. Szczegoly: app/utils/monetization/types.ts
+  /**
+   * Znacznik, ze post ma platna czesc. Sama tresc NIE jest w dokumencie posta -
+   * wydaje ja GET /api/premium po sprawdzeniu sesji i odblokowania.
+   */
+  hasPremium?: boolean;
+  /**
+   * ZGODNOSC WSTECZ: posty sprzed przeniesienia tresci do osobnej kolekcji maja
+   * ja tutaj, wiec jest publiczna. Nowe posty tego pola nie zapisuja.
+   */
+  premiumContent?: string;
+  /** Cena odblokowania jako string dziesietny, np. "0.5". */
+  unlockPrice?: string;
+  /** Token ceny. Brak = USDC (domyslny, bo w pelni weryfikowalny na serwerze). */
+  unlockToken?: 'ETH' | 'USDC';
   // 🎵 Music attachment field
   musicTrack?: {
     id: string;           // Spotify track ID
@@ -73,7 +96,7 @@ export interface Comment {
   mentions: string[];
   replyTo?: string;
   txHash?: string | null;
-  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain';
+  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood';
   tip?: {
     amount: number;
     currency: string;

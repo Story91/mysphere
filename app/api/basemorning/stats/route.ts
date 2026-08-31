@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Sterownik MongoDB (require z utils/mongodb) dziala tylko w Node, nie na edge.
+export const runtime = 'nodejs';
+
 // Conditional imports to avoid build errors when MongoDB is not available
 let getCollection: any = null;
 let COLLECTIONS: any = null;
@@ -425,18 +428,25 @@ export async function GET(request: NextRequest) {
       if (!adminKey || adminKey !== ADMIN_KEY) {
         return NextResponse.json(
           { error: 'Unauthorized access' },
-          { status: 401 }
+          { status: 401, headers: { 'Cache-Control': 'no-store, private' } }
         );
       }
-      
-      // Return admin analytics
+
+      // Return admin analytics. Odpowiedz admina nie moze wyladowac w zadnym
+      // wspoldzielonym cache'u - klucz jest w query stringu.
       const adminData = await getAdminAnalytics();
-      return NextResponse.json(adminData);
+      return NextResponse.json(adminData, {
+        headers: { 'Cache-Control': 'no-store, private' }
+      });
     }
-    
-    // Return public stats by default
+
+    // Return public stats by default. CDN trzyma odpowiedz 30 s (tyle co cache
+    // w pamieci nizej), wiec przy ruchu funkcja budzi sie raz na pol minuty
+    // zamiast przy kazdym odswiezeniu widoku.
     const publicData = await getPublicStats();
-    return NextResponse.json(publicData);
+    return NextResponse.json(publicData, {
+      headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60' }
+    });
     
   } catch (error) {
     console.error('Stats API error:', error);

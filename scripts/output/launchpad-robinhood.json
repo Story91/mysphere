@@ -1,0 +1,17 @@
+{
+  "chainId": 4663,
+  "network": "robinhood",
+  "deployer": "0xD4885A5aa53446843CABcDE1F35DE9b4E906030e",
+  "poolManager": "0x8366a39CC670B4001A1121B8F6A443A643e40951",
+  "tokenFactory": "0x91ca4f9C7eAA8A1C3775A2d1213a6F379f13a65A",
+  "launchpad": "0x712E93401b455d226284BbA873cE13CC1492B22f",
+  "vault": "0xbeC6D16d93fbD3B5237A1456A4F1434bb3e69913",
+  "hook": "0x177be4EF50d92d7B7bf381e078F7c333De5B6044",
+  "hookSalt": "0x0000000000000000000000000000000000000000000000000000000000000c2f",
+  "feeBps": "100",
+  "creatorFeeBps": "70",
+  "protocolShareBps": "3000",
+  "feeRecipient": "0x83C68Dbf0E79f934FcCCd3Ca015103A768C21E83",
+  "deployBlock": 33102326,
+  "deployedAt": "2026-08-10T20:55:35.653Z"
+}

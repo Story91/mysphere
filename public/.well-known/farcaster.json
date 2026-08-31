@@ -10,9 +10,8 @@
     "subtitle": "Build, grow, own your Sphere",
     "description": "Build, grow, and own your digital Sphere.",
     "screenshotUrls": [
-      "https://mysphere.fun/share/share-no-admin.png",
-      "https://mysphere.fun/share/share-creator-fee.png",
-      "https://mysphere.fun/share/share-burn-receipt.png"
+      "https://mysphere.fun/frame-v2.png",
+      "https://mysphere.fun/SphereWhite.png"
     ],
     "iconUrl": "https://mysphere.fun/android-chrome-512x512.png",
     "splashImageUrl": "https://mysphere.fun/SPLASH.gif",
@@ -21,11 +20,11 @@
     "webhookUrl": "https://api.neynar.com/f/app/abc550bb-3909-43b2-921a-ce797f9e925b/event",
     "primaryCategory": "social",
     "tags": ["web3", "base", "social", "onchain", "creator"],
-    "heroImageUrl": "https://mysphere.fun/share/share-no-admin.png",
+    "heroImageUrl": "https://mysphere.fun/SphereWhite.png",
     "tagline": "Create and get rewarded",
     "ogTitle": "MySphere - Social on Base",
     "ogDescription": "Build, grow, and own your digital Sphere. Create and monetize content on Base.",
-    "ogImageUrl": "https://mysphere.fun/share/share-no-admin.png"
+    "ogImageUrl": "https://mysphere.fun/SphereWhite.png"
   },
   "baseBuilder": {
     "allowedAddresses": ["0x5B9Db509BdA743DE9FF52C8049EFa92FEdD29126"]

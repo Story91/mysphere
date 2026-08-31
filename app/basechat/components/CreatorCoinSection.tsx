@@ -11,51 +11,87 @@ interface CreatorCoinSectionProps {
 
 export default function CreatorCoinSection({ userAddress, currentUserAddress }: CreatorCoinSectionProps) {
   const [creatorCoin, setCreatorCoin] = useState<CreatorCoinData | null>(null);
-  const [userBalance, setUserBalance] = useState<string>('0');
+  /**
+   * Saldo w tej monecie. `null` = NIE WIEMY (odczyt padl), a nie "zero".
+   *
+   * Wczesniej startowalo i konczylo na '0', wiec nieudane zapytanie do Zory
+   * dawalo to samo, co pusty portfel: znikaly i saldo, i przycisk "Sell".
+   * Czlowiek nie mial jak sprzedac wlasnej monety i nie wiedzial dlaczego.
+   */
+  const [userBalance, setUserBalance] = useState<string | null>(null);
+  const [balanceFailed, setBalanceFailed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showTradeModal, setShowTradeModal] = useState(false);
   const [tradeMode, setTradeMode] = useState<'buy' | 'sell'>('buy');
 
+  /** Saldo zalogowanego uzytkownika w danej monecie. Jedno miejsce - ta sama
+   *  logika stala wczesniej i w fetchBalance, i w efekcie ladujacym monete. */
+  const readCoinBalance = useCallback(async (coinAddress: string): Promise<string> => {
+    if (!currentUserAddress) return '0';
+
+    const balances = await getUserCoinBalances(currentUserAddress);
+    const balance = balances.find(b =>
+      b.coinAddress.toLowerCase() === coinAddress.toLowerCase()
+    );
+    // Tutaj zero jest prawda: odczyt sie udal, monety w portfelu nie ma.
+    return balance?.balanceFormatted || '0';
+  }, [currentUserAddress]);
+
   const fetchBalance = useCallback(async () => {
     if (!currentUserAddress || !creatorCoin) return;
-    
+
     try {
-      const balances = await getUserCoinBalances(currentUserAddress);
-      const balance = balances.find(b => 
-        b.coinAddress.toLowerCase() === creatorCoin.address.toLowerCase()
-      );
-      setUserBalance(balance?.balanceFormatted || '0');
+      setUserBalance(await readCoinBalance(creatorCoin.address));
+      setBalanceFailed(false);
     } catch (error) {
       console.error('Error fetching balance:', error);
+      setUserBalance(null);
+      setBalanceFailed(true);
     }
-  }, [currentUserAddress, creatorCoin]);
+  }, [currentUserAddress, creatorCoin, readCoinBalance]);
 
   useEffect(() => {
+    if (!userAddress) return;
+
+    // Przy szybkiej zmianie profilu odpowiedz dla poprzedniego adresu
+    // pokazywala cudza monete i cudze saldo.
+    let cancelled = false;
+
     const fetchCreatorCoin = async () => {
-      if (!userAddress) return;
-      
       setLoading(true);
+      setBalanceFailed(false);
       try {
         const coin = await getCreatorCoin(userAddress);
+        if (cancelled) return;
         setCreatorCoin(coin);
 
         // If viewing own profile or logged in, get balance
         if (currentUserAddress && coin) {
-          const balances = await getUserCoinBalances(currentUserAddress);
-          const balance = balances.find(b => 
-            b.coinAddress.toLowerCase() === coin.address.toLowerCase()
-          );
-          setUserBalance(balance?.balanceFormatted || '0');
+          // Wlasny try: padniete SALDO nie moze wygasic calej sekcji monety,
+          // ale tez nie moze udac zera.
+          try {
+            const balance = await readCoinBalance(coin.address);
+            if (cancelled) return;
+            setUserBalance(balance);
+          } catch (balanceError) {
+            if (cancelled) return;
+            console.error('Error fetching balance:', balanceError);
+            setUserBalance(null);
+            setBalanceFailed(true);
+          }
         }
       } catch (error) {
+        if (cancelled) return;
         console.error('Error fetching creator coin:', error);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchCreatorCoin();
-  }, [userAddress, currentUserAddress]);
+
+    return () => { cancelled = true; };
+  }, [userAddress, currentUserAddress, readCoinBalance]);
 
   const handleOpenTrade = (mode: 'buy' | 'sell') => {
     setTradeMode(mode);
@@ -69,12 +105,12 @@ export default function CreatorCoinSection({ userAddress, currentUserAddress }: 
 
   if (loading) {
     return (
-      <div className="bg-gradient-to-r from-purple-50 via-violet-50 to-indigo-50 dark:from-purple-900/20 dark:via-violet-900/20 dark:to-indigo-900/20 border border-purple-200 dark:border-purple-700/50 rounded-xl p-4 animate-pulse">
+      <div className="animate-pulse rounded-card bg-soft-surface p-4 shadow-card">
         <div className="flex items-center space-x-3">
-          <div className="w-12 h-12 bg-purple-200 dark:bg-purple-700 rounded-full" />
+          <div className="h-12 w-12 rounded-full bg-soft-sunken" />
           <div className="flex-1 space-y-2">
-            <div className="h-4 bg-purple-200 dark:bg-purple-700 rounded w-24" />
-            <div className="h-3 bg-purple-200 dark:bg-purple-700 rounded w-16" />
+            <div className="h-4 w-24 rounded bg-soft-sunken" />
+            <div className="h-3 w-16 rounded bg-soft-sunken" />
           </div>
         </div>
       </div>
@@ -87,59 +123,65 @@ export default function CreatorCoinSection({ userAddress, currentUserAddress }: 
 
   return (
     <>
-      <div className="bg-gradient-to-r from-purple-50 via-violet-50 to-indigo-50 dark:from-purple-900/20 dark:via-violet-900/20 dark:to-indigo-900/20 border border-purple-200 dark:border-purple-700/50 rounded-xl p-4 shadow-lg hover:shadow-xl transition-all duration-300">
+      {/* ===== MONETA TWORCY W JEZYKU RESZTY PRODUKTU =====
+          Byl tu gradient przez trzy fiolety, obwodka w czwartym i cien
+          `shadow-lg`, ktorego nie uzywa nic innego w tej aplikacji. Sekcja
+          krzyczala mocniej niz saldo i przyciski w srodku, a to one sa tu
+          trescia. Zwykla karta produktu; kolor niesie tylko to, co znaczy:
+          zielen kupna, czerwien sprzedazy, bursztyn przy kwocie. */}
+      <div className="rounded-card bg-soft-surface p-4 shadow-card">
         {/* Coin Info */}
         <div className="flex items-center space-x-3">
           {creatorCoin.imageUrl ? (
             <img 
               src={creatorCoin.imageUrl} 
               alt={creatorCoin.symbol} 
-              className="w-12 h-12 rounded-full object-cover ring-2 ring-purple-300 dark:ring-purple-600"
+              className="h-12 w-12 rounded-full object-cover"
             />
           ) : (
-            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-indigo-500 flex items-center justify-center ring-2 ring-purple-300 dark:ring-purple-600">
-              <span className="text-white font-bold text-lg">{creatorCoin.symbol.charAt(0)}</span>
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-soft-primary">
+              <span className="font-soft-display text-lg font-bold text-white">{creatorCoin.symbol.charAt(0)}</span>
             </div>
           )}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <span className="font-bold text-gray-900 dark:text-white truncate">
+              <span className="truncate font-soft-display font-bold text-soft-ink">
                 {creatorCoin.symbol}
               </span>
               {creatorCoin.priceUSD && (
-                <span className="text-sm text-green-600 dark:text-green-400 font-medium">
+                <span className="font-soft-display text-sm font-bold tabular-nums text-soft-accent-deep">
                   ${parseFloat(creatorCoin.priceUSD).toFixed(6)}
                 </span>
               )}
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+            <p className="text-xs text-soft-ink-soft truncate">
               {creatorCoin.name}
             </p>
           </div>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-purple-200/50 dark:border-purple-700/30">
+        <div className="mt-3 grid grid-cols-3 gap-2 border-t border-soft-line pt-3">
           {creatorCoin.marketCap && (
             <div className="text-center">
-              <p className="text-xs text-gray-500 dark:text-gray-400">Market Cap</p>
-              <p className="text-sm font-semibold text-gray-900 dark:text-white">
+              <p className="font-soft text-[10.5px] font-semibold uppercase tracking-[0.07em] text-soft-ink-soft">Market cap</p>
+              <p className="font-soft-display text-[15px] font-bold tabular-nums text-soft-ink">
                 ${Number(creatorCoin.marketCap).toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </p>
             </div>
           )}
           {creatorCoin.volume24h && (
             <div className="text-center">
-              <p className="text-xs text-gray-500 dark:text-gray-400">24h Vol</p>
-              <p className="text-sm font-semibold text-gray-900 dark:text-white">
+              <p className="font-soft text-[10.5px] font-semibold uppercase tracking-[0.07em] text-soft-ink-soft">24h volume</p>
+              <p className="font-soft-display text-[15px] font-bold tabular-nums text-soft-ink">
                 ${Number(creatorCoin.volume24h).toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </p>
             </div>
           )}
           {creatorCoin.uniqueHolders !== undefined && (
             <div className="text-center">
-              <p className="text-xs text-gray-500 dark:text-gray-400">Holders</p>
-              <p className="text-sm font-semibold text-gray-900 dark:text-white">
+              <p className="font-soft text-[10.5px] font-semibold uppercase tracking-[0.07em] text-soft-ink-soft">Holders</p>
+              <p className="font-soft-display text-[15px] font-bold tabular-nums text-soft-ink">
                 {creatorCoin.uniqueHolders.toLocaleString()}
               </p>
             </div>
@@ -151,14 +193,14 @@ export default function CreatorCoinSection({ userAddress, currentUserAddress }: 
           <div className="flex gap-2 mt-3">
             <button
               onClick={() => handleOpenTrade('buy')}
-              className="flex-1 py-2 px-3 rounded-lg text-sm font-semibold bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700 transition-all shadow-md hover:shadow-lg"
+              className="flex-1 rounded-pill bg-[#15803D] px-3 py-2 font-soft-display text-[13px] font-bold text-white transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
             >
               Buy
             </button>
-            {parseFloat(userBalance) > 0 && (
+            {userBalance !== null && parseFloat(userBalance) > 0 && (
               <button
                 onClick={() => handleOpenTrade('sell')}
-                className="flex-1 py-2 px-3 rounded-lg text-sm font-semibold bg-gradient-to-r from-red-500 to-rose-600 text-white hover:from-red-600 hover:to-rose-700 transition-all shadow-md hover:shadow-lg"
+                className="flex-1 rounded-pill bg-[#BE185D] px-3 py-2 font-soft-display text-[13px] font-bold text-white transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
               >
                 Sell
               </button>
@@ -167,10 +209,20 @@ export default function CreatorCoinSection({ userAddress, currentUserAddress }: 
         )}
 
         {/* User Balance */}
-        {currentUserAddress && parseFloat(userBalance) > 0 && (
+        {currentUserAddress && userBalance !== null && parseFloat(userBalance) > 0 && (
           <div className="mt-2 text-center">
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              Your balance: <span className="font-medium text-purple-600 dark:text-purple-400">{parseFloat(userBalance).toFixed(4)} {creatorCoin.symbol}</span>
+            <span className="text-xs text-soft-ink-soft">
+              Your balance: <span className="font-bold text-soft-accent-deep">{parseFloat(userBalance).toFixed(4)} {creatorCoin.symbol}</span>
+            </span>
+          </div>
+        )}
+
+        {/* Saldo nieodczytane. Piszemy o tym zamiast milczec - milczenie w tym
+            miejscu znaczy "nie masz tej monety", a tego nie sprawdzilismy. */}
+        {currentUserAddress && balanceFailed && (
+          <div className="mt-2 text-center">
+            <span className="text-xs text-soft-ink-soft">
+              Your balance couldn&apos;t be loaded
             </span>
           </div>
         )}
