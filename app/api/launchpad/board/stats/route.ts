@@ -196,7 +196,7 @@ export async function GET(request: NextRequest) {
   // bierze sam pierwszy kandydat i przez to ginie na zepsutej zmiennej - tu nie.
   let client: ReturnType<typeof createPublicClient> | null = null;
   let head = 0n;
-  for (const rpcUrl of rpcCandidates(chainId, process.env)) {
+  for (const rpcUrl of rpcCandidates(chainId, process.env, net.chain.rpcUrls.default.http)) {
     const candidate = createPublicClient({ chain: net.chain, transport: http(rpcUrl) });
     try {
       /**
@@ -217,6 +217,35 @@ export async function GET(request: NextRequest) {
        */
       const [id, latest] = await Promise.all([candidate.getChainId(), candidate.getBlockNumber()]);
       if (id !== chainId) continue;
+
+      /**
+       * EGZAMIN Z TEGO, PO CO TU PRZYSZLISMY - CZYLI Z `getLogs`.
+       *
+       * Numer bloku oddaje kazdy zywy endpoint. Nas interesuje wylacznie to,
+       * czy odda LOGI z zakresu, ktory zaraz zeskanujemy - a to sa dwie rozne
+       * zdolnosci i potrafia sie rozjechac:
+       *   - Arc, adres domyslny sieci (Blockdaemon): `eth_chainId` i
+       *     `eth_blockNumber` w porzadku, `eth_getLogs` przy bloku wdrozenia
+       *     -> `4444 pruned history unavailable`. Historii tam po prostu NIE MA.
+       *   - Arc, adres drugi (`rpc.testnet.arc.io`): historia komplet, ale
+       *     zakres ponad ~10 tys. blokow -> `-32012 requested range too large`.
+       *
+       * Bez tego egzaminu kolejka konczyla sie na pierwszym adresie, ktory
+       * potrafil podac godzine, i skan padal na pierwszym oknie - w kolko, przy
+       * kazdym zadaniu. Sonda jest jednym zapytaniem i pyta o DOKLADNIE to okno,
+       * ktore skan zrobi jako pierwsze, wiec nie zgaduje.
+       */
+      const probeFrom = stored && stored.meta.lastBlock >= net.deployBlock ? stored.meta.lastBlock + 1n : net.deployBlock;
+      if (probeFrom <= latest) {
+        const probeTo = probeFrom + net.scanWindow - 1n > latest ? latest : probeFrom + net.scanWindow - 1n;
+        await candidate.getLogs({
+          address: [net.launchpad as Address, net.hook as Address],
+          events: [LAUNCHED_EVENT, BOUGHT_EVENT, SOLD_EVENT, HOOK_FEE_SETTLED_EVENT, FEE_ACCRUED_EVENT],
+          fromBlock: probeFrom,
+          toBlock: probeTo,
+        });
+      }
+
       head = latest;
       client = candidate;
       break;
