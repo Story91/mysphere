@@ -126,7 +126,25 @@ export async function GET() {
   const clients = urls.map((u) => createPublicClient({ chain: base, transport: http(u) })) as unknown as LooseClient[];
   const client = clients[0];
 
-  const head = await client.getBlockNumber();
+  /**
+   * Pojedyncze odczyty tez musza rotowac po transportach - scanRange robil to
+   * od poczatku, ale getBlockNumber/getBlock/readContract szly zawsze na
+   * clients[0] i lapaly 429, gdy akurat ten endpoint mial limit.
+   */
+  async function anyClient<T>(what: (c: LooseClient) => Promise<T>): Promise<T> {
+    let last: unknown;
+    for (let i = 0; i < clients.length * 2; i++) {
+      try {
+        return await what(clients[i % clients.length]);
+      } catch (e) {
+        last = e;
+        await sleep(200 * (i + 1));
+      }
+    }
+    throw last;
+  }
+
+  const head = await anyClient((c) => c.getBlockNumber());
   const { epochIndex, fromBlock, toBlock } = epochRange(head);
   const scanTo = head < toBlock ? head : toBlock;
 
@@ -159,8 +177,8 @@ export async function GET() {
       .map(async (token) => {
         try {
           const [l, symbol] = await Promise.all([
-            client.readContract({ address: LAUNCHPAD, abi: LAUNCH_OF_ABI, functionName: 'launchOf', args: [token as Address] }),
-            client.readContract({ address: token as Address, abi: LAUNCH_OF_ABI, functionName: 'symbol' }).catch(() => '?'),
+            anyClient((c) => c.readContract({ address: LAUNCHPAD, abi: LAUNCH_OF_ABI, functionName: 'launchOf', args: [token as Address] })),
+            anyClient((c) => c.readContract({ address: token as Address, abi: LAUNCH_OF_ABI, functionName: 'symbol' })).catch(() => '?'),
           ]);
           const creator = (l as readonly unknown[])[0] as string;
           const startedAt = BigInt((l as readonly unknown[])[4] as bigint);
@@ -240,7 +258,7 @@ export async function GET() {
   const inputs: TokenEpochInput[] = [...perToken.values()].map((r) => ({ ...r, uniqueTraders: r.traders.size }));
 
   // Koniec epoki w unixie - do bramki wieku i odliczania w UI.
-  const headTs = (await client.getBlock({ blockNumber: head })).timestamp;
+  const headTs = (await anyClient((c) => c.getBlock({ blockNumber: head }))).timestamp;
   const epochEndUnix = headTs + (toBlock > head ? (toBlock - head) * 2n : 0n);
 
   const result = scoreEpoch(inputs, epochIndex, fromBlock, toBlock, epochEndUnix);
