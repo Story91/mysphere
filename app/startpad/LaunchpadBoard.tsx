@@ -67,6 +67,8 @@ import {
   serializeAggregate,
   shouldKeepUnscanned,
 } from './boardScan';
+// Agregat wspolny dla wszystkich urzadzen - patrz naglowek `boardStats`.
+import { fetchBoardStats, pickAggregateBase } from './boardStats';
 // Jedna, ZMIERZONA rezerwa na gaz i jedna arytmetyka procentow dla obu paneli
 // handlu - mini modala na tablicy i panelu na stronie tokena. Dwie kopie tej
 // samej liczby wlasnie kosztowaly nas przyciski, ktore wpisywaly zero.
@@ -1288,8 +1290,6 @@ export default function LaunchpadBoard() {
     if (!boardHasContentRef.current) setLoadingBoard(true);
     setBoardError(null);
     try {
-      const latest = await readClient.getBlockNumber();
-
       /**
        * SKAN ZACZYNA SIE TAM, GDZIE SKONCZYL POPRZEDNI.
        *
@@ -1304,11 +1304,43 @@ export default function LaunchpadBoard() {
        * gdy pokrycie jest ciagle od bloku wdrozenia - dzieki temu `lastBlock`
        * zawsze znaczy "policzone od poczatku do tego bloku", a nie "policzone
        * cokolwiek".
+       *
+       * ===================================================================
+       * AGREGAT MA DWA ZRODLA, BO JEDNO NIE WYSTARCZALO
+       * ===================================================================
+       * Zapamietany agregat lezal WYLACZNIE w `localStorage`. Dla kogos, kto
+       * wchodzil z drugiego urzadzenia, ta pamiec byla pusta - i akapit wyzej
+       * opisywal wtedy jego wejscie co do slowa: pelny skan od bloku
+       * wdrozenia, z sufitem okien, ktory lancuchy juz przerosly. Zglaszane
+       * jako "z innego urzadzenia pobiera dane od nowa".
+       *
+       * Drugim zrodlem jest `/api/launchpad/board/stats`: ten sam agregat,
+       * liczony raz po stronie serwera i wspolny dla wszystkich urzadzen.
+       * Bierzemy ten, ktory siega WYZEJ - nigdy oba naraz, bo oba znacza
+       * "policzone od bloku wdrozenia", wiec ich zlozenie policzyloby wolumen
+       * podwojnie (patrz `pickAggregateBase`).
+       *
+       * Zapytanie leci ROWNOLEGLE z odczytem glowy lancucha: to sa dwie
+       * niezalezne rzeczy, a szeregowanie ich dokladaloby cala runde do
+       * czasu, ktory ta zmiana ma skracac.
        */
       const cached = loadBoardAggregate(ACTIVE_LAUNCHPAD_NETWORK.chain.id, LAUNCHPAD_ADDRESS);
-      const cachedAggregate = cached ? parseAggregate(cached.aggregate) : null;
+      const localAggregate = cached ? parseAggregate(cached.aggregate) : null;
+
+      const [latest, serverStats] = await Promise.all([
+        readClient.getBlockNumber(),
+        fetchBoardStats(ACTIVE_LAUNCHPAD_NETWORK.chain.id),
+      ]);
+
+      const base = pickAggregateBase(
+        localAggregate && cached ? { aggregate: localAggregate, lastBlock: cached.lastBlock } : null,
+        serverStats,
+        latest
+      );
+      const cachedAggregate = base?.aggregate ?? null;
+
       const plan = planBoardScan({
-        cachedLastBlock: cachedAggregate ? (cached?.lastBlock ?? null) : null,
+        cachedLastBlock: base?.lastBlock ?? null,
         head: latest,
         deployBlock: LAUNCHPAD_DEPLOY_BLOCK,
         maxSpan: MAX_DELTA_SPAN,

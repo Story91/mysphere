@@ -26,6 +26,12 @@
 const ENV_BY_CHAIN: Record<number, string> = {
   8453: 'BASE_RPC_URL',
   84532: 'BASE_SEPOLIA_RPC_URL',
+  // Publiczny RPC Robinhooda jest przez jego wlasna dokumentacje oznaczony jako
+  // "not recommended for production", a serwerowy skan agregatu tablicy strzela
+  // w niego oknami po milion blokow. Zmienna byla tu potrzebna od poczatku -
+  // brakowalo jej dlatego, ze do tej pory serwer skanowal tylko historie
+  // pojedynczego tokena, a tej na Robinhoodzie nikt nie otwieral.
+  4663: 'ROBINHOOD_RPC_URL',
   5042002: 'ARC_TESTNET_RPC_URL',
 };
 
