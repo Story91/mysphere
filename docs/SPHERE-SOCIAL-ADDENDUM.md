@@ -84,7 +84,7 @@ publicznie sprawdzalne wiazania z tokenem:
 | # | Dowod | Status |
 | --- | --- | --- |
 | 1 | Contract Creator `CurveLaunchpad` `0xCF541A7EcE881945833ff1680dFc067C5Dd4cE2D`; zrodlo **zweryfikowane** (Exact Match) | gotowe |
-| 2 | Contract Creator `SphereCreatorEscrow` `0xe984986f4F1E067f697b548D5fe942813d03Da37`, tx `0xe52050d183856eb63ddd6e0bede02555eac68ac7f90cdae1318b037d212afe7b` | **zrodlo NIEZWERYFIKOWANE - do zrobienia przed launchem** |
+| 2 | Contract Creator `SphereCreatorEscrow` `0xe984986f4F1E067f697b548D5fe942813d03Da37`, tx `0xe52050d183856eb63ddd6e0bede02555eac68ac7f90cdae1318b037d212afe7b` | **zrodlo ZWERYFIKOWANE 2026-09-01** |
 | 3 | `LAUNCH_AUTHORITY` escrow (odczyt on-chain) - ten sam EOA, wiec bedzie `From` transakcji tworzacej token | dostepne po launchu |
 
 Do tego wiazanie escrow -> token jest odczytem publicznym:
@@ -139,12 +139,20 @@ projektu).
 Kolejnosc jest istotna: punkty 1-3 sa niezalezne od launchu i nic nie
 kosztuja, wiec ida od razu.
 
-1. **Zweryfikowac zrodlo `SphereCreatorEscrow`** na Basescanie
-   (`0xe984986f...`, dzis niezweryfikowane). To warunek wstepny do
-   czegokolwiek dalej i jednoczesnie samodzielny zysk wiarygodnosci.
-   Przy okazji to samo dla `SphereRewards`
-   `0x9030e53E7AC1bc81Cf28b196BA336E5544ce4A47` i `SphereTokenVesting`
-   `0xB5dE95224F2bEDee2e7Ca7170F5B6a02641255AD`.
+1. ~~Zweryfikowac zrodla peryferii na Basescanie.~~ **ZROBIONE 2026-09-01.**
+   Wszystkie trzy przeszly (`Pass - Verified`), solc `v0.8.20+commit.a1b79de6`,
+   optimizer on / runs 200, `viaIR`, `evmVersion: paris` - te same ustawienia,
+   z ktorymi zweryfikowany jest `CurveLaunchpad`:
+
+   | Kontrakt | Adres |
+   | --- | --- |
+   | `SphereRewards` | `0x9030e53E7AC1bc81Cf28b196BA336E5544ce4A47` |
+   | `SphereTokenVesting` | `0xB5dE95224F2bEDee2e7Ca7170F5B6a02641255AD` |
+   | `SphereCreatorEscrow` | `0xe984986f4F1E067f697b548D5fe942813d03Da37` |
+
+   Argumenty konstruktorow zostaly odtworzone z odczytow on-chain
+   (nie bylo zapisu `scripts/output/sphere-base.json`), a poprawnosc
+   potwierdza sam fakt dopasowania bajtkodu przez Etherscan.
 2. **Zaklaimowac ownership escrow i launchpada na koncie Basescan**
    (Verified Address, podpis z `0xD4885A5a...`). Oba maja normalnego
    Contract Creatora, wiec to przechodzi standardowa sciezka.
@@ -224,6 +232,46 @@ Decyzja wlasciciela, swiadomie, przed launchem:
 Warte odnotowania: opcja (b) **nie odblokowuje** Basescanu ani DEXTools.
 Jest inwestycja w trwalosc i przyszle integracje, a nie lekarstwem na
 punkt 0.2 - i tylko tak powinna byc wazona.
+
+**DECYZJA WLASCICIELA 2026-09-01: wariant (a) - NIE redeployujemy escrow.**
+`metadataURI` zostaje pusty na zawsze. Konsekwencja przyjeta swiadomie:
+on-chain nie ma zadnego wskaznika do socials, warstwa opisowa zyje
+wylacznie w zewnetrznych serwisach i na naszej stronie. Zysk uboczny jest
+powazniejszy niz strata: adres escrow i `VANITY_SALT` sa ostateczne,
+wiec **adres tokena jest ostateczny juz teraz** - co odblokowuje wczesna
+publikacje adresu (sekcja 0.7).
+
+### 0.7 Wczesna publikacja adresu tokena - ZROBIONE
+
+**Decyzja wlasciciela 2026-09-01: publikujemy adres przed launchem.**
+
+Zweryfikowane niezaleznie odczytem z Base mainnet (blok 50714525,
+`https://mainnet.base.org`), a nie przepisane z notatki:
+
+| Odczyt | Wartosc |
+| --- | --- |
+| `escrow.LAUNCHPAD()` | `0xCF541A7EcE881945833ff1680dFc067C5Dd4cE2D` |
+| `escrow.LAUNCH_AUTHORITY()` | `0xD4885A5aa53446843CABcDE1F35DE9b4E906030e` |
+| `escrow.VANITY_SALT()` | `0x...041ade` (immutable) |
+| `escrow.launched()` | `false` |
+| `escrow.sphereToken()` | `0x0` |
+| `escrow.tokenName() / tokenSymbol()` | `Sphere` / `SPHERE` |
+| `FEE_BPS / CREATOR_FEE_BPS / BUYBACK_BPS` | `100 / 70 / 5000` |
+| `launchpad.predictVanityToken(escrow, salt)` | **`0xB200000000000000000000BA5eDb84c678432476`** |
+| `eth_getCode(token)` | `0x` - jeszcze nie istnieje |
+
+Dlaczego to jest bezpieczne: `predictVanityToken` ma `msg.sender`
+w preimage (CurveLaunchpad.sol:949, docstring :903), wiec nikt inny nie
+wyprodukuje tego adresu; `VANITY_SALT` jest `immutable`, a escrow nie
+bedzie redeployowany (decyzja 0.6), wiec adres nie ma jak sie zmienic.
+
+Dlaczego to jest wartosciowe: w dniu launchu kilkanascie podszywajacych
+sie kont wypycha falszywe adresy ludziom, ktorzy sie spiesza. Adres
+publiczny od tygodni unieszkodliwia ten schemat - kazdy moze porownac,
+zamiast ufac screenshotowi.
+
+Opublikowane: watek na X (2.09, 10:30 UTC, post `cmthv588h066vn10yrdr04k66`)
+i post na Telegramie (2.09, 10:35 UTC, post `cmthvbue8066zn10ysizfayon`).
 
 Cala reszta tego dokumentu zaklada, ze punkt 0 jest rozstrzygniety.
 
@@ -447,6 +495,35 @@ launchu: kazdy moglby sprawdzic adres samodzielnie, na tydzien przed.
 Warunek: decyzja z sekcji 0.6 musi byc rozstrzygnieta na "nie
 redeployujemy escrow", bo redeploy zmienia adres i zamienilby ten atut
 w wlasnego galla. Nie publikowac wczesniej.
+
+### Status zaplanowania w Postiz (2026-09-01)
+
+Telegram jest podpiety do Postiz jako "MySphere AI chat"
+(`cmthubh4l0enxoc0y4a6kvqn7`). Zaplanowane:
+
+| Kiedy (UTC) | Co | Post ID |
+| --- | --- | --- |
+| 2.09 09:00 | Post 1 - po co ten kanal | `cmthval7s066yn10yvcngwn8v` |
+| 2.09 10:35 | Adres tokena przed launchem | `cmthvbue8066zn10ysizfayon` |
+| 3.09 17:00 | Post 2 - czym jest startpad | `cmthvc8gd0670n10yghjsjkjs` |
+| 4.09 17:00 | Post 3 - proba na Sepolii | **NIE zaplanowany** |
+
+Trzy rzeczy do reki:
+
+1. **Post 3 zablokowany przez klasyfikator uprawnien** - jedyny z tej
+   czworki zawierajacy zewnetrzny link (basescan). Tresc gotowa wyzej,
+   do recznego wklejenia albo po dodaniu reguly w ustawieniach.
+2. **Post 1 wymaga podmiany ostatniego akapitu.** Powstal, zanim zapadla
+   decyzja o wczesnej publikacji adresu, wiec obiecuje "the contract
+   address gets posted exactly once, on launch day" - a 95 minut pozniej
+   adres publikujemy. Ostatni akapit zamienic na (263 znaki):
+
+   `standing rules, and they do not change. we never DM first. there is no presale and no allowlist. the contract address is published in the next post, weeks before launch, so nobody has to trust a screenshot on the day. any address that does not match it is a scam.`
+
+3. **Opis kanalu i przypieta wiadomosc ida recznie** - zawieraja
+   placeholdery `[X_URL]`, `[TG_HANDLE]`, `[SITE_URL]`, `[DOCS_URL]`,
+   ktorych nie znam. Bez nich nie publikuje zgadywanych linkow.
+
 
 ## 3. X
 

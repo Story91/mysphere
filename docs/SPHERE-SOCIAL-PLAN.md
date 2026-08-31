@@ -144,6 +144,18 @@ ID postow i finalne tresci (wszystkie 255-264 znaki, limit X to 280):
    + "rewards program" pachnace jezykiem holder-rewards:
    `launching a token on base soon, worth knowing: startpad launches plug into volume mining measured on your token's real traded volume and funded by fees, not emissions. season 1 weights are being calibrated in the open right now. come watch the sausage get made.`
 
+7. **24.09** (`cmtglpbh70029n10yq2hsusa3`) - konsekwencja decyzji
+   wlasciciela z 1.09 o wczesnej publikacji adresu (addendum 0.7). Post
+   obiecuje, ze CA pojawi sie dopiero "when launch day comes", a adres
+   jest publiczny od 2.09. Nowa tresc (238 znakow):
+   `the $SPHERE address has been public since september 2nd, weeks before launch, so there is nothing to be first to on the day. no DMs, no early access, no second chance links. if an address does not match the one we published, it is a scam.`
+
+**Nowy watek poza kalendarzem 1/dzien:** 2.09 o 10:30 UTC leci watek
+z adresem tokena przed launchem (post `cmthv588h066vn10yrdr04k66`).
+Swiadomy dzien podwojny i godzina spoza rutyny - jedno i drugie lamie
+sztywny wzorzec, ktory ranker X czyta jako bota.
+
+
 **Opcjonalna podmiana 10.09** (`cmtglofn1001un10yqneyr7gh`): Web3 Warsaw
 odbywa sie 9-10 wrzesnia 2026. Jesli chcesz to wykorzystac, post-pytanie
 z tego dnia mozna zamienic na:
