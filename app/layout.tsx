@@ -33,8 +33,25 @@ export default function RootLayout({
         {/* Usunięto skrypt reCAPTCHA - obciążał stronę */}
         {/* <script src="https://www.google.com/recaptcha/enterprise.js?render=6LfNUMkqAAAAAKwvD-9Ow1vtA8aPwZFDSJ2nen47" /> */}
         <title>MySphere.fun</title>
-        <meta name="description" content="The onchain social Dapp on Base. Build, grow, and own your digital Sphere." />
+        <meta name="description" content="The onchain social Dapp on Base. Your posts live onchain and stay yours." />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+
+        {/* Link preview card. Swap the two image URLs to any file in /public/share
+            to change what X, Discord, Slack and iMessage show. All are 1200x630. */}
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="MySphere" />
+        <meta property="og:url" content="https://mysphere.fun" />
+        <meta property="og:title" content="MySphere - onchain social on Base" />
+        <meta property="og:description" content="The onchain social Dapp on Base. Your posts live onchain and stay yours." />
+        <meta property="og:image" content="https://mysphere.fun/share/share-no-admin.png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:alt" content="Startpad contract surface: owner, pause, upgrade, blacklist and fee switch all listed as none." />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="MySphere - onchain social on Base" />
+        <meta name="twitter:description" content="The onchain social Dapp on Base. Your posts live onchain and stay yours." />
+        <meta name="twitter:image" content="https://mysphere.fun/share/share-no-admin.png" />
+        <meta name="twitter:image:alt" content="Startpad contract surface: owner, pause, upgrade, blacklist and fee switch all listed as none." />
         
         {/* Farcaster Frame - zaktualizowany format z launch_frame */}
         <meta name="fc:frame" content='{
