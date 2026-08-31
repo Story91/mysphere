@@ -105,6 +105,32 @@ service cloud.firestore {
     }
 
     // ========================================================================
+    // AGREGAT TABLICY LAUNCHPADA
+    // ========================================================================
+    // Liczby tablicy jednej sieci, odtworzone z logow: wolumen, liczba
+    // transakcji, handlujacy, ceny do sparkline'a, naliczenia oplat i tasma
+    // zdarzen - razem z blokiem, do ktorego sa policzone. Zapis robi wylacznie
+    // /api/launchpad/board/stats, po skanie lancucha.
+    //
+    // ODCZYT jest jawny, bo to publiczne logi. ZAPIS nalezy wylacznie do
+    // serwera i to nie jest formalnosc: po TYCH liczbach sortuje sie Trending i
+    // Top volume, czyli miejsce, w ktorym ludzie wybieraja, co kupic. Kto
+    // moglby tu pisac, wystawilby dowolnemu tokenowi dowolny wolumen.
+    //
+    // Kawalki lezą w podkolekcji `parts`, stad druga regula. Nazwa kolekcji
+    // JEST na liscie w `hasOwnRules` - bez tego obie te reguly bylyby martwa
+    // dekoracja.
+    match /launchpadBoardStats/{boardKey} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /launchpadBoardStats/{boardKey}/{rest=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // ========================================================================
     // REJESTR AGENTOW
     // ========================================================================
     // docId = adres wlasciciela, lowercase. Dzieki temu dopasowanie autora
@@ -578,7 +604,8 @@ service cloud.firestore {
         'curatorChanges',
         'launchpadTokens',
         'launchpadHistory',
-        'launchpadTokenIndex'
+        'launchpadTokenIndex',
+        'launchpadBoardStats'
       ];
     }
 

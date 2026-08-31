@@ -377,9 +377,25 @@ export const LAUNCHPAD_NETWORKS: Record<number, LaunchpadNetwork> = {
     explorerUrl: 'https://testnet.arcscan.app',
     // ZMIERZONE 2026-08-13 na wszystkich pieciu endpointach z docs.arc.io:
     // 50 000 przechodzi wylacznie na Blockdaemonie, pozostale odbijaja sie o
-    // "requested range too large" powyzej 10 000. Zapas pod krancowy blok.
-    scanWindow: 49_000n,
-    // 60 x 49 000 to ~2,9 mln blokow, czyli okolo siedemnastu dni tego lancucha.
+    // "requested range too large" powyzej 10 000.
+    //
+    // ZMIERZONE PONOWNIE 2026-09-01 i to zmienilo wniosek: Blockdaemon owszem
+    // bierze 50 000, ale TYLKO przy glowie lancucha. Przy bloku wdrozenia
+    // (56 866 835) oddaje `4444 pruned history unavailable` na kazde okno, nawet
+    // tysiacblokowe - tej historii on po prostu nie ma. Jedynym endpointem z
+    // kompletna historia jest `rpc.testnet.arc.io` (354 logi w 496 ms na oknie
+    // 10 000 przy bloku wdrozenia), a on tnie zakresy powyzej ~10 000.
+    //
+    // Okno idzie wiec pod TEN endpoint, bo tylko on umie oddac to, czego szukamy.
+    // Wartosc jest ta sama, co na Base - sprawdzona i z zapasem pod limit.
+    // Blockdaemon obsluzy przy okazji delty przy glowie, gdzie historii nie
+    // brakuje; kolejnosc endpointow rozstrzyga sonda `getLogs` w
+    // /api/launchpad/board/stats, a nie ta stala.
+    scanWindow: 9_500n,
+    // 60 x 9 500 to 570 tys. blokow, czyli okolo trzech i pol doby tego lancucha -
+    // z zapasem na delte miedzy wizytami. Pelnej historii przegladarka i tak nie
+    // przemiecie (2,9 mln blokow); od tego jest wspolny agregat na serwerze,
+    // ktory nadrabia porcjami i zapisuje postep.
     maxScanWindows: 60,
     // Zmierzone: 0,51 s (100 tys. blokow roznicy timestampow / 100 tys.).
     secondsPerBlock: 0.51,
