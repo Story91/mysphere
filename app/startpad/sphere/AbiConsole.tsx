@@ -16,7 +16,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
-import { formatEther, parseEther, type Abi, type AbiFunction, type Address } from 'viem';
+import { formatEther, parseEther, zeroAddress, type Abi, type AbiFunction, type Address } from 'viem';
 import { ChevronDown, ChevronUp, Loader2, PencilLine, RefreshCw } from 'lucide-react';
 import { LAUNCHPAD_CHAIN, LAUNCHPAD_EXPLORER_URL, NATIVE_SYMBOL } from '../config';
 import { SPHERE_FN_DOCS } from './sphereConfig';
@@ -51,6 +51,10 @@ function renderResult(value: unknown): string {
     return value >= 10n ** 12n ? `${formatEther(value)} (${value.toString()} wei)` : value.toString();
   }
   if (Array.isArray(value)) return value.map(renderResult).join(', ');
+  // Zero address = wartosc nieustawiona (np. sphereToken() przed launchem).
+  if (typeof value === 'string' && value.toLowerCase() === zeroAddress) {
+    return `${zeroAddress} (zero address - not set)`;
+  }
   return String(value);
 }
 
@@ -152,7 +156,12 @@ function ReadRow({ address, abi, fn }: { address: Address; abi: Abi; fn: AbiFunc
     try {
       const parsed = fn.inputs.map((input, i) => parseArg(input.type, args[i] ?? ''));
       const value = await readClient.readContract({ address, abi, functionName: fn.name, args: parsed } as never);
-      setResult(renderResult(value));
+      // sphereToken() zwraca 0x0 przed launchem - nazywamy stan wprost.
+      if (fn.name === 'sphereToken' && typeof value === 'string' && value.toLowerCase() === zeroAddress) {
+        setResult('Token not launched yet (sphereToken() = zero address)');
+      } else {
+        setResult(renderResult(value));
+      }
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message.split('\n')[0].slice(0, 120) : String(err));

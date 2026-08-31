@@ -80,7 +80,14 @@ export default function SphereEscrowPanel() {
           <ActionButton label="Deliver hook fees" address={LAUNCH_HOOK_ADDRESS as Address} abi={hookAbi} functionName="claimEthFor" args={[escrow]} disabled={!state || state.hookClaimable === 0n} />
           <ActionButton label="Deliver LP fees" address={LIQUIDITY_VAULT_ADDRESS as Address} abi={liquidityVaultAbi} functionName="claimEthFor" args={[escrow]} disabled={!state || state.vaultClaimable === 0n} />
           <ActionButton label="Release ETH (50/50 split)" address={escrow} abi={sphereCreatorEscrowAbi} functionName="release" disabled={!state || state.balance === 0n} />
-          <ActionButton label="Release tokens → vesting" address={escrow} abi={sphereCreatorEscrowAbi} functionName="releaseToken" args={[zeroAddress]} disabled={!state || !state.launched} />
+          {/* Akcja tokenowa dopiero po launchu - wczesniej sphereToken() = 0x0. */}
+          {state?.launched ? (
+            <ActionButton label="Release tokens → vesting" address={escrow} abi={sphereCreatorEscrowAbi} functionName="releaseToken" args={[zeroAddress]} />
+          ) : (
+            <span className="self-center text-[10.5px] font-bold text-sp-shade/45">
+              Token not launched yet - token release unlocks after launch().
+            </span>
+          )}
         </div>
         <p className="mt-2 text-[10.5px] text-sp-shade/45">
           All buttons above are permissionless - you only pay gas; destinations are hard-coded in
