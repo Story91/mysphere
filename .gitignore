@@ -212,3 +212,11 @@ wallet_data.txt
 *.tsbuildinfo
 next-env.d.ts
 .env*.local
+
+# claude code local state (contains git worktrees - must never be committed)
+.claude/
+
+# raw json-rpc dumps kept from debugging sessions
+base_pm.json
+cctp_recent.json
+impl.txt
