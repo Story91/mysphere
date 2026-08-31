@@ -1,0 +1,29 @@
+{
+  "chainId": 84532,
+  "network": "base-sepolia",
+  "note": "PIERWSZY LAUNCH SPHERE - proba na zywym testnecie z PRAWDZIWYM precompile B20 (2026-08-31). Zapis reczny: skrypt wywrocil sie na weryfikacji odczytem (lagujacy RPC, naprawione retry), launch dowolany bezposrednio na escrow.",
+  "deployer": "0xD4885A5aa53446843CABcDE1F35DE9b4E906030e",
+  "launchpad": "0x6Dc063a75CAE0935351be13aFB942732D631E5C7",
+  "vault": "0xD65eB8B16768454Dc4469e48d1EEDA8890a539e0",
+  "tokenFactory": "0x33FC42FD8e5D6F5E14cEBd4b8A4420a004824A2D",
+  "safe": "0xD4885A5aa53446843CABcDE1F35DE9b4E906030e",
+  "sphereRewards": "0x5Ff3a8532522b82c527b1ed27aDb5b8176465b89",
+  "sphereTokenVesting": "0x25D1C47C02f93262b6B9d1ffAE40134DF8Eb22Ca",
+  "sphereCreatorEscrow": "0xD9b6BBC5e453851Bb9A7Dda9dBe0b837FAe16e7A",
+  "token": "0xB200000000000000000000ba5eD4d94c63Cad5e9",
+  "vanitySalt": "0x00000000000000000000000000000000000000000000000000000000000425c7",
+  "vanityPattern": "ba5ed",
+  "launchTx": "0x4edef7fdb190d90e1af917fceee2df6f599638fb1e1c614b983800730ab15616",
+  "devBuyEth": "0.01",
+  "devBuyTokens": "13028030.003947887879984208",
+  "vesting": { "start": "1788140732", "cliff": "2592000", "duration": "31536000" },
+  "proofs": {
+    "realB20Precompile": "name/symbol/totalSupply 1e9 odczytane z prawdziwego B20; adres zgodny z predictVanityToken co do bitu",
+    "creatorIsEscrow": true,
+    "windowCapLive": "zewnetrzny buy w oknie 300 s odbil sie WindowCap() - cap dziala na zywo",
+    "feeSplitLive": "buy 0.2 tETH -> fee 0.002: rewards 0.000882 (42%) / escrow 0.000588 (28%) / safe 0.00063 (30%) - co do wei zgodne z tabela efektywna speca",
+    "claimForDelivery": "claimFor(rewards) -> pullable 0.000882 ETH"
+  },
+  "pending": "graduacja na realnym PoolManagerze Sepolii (0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408) - wymaga ~3.2 tETH w portfelu (domkniecie krzywej = 3.0 ETH rezerwy)",
+  "deployedAt": "2026-08-31T00:45:00.000Z"
+}
