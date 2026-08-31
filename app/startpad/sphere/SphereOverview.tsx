@@ -1,96 +1,65 @@
 'use client';
 
 /**
- * Overview $SPHERE - petla wartosci, efektywne splity i stan kontraktow.
- *
- * Uczciwosc komunikacji (spec sekcja 5, twardy wymog): kazdy mechanizm nosi
- * plakietke "Enforced by contract" ALBO "Team-run, on-chain" - zadnego
- * mieszania obietnic zespolu z gwarancjami kodu. Liczby splitow pochodza
- * z tabeli efektywnej w docs/SPHERE-TOKENOMIKA.md (sekcja 4).
+ * OVERVIEW = action hub (decyzja wlasciciela 2026-08-31: "jedna strona
+ * z tekstem, reszta z dzialaniem"). Zero akapitow - hero, trzy wielkie
+ * tykajace liczby i kafle akcji. Cale objasnienia mieszkaja w /about.
  */
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { usePublicClient } from 'wagmi';
+import { useEffect, useState } from 'react';
 import { formatEther, type Address } from 'viem';
-import { ExternalLink, Flame, FlaskConical } from 'lucide-react';
-import {
-  LAUNCHPAD_ADDRESS,
-  LAUNCHPAD_CHAIN,
-  LAUNCHPAD_EXPLORER_URL,
-  NATIVE_SYMBOL,
-  launchpadAbi,
-} from '../config';
+import { usePublicClient } from 'wagmi';
+import { ArrowRight, BookOpen, Coins, Flame, Landmark, Timer, Trophy } from 'lucide-react';
+import { LAUNCHPAD_ADDRESS, LAUNCHPAD_CHAIN, NATIVE_SYMBOL, launchpadAbi } from '../config';
+import NumberTicker from './NumberTicker';
 import {
   SPHERE_ESCROW_ADDRESS,
   SPHERE_LIVE,
-  SPHERE_PLAN,
   SPHERE_REWARDS_ADDRESS,
-  SPHERE_SAFE_ADDRESS,
   SPHERE_TOKEN_ADDRESS,
-  SPHERE_VESTING_ADDRESS,
 } from './sphereConfig';
-import { EnforcedBadge, TeamRunBadge } from './SphereShell';
 
-function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return <section className={`rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 sm:p-5 ${className}`}>{children}</section>;
-}
+const FUTURE_TOKEN = '0xB200000000000000000000BA5eDb84c678432476';
 
-function AddrLink({
-  address,
-  label,
-  pendingText = 'not deployed yet',
-}: {
-  address: Address | null;
-  label: string;
-  pendingText?: string;
-}) {
-  if (!address) {
-    return (
-      <span className="text-[11.5px] text-sp-shade/45">
-        {label}: <span className="font-bold">{pendingText}</span>
-      </span>
-    );
-  }
+function HeroStat({ icon, label, value, decimals, suffix }: { icon: React.ReactNode; label: string; value: number; decimals?: number; suffix?: string }) {
   return (
-    <a
-      href={`${LAUNCHPAD_EXPLORER_URL}/address/${address}`}
-      target="_blank"
-      rel="noreferrer"
-      className="inline-flex items-center gap-1 text-[11.5px] font-bold text-sp-brand hover:underline"
-    >
-      {label}: {address.slice(0, 8)}…{address.slice(-6)} <ExternalLink className="h-3 w-3" aria-hidden="true" />
-    </a>
+    <div className="rounded-2xl bg-white/70 p-3.5 backdrop-blur-sm sm:p-4">
+      <p className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/50">
+        {icon} {label}
+      </p>
+      <p className="mt-1 font-soft-display text-[26px] font-extrabold leading-none text-sp-ink sm:text-[30px]">
+        <NumberTicker value={value} decimals={decimals ?? 0} />
+        {suffix && <span className="ml-1 text-[13px] font-bold text-sp-shade/50">{suffix}</span>}
+      </p>
+    </div>
   );
 }
 
-/** Segmentowy pasek splitu - konwencja paskow z modalu launchu. */
-function SplitBar({ parts }: { parts: { label: string; bps: number; className: string }[] }) {
+function ActionTile({ href, icon, title, hint }: { href: string; icon: React.ReactNode; title: string; hint: string }) {
   return (
-    <div>
-      <div className="flex h-3 w-full overflow-hidden rounded-full">
-        {parts.map((p) => (
-          <div key={p.label} className={p.className} style={{ width: `${p.bps / 100}%` }} />
-        ))}
-      </div>
-      <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
-        {parts.map((p) => (
-          <span key={p.label} className="text-[10.5px] font-bold text-sp-shade/60">
-            <span className={`mr-1 inline-block h-2 w-2 rounded-full align-middle ${p.className}`} />
-            {p.label} {(p.bps / 100).toFixed(1)}%
-          </span>
-        ))}
-      </div>
-    </div>
+    <Link
+      href={href}
+      className="sph-card group flex items-center justify-between gap-3 rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4"
+    >
+      <span className="flex items-center gap-3">
+        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sp-brand/10 text-sp-brand">{icon}</span>
+        <span>
+          <span className="block text-[14px] font-extrabold text-sp-ink">{title}</span>
+          <span className="block text-[11px] font-bold text-sp-shade/50">{hint}</span>
+        </span>
+      </span>
+      <ArrowRight className="h-4 w-4 text-sp-shade/30 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-sp-brand" aria-hidden="true" />
+    </Link>
   );
 }
 
 export default function SphereOverview() {
   const readClient = usePublicClient({ chainId: LAUNCHPAD_CHAIN.id });
   const [claimables, setClaimables] = useState<{ rewards: bigint; escrow: bigint } | null>(null);
+  const [weekProgress, setWeekProgress] = useState<number | null>(null);
 
   useEffect(() => {
-    // Lokalne stale, zeby zawezenie null przetrwalo do wnetrza closure.
     const rewardsAddr = SPHERE_REWARDS_ADDRESS;
     const escrowAddr = SPHERE_ESCROW_ADDRESS;
     if (!SPHERE_LIVE || !readClient || !rewardsAddr || !escrowAddr) return;
@@ -114,124 +83,69 @@ export default function SphereOverview() {
     };
   }, [readClient]);
 
+  useEffect(() => {
+    let alive = true;
+    fetch('/api/sphere/season')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (alive && d?.epoch) setWeekProgress(d.epoch.progressBps / 100);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const feesWaiting = claimables ? Number(formatEther(claimables.rewards + claimables.escrow)) : 0;
+
   return (
-    <div className="grid gap-4">
-      {/* PETLA WARTOSCI ------------------------------------------------------ */}
-      <Card>
-        <h2 className="text-[14px] font-extrabold text-sp-ink">How $SPHERE accrues value</h2>
-        <div className="mt-3 grid gap-2.5 text-[12.5px] leading-relaxed text-sp-shade/70">
-          <p>
-            <EnforcedBadge /> <span className="ml-1">Auto-burn: 50% of the creator-side ETH from every post-graduation
-            SPHERE swap fee buys SPHERE in its own pool and sends it to 0xdEaD. Frozen at launch, no one can turn it off.</span>
-          </p>
-          <p>
-            <EnforcedBadge /> <span className="ml-1">Frozen fee split: curve fees route 60% to the rewards vault and
-            40% to the creator escrow - receivers are baked into the launch forever.</span>
-          </p>
-          <p>
-            <TeamRunBadge /> <span className="ml-1">Revenue buybacks: the treasury Safe may buy SPHERE with protocol
-            revenue. Every purchase is visible on-chain, but it is a policy, not a contract guarantee - we label it
-            honestly.</span>
-          </p>
-        </div>
-      </Card>
+    <div className="sph-stagger grid gap-4">
+      {/* HERO ---------------------------------------------------------------- */}
+      <section className="sph-hero rounded-[24px] border border-sp-shade/10 p-5 sm:p-7">
+        <div className="sph-orb left-[-40px] top-[-60px] h-48 w-48 bg-sp-brand/40" aria-hidden="true" />
+        <div className="sph-orb bottom-[-70px] right-[-30px] h-56 w-56 bg-sp-up/30 [animation-delay:-7s]" aria-hidden="true" />
 
-      {/* EFEKTYWNE SPLITY ---------------------------------------------------- */}
-      <Card>
-        <h2 className="text-[14px] font-extrabold text-sp-ink">Where every fee goes</h2>
-        <div className="mt-3 grid gap-4">
-          <div>
-            <p className="mb-1.5 text-[11px] font-extrabold uppercase tracking-[0.06em] text-sp-shade/45">Curve fee (1% of every trade before graduation)</p>
-            <SplitBar
-              parts={[
-                { label: 'Protocol Safe', bps: 3000, className: 'bg-sp-shade/40' },
-                { label: 'Rewards vault', bps: 4200, className: 'bg-sp-brand' },
-                { label: 'Creator escrow', bps: 2800, className: 'bg-sp-up' },
-              ]}
-            />
+        <div className="relative">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="font-soft-display text-[30px] font-extrabold leading-tight text-sp-ink sm:text-[38px]">
+                The launchpad&apos;s own token.
+                <span className="block bg-gradient-to-r from-sp-brand to-sp-up bg-clip-text text-transparent">
+                  Burns itself. Pays its creators.
+                </span>
+              </h2>
+              <p className="mt-2 inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1 font-mono text-[11px] font-bold text-sp-shade/60 backdrop-blur-sm">
+                {SPHERE_TOKEN_ADDRESS ? SPHERE_TOKEN_ADDRESS : `${FUTURE_TOKEN.slice(0, 10)}…${FUTURE_TOKEN.slice(-8)}`}
+                <span className="rounded-full bg-sp-brand/10 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.08em] text-sp-brand">
+                  {SPHERE_TOKEN_ADDRESS ? 'live' : 'address locked · launch soon'}
+                </span>
+              </p>
+            </div>
+            <Flame className="sph-flame hidden h-16 w-16 text-sp-brand/70 sm:block" aria-hidden="true" />
           </div>
-          <div>
-            <p className="mb-1.5 text-[11px] font-extrabold uppercase tracking-[0.06em] text-sp-shade/45">Pool hook fee in ETH (1% of every swap after graduation)</p>
-            <SplitBar
-              parts={[
-                { label: 'Protocol Safe', bps: 3000, className: 'bg-sp-shade/40' },
-                { label: 'Creator escrow', bps: 3500, className: 'bg-sp-up' },
-                { label: 'Burned forever', bps: 3500, className: 'bg-sp-down' },
-              ]}
-            />
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <HeroStat icon={<Flame className="h-3.5 w-3.5 text-sp-down" aria-hidden="true" />} label="Burned forever" value={SPHERE_TOKEN_ADDRESS ? 0 : 0} suffix="SPHERE" />
+            <HeroStat icon={<Coins className="h-3.5 w-3.5 text-sp-up" aria-hidden="true" />} label="Fees waiting" value={feesWaiting} decimals={4} suffix={NATIVE_SYMBOL} />
+            <HeroStat icon={<Timer className="h-3.5 w-3.5 text-sp-brand" aria-hidden="true" />} label="Week progress" value={weekProgress ?? 0} decimals={1} suffix="%" />
           </div>
-          <p className="text-[10.5px] text-sp-shade/45">
-            Exact effective numbers from the tokenomics spec: buybackBps={SPHERE_PLAN.buybackBps} cuts the creator ETH leg
-            only; token-denominated legs go 70/30 escrow/Safe with no burn cut.
-          </p>
         </div>
-      </Card>
+      </section>
 
-      {/* STAN KONTRAKTOW ----------------------------------------------------- */}
-      <Card>
-        <h2 className="text-[14px] font-extrabold text-sp-ink">Contracts</h2>
-        <div className="mt-3 grid gap-2">
-          <AddrLink address={SPHERE_TOKEN_ADDRESS} label="SPHERE token" pendingText="not launched yet" />
-          <AddrLink address={SPHERE_ESCROW_ADDRESS} label="Creator escrow" />
-          <AddrLink address={SPHERE_REWARDS_ADDRESS} label="Rewards vault" />
-          <AddrLink address={SPHERE_VESTING_ADDRESS} label="Treasury vesting" />
-          <AddrLink address={SPHERE_SAFE_ADDRESS} label="Treasury Safe" />
-        </div>
-        {SPHERE_LIVE && claimables && (
-          <div className="mt-3 grid gap-1.5 border-t border-sp-shade/10 pt-3 text-[12px] text-sp-shade/70">
-            <p>
-              Curve fees waiting for delivery: <span className="font-extrabold text-sp-ink">{formatEther(claimables.rewards)} {NATIVE_SYMBOL}</span> to rewards,{' '}
-              <span className="font-extrabold text-sp-ink">{formatEther(claimables.escrow)} {NATIVE_SYMBOL}</span> to escrow (anyone can deliver - see subpages).
-            </p>
-          </div>
-        )}
-        <div className="mt-3 flex flex-wrap gap-2">
-          {(['escrow', 'rewards', 'vesting'] as const).map((slug) => (
-            <Link
-              key={slug}
-              href={`/startpad/sphere/${slug}`}
-              className="rounded-full border border-sp-shade/15 px-3.5 py-1.5 text-[11.5px] font-extrabold text-sp-shade/70 transition-colors hover:border-sp-brand hover:text-sp-brand"
-            >
-              Manage {slug} →
-            </Link>
-          ))}
-        </div>
-      </Card>
+      {/* AKCJE --------------------------------------------------------------- */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <ActionTile href="/startpad/sphere/season" icon={<Trophy className="h-5 w-5" aria-hidden="true" />} title="Season" hint="Weekly creator leaderboard · live" />
+        <ActionTile href="/startpad/sphere/escrow" icon={<Landmark className="h-5 w-5" aria-hidden="true" />} title="Escrow" hint="Creator stream · release splits" />
+        <ActionTile href="/startpad/sphere/rewards" icon={<Coins className="h-5 w-5" aria-hidden="true" />} title="Rewards vault" hint="Fee inflows · pull to treasury" />
+        <ActionTile href="/startpad/sphere/vesting" icon={<Timer className="h-5 w-5" aria-hidden="true" />} title="Vesting" hint="Treasury lock · 30d cliff / 12m" />
+      </div>
 
-      {/* BURN LEDGER PLACEHOLDER --------------------------------------------- */}
-      <Card>
-        <h2 className="flex items-center gap-1.5 text-[14px] font-extrabold text-sp-ink">
-          <Flame className="h-4 w-4 text-sp-down" aria-hidden="true" /> Burns
-        </h2>
-        <p className="mt-2 text-[12px] text-sp-shade/60">
-          {SPHERE_LIVE && SPHERE_TOKEN_ADDRESS
-            ? 'AutoBuyback events will populate here as burns execute (each entry links to its transaction).'
-            : SPHERE_LIVE
-              ? 'Contracts are live, but the token has not launched yet. From the first post-graduation swap on, every auto-burn lands here: date, ETH in, SPHERE burned, transaction link. Burns are transfers to 0xdEaD - total supply stays 1B by design; the dead balance is publicly verifiable.'
-              : 'After launch, every auto-burn lands here: date, ETH in, SPHERE burned, transaction link. Burns are transfers to 0xdEaD - total supply stays 1B by design; the dead balance is publicly verifiable.'}
-        </p>
-      </Card>
-
-      {/* PROBA GENERALNA NA SEPOLII ------------------------------------------ */}
-      <Card>
-        <h2 className="flex items-center gap-1.5 text-[14px] font-extrabold text-sp-ink">
-          <FlaskConical className="h-4 w-4 text-sp-brand" aria-hidden="true" /> Rehearsal proven on Sepolia
-        </h2>
-        <p className="mt-2 text-[12px] leading-relaxed text-sp-shade/60">
-          Before mainnet, the exact SPHERE lifecycle ran end-to-end on Base Sepolia with the
-          same contracts: launch, a full graduation of the bonding curve and the first
-          auto-burn of <span className="font-extrabold text-sp-ink">12,131 SPHERE</span> - executed by the real
-          mechanism, not a simulation.
-        </p>
-        <a
-          href="https://sepolia.basescan.org/address/0xb200000000000000000000Ba5ED02Ebf7B04aDBc"
-          target="_blank"
-          rel="noreferrer"
-          className="mt-2 inline-flex items-center gap-1 text-[11.5px] font-bold text-sp-brand hover:underline"
-        >
-          Rehearsal token 0xb20000…04aDBc on Sepolia BaseScan <ExternalLink className="h-3 w-3" aria-hidden="true" />
-        </a>
-      </Card>
+      <Link
+        href="/startpad/sphere/about"
+        className="sph-card flex items-center justify-center gap-2 rounded-[20px] border border-dashed border-sp-shade/20 bg-sp-surface p-3.5 text-[12.5px] font-extrabold text-sp-shade/60 hover:text-sp-brand"
+      >
+        <BookOpen className="h-4 w-4" aria-hidden="true" /> How it works - tokenomics, fee flows & the honest fine print
+      </Link>
     </div>
   );
 }

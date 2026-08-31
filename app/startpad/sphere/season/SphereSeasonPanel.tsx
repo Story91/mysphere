@@ -16,6 +16,7 @@ import { formatEther } from 'viem';
 import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { ChevronDown, ChevronUp, Info, Loader2 } from 'lucide-react';
 import { NATIVE_SYMBOL } from '../../config';
+import NumberTicker from '../NumberTicker';
 
 type SeasonToken = {
   token: string;
@@ -78,11 +79,13 @@ function Countdown({ endsAtUnix }: { endsAtUnix: string }) {
   );
 }
 
-function StatTile({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function StatTile({ label, num, decimals = 0, sub }: { label: string; num: number; decimals?: number; sub?: string }) {
   return (
-    <div className="rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4">
+    <div className="sph-card rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4">
       <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/45">{label}</p>
-      <p className="mt-1 font-soft-display text-[20px] font-extrabold text-sp-ink">{value}</p>
+      <p className="mt-1 font-soft-display text-[20px] font-extrabold text-sp-ink">
+        <NumberTicker value={num} decimals={decimals} />
+      </p>
       {sub && <p className="text-[10.5px] text-sp-shade/50">{sub}</p>}
     </div>
   );
@@ -110,7 +113,7 @@ function CreatorRow({ rank, c }: { rank: number; c: SeasonCreator }) {
         </span>
         {open ? <ChevronUp className="h-4 w-4 text-sp-shade/40" aria-hidden="true" /> : <ChevronDown className="h-4 w-4 text-sp-shade/40" aria-hidden="true" />}
       </button>
-      {open && (
+      <div className="sph-collapse" data-open={open} aria-hidden={!open}>
         <div className="mb-3 rounded-xl border border-sp-shade/10 bg-sp-shade/[0.03] p-3">
           <p className="mb-2 text-[10.5px] font-bold text-sp-shade/55">
             Why this number - every step of the public formula:
@@ -134,7 +137,7 @@ function CreatorRow({ rank, c }: { rank: number; c: SeasonCreator }) {
             {c.capBinding ? ' - cap is binding for this creator' : ''}). Wash trading pays more in fees than it can ever get back.
           </p>
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -183,18 +186,36 @@ export default function SphereSeasonPanel() {
     );
   }
   if (!data) {
+    // Szkielety zamiast golego tekstu: strona "stoi" w docelowym ukladzie,
+    // wiec po dojechaniu danych nic nie skacze (layout shift = 0).
     return (
-      <p className="flex items-center gap-2 rounded-[20px] border border-sp-shade/10 bg-sp-surface p-5 text-[12.5px] text-sp-shade/55">
-        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Indexing this week&apos;s volume from Base…
-        first load scans on-chain logs and can take a minute.
-      </p>
+      <div className="grid gap-4">
+        <div className="rounded-[20px] border border-sp-shade/10 bg-sp-surface p-5">
+          <p className="mb-3 flex items-center gap-2 text-[12.5px] text-sp-shade/55">
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Indexing this week&apos;s volume
+            from Base… first load scans on-chain logs and can take a minute.
+          </p>
+          <div className="sph-skeleton h-2 w-full" />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4">
+              <div className="sph-skeleton h-3 w-24" />
+              <div className="sph-skeleton mt-3 h-6 w-16" />
+            </div>
+          ))}
+        </div>
+        <div className="rounded-[20px] border border-sp-shade/10 bg-sp-surface p-5">
+          <div className="sph-skeleton h-56 w-full" />
+        </div>
+      </div>
     );
   }
 
   return (
-    <div className="grid gap-4">
+    <div className="sph-stagger grid gap-4">
       {/* NAGLOWEK TYGODNIA --------------------------------------------------- */}
-      <section className="rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
+      <section className="sph-card rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-[15px] font-extrabold text-sp-ink">
             Week {data.epoch.index + 1}
@@ -205,23 +226,23 @@ export default function SphereSeasonPanel() {
           </span>
         </div>
         <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-sp-shade/10">
-          <div className="h-full rounded-full bg-sp-brand" style={{ width: `${data.epoch.progressBps / 100}%` }} />
+          <div className="sph-progress h-full rounded-full bg-sp-brand" style={{ width: `${data.epoch.progressBps / 100}%` }} />
         </div>
         <p className="mt-2 text-[10.5px] text-sp-shade/50">
-          Shadow season calibrates the public reward formula on real volume before any SPHERE is paid.
-          Rules are published; anyone can recompute this page from chain logs.{' '}
+          <a href="/startpad/sphere/about" className="font-bold text-sp-brand hover:underline">How scoring works →</a>{' '}
+          ·{' '}
           <a href="/api/sphere/season" target="_blank" rel="noreferrer" className="font-bold text-sp-brand hover:underline">
-            Verify the math → raw data
+            Verify the math (raw data)
           </a>
         </p>
       </section>
 
       {/* KAFLE --------------------------------------------------------------- */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatTile label={`External volume (${NATIVE_SYMBOL})`} value={eth(data.totals.externalVolumeEth, 3)} sub="creator self-trades excluded" />
-        <StatTile label={`Protocol revenue (${NATIVE_SYMBOL})`} value={eth(data.totals.protocolEth, 4)} sub="funds the future reward pool" />
-        <StatTile label="Creators in the running" value={String(data.totals.creators)} />
-        <StatTile label="Tokens counted" value={String(data.totals.tokens)} sub=">48h after launch to enter" />
+        <StatTile label={`External volume (${NATIVE_SYMBOL})`} num={Number(eth(data.totals.externalVolumeEth, 3))} decimals={3} sub="creator self-trades excluded" />
+        <StatTile label={`Protocol revenue (${NATIVE_SYMBOL})`} num={Number(eth(data.totals.protocolEth, 4))} decimals={4} sub="funds the future reward pool" />
+        <StatTile label="Creators in the running" num={data.totals.creators} />
+        <StatTile label="Tokens counted" num={data.totals.tokens} sub=">48h after launch to enter" />
       </div>
 
       {/* WYKRES: wolumen dzienny --------------------------------------------- */}

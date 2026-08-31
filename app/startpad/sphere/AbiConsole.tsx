@@ -213,7 +213,7 @@ export default function AbiConsole({ title, address, abi }: { title: string; add
   const writes = fns.filter((f) => f.stateMutability !== 'view' && f.stateMutability !== 'pure');
 
   return (
-    <section className="rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4">
+    <section className="sph-card rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4">
       <button type="button" onClick={() => setOpen((v) => !v)} className="flex w-full items-center justify-between gap-2">
         <div className="text-left">
           <h3 className="text-[13.5px] font-extrabold text-sp-ink">Advanced · {title} - full contract surface</h3>

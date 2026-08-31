@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ArrowLeft, Flame, ShieldCheck, Users } from 'lucide-react';
 import { SPHERE_LIVE, SPHERE_TOKEN_ADDRESS } from './sphereConfig';
+import './sphere-motion.css';
 
 const TABS = [
   { href: '/startpad/sphere', label: 'Overview' },
@@ -17,6 +18,7 @@ const TABS = [
   { href: '/startpad/sphere/escrow', label: 'Escrow' },
   { href: '/startpad/sphere/rewards', label: 'Rewards' },
   { href: '/startpad/sphere/vesting', label: 'Vesting' },
+  { href: '/startpad/sphere/about', label: 'About' },
 ] as const;
 
 /**
@@ -42,7 +44,7 @@ export function TeamRunBadge() {
 export default function SphereShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 pb-16 pt-6 sm:px-6">
+    <div className="sphere-shell mx-auto w-full max-w-5xl px-4 pb-16 pt-6 sm:px-6">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Link
@@ -52,7 +54,7 @@ export default function SphereShell({ children }: { children: React.ReactNode })
             <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" /> Startpad
           </Link>
           <h1 className="flex items-center gap-2 font-soft-display text-[22px] font-extrabold text-sp-ink">
-            <Flame className="h-5 w-5 text-sp-brand" aria-hidden="true" /> $SPHERE
+            <Flame className="sph-flame h-5 w-5 text-sp-brand" aria-hidden="true" /> $SPHERE
           </h1>
         </div>
         <nav className="inline-flex items-stretch overflow-hidden rounded-full border border-sp-shade/10 bg-sp-surface">
@@ -62,7 +64,8 @@ export default function SphereShell({ children }: { children: React.ReactNode })
               <Link
                 key={tab.href}
                 href={tab.href}
-                className={`px-3.5 py-2 text-[12px] font-extrabold transition-colors ${active ? 'bg-sp-brand text-white' : 'text-sp-shade/60 hover:text-sp-brand'}`}
+                data-active={active}
+                className={`sph-tab isolate px-3.5 py-2 text-[12px] font-extrabold ${active ? 'text-sp-brand' : 'text-sp-shade/60 hover:text-sp-brand'}`}
               >
                 {tab.label}
               </Link>
@@ -94,7 +97,7 @@ export default function SphereShell({ children }: { children: React.ReactNode })
         </div>
       )}
 
-      {children}
+      <div className="sph-stagger">{children}</div>
     </div>
   );
 }
