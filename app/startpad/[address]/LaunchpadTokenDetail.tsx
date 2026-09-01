@@ -156,7 +156,15 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
           account ? readClient.readContract({ address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'claimableToken', args: [tokenAddress, accountAddress] }) : Promise.resolve(0n),
         readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'feeConfigOf', args: [tokenAddress] }).catch(() => missing),
         readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'metadataURI', args: [tokenAddress] }).catch(() => ''),
-        readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'buybackBps', args: [tokenAddress] }).catch(() => 0),
+        // Hook zna buybackBps dopiero od graduate() (CurveLaunchpad.sol:1388);
+        // wczesniej pytamy launchpad, inaczej krzywa klamie "0%" wbrew
+        // zamrozonemu przy launchu configowi.
+        readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'buybackBps', args: [tokenAddress] }).catch(() => 0)
+          .then(async (bps) =>
+            Number(bps) > 0
+              ? bps
+              : readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'launchBuybackBps', args: [tokenAddress] }).catch(() => 0)
+          ),
         readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'pendingBuybackEth', args: [tokenAddress] }).catch(() => 0n),
         readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'buybackTokens', args: [tokenAddress] }).catch(() => 0n),
         readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'gradFeeOf', args: [tokenAddress] }).catch(() => null),

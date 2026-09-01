@@ -878,6 +878,9 @@ export const launchpadAbi = [
   { type: 'function', name: 'MAX_CREATOR_SHARE_BPS', stateMutability: 'view', inputs: [], outputs: [{ name: '', type: 'uint16' }] },
   { type: 'function', name: 'MAX_BUYBACK_BPS', stateMutability: 'view', inputs: [], outputs: [{ name: '', type: 'uint16' }] },
   { type: 'function', name: 'MAX_FEE_RECIPIENTS', stateMutability: 'view', inputs: [], outputs: [{ name: '', type: 'uint8' }] },
+  // buybackBps zamrozony przy launchu; hook dostaje go dopiero przy graduate()
+  // (CurveLaunchpad.sol:1388), wiec PRZED graduacja to jest jedyne zrodlo prawdy.
+  { type: 'function', name: 'launchBuybackBps', stateMutability: 'view', inputs: [{ name: 'token', type: 'address' }], outputs: [{ name: '', type: 'uint16' }] },
   {
     type: 'function',
     name: 'feeConfigOf',
