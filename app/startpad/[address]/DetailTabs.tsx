@@ -24,6 +24,7 @@ import {
 import { resizeImageFile } from '../logoUpload';
 import useSiweAuth from '../../utils/auth/useSiweAuth';
 import { parseMetadataUri, pickTokenImage, resolveMediaUrl } from '../metadata';
+import { SPHERE_TOKEN_ADDRESS } from '../sphere/sphereConfig';
 import {
   DEAD_ADDRESS,
   fmtEth,
@@ -353,6 +354,17 @@ export default function DetailTabs({
 
       {tab === 'info' && (
         <div className="space-y-5 p-4 sm:p-5">
+          {/* SPHERE ma wlasny hub (sezon, escrow, vesting) - strona handlu
+              o nim nie wspomina, wiec relacja bylaby niewidoczna. */}
+          {SPHERE_TOKEN_ADDRESS && core.token.toLowerCase() === SPHERE_TOKEN_ADDRESS.toLowerCase() && (
+            <a
+              href="/startpad/sphere"
+              className="flex items-center justify-between gap-2 rounded-xl border border-sp-brand/30 bg-sp-brand/5 px-3 py-2.5 text-[12px] font-extrabold text-sp-brand hover:bg-sp-brand/10"
+            >
+              <span>This is the launchpad&apos;s own token - see the $SPHERE hub: season, burns, vesting</span>
+              <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            </a>
+          )}
           {core.config.known ? (
             <div>
               <h3 className="text-[13px] font-extrabold text-sp-ink">Creator setup</h3>

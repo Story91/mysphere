@@ -21,6 +21,7 @@ import { ChevronDown, ChevronUp, Loader2, PencilLine, RefreshCw } from 'lucide-r
 // Hub SPHERE jest przybity do Base - uzasadnienie w ./sphereChain.ts.
 import { SPHERE_CHAIN, SPHERE_EXPLORER_URL, SPHERE_NATIVE_SYMBOL } from './sphereChain';
 import { SPHERE_FN_DOCS } from './sphereConfig';
+import { useSphereCreator } from './sphereActions';
 
 const inputClass =
   'w-full rounded-xl border border-sp-shade/10 bg-sp-surface px-3 py-2 text-[12.5px] text-sp-ink outline-none transition-colors placeholder:text-sp-shade/35 focus:border-sp-brand';
@@ -209,9 +210,26 @@ function ReadRow({ address, abi, fn }: { address: Address; abi: Abi; fn: AbiFunc
 
 export default function AbiConsole({ title, address, abi }: { title: string; address: Address; abi: Abi }) {
   const [open, setOpen] = useState(false);
+  // Konsola jest narzedziem TWORCY (decyzja wlasciciela 2026-09-01): surowe
+  // formularze write'ow typu escrow.launch() czy rewards.pull() u zwyklego
+  // gościa koncza sie tylko rewertem i spalonym gazem. Odczyty publiczne sa
+  // na Basescanie - link zostaje w nocie ponizej.
+  const isCreator = useSphereCreator();
   const fns = useMemo(() => abi.filter((e): e is AbiFunction => e.type === 'function'), [abi]);
   const reads = fns.filter((f) => f.stateMutability === 'view' || f.stateMutability === 'pure');
   const writes = fns.filter((f) => f.stateMutability !== 'view' && f.stateMutability !== 'pure');
+
+  if (!isCreator) {
+    return (
+      <p className="text-[11px] text-sp-shade/45">
+        Creator console hidden - it only renders for the SPHERE creator wallet. All reads are public on{' '}
+        <a href={`${SPHERE_EXPLORER_URL}/address/${address}`} target="_blank" rel="noreferrer" className="font-bold text-sp-brand hover:underline">
+          Basescan
+        </a>
+        .
+      </p>
+    );
+  }
 
   return (
     <section className="sph-card rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4">

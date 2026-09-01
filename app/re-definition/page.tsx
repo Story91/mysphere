@@ -306,8 +306,8 @@ const CONTRACT_GROUPS: { title: string; note: string; rows: ContractRow[] }[] = 
     ],
   },
   {
-    title: '$SPHERE: deployed around a token that does not exist yet',
-    note: 'Three contracts on Base mainnet, source-verified, none with an owner, all waiting on a launch nobody has dated. The token itself is not in this table on purpose: its future address is known in advance, and there is no code at that address today. This table lists code the chain confirms, not predictions.',
+    title: '$SPHERE: the periphery around the launched token',
+    note: 'Three contracts on Base mainnet, source-verified, none with an owner. The token launched through the escrow on 1 September 2026 at 0xB200000000000000000000BA5eDb84c678432476 - the exact address published in advance. It is a B20 protocol token (no EVM bytecode of its own), which is why the periphery, not the token, carries the verifiable code in this table.',
     rows: [
       {
         what: '$SPHERE rewards hub',
@@ -320,14 +320,14 @@ const CONTRACT_GROUPS: { title: string; note: string; rows: ContractRow[] }[] = 
         what: '$SPHERE vesting',
         chain: 'Base',
         address: '0xB5dE95224F2bEDee2e7Ca7170F5B6a02641255AD',
-        line: 'Releases whatever SPHERE it is sent to one fixed beneficiary on a schedule baked into the contract: the clock starts about 7 September 2026, a 30-day cliff, then a linear year. It holds nothing, because the token it would hold has not been launched.',
+        line: 'Releases whatever SPHERE it is sent to one fixed beneficiary on a schedule baked into the contract: the clock starts about 7 September 2026, a 30-day cliff, then a linear year. It holds the treasury dev-buy (~61.9M SPHERE) since launch day - verify with balanceOf on-chain.',
         explorer: 'https://basescan.org/address/0xB5dE95224F2bEDee2e7Ca7170F5B6a02641255AD',
       },
       {
         what: '$SPHERE creator escrow',
         chain: 'Base',
         address: '0xe984986f4F1E067f697b548D5fe942813d03Da37',
-        line: 'The contract that will itself launch the SPHERE token and be its creator forever. It can only split incoming ETH half and half between two fixed targets and forward tokens to the vesting contract. The launch call has not happened, and the fee streams it exists to collect cannot start before the token does.',
+        line: 'The contract that launched the SPHERE token on 1 September 2026 and is its creator forever. It can only split incoming ETH half and half between two fixed targets and forward tokens to the vesting contract - both one-way rules frozen at deployment. The creator fee streams accrue to it from now on.',
         explorer: 'https://basescan.org/address/0xe984986f4F1E067f697b548D5fe942813d03Da37',
       },
     ],
@@ -840,12 +840,12 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
   {
     name: '$SPHERE: the contracts, deployed',
     status: 'live',
-    note: 'Three contracts stand on Base mainnet since 31 August 2026, source-verified and listed in the table below: a rewards hub that can only receive ETH and let one fixed consumer pull it, a vesting lock with its schedule set in stone, and the escrow that will itself launch the token and be its creator forever. They collect nothing yet: every stream they exist to receive starts at the launch. /startpad/sphere reads each of them live off the chain.',
+    note: 'Three contracts stand on Base mainnet since 31 August 2026, source-verified and listed in the table below: a rewards hub that can only receive ETH and let one fixed consumer pull it, a vesting lock with its schedule set in stone, and the escrow that launched the token on 1 September 2026 and is its creator forever. The fee streams they exist to receive are live since that launch. /startpad/sphere reads each of them live off the chain.',
   },
   {
     name: '$SPHERE: the token',
-    status: 'planned',
-    note: 'Not launched, not tradable, no launch date decided. The address it will live at is known in advance because the escrow bakes it in, and there is no code at that address today: check that before believing anyone who says otherwise. The vesting clock is already set (it starts around 7 September 2026, with a 30-day cliff and a linear year after that), but a schedule for a token that does not exist pays out nothing.',
+    status: 'live',
+    note: 'Launched 1 September 2026 through the escrow (block 50749275), at exactly the address that was published in advance - the same one the escrow had baked in. Fixed supply of 1,000,000,000, trading on the public curve like any other Startpad token; the treasury dev-buy (~6.2% of supply) sits in the vesting lock, whose clock starts around 7 September 2026 with a 30-day cliff and a linear year after that. Verify the launch transaction and the vesting balance on-chain before believing this page, same as always.',
   },
 ];
 

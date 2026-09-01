@@ -12,14 +12,17 @@ import { ArrowLeft, Flame, ShieldCheck, Users } from 'lucide-react';
 import { SPHERE_LIVE, SPHERE_TOKEN_ADDRESS } from './sphereConfig';
 import './sphere-motion.css';
 
+// Zakladka Buy prowadzi na strone handlu tokenem (?c=8453, zeby link wygrywal
+// z zapamietana siecia goscia) i istnieje tylko po launchu.
 const TABS = [
   { href: '/startpad/sphere', label: 'Overview' },
+  ...(SPHERE_TOKEN_ADDRESS ? [{ href: `/startpad/${SPHERE_TOKEN_ADDRESS}?c=8453`, label: 'Buy' }] : []),
   { href: '/startpad/sphere/season', label: 'Season' },
   { href: '/startpad/sphere/escrow', label: 'Escrow' },
   { href: '/startpad/sphere/rewards', label: 'Rewards' },
   { href: '/startpad/sphere/vesting', label: 'Vesting' },
   { href: '/startpad/sphere/about', label: 'About' },
-] as const;
+];
 
 /**
  * Dwuklasowe plakietki uczciwosci (spec sekcja 5): tylko to, co wymusza

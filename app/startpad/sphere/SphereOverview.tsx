@@ -9,7 +9,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { formatEther, type Address } from 'viem';
-import { usePublicClient } from 'wagmi';
+import { useAccount, usePublicClient } from 'wagmi';
 import { ArrowRight, BookOpen, Coins, Flame, Landmark, Timer, Trophy } from 'lucide-react';
 import { launchpadAbi } from '../config';
 import { SPHERE_CHAIN, SPHERE_LAUNCHPAD_ADDRESS, SPHERE_NATIVE_SYMBOL } from './sphereChain';
@@ -55,10 +55,22 @@ function ActionTile({ href, icon, title, hint }: { href: string; icon: React.Rea
   );
 }
 
+/**
+ * Minimalne ABI ERC-20 do dwoch odczytow: burn (saldo 0xdEaD) i saldo
+ * podlaczonego portfela. Token B20 nie ma wlasnego artefaktu w repo.
+ */
+const erc20ReadsAbi = [
+  { type: 'function', name: 'balanceOf', stateMutability: 'view', inputs: [{ name: '', type: 'address' }], outputs: [{ name: '', type: 'uint256' }] },
+] as const;
+const DEAD = '0x000000000000000000000000000000000000dEaD' as Address;
+
 export default function SphereOverview() {
   const readClient = usePublicClient({ chainId: SPHERE_CHAIN.id });
+  const { address: account } = useAccount();
   const [claimables, setClaimables] = useState<{ rewards: bigint; escrow: bigint } | null>(null);
   const [weekProgress, setWeekProgress] = useState<number | null>(null);
+  const [burned, setBurned] = useState<bigint | null>(null);
+  const [myBalance, setMyBalance] = useState<bigint | null>(null);
 
   useEffect(() => {
     const rewardsAddr = SPHERE_REWARDS_ADDRESS;
@@ -83,6 +95,37 @@ export default function SphereOverview() {
       clearInterval(t);
     };
   }, [readClient]);
+
+  // Zywy burn + saldo uzytkownika. Przed graduacja burn to fizycznie 0 (palenie
+  // rusza z hookiem po graduacji), ale liczba jest CZYTANA, nie wpisana - ta
+  // sama zasada co wszedzie: zero recznych statystyk.
+  useEffect(() => {
+    const token = SPHERE_TOKEN_ADDRESS;
+    if (!readClient || !token) return;
+    let alive = true;
+    const load = async () => {
+      try {
+        const [b, mine] = await Promise.all([
+          readClient.readContract({ address: token, abi: erc20ReadsAbi, functionName: 'balanceOf', args: [DEAD] }),
+          account
+            ? readClient.readContract({ address: token, abi: erc20ReadsAbi, functionName: 'balanceOf', args: [account] })
+            : Promise.resolve(null),
+        ]);
+        if (alive) {
+          setBurned(b as bigint);
+          setMyBalance(mine as bigint | null);
+        }
+      } catch {
+        /* nastepny interwal */
+      }
+    };
+    void load();
+    const t = setInterval(load, 30_000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [readClient, account]);
 
   useEffect(() => {
     let alive = true;
@@ -126,10 +169,27 @@ export default function SphereOverview() {
           </div>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
-            <HeroStat icon={<Flame className="h-3.5 w-3.5 text-sp-down" aria-hidden="true" />} label="Burned forever" value={SPHERE_TOKEN_ADDRESS ? 0 : 0} suffix="SPHERE" />
+            <HeroStat icon={<Flame className="h-3.5 w-3.5 text-sp-down" aria-hidden="true" />} label="Burned forever" value={burned !== null ? Number(formatEther(burned)) : 0} suffix="SPHERE" />
             <HeroStat icon={<Coins className="h-3.5 w-3.5 text-sp-up" aria-hidden="true" />} label="Fees waiting" value={feesWaiting} decimals={4} suffix={SPHERE_NATIVE_SYMBOL} />
             <HeroStat icon={<Timer className="h-3.5 w-3.5 text-sp-brand" aria-hidden="true" />} label="Week progress" value={weekProgress ?? 0} decimals={1} suffix="%" />
           </div>
+
+          {/* KUP / TWOJE SALDO - jedyne CTA, ktorego szuka zwykly gosc. */}
+          {SPHERE_TOKEN_ADDRESS && (
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <Link
+                href={`/startpad/${SPHERE_TOKEN_ADDRESS}?c=${SPHERE_CHAIN.id}`}
+                className="inline-flex items-center gap-2 rounded-full bg-sp-brand px-5 py-2.5 text-[13px] font-extrabold text-sp-on-brand transition-transform hover:scale-[1.03]"
+              >
+                Buy $SPHERE <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </Link>
+              {myBalance !== null && (
+                <span className="rounded-full bg-white/70 px-4 py-2 text-[12px] font-extrabold text-sp-shade/70 backdrop-blur-sm">
+                  You hold {Number(formatEther(myBalance)).toLocaleString('en-US', { maximumFractionDigits: 0 })} SPHERE
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </section>
 

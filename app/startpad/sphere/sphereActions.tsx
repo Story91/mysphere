@@ -13,6 +13,50 @@ import { Loader2 } from 'lucide-react';
 import type { Abi, Address } from 'viem';
 // Odczyty i zapisy huba ida ZAWSZE na Base - uzasadnienie w ./sphereChain.ts.
 import { SPHERE_CHAIN } from './sphereChain';
+import { SPHERE_ESCROW_ADDRESS, sphereCreatorEscrowAbi } from './sphereConfig';
+
+/**
+ * Czy podlaczony portfel to tworca SPHERE (LAUNCH_AUTHORITY escrow)?
+ *
+ * Tworca on-chain jest KONTRAKT (escrow-as-creator, sekcja 8 tokenomiki),
+ * wiec "tworca" w UI znaczy: adres, ktory escrow sam deklaruje przez
+ * LAUNCH_AUTHORITY(). Zadnego hardkodu EOA - jedno zrodlo prawdy, lancuch.
+ * Ta sama bramka stoi po stronie serwera (api/launchpad/token/route.ts)
+ * i w UI strony tokena (LaunchpadTokenDetail).
+ *
+ * LAUNCH_AUTHORITY jest immutable, stad cache na poziomie modulu: N paneli
+ * montujacych sie naraz robi DOKLADNIE jeden odczyt RPC na zaladowanie strony.
+ */
+let sphereAuthorityPromise: Promise<string> | null = null;
+export function useSphereCreator(): boolean {
+  const { address: account } = useAccount();
+  const readClient = usePublicClient({ chainId: SPHERE_CHAIN.id });
+  const [authority, setAuthority] = useState<string | null>(null);
+  useEffect(() => {
+    // Pre-deploy (escrow bez adresu): nikt nie jest tworca.
+    if (!readClient || !SPHERE_ESCROW_ADDRESS) return;
+    sphereAuthorityPromise ??= readClient
+      .readContract({
+        address: SPHERE_ESCROW_ADDRESS,
+        abi: sphereCreatorEscrowAbi,
+        functionName: 'LAUNCH_AUTHORITY',
+      })
+      .then((a) => (a as string).toLowerCase())
+      .catch((cause) => {
+        // Nieudany odczyt nie moze zatruc cache'u na caly czas zycia karty.
+        sphereAuthorityPromise = null;
+        throw cause;
+      });
+    let stale = false;
+    sphereAuthorityPromise.then((a) => {
+      if (!stale) setAuthority(a);
+    }).catch(() => {});
+    return () => {
+      stale = true;
+    };
+  }, [readClient]);
+  return Boolean(account && authority && account.toLowerCase() === authority);
+}
 
 export function useSphereRead<T>(
   reader: (client: NonNullable<ReturnType<typeof usePublicClient>>) => Promise<T>,
