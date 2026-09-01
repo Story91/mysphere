@@ -150,7 +150,7 @@ export function FeedbackForm({ agentId, onSuccess }: FeedbackFormProps) {
         <textarea
           value={comment}
           onChange={(e) => setComment(e.target.value.slice(0, 280))}
-          placeholder="Optional comment — hash stored on-chain, full text off-chain..."
+          placeholder="Optional comment (hash goes on-chain, full text stays off-chain)"
           rows={2}
           className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#0052FF]/20 focus:border-[#0052FF]"
         />

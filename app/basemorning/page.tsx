@@ -361,7 +361,7 @@ export default function BaseMorning() {
               <h2 className="text-3xl font-bold text-cyan-400 mb-4">⚔️ PvP Arena</h2>
               <p className="text-gray-400 mb-8">Coming Soon - Battle other commanders!</p>
               <div className="bg-gradient-to-r from-red-900/20 to-orange-900/20 border border-red-500/30 rounded-xl p-8 max-w-2xl mx-auto">
-                <p className="text-red-300">Feature under development. Prepare your elements for epic battles!</p>
+                <p className="text-red-300">Still in development. Keep leveling your elements, battles are coming.</p>
               </div>
             </motion.div>
           </AnimatePresence>
@@ -693,7 +693,7 @@ export default function BaseMorning() {
             <h1 className="text-5xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600">
               {activeView === "dashboard" ? "NEXUS CORE" : navigationItems.find(item => item.view === activeView)?.name}
             </h1>
-            <p className="text-xl text-cyan-300">Forge the future. Command your elements. Build an empire.</p>
+            <p className="text-xl text-cyan-300">Command your elements and build an empire on Base.</p>
           </motion.div>
 
           <AnimatePresence mode="wait">

@@ -54,7 +54,7 @@ export default function DiscordCallbackPage() {
           <>
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-400 mx-auto mb-4"></div>
             <h2 className="text-2xl font-bold text-orange-200 mb-2">💬 Connecting Discord</h2>
-            <p className="text-orange-100">Processing your Discord connection...</p>
+            <p className="text-orange-100">Linking your Discord account...</p>
           </>
         )}
 
@@ -62,7 +62,7 @@ export default function DiscordCallbackPage() {
           <>
             <div className="text-6xl mb-4">✅</div>
             <h2 className="text-2xl font-bold text-green-300 mb-2">Discord Connected!</h2>
-            <p className="text-orange-100 mb-4">Your Discord account has been successfully linked to Camp Network.</p>
+            <p className="text-orange-100 mb-4">Your Discord account is now linked to Camp Network.</p>
             <p className="text-orange-200/70 text-sm">Redirecting back to My Camp...</p>
           </>
         )}
@@ -71,7 +71,7 @@ export default function DiscordCallbackPage() {
           <>
             <div className="text-6xl mb-4">❌</div>
             <h2 className="text-2xl font-bold text-red-300 mb-2">Connection Failed</h2>
-            <p className="text-orange-100 mb-4">There was an issue connecting your Discord account.</p>
+            <p className="text-orange-100 mb-4">We couldn't connect your Discord account.</p>
             <p className="text-orange-200/70 text-sm">Redirecting back to My Camp...</p>
           </>
         )}

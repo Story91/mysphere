@@ -35,7 +35,7 @@ export default function YapScanCallback() {
           className="w-16 h-16 border-4 border-t-blue-500 border-r-transparent border-b-blue-500 border-l-transparent rounded-full mx-auto mb-4"
         ></motion.div>
         <h1 className="text-2xl text-white font-bold">Processing...</h1>
-        <p className="text-gray-400 mt-2">Please wait while we complete your request</p>
+        <p className="text-gray-400 mt-2">One moment, taking you back to YapScan</p>
       </motion.div>
     </div>
   );

@@ -91,7 +91,7 @@ const QuestLoader: React.FC = () => {
           }}
           className="text-white/70 text-lg mb-8"
         >
-          Preparing your epic adventure...
+          Getting your quests ready...
         </motion.p>
 
         {/* Progress Bar */}

@@ -688,7 +688,7 @@ function MyCampPageContent() {
         >
           <div className="flex items-center gap-2">
             <div className="text-xl">🎉</div>
-            <span className="font-medium text-sm sm:text-base">Social account connected successfully!</span>
+            <span className="font-medium text-sm sm:text-base">Social account connected!</span>
           </div>
         </motion.div>
       )}
@@ -1468,7 +1468,7 @@ function MyCampPageContent() {
             className="bg-black/30 backdrop-blur-sm border border-orange-500/20 rounded-2xl p-4 sm:p-6 mb-8"
           >
             <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-orange-200 mb-4 sm:mb-6 flex items-center gap-2">
-              🎯 Epic Quest System
+              🎯 Quest System
               <span className="text-sm bg-cyan-500/20 text-cyan-300 px-2 py-1 rounded-full">
                 3D Experience
               </span>
@@ -1496,11 +1496,11 @@ function MyCampPageContent() {
               </div>
               
               <h4 className="text-2xl font-bold text-white mb-4 bg-gradient-to-r from-cyan-400 via-purple-500 to-pink-400 bg-clip-text text-transparent">
-                Revolutionary Quest Experience
+                7 Days of Quests
               </h4>
               
               <p className="text-orange-200/70 text-sm mt-2 mb-6">
-                Embark on an epic 7-day journey through the Camp Network multiverse
+                A new quest each day across the Camp Network multiverse
               </p>
               
               <motion.div
@@ -1549,13 +1549,13 @@ function MyCampPageContent() {
                   <div className="bg-gradient-to-br from-purple-600/20 via-purple-500/10 to-purple-800/20 backdrop-blur-sm border border-purple-500/30 rounded-xl p-4">
                     <div className="text-3xl mb-2">💎</div>
                     <h5 className="text-purple-200 font-bold text-sm mb-1">NFT Rewards</h5>
-                    <p className="text-purple-200/70 text-xs">Mint exclusive animated NFTs</p>
+                    <p className="text-purple-200/70 text-xs">Mint animated NFTs as rewards</p>
                   </div>
                   
                   <div className="bg-gradient-to-br from-pink-600/20 via-pink-500/10 to-pink-800/20 backdrop-blur-sm border border-pink-500/30 rounded-xl p-4">
                     <div className="text-3xl mb-2">🌟</div>
-                    <h5 className="text-pink-200 font-bold text-sm mb-1">Epic Journey</h5>
-                    <p className="text-pink-200/70 text-xs">7-day adventure with legendary rewards</p>
+                    <h5 className="text-pink-200 font-bold text-sm mb-1">7-Day Run</h5>
+                    <p className="text-pink-200/70 text-xs">One quest a day, legendary rewards at the end</p>
                   </div>
                 </div>
               </div>
@@ -1970,7 +1970,7 @@ function MyCampPageContent() {
                       {walletStats.campNFTDetails?.name || 'MSxCAMP NFT'}
                     </h4>
                     <p className="text-purple-200/70 text-sm mb-4">
-                      Exclusive Camp Network Member NFT
+                      Camp Network Member NFT
                     </p>
                     
                     <div className="bg-purple-500/20 rounded-lg p-3 mb-4">

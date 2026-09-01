@@ -47,7 +47,7 @@ const FEATURES = [
       </svg>
     ),
     title: "Verify Identity",
-    desc: "Every agent is anchored to the ERC-8004 standard. Cross-chain identity gives you full trust context instantly.",
+    desc: "Every agent is anchored to the ERC-8004 standard, so you can check its cross-chain identity and trust history in one place.",
     accent: "from-emerald-400 to-green-600",
     bg: "bg-emerald-50",
     text: "text-emerald-700",
@@ -59,7 +59,7 @@ const FEATURES = [
       </svg>
     ),
     title: "Rate & Review",
-    desc: "Submit on-chain feedback that builds permanent reputation. Your reviews shape the trustworthiness of the agentic economy.",
+    desc: "Leave on-chain feedback that becomes part of an agent's permanent record. Reviews are public and can't be quietly deleted.",
     accent: "from-amber-400 to-orange-500",
     bg: "bg-amber-50",
     text: "text-amber-700",
@@ -71,7 +71,7 @@ const FEATURES = [
       </svg>
     ),
     title: "Register Your Agent",
-    desc: "Give your AI agent a verifiable on-chain identity. Register once, recognized everywhere across the multichain ecosystem.",
+    desc: "Give your AI agent a verifiable on-chain identity. You register once and it's recognized on every supported chain.",
     accent: "from-violet-500 to-purple-600",
     bg: "bg-violet-50",
     text: "text-violet-700",
@@ -182,8 +182,8 @@ export default function MyAgentsPage() {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="text-lg md:text-xl text-slate-200 max-w-2xl mb-10 leading-relaxed drop-shadow-[0_4px_18px_rgba(0,0,0,0.45)]"
           >
-            Discover, verify, and rate AI agents across 20+ EVM chains.
-            Every agent has a verifiable on-chain identity and cross-chain reputation score.
+            Find and rate AI agents across 20+ EVM chains.
+            Each one has a verifiable on-chain identity and a cross-chain reputation score.
           </motion.p>
 
           {/* CTAs */}
@@ -254,7 +254,7 @@ export default function MyAgentsPage() {
               The full lifecycle of an AI agent
             </h2>
             <p className="mt-3 text-gray-500 max-w-xl mx-auto">
-              From registration to reputation — everything happens transparently on-chain.
+              From registration to reputation, everything happens on-chain where anyone can check it.
             </p>
           </motion.div>
 
@@ -301,8 +301,8 @@ export default function MyAgentsPage() {
               <span className="text-[#0052FF]">KYA Standard</span>
             </h2>
             <p className="text-gray-500 leading-relaxed mb-6">
-              KYA (Know Your Agent) aggregates identity and reputation from ERC-8004 registries across all major EVM chains.
-              Every agent gets a unified cross-chain profile — one address, many chains, one reputation score.
+              KYA (Know Your Agent) pulls identity and reputation data from ERC-8004 registries on all major EVM chains.
+              Every agent gets a single cross-chain profile: one address and one reputation score that follows it everywhere.
             </p>
             <div className="flex flex-col gap-3">
               {[

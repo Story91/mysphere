@@ -218,3 +218,11 @@ next-env.d.ts
 
 # Ustawienia Claude Code per maszyna - nie do repo.
 .claude/settings.local.json
+# Worktree'y Claude Code: katalog roboczy gita w srodku repo. Reszta .claude/
+# (skille, launch.json) jest wersjonowana celowo, wiec ignorujemy punktowo.
+.claude/worktrees/
+
+# Surowe zrzuty json-rpc z debugowania, nie sa wejsciem do buildu.
+base_pm.json
+cctp_recent.json
+impl.txt

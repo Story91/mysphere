@@ -49,41 +49,41 @@ export default function YapScan() {
             transition={{ duration: 0.5, delay: 0.4 }}
             className="mt-16 bg-white rounded-xl p-8 shadow-sm border border-blue-100 font-['Coinbase_Display']"
           >
-            <h2 className="text-2xl font-bold mb-6 text-blue-600 font-['Coinbase_Display']">Yaps from Kaito - What is it and how does it work?</h2>
+            <h2 className="text-2xl font-bold mb-6 text-blue-600 font-['Coinbase_Display']">How Yaps from Kaito actually work</h2>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <div className="bg-blue-50 p-6 rounded-lg">
                 <h3 className="text-lg font-semibold mb-3 text-blue-700 font-['Coinbase_Display']">What are Yaps?</h3>
                 <p className="text-gray-700 font-['Coinbase_Display']">
-                  Yaps is a scoring system introduced by the Kaito protocol that measures your activity and engagement within the ecosystem. 
-                  These points reflect your presence and participation in the network, which may bring various benefits in the future.
+                  Yaps is a scoring system from the Kaito protocol that measures how active you are.
+                  The points track your participation in the network, and Kaito may attach benefits to them later on.
                 </p>
               </div>
               
               <div className="bg-blue-50 p-6 rounded-lg">
                 <h3 className="text-lg font-semibold mb-3 text-blue-700 font-['Coinbase_Display']">Why collect Yaps?</h3>
                 <ul className="list-disc list-inside text-gray-700 space-y-2 font-['Coinbase_Display']">
-                  <li>Track progress - Yaps allow you to monitor your engagement over time</li>
-                  <li>Potential rewards - In the future, Yaps may be used for various initiatives within the Kaito ecosystem</li>
-                  <li>Community status - A higher Yaps score can demonstrate active participation in the network</li>
+                  <li>See how your engagement changes over time</li>
+                  <li>Kaito may use Yaps for rewards or other initiatives down the line</li>
+                  <li>A higher score shows the network you actually take part in it</li>
                 </ul>
               </div>
               
               <div className="bg-blue-50 p-6 rounded-lg">
                 <h3 className="text-lg font-semibold mb-3 text-blue-700 font-['Coinbase_Display']">How to increase your Yaps score?</h3>
                 <p className="text-gray-700 font-['Coinbase_Display']">
-                  While the exact scoring algorithm is not publicly known, regularly using the Kaito protocol features 
-                  and participating in the ecosystem likely positively affects your score. Remember that Yaps is not just 
-                  a number - it reflects your participation in an evolving network.
+                  The exact scoring algorithm isn't public, but using Kaito's features regularly and taking part
+                  in the network almost certainly helps. The score follows what you actually do there,
+                  so there is no real shortcut.
                 </p>
               </div>
             </div>
             
             <div className="mt-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
               <p className="text-sm text-gray-500 font-['Coinbase_Display']">
-                <strong>Note:</strong> Collecting Yaps should not be the sole purpose of using the Kaito protocol. 
-                The most important thing is to use tools and services in a way that is valuable to you. 
-                Yaps are just an additional element measuring your engagement.
+                <strong>Note:</strong> Don't use Kaito only to farm Yaps.
+                Use the tools that are actually useful to you, and treat the score
+                as a side effect of that, nothing more.
               </p>
               <p className="text-sm text-gray-500 mt-2 font-['Coinbase_Display']">
                 This information is for educational purposes. For more details, please refer to the official Kaito documentation.

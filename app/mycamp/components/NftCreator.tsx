@@ -461,10 +461,10 @@ export default function NftCreator() {
             {/* File Upload */}
             <div>
               <label className="block text-purple-200 text-sm font-medium mb-2">
-                {uploadTab === 'image' && 'Drag and drop your file here, or click to select a file. jpeg, png, gif, or webp — Max size: 10 MB'}
-                {uploadTab === 'audio' && 'Drag and drop your file here, or click to select a file. mpeg, wav, or ogg — Max size: 15 MB'}
-                {uploadTab === 'video' && 'Drag and drop your file here, or click to select a file. mp4, or webm — Max size: 20 MB'}
-                {uploadTab === 'text' && 'Drag and drop your file here, or click to select a file. txt — Max size: 10 MB'}
+                {uploadTab === 'image' && 'Drag and drop your file here, or click to pick one. jpeg, png, gif or webp, max 10 MB'}
+                {uploadTab === 'audio' && 'Drag and drop your file here, or click to pick one. mpeg, wav or ogg, max 15 MB'}
+                {uploadTab === 'video' && 'Drag and drop your file here, or click to pick one. mp4 or webm, max 20 MB'}
+                {uploadTab === 'text' && 'Drag and drop your file here, or click to pick one. txt, max 10 MB'}
               </label>
               <div
                 className="relative"
