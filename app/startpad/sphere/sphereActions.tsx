@@ -11,13 +11,14 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
 import { Loader2 } from 'lucide-react';
 import type { Abi, Address } from 'viem';
-import { LAUNCHPAD_CHAIN } from '../config';
+// Odczyty i zapisy huba ida ZAWSZE na Base - uzasadnienie w ./sphereChain.ts.
+import { SPHERE_CHAIN } from './sphereChain';
 
 export function useSphereRead<T>(
   reader: (client: NonNullable<ReturnType<typeof usePublicClient>>) => Promise<T>,
   deps: unknown[] = []
 ) {
-  const readClient = usePublicClient({ chainId: LAUNCHPAD_CHAIN.id });
+  const readClient = usePublicClient({ chainId: SPHERE_CHAIN.id });
   const [value, setValue] = useState<T | null>(null);
   useEffect(() => {
     if (!readClient) return;
@@ -62,7 +63,7 @@ export function ActionButton({
 }) {
   const { address: account } = useAccount();
   const { data: walletClient } = useWalletClient();
-  const readClient = usePublicClient({ chainId: LAUNCHPAD_CHAIN.id });
+  const readClient = usePublicClient({ chainId: SPHERE_CHAIN.id });
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
@@ -82,7 +83,7 @@ export function ActionButton({
         functionName,
         args,
         value,
-        chain: LAUNCHPAD_CHAIN,
+        chain: SPHERE_CHAIN,
         account,
       } as never);
       await readClient.waitForTransactionReceipt({ hash });

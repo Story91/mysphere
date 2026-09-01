@@ -1,4 +1,4 @@
-import { LAUNCHPAD_NETWORKS } from './config';
+import { DEFAULT_LAUNCHPAD_CHAIN_ID, LAUNCHPAD_NETWORKS } from './config';
 
 /**
  * MOTYW SIECI - startpad na Robinhoodzie jest czarno-zielony.
@@ -85,7 +85,13 @@ export function themeKeyFor(pathname: string, chainId: number): string | null {
   const path = pathname.toLowerCase();
   const inStartpad = path === '/startpad' || path === '/startpad/' || path.startsWith('/startpad/');
   if (!inStartpad) return null;
-  return LAUNCHPAD_NETWORKS[chainId]?.theme?.key ?? null;
+  // Hub $SPHERE renderuje sie ZAWSZE jak siec domyslna (Base), niezaleznie od
+  // wybranej sieci tablicy - SPHERE zyje tylko na Base i jego strony czytaja
+  // wylacznie kontrakty Base (sphere/sphereChain.ts). Bez tego wyjatku wejscie
+  // w $SPHERE przy wybranym Arc przemalowywalo caly hub na barwy USDC.
+  const inSphere = path === '/startpad/sphere' || path.startsWith('/startpad/sphere/');
+  const effectiveChainId = inSphere ? DEFAULT_LAUNCHPAD_CHAIN_ID : chainId;
+  return LAUNCHPAD_NETWORKS[effectiveChainId]?.theme?.key ?? null;
 }
 
 /**
@@ -124,7 +130,11 @@ export function themeBootScript(defaultChainId: number): string {
     if (net.theme) map[chainId] = net.theme.key;
   }
 
+  // Ten sam wyjatek dla huba $SPHERE co w themeKeyFor: siec efektywna to
+  // domyslna (Base), a nie zapamietana - inaczej wejscie z linku prosto na
+  // /startpad/sphere przy zapisanym Arc mignelo by cudzym motywem, zanim
+  // NetworkThemeSync zdazy go zdjac.
   return `try{var p=location.pathname.toLowerCase();if(p==='/startpad'||p.indexOf('/startpad/')===0){var m=${JSON.stringify(
     map
-  )};var c=window.localStorage.getItem('startpad.chainId')||'${defaultChainId}';var k=m[c];if(k)document.documentElement.setAttribute('${THEME_ATTRIBUTE}',k)}}catch(e){}`;
+  )};var s=p==='/startpad/sphere'||p.indexOf('/startpad/sphere/')===0;var c=s?'${defaultChainId}':(window.localStorage.getItem('startpad.chainId')||'${defaultChainId}');var k=m[c];if(k)document.documentElement.setAttribute('${THEME_ATTRIBUTE}',k)}}catch(e){}`;
 }

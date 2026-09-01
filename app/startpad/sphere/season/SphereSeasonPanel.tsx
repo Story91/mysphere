@@ -20,7 +20,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { formatEther } from 'viem';
 import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { ChevronDown, ChevronUp, Info, Loader2, Trophy } from 'lucide-react';
-import { NATIVE_SYMBOL } from '../../config';
+// Sezon liczy zrealizowane ETH z Base (/api/sphere/season, CHAIN_ID 8453) -
+// etykieta nie moze podazac za wybrana siecia tablicy.
+import { SPHERE_NATIVE_SYMBOL } from '../sphereChain';
 import { BigStat, LearnMore, PageHero } from '../SphereUI';
 
 type SeasonToken = {
@@ -132,7 +134,7 @@ function CreatorRow({ rank, c }: { rank: number; c: SeasonCreator }) {
           </span>
           <span className="hidden shrink-0 text-right sm:block">
             <span className="font-mono text-[12px] font-bold text-sp-ink">{eth(c.rewardCapEth)}</span>
-            <span className="mt-0.5 block text-[9.5px] font-bold uppercase tracking-[0.06em] text-sp-shade/40">reward cap ({NATIVE_SYMBOL})</span>
+            <span className="mt-0.5 block text-[9.5px] font-bold uppercase tracking-[0.06em] text-sp-shade/40">reward cap ({SPHERE_NATIVE_SYMBOL})</span>
           </span>
           {open ? (
             <ChevronUp className="h-4 w-4 shrink-0 text-sp-shade/40" aria-hidden="true" />
@@ -151,7 +153,7 @@ function CreatorRow({ rank, c }: { rank: number; c: SeasonCreator }) {
             {c.tokens.map((t) => (
               <div key={t.token} className="grid gap-x-4 gap-y-0.5 rounded-lg bg-sp-surface p-2.5 text-[11px] sm:grid-cols-2">
                 <span className="font-extrabold text-sp-ink">{t.symbol}</span>
-                <span className="text-sp-shade/60">external volume: <b>{eth(t.externalVolumeEth, 3)} {NATIVE_SYMBOL}</b></span>
+                <span className="text-sp-shade/60">external volume: <b>{eth(t.externalVolumeEth, 3)} {SPHERE_NATIVE_SYMBOL}</b></span>
                 <span className="text-sp-shade/60">excluded self-volume: <b>{eth(t.selfVolumeEth, 3)}</b></span>
                 <span className="text-sp-shade/60">unique traders: <b>{t.uniqueTraders}</b> → multiplier <b>{(t.traderMultiplierBps / 10_000).toFixed(1)}×</b></span>
                 <span className="text-sp-shade/60">age gate (48h): <b>{t.ageEligible ? 'eligible' : 'not yet'}</b></span>
@@ -162,7 +164,7 @@ function CreatorRow({ rank, c }: { rank: number; c: SeasonCreator }) {
           <p className="mt-2 flex items-start gap-1.5 text-[10.5px] text-sp-shade/55">
             <Info className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
             Reward never exceeds 30% of the fees this creator&apos;s tokens actually contributed to the
-            protocol this week ({eth(c.netProtocolEth)} {NATIVE_SYMBOL} contributed → cap {eth(c.rewardCapEth)} {NATIVE_SYMBOL}
+            protocol this week ({eth(c.netProtocolEth)} {SPHERE_NATIVE_SYMBOL} contributed → cap {eth(c.rewardCapEth)} {SPHERE_NATIVE_SYMBOL}
             {c.capBinding ? ' - cap is binding for this creator' : ''}). Wash trading pays more in fees than it can ever get back.
           </p>
         </div>
@@ -238,13 +240,13 @@ export default function SphereSeasonPanel() {
       >
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <BigStat
-            label={`External volume (${NATIVE_SYMBOL})`}
+            label={`External volume (${SPHERE_NATIVE_SYMBOL})`}
             value={totals ? Number(formatEther(BigInt(totals.externalVolumeEth))) : null}
             decimals={3}
             hint="self-trades excluded"
           />
           <BigStat
-            label={`Protocol revenue (${NATIVE_SYMBOL})`}
+            label={`Protocol revenue (${SPHERE_NATIVE_SYMBOL})`}
             value={totals ? Number(formatEther(BigInt(totals.protocolEth))) : null}
             decimals={4}
             tone="up"
@@ -267,7 +269,7 @@ export default function SphereSeasonPanel() {
 
       {/* WYKRES: wolumen dzienny --------------------------------------------- */}
       <section className="sph-card rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
-        <h3 className="text-[13.5px] font-extrabold text-sp-ink">Daily external volume ({NATIVE_SYMBOL})</h3>
+        <h3 className="text-[13.5px] font-extrabold text-sp-ink">Daily external volume ({SPHERE_NATIVE_SYMBOL})</h3>
         <div className="mt-3 h-56 w-full">
           {data ? (
             <ResponsiveContainer width="100%" height="100%">
@@ -277,7 +279,7 @@ export default function SphereSeasonPanel() {
                 <YAxis width={44} tickLine={false} axisLine={false} tick={{ fontSize: 10.5, fill: 'rgba(0,0,0,0.45)' }} />
                 <Tooltip
                   cursor={{ fill: 'rgba(124,107,218,0.08)' }}
-                  formatter={(v: number) => [`${v.toFixed(4)} ${NATIVE_SYMBOL}`, 'Volume']}
+                  formatter={(v: number) => [`${v.toFixed(4)} ${SPHERE_NATIVE_SYMBOL}`, 'Volume']}
                   contentStyle={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.1)', fontSize: 11.5 }}
                 />
                 <Bar dataKey="volume" fill={BRAND} radius={[4, 4, 0, 0]} maxBarSize={40}>

@@ -15,15 +15,14 @@
 
 import { erc20Abi, formatEther, zeroAddress, type Address } from 'viem';
 import { Landmark } from 'lucide-react';
+import { hookAbi, launchpadAbi, liquidityVaultAbi } from '../../config';
+// Adresy i waluta przybite do Base - uzasadnienie w ../sphereChain.ts.
 import {
-  LAUNCHPAD_ADDRESS,
-  LAUNCH_HOOK_ADDRESS,
-  LIQUIDITY_VAULT_ADDRESS,
-  NATIVE_SYMBOL,
-  hookAbi,
-  launchpadAbi,
-  liquidityVaultAbi,
-} from '../../config';
+  SPHERE_HOOK_ADDRESS,
+  SPHERE_LAUNCHPAD_ADDRESS,
+  SPHERE_NATIVE_SYMBOL,
+  SPHERE_VAULT_ADDRESS,
+} from '../sphereChain';
 import AbiConsole from '../AbiConsole';
 import { SPHERE_ESCROW_ADDRESS, SPHERE_LIVE, SPHERE_PLAN, sphereCreatorEscrowAbi } from '../sphereConfig';
 import { ActionButton, useSphereRead } from '../sphereActions';
@@ -35,7 +34,7 @@ const TAGLINE = "SPHERE's creator stream - immutable routing";
 
 /** Krotka liczba ETH do podpisu kafla - liczby > slowa. */
 function eth(value: bigint) {
-  return `${Number(formatEther(value)).toFixed(4)} ${NATIVE_SYMBOL}`;
+  return `${Number(formatEther(value)).toFixed(4)} ${SPHERE_NATIVE_SYMBOL}`;
 }
 
 export default function SphereEscrowPanel() {
@@ -47,9 +46,9 @@ export default function SphereEscrowPanel() {
       client.readContract({ address: escrow, abi: sphereCreatorEscrowAbi, functionName: 'launched' }),
       client.readContract({ address: escrow, abi: sphereCreatorEscrowAbi, functionName: 'sphereToken' }).catch(() => zeroAddress),
       client.getBalance({ address: escrow }),
-      client.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'claimable', args: [escrow] }),
-      client.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'claimableEth', args: [escrow] }),
-      client.readContract({ address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'claimableEth', args: [escrow] }),
+      client.readContract({ address: SPHERE_LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'claimable', args: [escrow] }),
+      client.readContract({ address: SPHERE_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'claimableEth', args: [escrow] }),
+      client.readContract({ address: SPHERE_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'claimableEth', args: [escrow] }),
     ]);
     // Kierunki i split: stale immutable z konstruktora - do pastylek i paska.
     // Kazdy odczyt ma fallback, zeby nie zablokowac calego panelu.
@@ -87,7 +86,7 @@ export default function SphereEscrowPanel() {
       <div className="sph-stagger grid gap-4">
         <PageHero title="Creator escrow" tagline={TAGLINE} badge={<EnforcedBadge />} icon={HERO_ICON}>
           <div className="grid gap-3 sm:grid-cols-3">
-            <BigStat label={`${NATIVE_SYMBOL} in escrow`} value={null} />
+            <BigStat label={`${SPHERE_NATIVE_SYMBOL} in escrow`} value={null} />
             <BigStat label="SPHERE in escrow" value={null} />
             <BigStat label="Waiting on curve" value={null} />
           </div>
@@ -108,10 +107,10 @@ export default function SphereEscrowPanel() {
       <PageHero title="Creator escrow" tagline={TAGLINE} badge={<EnforcedBadge />} icon={HERO_ICON}>
         <div className="grid gap-3 sm:grid-cols-3">
           <BigStat
-            label={`${NATIVE_SYMBOL} in escrow`}
+            label={`${SPHERE_NATIVE_SYMBOL} in escrow`}
             value={state ? Number(formatEther(state.balance)) : null}
             decimals={4}
-            suffix={NATIVE_SYMBOL}
+            suffix={SPHERE_NATIVE_SYMBOL}
             tone="brand"
           />
           <BigStat
@@ -125,7 +124,7 @@ export default function SphereEscrowPanel() {
             label="Waiting on curve"
             value={state ? Number(formatEther(state.padClaimable)) : null}
             decimals={4}
-            suffix={NATIVE_SYMBOL}
+            suffix={SPHERE_NATIVE_SYMBOL}
             tone="up"
           />
         </div>
@@ -147,7 +146,7 @@ export default function SphereEscrowPanel() {
         >
           <ActionButton
             label="Deliver curve fees"
-            address={LAUNCHPAD_ADDRESS as Address}
+            address={SPHERE_LAUNCHPAD_ADDRESS as Address}
             abi={launchpadAbi}
             functionName="claimFor"
             args={[escrow]}
@@ -161,7 +160,7 @@ export default function SphereEscrowPanel() {
         >
           <ActionButton
             label="Deliver hook fees"
-            address={LAUNCH_HOOK_ADDRESS as Address}
+            address={SPHERE_HOOK_ADDRESS as Address}
             abi={hookAbi}
             functionName="claimEthFor"
             args={[escrow]}
@@ -175,7 +174,7 @@ export default function SphereEscrowPanel() {
         >
           <ActionButton
             label="Deliver LP fees"
-            address={LIQUIDITY_VAULT_ADDRESS as Address}
+            address={SPHERE_VAULT_ADDRESS as Address}
             abi={liquidityVaultAbi}
             functionName="claimEthFor"
             args={[escrow]}

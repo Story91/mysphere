@@ -11,7 +11,8 @@ import { useEffect, useState } from 'react';
 import { formatEther, type Address } from 'viem';
 import { usePublicClient } from 'wagmi';
 import { ArrowRight, BookOpen, Coins, Flame, Landmark, Timer, Trophy } from 'lucide-react';
-import { LAUNCHPAD_ADDRESS, LAUNCHPAD_CHAIN, NATIVE_SYMBOL, launchpadAbi } from '../config';
+import { launchpadAbi } from '../config';
+import { SPHERE_CHAIN, SPHERE_LAUNCHPAD_ADDRESS, SPHERE_NATIVE_SYMBOL } from './sphereChain';
 import NumberTicker from './NumberTicker';
 import {
   SPHERE_ESCROW_ADDRESS,
@@ -55,7 +56,7 @@ function ActionTile({ href, icon, title, hint }: { href: string; icon: React.Rea
 }
 
 export default function SphereOverview() {
-  const readClient = usePublicClient({ chainId: LAUNCHPAD_CHAIN.id });
+  const readClient = usePublicClient({ chainId: SPHERE_CHAIN.id });
   const [claimables, setClaimables] = useState<{ rewards: bigint; escrow: bigint } | null>(null);
   const [weekProgress, setWeekProgress] = useState<number | null>(null);
 
@@ -67,8 +68,8 @@ export default function SphereOverview() {
     const load = async () => {
       try {
         const [r, e] = await Promise.all([
-          readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'claimable', args: [rewardsAddr] }),
-          readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'claimable', args: [escrowAddr] }),
+          readClient.readContract({ address: SPHERE_LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'claimable', args: [rewardsAddr] }),
+          readClient.readContract({ address: SPHERE_LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'claimable', args: [escrowAddr] }),
         ]);
         if (alive) setClaimables({ rewards: r as bigint, escrow: e as bigint });
       } catch {
@@ -126,7 +127,7 @@ export default function SphereOverview() {
 
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
             <HeroStat icon={<Flame className="h-3.5 w-3.5 text-sp-down" aria-hidden="true" />} label="Burned forever" value={SPHERE_TOKEN_ADDRESS ? 0 : 0} suffix="SPHERE" />
-            <HeroStat icon={<Coins className="h-3.5 w-3.5 text-sp-up" aria-hidden="true" />} label="Fees waiting" value={feesWaiting} decimals={4} suffix={NATIVE_SYMBOL} />
+            <HeroStat icon={<Coins className="h-3.5 w-3.5 text-sp-up" aria-hidden="true" />} label="Fees waiting" value={feesWaiting} decimals={4} suffix={SPHERE_NATIVE_SYMBOL} />
             <HeroStat icon={<Timer className="h-3.5 w-3.5 text-sp-brand" aria-hidden="true" />} label="Week progress" value={weekProgress ?? 0} decimals={1} suffix="%" />
           </div>
         </div>

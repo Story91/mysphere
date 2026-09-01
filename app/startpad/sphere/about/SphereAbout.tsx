@@ -9,7 +9,7 @@
 
 import { ExternalLink, Flame, FlaskConical } from 'lucide-react';
 import type { Address } from 'viem';
-import { LAUNCHPAD_EXPLORER_URL } from '../../config';
+import { SPHERE_EXPLORER_URL } from '../sphereChain';
 import { EnforcedBadge, TeamRunBadge } from '../SphereShell';
 import {
   SPHERE_ESCROW_ADDRESS,
@@ -34,7 +34,7 @@ function AddrLink({ address, label, pendingText = 'not deployed yet' }: { addres
   }
   return (
     <a
-      href={`${LAUNCHPAD_EXPLORER_URL}/address/${address}`}
+      href={`${SPHERE_EXPLORER_URL}/address/${address}`}
       target="_blank"
       rel="noreferrer"
       className="inline-flex items-center gap-1 text-[11.5px] font-bold text-sp-brand hover:underline"
