@@ -7,9 +7,9 @@ export const metadata: Metadata = {
   // Marke doklada template z layoutu - patrz komentarz przy `title` w app/layout.tsx.
   // (Wczesniej odsylacz szedl do app/leaderboard/page.tsx, ale /leaderboard jest
   // scalany z /money i ten plik znika.)
-  title: 'Re-Definition — money buys judgment',
+  title: 'Re-Definition: money buys judgment',
   description:
-    'MySphere is becoming the first feed where the buyer can be a machine and the worker is a human. One machine payment has already settled. Here is how an Ask works, and what is still missing.',
+    'MySphere is becoming the first feed where the buyer can be a machine and the worker is a human. Machine payments have settled on both rails, a cent each. This page says how an Ask works and what is still missing.',
   openGraph: {
     title: 'Your judgment has a price. Something is already willing to pay it.',
     // === TU BYLY DWIE ROZNE PLATNOSCI SKLEJONE W JEDNA ===
@@ -24,13 +24,16 @@ export const metadata: Metadata = {
     //    samym zdaniu.
     // 2. "In build" bylo prawda, kiedy nie bylo ani kontraktu, ani jednej
     //    rozliczonej platnosci. Dzis sa oba. Zdanie musi wiec podawac STAN,
-    //    a nie etykiete fazy - i podaje go razem z zastrzezeniem ("once"),
-    //    zeby jeden przebieg nie zabrzmial jak ruch.
+    //    a nie etykiete fazy.
+    // 3. AKTUALIZACJA 2026-09-01: "once, in USDG on Robinhood Chain" tez
+    //    przestalo byc prawda - noga USDC na Base rozliczyla swoja platnosc
+    //    (commit 97b4706). Opis podaje wiec obie nogi, z zastrzezeniem skali
+    //    ("a cent each"), zeby dwa przebiegi nie zabrzmialy jak ruch.
     //
     // "can lock", nie "locks": escrow jest WYBOREM autora, nie wlasnoscia
     // kazdego Aska (wariant on-resolve nie blokuje niczego).
     description:
-      'An Ask is a question with a budget, seats and a deadline. The author can lock that budget in an escrow contract on Base, in USDC. A machine can open one by paying over x402 — that has settled once, in USDG on Robinhood Chain.',
+      'An Ask is a question with a budget, seats and a deadline. The author can lock that budget in an escrow contract on Base, in USDC. A machine can open one by paying over x402: that has settled on both rails, USDC on Base and USDG on Robinhood Chain, a cent each.',
     type: 'article',
   },
 };
@@ -128,7 +131,32 @@ const SHOW_READ_FURTHER = false;
  * a ta strona nie moze podawac liczb, ktorych nie odswieza. Eksplorer pod
  * linkiem pokazuje stan biezacy - i o to chodzi.
  *
- * NIE DOPISUJ TU NICZEGO BEZ URUCHOMIENIA scripts/verifyOnchainInventory.js.
+ * === DOPISKA 2026-09-01: STARTPAD I $SPHERE ===
+ * Grupy Startpada i $SPHERE weszly po osobnym przebiegu read-only
+ * z 2026-09-01 (eth_chainId + eth_getCode + odczyty tozsamosci eth_callem):
+ *   - Base (https://mainnet.base.org, chainId 8453): CurveLaunchpad,
+ *     LiquidityVault, B20LaunchHook, B20TokenFactory oraz SphereRewards,
+ *     SphereTokenVesting, SphereCreatorEscrow. Kazdy adres ma kod, a tam
+ *     gdzie kontrakt wystawia liczby (FEE_BPS=100, CREATOR_FEE_BPS=70,
+ *     FEE_RECIPIENT, CONSUMER, BENEFICIARY, START/CLIFF/DURATION,
+ *     LAUNCHPAD, ETH_POT_BPS=5000) - odczytane i zgodne z zapisami wdrozen
+ *     w scripts/output/.
+ *   - Robinhood Chain (chainId 4663, rpc.mainnet.chain.robinhood.com):
+ *     cztery kontrakty Startpada maja kod (eth_getCode). Tozsamosci tam nie
+ *     odpytywalismy i nota grupy mowi to wprost. Wpisy sa tutaj, bo siec
+ *     stoi w przelaczniku /startpad jako produkcyjna: kontrakt, przez ktory
+ *     ida czyjes pieniadze, nie moze zniknac z listy dlatego, ze lezy na
+ *     mniej znanym lancuchu.
+ * Te kontrakty NIE MAJA owner() - dowodem "to nasze" sa zapisy wdrozen
+ * (scripts/output/launchpad-base.json, scripts/output/sphere-base.json),
+ * nie wspolny wlasciciel. Dlatego stoja we wlasnych grupach, a nota grupy
+ * "Ours" dalej mowi prawde o dziewieciu kontraktach ze wspolnym ownerem.
+ * PRZEWIDZIANY adres tokena SPHERE (0xB2000...2476) celowo NIE jest
+ * wierszem: eth_getCode zwraca 0x, tokena nie ma. Tabela wymienia kod,
+ * nie przepowiednie.
+ *
+ * NIE DOPISUJ TU NICZEGO BEZ URUCHOMIENIA scripts/verifyOnchainInventory.js
+ * (a dla grup Startpad/$SPHERE: bez wlasnego odczytu z lancucha jak wyzej).
  */
 type ContractRow = {
   what: string;
@@ -147,7 +175,7 @@ const CONTRACT_GROUPS: { title: string; note: string; rows: ContractRow[] }[] = 
         what: 'Ask escrow',
         chain: 'Base',
         address: '0xD5f65Cfbe6A1AA1B6f82CBE0A336DDFCD39a5340',
-        line: 'Holds the USDC budget for an Ask until the author accepts answers. Source is verified — you can read it before you write a word. It is holding nothing today: no transaction has touched it since it was deployed, and the explorer under this link will tell you that before we do.',
+        line: 'Holds the USDC budget for an Ask until the author accepts answers. Source is verified: you can read it before you write a word. It has been funded for real, from this app, on mainnet, after months of sitting empty with this row saying so.',
         explorer: 'https://basescan.org/address/0xD5f65Cfbe6A1AA1B6f82CBE0A336DDFCD39a5340#code',
       },
       {
@@ -216,7 +244,96 @@ const CONTRACT_GROUPS: { title: string; note: string; rows: ContractRow[] }[] = 
     ],
   },
   {
-    title: 'Not ours — but money moves through them',
+    title: 'Startpad: ours, with no owner at all',
+    note: 'Also written in this repository and deployed by us, but the shared-owner proof above cannot apply here: these contracts have no owner by design, so no address, ours included, can change a number in them. Each was read off its chain on 1 September 2026. On Base the fee numbers and recipients were read back and matched the deploy records; on Robinhood Chain we confirmed the code is there and claim no more than that.',
+    rows: [
+      {
+        what: 'Startpad curve',
+        chain: 'Base',
+        address: '0xCF541A7EcE881945833ff1680dFc067C5Dd4cE2D',
+        line: 'Runs every Startpad launch and every curve trade on Base: a 1% trading fee, up to 70% of it to the creator, both immutable. It holds the ETH of every curve that has not closed yet.',
+        explorer: 'https://basescan.org/address/0xCF541A7EcE881945833ff1680dFc067C5Dd4cE2D',
+      },
+      {
+        what: 'Liquidity vault',
+        chain: 'Base',
+        address: '0x6108aDCb176D2A4A6283A06bb0Dd468b86A6AB63',
+        line: 'Will hold the locked LP position of every graduated token forever; only the fees it earns can ever leave. No token has graduated on Base yet, so it holds nothing today.',
+        explorer: 'https://basescan.org/address/0x6108aDCb176D2A4A6283A06bb0Dd468b86A6AB63',
+      },
+      {
+        what: 'Launch hook',
+        chain: 'Base',
+        address: '0x71028Ea6999e2c415b46cc022ED0A9fDca2e2044',
+        line: 'The Uniswap v4 hook that takes the 1% fee on every pool swap after graduation. With no graduation on Base yet, it has never collected one.',
+        explorer: 'https://basescan.org/address/0x71028Ea6999e2c415b46cc022ED0A9fDca2e2044',
+      },
+      {
+        what: 'Token factory',
+        chain: 'Base',
+        address: '0xEC7db55Bc081289820097703B3A66003092844D1',
+        line: 'Deploys the token itself, at a vanity address starting with 0xB2, inside the same transaction as the launch.',
+        explorer: 'https://basescan.org/address/0xEC7db55Bc081289820097703B3A66003092844D1',
+      },
+      {
+        what: 'Startpad curve',
+        chain: 'Robinhood',
+        address: '0x712E93401b455d226284BbA873cE13CC1492B22f',
+        line: 'The same launchpad on Robinhood Chain. Tokens there are plain ERC-20s; the vanity address is a Base-only feature.',
+        explorer: 'https://robinhoodchain.blockscout.com/address/0x712E93401b455d226284BbA873cE13CC1492B22f',
+      },
+      {
+        what: 'Liquidity vault',
+        chain: 'Robinhood',
+        address: '0xbeC6D16d93fbD3B5237A1456A4F1434bb3e69913',
+        line: 'Will hold the locked LP of graduated tokens on Robinhood Chain forever. Nothing has graduated there, so it holds nothing today.',
+        explorer: 'https://robinhoodchain.blockscout.com/address/0xbeC6D16d93fbD3B5237A1456A4F1434bb3e69913',
+      },
+      {
+        what: 'Launch hook',
+        chain: 'Robinhood',
+        address: '0x177be4EF50d92d7B7bf381e078F7c333De5B6044',
+        line: 'The pool-fee hook on Robinhood Chain: the same role as its Base twin, and just as uncalled until a token graduates.',
+        explorer: 'https://robinhoodchain.blockscout.com/address/0x177be4EF50d92d7B7bf381e078F7c333De5B6044',
+      },
+      {
+        what: 'Token factory',
+        chain: 'Robinhood',
+        address: '0x91ca4f9C7eAA8A1C3775A2d1213a6F379f13a65A',
+        line: 'Deploys the plain ERC-20 tokens that Startpad launches on Robinhood Chain.',
+        explorer: 'https://robinhoodchain.blockscout.com/address/0x91ca4f9C7eAA8A1C3775A2d1213a6F379f13a65A',
+      },
+    ],
+  },
+  {
+    title: '$SPHERE: deployed around a token that does not exist yet',
+    note: 'Three contracts on Base mainnet, source-verified, none with an owner, all waiting on a launch nobody has dated. The token itself is not in this table on purpose: its future address is known in advance, and there is no code at that address today. This table lists code the chain confirms, not predictions.',
+    rows: [
+      {
+        what: '$SPHERE rewards hub',
+        chain: 'Base',
+        address: '0x9030e53E7AC1bc81Cf28b196BA336E5544ce4A47',
+        line: 'Receives ETH and lets one fixed consumer pull it; it can do nothing else. It has never been pulled from and holds nothing today.',
+        explorer: 'https://basescan.org/address/0x9030e53E7AC1bc81Cf28b196BA336E5544ce4A47',
+      },
+      {
+        what: '$SPHERE vesting',
+        chain: 'Base',
+        address: '0xB5dE95224F2bEDee2e7Ca7170F5B6a02641255AD',
+        line: 'Releases whatever SPHERE it is sent to one fixed beneficiary on a schedule baked into the contract: the clock starts about 7 September 2026, a 30-day cliff, then a linear year. It holds nothing, because the token it would hold has not been launched.',
+        explorer: 'https://basescan.org/address/0xB5dE95224F2bEDee2e7Ca7170F5B6a02641255AD',
+      },
+      {
+        what: '$SPHERE creator escrow',
+        chain: 'Base',
+        address: '0xe984986f4F1E067f697b548D5fe942813d03Da37',
+        line: 'The contract that will itself launch the SPHERE token and be its creator forever. It can only split incoming ETH half and half between two fixed targets and forward tokens to the vesting contract. The launch call has not happened, and the fee streams it exists to collect cannot start before the token does.',
+        explorer: 'https://basescan.org/address/0xe984986f4F1E067f697b548D5fe942813d03Da37',
+      },
+    ],
+  },
+  {
+    title: 'Not ours, but money moves through them',
     note: 'Tokens and one name resolver. We did not write these and we cannot change them; they are listed because your money passes through them.',
     rows: [
       {
@@ -230,7 +347,7 @@ const CONTRACT_GROUPS: { title: string; note: string; rows: ContractRow[] }[] = 
         what: 'USDG',
         chain: 'Robinhood',
         address: '0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168',
-        line: 'Global Dollar. This is what an agent actually pays in when it posts an Ask — one such payment has settled, for a cent. Robinhood Chain has no canonical USDC, and of the stablecoins there this is the only one that supports signed transfers, so it is the only one a machine can pay with while holding no gas.',
+        line: 'Global Dollar. This is what an agent pays in when it posts an Ask. One such payment has settled, for a cent. Robinhood Chain has no canonical USDC, and of the stablecoins there this is the only one that supports signed transfers, so it is the only one a machine can pay with while holding no gas.',
         explorer: 'https://robinhoodchain.blockscout.com/address/0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168',
       },
       {
@@ -425,7 +542,7 @@ function AskCard() {
         <a href="/asks" className="underline decoration-soft-line-strong underline-offset-2">
           /asks
         </a>{' '}
-        and open ones now show up in the feed — but not here.
+        and open ones now show up in the feed, but not here.
       </p>
     </figure>
   );
@@ -537,14 +654,30 @@ function AskCard() {
  * ze rynek dziala: nigdy.
  *
  * === STARTPAD WSZEDL DO TABELI JAKO DWA WIERSZE, NIE JEDEN ===
- * Modul jest nowy i dziala, ale na Base Sepolia - tam ETH nie jest pieniadzem.
- * Jeden wiersz `live` mowilby "dziala" i przemilczal, ze zaden prawdziwy grosz
- * przez to nie przeszedl; jeden wiersz `planned` przemilczalby, ze pelna
- * sciezka od startu po buyback i wyplaty zostala przejechana na lancuchu.
- * Sa wiec dwa: co stoi na testnecie i co stoi miedzy testnetem a prawdziwymi
- * pieniedzmi (audyt zewnetrzny - bo kontrakty nie maja wlasciciela ani pauzy
- * i bledu nie daloby sie cofnac). Zrodla prawdy: docs/LAUNCHPAD-DOSSIER.md
- * i docs/LAUNCHPAD-STAN.md, oba aktualizowane przy kazdej zmianie launchpada.
+ * Pierwotnie linia podzialu byla "testnet vs prawdziwe pieniadze", bo modul
+ * stal tylko na Base Sepolia. Od 11 sierpnia stoi na mainnecie Base, a potem
+ * do przelacznika sieci weszly Robinhood Chain (prawdziwe pieniadze) i Arc
+ * (testnet). Dwa wiersze zostaja, ale mowia co innego: pierwszy CO dziala
+ * i na jakich sieciach, drugi czym "dziala" rozni sie od "sprawdzone"
+ * (audyt zewnetrzny odlozony decyzja wlasciciela; kontrakty nie maja
+ * wlasciciela ani pauzy, wiec bledu nie daloby sie cofnac). Skan eth_getLogs
+ * z 2026-09-01 (pelny zakres od bloku wdrozenia, zero okien padnietych)
+ * potwierdzil: na mainnecie Base sa starty, ale ZERO zdarzen Graduated.
+ * Prog krzywej jest PER-SIEC (3.00 ETH tylko na Base; Arc liczy w USDC),
+ * wiec zadne zdanie nie ma prawa podawac trojki jako uniwersalnej stalej.
+ * Zrodla prawdy: docs/LAUNCHPAD-DOSSIER.md i docs/LAUNCHPAD-STAN.md.
+ *
+ * === $SPHERE: DWA WIERSZE, BO PRAWDA MA DWIE POLOWY ===
+ * Kontrakty (rewards, vesting, escrow tworcy) stoja na mainnecie Base od
+ * 2026-08-31, sa zweryfikowane zrodlowo i hub /startpad/sphere czyta je na
+ * zywo - to jest `live`. Sam token NIE istnieje: pod przewidzianym adresem
+ * getCode zwraca 0x i zadna data startu nie jest ustalona - to jest
+ * `planned`. Jeden wiersz `live` klamalby w gore, jeden `planned` w dol.
+ *
+ * === LICZBY 187 / 184 064 SA DATOWANE, BO NIKT ICH NIE ODSWIEZA ===
+ * Nota i tresc podaja przy nich date (polowa sierpnia 2026, ostatnie zlozenie
+ * strony). Liczba bez daty na stronie o stanie to obietnica, ze ktos ja
+ * odswieza - a nikt tego nie robi.
  *
  * NIE DOPISUJ TU WIERSZA, DOPOKI NIE ZOBACZYSZ GO W KODZIE. Ta tabela jest
  * jedynym miejscem na stronie, gdzie klamstwo nie ma sie gdzie schowac.
@@ -597,7 +730,7 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
   {
     name: 'The money timeline',
     status: 'live',
-    note: 'A public feed of payments between people, carrying names and avatars rather than bare addresses. 187 settled payments deep, every line with a transaction you can open. Read what they are before you read them as traction: all 187 are tips — a like with a price on it — across 184,064 accounts, so one account in a thousand has ever sent one. Nobody has yet been paid here for work they were asked to do.',
+    note: 'A public feed of payments between people, carrying names and avatars rather than bare addresses, every line with a transaction you can open. Read the numbers as what they are before you read them as traction: when this page was last put together, in mid-August 2026, the timeline was 187 payments deep, all of them tips (a like with a price on it) across 184,064 accounts. One account in a thousand had ever sent one, and not one line was payment for work somebody asked for.',
   },
   {
     name: 'Your money, in one place',
@@ -607,12 +740,12 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
   {
     name: 'Paid sections',
     status: 'live',
-    note: 'Text sold per post. The text itself lives in a collection the browser is refused outright — it is not in the feed response, not in the page source, not anywhere a reader could dig for it. A server route hands it over after checking a signed session and a paid unlock. Until this week it sat in the post document in plain text; treat any older claim about it as wrong.',
+    note: 'Text sold per post. The text itself lives in a collection the browser is refused outright: it is not in the feed response, not in the page source, not anywhere a reader could dig for it. A server route hands it over after checking a signed session and a paid unlock. Until mid-August 2026 it sat in the post document in plain text; treat any older claim about it as wrong.',
   },
   {
     name: 'A page that says what you can do today',
     status: 'live',
-    note: '/how is a numbered list of steps, each with its price on the front: what it costs, what you sign, where the receipt ends up. Nothing on it is in the future tense — a thing you cannot do today is not allowed on that page in any form, not even as a promise. That is the division of labour between the two pages: /how is the instruction, this one is the state, and everything unbuilt lives here.',
+    note: '/how is a numbered list of steps, each with its price on the front. Nothing on it is in the future tense. A thing you cannot do today is not allowed on that page in any form, not even as a promise. That is the division of labour between the two pages: /how is the instruction, this one is the state, and everything unbuilt lives here.',
   },
   {
     name: 'Rules and indexes, deployed rather than described',
@@ -622,7 +755,7 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
   {
     name: 'A read the product cannot be taken down by',
     status: 'planned',
-    note: 'The nearest missing thing away from the money rails. A counting script walked 33,000 posts and used up the whole day of reads, and for hours after that the product could not answer an Ask or hand over paid text — the two things it charges for. The script now stops at a ceiling and refuses to write a partial total. Nothing does that for the product itself: a page that starts reading too much has nothing above it to say no.',
+    note: 'The nearest missing thing away from the money rails. A counting script walked 33,000 posts and used up the whole day of reads, and for hours after that the product could not answer an Ask or hand over paid text, the two things it charges for. The script now stops at a ceiling and refuses to write a partial total. Nothing does that for the product itself: a page that starts reading too much has nothing above it to say no.',
   },
   {
     name: 'An invite link that arrives somewhere',
@@ -637,32 +770,32 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
   {
     name: 'x402: an agent pays for an Ask',
     status: 'live',
-    note: 'A payout address is set and enforcement is on: POST /api/asks answers 402, takes a signed authorization and writes the Ask. One real payment has settled this way — 0.01 USDG on Robinhood Chain, the payer signing only and paying no gas. One payment between two of our own addresses is proof the path works, not evidence of traffic.',
+    note: 'A payout address is set and enforcement is on: POST /api/asks answers 402, takes a signed authorization and writes the Ask. The first real payment settled this way: 0.01 USDG on Robinhood Chain, the payer signing only and paying no gas. A payment between two of our own addresses is proof the path works, not evidence of traffic.',
   },
   {
     name: 'x402 on Base, in USDC',
     status: 'live',
-    note: 'The 402 answer now carries both rails at once and the payer picks: USDC on Base, or USDG on Robinhood Chain. Both have settled real money — a cent each way, gas paid by the facilitator rather than the payer. One quirk worth knowing if you build against this: the Coinbase facilitator refuses a payment to yourself, so the Base rail cannot be tested by paying your own address. The Robinhood one allows it.',
+    note: 'The 402 answer now carries both rails at once and the payer picks: USDC on Base, or USDG on Robinhood Chain. Both have settled real money: a cent each way, gas paid by the facilitator rather than the payer. One quirk worth knowing if you build against this: the Coinbase facilitator refuses a payment to yourself, so the Base rail cannot be tested by paying your own address. The Robinhood one allows it.',
   },
   {
     name: 'Ask: post and answer',
     status: 'live',
-    note: 'Budget, seats, deadline, resolve rate. Answer text goes to a collection the browser is refused outright and comes back only through a server route, so the seal is a rule and not a curtain. The author accepts and resolves from /asks.',
+    note: 'Budget, seats, deadline, resolve rate. Answer text goes to a collection the browser is refused outright and comes back only through a server route, so the seal is enforced by the database itself. The author accepts and resolves from /asks.',
   },
   {
     name: 'Ask: escrow',
     status: 'live',
-    note: 'AskEscrow on Base, 0xD5f65Cfbe6A1AA1B6f82CBE0A336DDFCD39a5340, source-verified, no owner. Approve, fund, wait for the receipt — only then does the Ask document get written. Resolving is one transaction, collecting is a claim. Whoever is thinking of answering reads the locked amount off the chain first, and that reading is now worth something: the contract has been funded from this app on mainnet and holds a real budget against a real deadline. It went for months holding nothing, and this row said so.',
+    note: 'AskEscrow on Base, 0xD5f65Cfbe6A1AA1B6f82CBE0A336DDFCD39a5340, source-verified, no owner. Approve, fund, wait for the receipt. Only then is the Ask document written. Resolving is one transaction, collecting is a claim. Whoever is thinking of answering reads the locked amount off the chain first, and that reading is now worth something: the contract has been funded from this app on mainnet, a real budget against a real deadline. It went for months holding nothing, and this row said so.',
   },
   {
     name: 'Ask: escrow from a browser, on mainnet',
     status: 'live',
-    note: 'Somebody went first. A budget was approved and locked from this app, on Base mainnet, in two transactions from a browser wallet, and the contract now answers for that ask with a funded escrow, a per-answer amount and a deadline. Two things were learned in the process and both are fixed. A wallet warns you that the contract is untrusted, because it is new and has no history to judge it by, and it asks to spend the exact budget rather than an open-ended allowance. And the first attempt failed: the second transaction went out before the first had been mined.',
+    note: 'Somebody went first. A budget was approved and locked from this app, on Base mainnet, in two transactions from a browser wallet, and the contract answered for that ask with a funded escrow, a per-answer amount and a deadline. Two things were learned in the process and both are fixed. A wallet warns you that the contract is untrusted, because it is new and has no history to judge it by, and it asks to spend the exact budget rather than an open-ended allowance. And the first attempt failed: the second transaction went out before the first had been mined.',
   },
   {
     name: 'Ask: expiry refund in the interface',
     status: 'live',
-    note: '/money shows every budget the contract still holds for you and which stage it is at: running, the 48 hours you have left to accept answers, or expired. Expired ones get a button. It states the 2.5% fee up front and that the money returns as a balance you collect separately — two steps, not one.',
+    note: '/money shows every budget the contract still holds for you and which stage it is at: running, the 48 hours you have left to accept answers, or expired. Expired ones get a button. It states the 2.5% fee up front and that the money returns as a balance you collect separately: two steps, not one.',
   },
   {
     name: 'Ask: a settled Ask that says it is settled',
@@ -677,32 +810,42 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
   {
     name: 'Ask: in the feed',
     status: 'live',
-    note: 'A strip above the posts carries up to four open asks — open, still before the deadline, still with a free seat — read once per five minutes and cached like the posts are, so scrolling the feed costs nothing extra. It is a strip, not a card sitting between two posts: an Ask counts down, and a countdown buried at position thirty-seven is a countdown nobody reaches. No resolve record is shown there — that is a query per author, and the card on /asks carries it.',
+    note: 'A strip above the posts carries up to four open asks (open, still before the deadline, still with a free seat), read once per five minutes and cached like the posts are, so scrolling the feed costs nothing extra. It is a strip, not a card sitting between two posts: an Ask counts down, and a countdown buried at position thirty-seven is a countdown nobody reaches. No resolve record is shown there: that is a query per author, and the card on /asks carries it.',
   },
   {
     name: 'Ask: starting one where you already are',
     status: 'live',
-    note: 'A Post / Ask switch above the box you write posts in. Flip it and the same box becomes the question, the budget, the seats and the deadline — nothing to navigate to. An empty form offers five ready-made starts, and each one fills the question, the budget, the seats and the deadline together, because a blank field does not tell you what you are allowed to ask or what it costs. They vanish the moment you type, so nothing you already set gets overwritten.',
+    note: 'A Post / Ask switch above the box you write posts in. Flip it and the same box becomes the question, the budget, the seats and the deadline, with nothing to navigate to. An empty form offers five ready-made starts, and each one fills in all four together, because a blank field does not tell you what you are allowed to ask or what it costs. They vanish the moment you type, so nothing you already set gets overwritten.',
   },
   {
     name: 'A record of what vault curators changed',
     status: 'live',
-    note: 'Money in a lending vault sits under somebody else’s decisions: they set the fee they take and they can raise it without telling anyone. The curator record, now a tab under Asks, keeps a dated record of exactly that for the vaults Morpho lists on Base: the fee before, the fee after, and who was curating. No score for anybody, no forecast, nothing about your wallet or anyone else’s, and no automatic posts in the feed. It reads one set of parameters a day, so an entry says a change happened between two dates rather than inventing an hour. It records the fee, the curator and whether a vault is listed; it does not read what a vault lends against, and it says so on the page rather than letting an empty list imply nothing happened.',
+    note: 'Money in a lending vault sits under somebody else’s decisions: they set the fee they take and they can raise it without telling anyone. The curator record, now a tab under Asks, keeps a dated record of exactly that for the vaults Morpho lists on Base: the fee before, the fee after, and who was curating. It scores nobody and forecasts nothing, and it never posts in the feed on its own. It reads one set of parameters a day, so an entry says a change happened between two dates rather than inventing an hour. It records the fee, the curator and whether a vault is listed; it does not read what a vault lends against, and it says so on the page rather than letting an empty list imply nothing happened.',
   },
   {
     name: 'Ask: answering without leaving the feed',
     status: 'live',
-    note: 'The button on a feed card opens the answer box in place. You read the question, the amount and the clock, and you write without going anywhere. What stays on /asks is the author side of it: opening the sealed answers and resolving with a payment, which needs a wallet and a signature and sometimes two transactions. The feed does not fetch the thread behind each card, so it does not know whether you have already answered - the server does, and it says so when you send. Past the deadline or with every seat taken the button goes back to being a link, because a form that cannot be submitted is worse than no form.',
+    note: 'The button on a feed card opens the answer box in place. You read the question, the amount and the clock, and you write without going anywhere. What stays on /asks is the author side of it: opening the sealed answers and resolving with a payment, which needs a wallet and a signature and sometimes two transactions. The feed does not fetch the thread behind each card, so it does not know whether you have already answered. The server does, and it says so when you send. Past the deadline or with every seat taken the button goes back to being a link, because a form that cannot be submitted is worse than no form.',
   },
   {
     name: 'Startpad: launch a token',
     status: 'live',
-    note: 'A bonding curve that closes at exactly 3.00 ETH and graduates into a Uniswap v4 pool, fees split up to 70% to the creator and never less than 30% to the protocol; the floor is in the contract, not the form. It is live on Base mainnet with real ETH (the default network) and also on Base Sepolia for testing. The full path (launch, curve close, graduation, pool swaps, buyback and burn, claims) has been run end to end on Base-mainnet forks and a Sepolia mini-stack; on the live mainnet, launch and trading run, but no token has reached graduation yet.',
+    note: 'A bonding curve that closes at a fixed target (exactly 3.00 ETH on Base; each network sets its own) and graduates into a Uniswap v4 pool. The 1% trading fee splits up to 70% to the creator and never less than 30% to the protocol, and the floor is in the contract, not the form. Live with real money on Base mainnet (the default) and on Robinhood Chain, with Base Sepolia and Arc Testnet there for testing. The full path (launch, curve close, graduation, pool swaps, buyback and burn, claims) has run end to end on test networks; on the real-money networks, launches and trading run, but no token has graduated yet.',
   },
   {
     name: 'Startpad on real money',
     status: 'live',
-    note: 'Live on Base mainnet since 11 August 2026. The contracts have no owner, no pause and no upgrade path, so a bug is irreversible and nobody could hand the ETH back. The external audit was deferred by the owner in favor of a harder internal adversarial review and real Base-mainnet fork tests; that raised risk is named here on purpose, not hidden. No token has reached graduation on the live deployment yet.',
+    note: 'Live on Base mainnet since 11 August 2026, and on Robinhood Chain with the same stack and plain ERC-20 tokens. The contracts have no owner and no admin functions, so a bug is irreversible and nobody could hand the ETH back. The external audit was deferred by the owner in favor of a harder internal adversarial review and real Base-mainnet fork tests; that raised risk is named here on purpose. No token has graduated on either real-money network yet; the only full live graduation so far ran on a testnet.',
+  },
+  {
+    name: '$SPHERE: the contracts, deployed',
+    status: 'live',
+    note: 'Three contracts stand on Base mainnet since 31 August 2026, source-verified and listed in the table below: a rewards hub that can only receive ETH and let one fixed consumer pull it, a vesting lock with its schedule set in stone, and the escrow that will itself launch the token and be its creator forever. They collect nothing yet: every stream they exist to receive starts at the launch. /startpad/sphere reads each of them live off the chain.',
+  },
+  {
+    name: '$SPHERE: the token',
+    status: 'planned',
+    note: 'Not launched, not tradable, no launch date decided. The address it will live at is known in advance because the escrow bakes it in, and there is no code at that address today: check that before believing anyone who says otherwise. The vesting clock is already set (it starts around 7 September 2026, with a 30-day cliff and a linear year after that), but a schedule for a token that does not exist pays out nothing.',
   },
 ];
 
@@ -749,14 +892,12 @@ export default function ReDefinitionPage() {
             {/* PIGULKA JEST OPISEM PLATNOSCI, NIE LISTA FILAROW - I DLATEGO
                 MUSIALA SIE ZMIENIC.
                 Stalo "Base · USDC · x402". Trzy slowa w jednym rzedzie czyta
-                sie jako jedno zdanie: "x402 na Base w USDC". To jest dokladnie
-                ta platnosc, ktora NIE ISTNIEJE - galaz w kodzie jest, nie
-                przeszedl przez nia ani jeden cent. Prawdziwe sa dwie inne:
-                budzet w USDC na Base (escrow) i x402 w USDG na Robinhoodzie.
-                Rozwazalem zostawienie tego jako listy filarow, ale filar
-                "USDC" nie jest filarem - to nazwa tokena, wiec czytelnik i tak
-                przeczyta te linijke jako rachunek. Skoro ma byc rachunkiem,
-                ma byc pelnym rachunkiem.
+                sie jako jedno zdanie: "x402 na Base w USDC". W chwili pisania
+                ta platnosc nie istniala i pigulka zostala rozbita na pelny
+                rachunek. AKTUALIZACJA 2026-09-01: od commita 97b4706 obie
+                nogi x402 sa udowodnione ruchem pieniedzy (USDC na Base
+                i USDG na Robinhoodzie, po cencie), wiec rachunek jest dzis
+                prawdziwy w kazdym czlonie i zostaje bez zmian.
                 `flex-wrap`, bo trzy czlony nie mieszcza sie w jednej linii na
                 telefonie, a bez tego tekst lamal by sie w srodku span-a. */}
             <p className="mb-6 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-soft-ink-faint">
@@ -833,20 +974,31 @@ export default function ReDefinitionPage() {
                 dowodu, ze rynek dziala, bo rynek to zaplata za robote na
                 zamowienie, a takich przejsc jest zero. Fosa tego produktu
                 lezy w kodzie: escrow bez wlasciciela, zapieczetowane
-                odpowiedzi i wskaznik rozstrzygalnosci - nie w tej liczbie. */}
+                odpowiedzi i wskaznik rozstrzygalnosci - nie w tej liczbie.
+
+                === AKTUALIZACJA 2026-09-01 ===
+                Trzy pozycje z "Being built" (escrow z przegladarki, odpowiedz
+                z feedu, x402 na Base w USDC) sa od polowy sierpnia `live`
+                w tabeli nizej, wiec kolumna klamala w dol. Zgodnie z zasada
+                wyzej puste miejsce sie nie pojawia: weszly sufit odczytow
+                (wiersz `planned`) i token $SPHERE (kontrakty stoja na
+                mainnecie, tokena nie ma). Wzmianka o escrow "zero zdarzen,
+                balans zero" wyzej opisuje stan z dnia pisania - od tamtej
+                pory budzet zostal zablokowany z aplikacji na mainnecie
+                (commity 2bc5781, 1bd728b) i tresci strony to podaja. */}
             <dl className="mt-9 grid gap-y-4 border-t border-soft-line/70 pt-6 sm:grid-cols-3 sm:gap-x-6">
               {[
                 {
                   t: 'Runs today',
-                  d: 'Post onchain. Tip in USDC. Ask a question with a budget and pay for the answers you accept — somebody already has. /money adds up what you are owed and hands you the button.',
+                  d: 'Post onchain. Tip in USDC. Ask a question with a budget, lock it in escrow, and pay for the answers you accept. Somebody already has. /money adds up what you are owed and hands you the button.',
                 },
                 {
                   t: 'Being built',
-                  d: 'Locking a budget in escrow from the browser. Answering without leaving the feed. Paying in USDC on Base when the buyer is software.',
+                  d: 'A read ceiling above the product itself, so one hungry page cannot take the paid paths down. And the $SPHERE token: its contracts stand on Base mainnet, the token itself is not launched.',
                 },
                 {
                   t: 'Direction',
-                  d: 'Enough of this happening between strangers to call it a market. One payment is a working path. It is not yet a market.',
+                  d: 'Enough of this happening between strangers to call it a market. A handful of first payments is a working path, not yet a market.',
                 },
               ].map((item) => (
                 <div key={item.t}>
@@ -888,7 +1040,7 @@ export default function ReDefinitionPage() {
             The agent economy landed in the same ditch from the other side. There are{' '}
             <Hi>more than 230 platforms</Hi> where an AI agent can supposedly be hired. Across the
             ones that publish numbers, real payouts total in the{' '}
-            <Hi>low hundreds of dollars</Hi> — one of the largest reports 283 completed tasks in its
+            <Hi>low hundreds of dollars</Hi>: one of the largest reports 283 completed tasks in its
             entire history. Where there is a crowd, there is no money. Where there is money, there
             is no crowd.
           </P>
@@ -902,12 +1054,12 @@ export default function ReDefinitionPage() {
         <section id="ask" className="scroll-mt-8 py-16">
           <Marker amount="$2.00" label="one seat, one answer" />
           <H2>The unit is not a post. It is an Ask.</H2>
-          <State tone="live">Runs on /asks — open ones also show in the feed</State>
+          <State tone="live">Runs on /asks. Open ones also show in the feed</State>
           <P>
             An Ask is a question with a budget, a number of seats and a deadline. You set all three
             and it appears as a card that counts down. It runs on its own page, and open ones now
-            sit in a strip above the feed — you can see one where you already are, though taking a
-            seat still means opening /asks.
+            sit in a strip above the feed, where you can read one and answer it without going
+            anywhere.
           </P>
           <P>
             Answers stay <Hi>sealed until you resolve</Hi>. Nobody can read what anyone else wrote,
@@ -917,22 +1069,22 @@ export default function ReDefinitionPage() {
           </P>
           <P>
             The sealing is not a curtain in the interface. Answer text does not sit inside the Ask.
-            It goes to <Hi>its own collection the app is forbidden to read</Hi> — the rule is
-            literally <code className="rounded bg-soft-sunken px-1.5 py-0.5 text-[13px] text-soft-ink">if false</code> — and only a server route hands it
+            It goes to <Hi>its own collection the app is forbidden to read</Hi> (the rule is
+            literally <code className="rounded bg-soft-sunken px-1.5 py-0.5 text-[13px] text-soft-ink">if false</code>), and only a server route hands it
             back, to the people allowed to have it. Hiding text in the interface would not be
             sealing it: while it sits in a document the feed reads, it is already in the network
             response and every reader has it. Paid sections now work exactly this way too; the Ask
             and the paywall share one piece of plumbing rather than each inventing its own.
           </P>
           <P>
-            That is worth one more sentence, because until this week it was not true. The{' '}
+            Until mid-August 2026 that was not true. The{' '}
             <code className="rounded bg-soft-sunken px-1.5 py-0.5 text-[13px] text-soft-ink">if false</code>{' '}
             sat there, but a catch-all rule underneath it granted every document in the database to
-            everybody — and in this database, permission is granted if <em>any</em> rule allows it.
+            everybody. In this database, permission is granted if <em>any</em> rule allows it.
             So the seal was written down and not enforced, and the paid text was sitting in the post
             document in the clear. Both are closed now, and we checked by trying: those two
             collections refuse to be read, and the twelve that should still open still open.{' '}
-            <Hi>If you read this page a week ago, it told you something that was not true.</Hi>
+            <Hi>If you read this page before that fix, it told you something that was not true.</Hi>
           </P>
           <P>
             Funding an Ask once, up front, used to be the one promise on this page with no contract
@@ -948,38 +1100,39 @@ export default function ReDefinitionPage() {
               </code>
             </a>{' '}
             with its source verified, so you can read what it does instead of taking this page's
-            word for it. It has no owner, no pause, no upgrade path and no rescue function — which
+            word for it. It has no owner, no pause, no upgrade path and no rescue function, which
             also means nobody, including us, can hand your money back to you by hand.
           </P>
           <P>
             Choosing escrow takes the budget out of your wallet <Hi>before the Ask exists</Hi>: if
             the transfer does not land, the Ask is never posted. Anyone thinking about answering can
             read the locked amount straight off the contract. It is a choice, not a property of
-            every Ask — the older way, paying out of pocket when you accept, still exists and locks
+            every Ask: the older way, paying out of pocket when you accept, still exists and locks
             nothing, so each card says which one it is.
           </P>
           <P>
-            One sentence before you read any of that as a running market. <Hi>Nobody has gone
-            through this contract yet.</Hi> Ask it for every event it has emitted since the block it
-            was deployed in and it returns none; its balance is zero. What exists is a finished
-            contract and a finished path to it, checkable by anyone, carrying nobody&apos;s money.
-            That is a smaller claim than the one this section could make, and it is the true one.
+            Read this before you take any of that as a running market. <Hi>Somebody has gone
+            through this contract for real.</Hi> A budget was approved and locked on Base mainnet,
+            from a browser wallet in this app, against a real deadline. For months before that the
+            contract sat empty and this page said so. A first funding proves the path, not the
+            market, and that is a smaller claim than the one this section could make. It is the
+            true one.
           </P>
           <P>
             The fee is <Hi>2.5%</Hi>, and it is charged only on money going <em>back</em> to the
-            author — never on a payout to someone who answered. Close before the deadline and you
+            author, never on a payout to someone who answered. Close before the deadline and you
             must fill every seat, so nothing returns and nothing is charged. After the deadline you
             can take some seats and leave others; whatever comes back to you is minus the fee. Let
             the deadline pass entirely and the whole budget returns to you the same way, minus the
-            same fee — and your <Hi>resolve rate</Hi> drops in public, on the front of every Ask you
+            same fee, and your <Hi>resolve rate</Hi> drops in public, on the front of every Ask you
             post afterwards. Taking money out of the feed costs you the same way putting bad answers
             in does.
           </P>
           <P>
             Two things about that last path are not finished, and this page will not round them up.
             The expiry refund has a button on /money, but{' '}
-            <Hi>no expired Ask has ever gone through it</Hi> — it needs 48 hours to have passed, and
-            nothing on a live network lets you skip them. And money does not arrive on its own:
+            <Hi>it is the least-travelled leg of the contract</Hi>: it needs 48 hours to have
+            passed, and nothing on a live network lets you skip them. And money does not arrive on its own:
             resolving credits each winner a balance they then collect, and the refund credits the
             author the same way. &quot;Paid&quot; means the contract owes it irreversibly, not that
             it has landed in a wallet.
@@ -991,9 +1144,10 @@ export default function ReDefinitionPage() {
             </Link>{' '}
             answers the four questions this product used to leave scattered across four screens:
             what the escrow owes you, what your own open Asks are holding, what people paid you and
-            for what, and what you spent — with the button that collects the first of those. What it
-            still does not do is <Hi>come and find you</Hi>: nothing notifies a winner, so the money
-            waits until someone thinks to look.
+            for what, and what you spent, with the button that collects the first of those. The
+            money also no longer waits for you to think of looking: resolving sends each winner a
+            notification that says whether the contract is holding it or it is already in the
+            wallet. Collecting is still a claim you send yourself.
           </P>
         </section>
 
@@ -1002,41 +1156,42 @@ export default function ReDefinitionPage() {
           <Marker amount="402" label="payment required" />
           <H2>The buyer does not have to be human</H2>
           <State tone="live">
-            Running — one real payment has settled through it, and that is exactly one
+            Running. Both rails have settled one real payment each
           </State>
           <P>
             An agent has no browser, no wallet popup and no account. What it does have is money and
             a standard for spending it. That standard is x402: the resource answers a request with{' '}
             <Hi>402 Payment Required</Hi> and its price, the agent signs a transfer authorization
-            inside whatever spending cap its owner set, and retries. No sign-up, no API key, no
-            invoice. The agent never touches a chain itself — it signs, and the facilitator sends
-            the transaction, so the paying wallet needs no gas at all.
+            inside whatever spending cap its owner set, and retries. No sign-up and no API key; the
+            402 answer is the whole interface. The agent never touches a chain itself: it signs,
+            and the facilitator sends the transaction, so the paying wallet needs no gas at all.
           </P>
           <P>
-            So an agent can post an Ask the same way you can — <code className="rounded bg-soft-sunken px-1.5 py-0.5 text-[13px] text-soft-ink">GET /api/asks</code> to see
+            So an agent can post an Ask the same way you can: <code className="rounded bg-soft-sunken px-1.5 py-0.5 text-[13px] text-soft-ink">GET /api/asks</code> to see
             the price, sign, then <code className="rounded bg-soft-sunken px-1.5 py-0.5 text-[13px] text-soft-ink">POST</code> the question. Your answer
             comes back to it as JSON when you deliver it.
           </P>
           <P>
-            That has now happened once, for real money: <Hi>0.01 USDG on Robinhood Chain</Hi>. The
-            endpoint refused the unpaid request with a 402 and its price, took the signed
+            That has now happened for real money, once on each rail: first{' '}
+            <Hi>0.01 USDG on Robinhood Chain</Hi>, then a cent of USDC on Base. On the first of
+            them, the endpoint refused the unpaid request with a 402 and its price, took the signed
             authorization on the retry, and wrote the Ask. The payer&apos;s balance fell by ten
             thousand units and ours rose by the same ten thousand, in a transaction the payer never
             sent and never paid gas for.
           </P>
           <P>
-            Now the part a launch post would leave out. That was <Hi>one payment, of one cent,
-            between two addresses we both own</Hi>. It settles on Robinhood Chain rather than Base
-            because Robinhood Chain has no canonical USDC and USDG is the only stablecoin there that
-            can be paid by signature — that is the only reason, not a preference. And the
-            facilitator&apos;s signing key on that chain had nineteen transactions in its whole
-            history when we checked, against roughly sixty-eight top-ups keeping it in gas. The
-            path works. It is not worn in, and this page is not going to tell you it is.
+            Now the part a launch post would leave out. Those were <Hi>two payments of one cent
+            each, between addresses we own on both ends</Hi>. The Robinhood leg settles in USDG
+            only because that chain has no canonical USDC and USDG is the only stablecoin there
+            that can be paid by signature. And the facilitator&apos;s signing key on that chain had
+            nineteen transactions in its whole history when we checked, against roughly sixty-eight
+            top-ups keeping it in gas. The path works on both rails. It is not worn in, and this
+            page is not going to tell you it is.
           </P>
           <P>
             Every marketplace in this space sells machine work to humans. This one sells{' '}
             <Hi>human judgment to machines</Hi>. That shelf is empty, and it is the one thing a
-            model genuinely cannot do for itself.
+            model cannot do for itself.
           </P>
         </section>
 
@@ -1045,7 +1200,7 @@ export default function ReDefinitionPage() {
           <Marker amount="$340" label="the only score that costs money" />
           <H2>Reputation you cannot buy, because it is not for sale</H2>
           <State tone="direction">
-            Direction — resolve rate is in the model, the rest is not built
+            Direction: resolve rate is in the model, the rest is not built
           </State>
           <P>
             Both sides carry the same object. As an answerer:{' '}
@@ -1070,7 +1225,7 @@ export default function ReDefinitionPage() {
           <Marker amount="/u/" label="one page, two readers" />
           <H2>A profile that is a CV and a receipt at once</H2>
           <State tone="direction">
-            Page is live and counts tips — the answer figures below need Asks first
+            Page is live and counts tips. The answer figures below need Asks first
           </State>
           <P>
             One public page per address, readable by a person and by a crawler:{' '}
@@ -1084,45 +1239,46 @@ export default function ReDefinitionPage() {
         <section className="py-16">
           <Marker amount="0x…" label="the part that travels" />
           <H2>A receipt spreads. A screenshot does not.</H2>
-          <State tone="live">Running today — every line below is checkable onchain</State>
+          <State tone="live">Running today. Every line below is checkable onchain</State>
           <P>
             Every tip already has its own page and its own share card: the amount, both names,
             the transaction. Paste it anywhere and the preview shows the number before anyone
-            clicks. <Hi>Nothing on it is self-reported</Hi> — open the explorer and check it
+            clicks. <Hi>Every number on it can be checked</Hi>: open the explorer and hold it
             against the chain.
           </P>
           <P>
             This is not decoration. Through 2026, the thing that actually moved crypto links
-            was the preview that carried a live number — prediction markets grew on link cards
+            was the preview that carried a live number: prediction markets grew on link cards
             showing real-time odds, not on their content. Meanwhile the platform experiment in
             onchain social went the other way: <Hi>Base shut down its own social feed and
             creator rewards in February 2026</Hi> and moved to trading, payments and agents.
           </P>
           <P>
             So we are not building another feed. We are building objects that carry a
-            verifiable amount and travel on their own — a receipt today, an Ask next.
+            verifiable amount and travel on their own: a receipt today, an Ask next.
           </P>
           <P>
             The first of them is already live: <Hi>a public timeline of payments between people</Hi>.
-            Not a leaderboard of points, not a wall of likes — the money itself, in the order it
-            landed, every line carrying a transaction you can open and check against the chain, and
-            names and faces on both ends of it rather than two truncated addresses. Every social
-            product has a feed of what people said. None has a feed of what people paid each other.
+            The money itself, in the order it landed, every line carrying a transaction you can
+            open and check against the chain, with names and faces on both ends rather than two
+            truncated addresses. Every social product has a feed of what people said. None has a
+            feed of what people paid each other.
           </P>
           <P>
-            And now the size of it, because a page that hides this has no business asking you to
-            trust the rest. That timeline is <Hi>187 payments deep</Hi>, all of them tips, spread
-            across 184,064 accounts — one account in a thousand has ever sent one. A tip is a like
-            with a price on it, which is strictly more than a like and still not somebody buying an
-            answer. Not one of those 187 was payment for work somebody asked for. So read the number
-            as what it is: proof the rail carries money, not proof that a market has started here.
+            The size of it, since a page that hides this has no business asking you to trust the
+            rest. When this page was last put together, in mid-August 2026, that timeline was{' '}
+            <Hi>187 payments deep</Hi>, all of them tips, spread across 184,064 accounts, and one
+            account in a thousand had ever sent one. A tip is a like with a price on it, which is
+            strictly more than a like and still not somebody buying an answer. Not one of those 187
+            was payment for work somebody asked for. So read the number as what it is: proof the
+            rail carries money, not proof that a market has started here.
           </P>
           <P>
             The thing that would be hard to copy is not that number either. It is the part written
-            in code and given away: <Hi>an escrow with no owner</Hi>, so nobody — us included — can
+            in code and given away: <Hi>an escrow with no owner</Hi>, so nobody, us included, can
             reach into it; answers sealed by a database rule rather than by an interface; and a
             resolve rate an author cannot raise without paying somebody. Those exist whether or not
-            anyone has used them yet, and the row above is honest that nobody has.
+            anyone uses them, and the rows above are honest about how thin the traffic is.
           </P>
           {/* Timeline platnosci mieszka teraz w /money, w zakladce Paid -
               /leaderboard jest scalany z ta strona i ten link nie ma prawa
@@ -1154,20 +1310,19 @@ export default function ReDefinitionPage() {
         <section className="py-16">
           <Marker amount="Δ" label="the change nobody announces" />
           <H2>Somebody can change the terms of your vault overnight</H2>
-          <State tone="live">Running — the record collects one reading a day</State>
+          <State tone="live">Running. The record collects one reading a day</State>
           <P>
             Money parked in a lending vault sits under somebody else&apos;s decisions. That person
             sets the fee they take and decides what the vault lends against, and they can change
             either one without telling anybody. The numbers are public the whole time. What is
-            missing is <Hi>anyone writing down what they used to be</Hi> — so &ldquo;this used to
-            charge 5%&rdquo; is a memory, not a fact, and memories are not what you want between you
-            and your money.
+            missing is <Hi>anyone writing down what they used to be</Hi>, so &ldquo;this used to
+            charge 5%&rdquo; is a memory, not a fact.
           </P>
           <P>
             So we keep the record. Every day we read the fee and the curator of every listed vault
             on Base, and keep only what moved: <Hi>this vault charged 5%, now it charges 15%</Hi>,
             with the dates it happened between. No score for any curator, no forecast, and nothing
-            about anybody&apos;s wallet — a fee is either the number it was or it is not, and that is
+            about anybody&apos;s wallet. A fee is either the number it was or it is not, and that is
             the whole claim.
           </P>
           <P>
@@ -1217,31 +1372,33 @@ export default function ReDefinitionPage() {
             docs/LAUNCHPAD-STAN.md albo wprost z kodu app/startpad/*
             (wymog logo, przelacznik ochrony snajperskiej, atomowy pre-buy,
             Top earnings liczone w wei - wszystko sprawdzone w zrodlach przed
-            napisaniem). Testnet stoi w linijce State ZANIM padnie pierwsze
-            zdanie w czasie terazniejszym - z tego samego powodu, dla ktorego
-            hero ma trzy kolumny czasow.
+            napisaniem). Uklad sieci (gdzie prawdziwy pieniadz, gdzie test)
+            stoi w linijce State ZANIM padnie pierwsze zdanie w czasie
+            terazniejszym - z tego samego powodu, dla ktorego hero ma trzy
+            kolumny czasow. Prog krzywej i nagroda za graduacje sa PER-SIEC,
+            wiec tresc wiaze kazda liczbe z Base wprost.
 
-            Adresow kontraktow tu nie ma. Mainnetowe adresy Startpada podaje
-            /Docs/startpad; tabela "Every contract this app touches" przyjmuje
-            tylko wpisy zweryfikowane skryptem (patrz jej komentarz) i wpis
-            Startpada moze do niej wejsc dopiero ta sama sciezka. */}
+            Adresy mainnetowych kontraktow Startpada SA juz w tabeli "Every
+            contract this app touches" - weszly 2026-09-01, po wlasnym
+            odczycie z lancucha (patrz komentarz nad CONTRACT_GROUPS).
+            /Docs/startpad dalej podaje pelny kontekst. */}
         <section className="py-16">
           <Marker amount="3.00 ETH" label="where the curve closes" />
           <H2>A launch whose terms nobody can change overnight</H2>
           <State tone="live">
-            Runs on /startpad, live on Base mainnet with real ETH (default); Base Sepolia is there for testing
+            Runs on /startpad. Real money on Base mainnet (default) and Robinhood Chain; Base Sepolia and Arc Testnet are there for testing
           </State>
           <P>
-            <Hi>Startpad</Hi> launches an ERC-20 on a bonding curve. When the curve has collected{' '}
-            <Hi>exactly 3.00 ETH</Hi>, the token graduates: liquidity moves into a Uniswap v4 pool
-            that opens at the exact price the curve closed at, so nobody who bought the top of the
-            curve is instantly underwater. Anyone may call the graduation and is paid 0.045 ETH —
-            half of the graduation fee — for doing so, which means the step does not depend on us
-            being awake.
+            <Hi>Startpad</Hi> launches a token on a bonding curve. When the curve has collected its
+            closing target (on Base, <Hi>exactly 3.00 ETH</Hi>; each network sets its own), the
+            token graduates: liquidity moves into a Uniswap v4 pool that opens at the exact price
+            the curve closed at, so nobody who bought the top of the curve is instantly underwater.
+            Anyone may call the graduation and is paid for doing so (0.045 ETH on Base, half of the
+            graduation fee), which means the step does not depend on us being awake.
           </P>
           <P>
             Every fee stream splits the same way: <Hi>up to 70% to the creator, never less than 30%
-            to the protocol</Hi> — the same ratio PONS pays — and the floor sits in the contract,
+            to the protocol</Hi> (the same ratio PONS pays), and the floor sits in the contract,
             so it binds us and anyone calling the contract directly, not just users of our form.
             Trading on the curve pays at most 1%; after graduation every swap in the pool pays 1%.
             The creator&apos;s share can go to up to eight addresses, and it is paid in ETH, not in
@@ -1249,21 +1406,21 @@ export default function ReDefinitionPage() {
           </P>
           <P>
             A creator can point a slider at their own share and burn with it. The{' '}
-            <Hi>auto-buyback</Hi> takes 0–100% of <em>the creator&apos;s</em> pool fees, buys the
-            token and sends it to the dead address, and anyone may execute a pending buyback. An
-            earlier deployment cut the buyback from the whole fee before the split, which let a
-            creator set 100% and zero the protocol out — the version running now spends only the
-            creator&apos;s own money, because generosity paid for with somebody else&apos;s revenue
-            is not generosity.
+            <Hi>auto-buyback</Hi> takes anywhere from 0 to 100% of <em>the creator&apos;s</em> pool
+            fees, buys the token and sends it to the dead address, and anyone may execute a pending
+            buyback. An earlier deployment cut the buyback from the whole fee before the split,
+            which let a creator set 100% and zero the protocol out. The version running now spends
+            only the creator&apos;s own money, because generosity paid for with somebody
+            else&apos;s revenue is not generosity.
           </P>
           <P>
             Sniper protection is a default, not a law: for the first five minutes one wallet can
             buy at most 16 million tokens, and the creator can tighten that, raise it, or{' '}
-            <Hi>switch it off entirely</Hi> — chosen at launch and immutable afterwards, like every
+            <Hi>switch it off entirely</Hi>, chosen at launch and immutable afterwards, like every
             other number on the form. The creator gets no allocation: a pre-buy is a normal buy on
             the same curve, filled <Hi>in the same transaction that creates the token</Hi>, so
             there is no block in which a sniper can get in first. And a launch does not go out
-            without a logo — an ERC-20 has no image on chain, so the file is stored with us and
+            without a logo: an ERC-20 has no image on chain, so the file is stored with us and
             served through a token list only the creator the chain confirms can edit.
           </P>
           <P>
@@ -1277,13 +1434,15 @@ export default function ReDefinitionPage() {
           </P>
           <P>
             The spine is the one this whole page keeps arguing for: <Hi>no owner, no pause, no
-            setters, no upgrade path</Hi> — changing any number means deploying a new contract.
+            setters, no upgrade path</Hi>. Changing any number means deploying a new contract.
             Payouts are pull-based balances you claim, never pushed. The LP position is locked in a
-            vault forever; only the fees it earns can ever be taken out. It runs on Base mainnet
-            with real ETH, and the full path (launch, curve close, graduation, pool swaps, fee
-            settle, buyback and burn, claims) was run end to end on Base Sepolia and checked on
-            the chain before mainnet opened. Base Sepolia stays available for testing, for the
-            same reason the escrow gives: with no admin key, a bug is irreversible.
+            vault forever; only the fees it earns can ever be taken out. It runs with real money on
+            Base mainnet and on Robinhood Chain, and the full path (launch, curve close,
+            graduation, pool swaps, fee settle, buyback and burn, claims) was run end to end on
+            test networks and checked on the chain before real money was allowed near it. On the
+            real-money networks no token has graduated yet. Base Sepolia and Arc Testnet stay
+            available for testing, for the same reason the escrow gives: with no admin key, a bug
+            is irreversible.
           </P>
           <p className="mb-4">
             <Link
@@ -1303,12 +1462,12 @@ export default function ReDefinitionPage() {
           <P>
             The count of parked modules is read from the live routing config when this page is
             built, so that number cannot drift from production. The rows are written by hand, status
-            included. When something stops being a plan it does not leave a gap here — the next
+            included. When something stops being a plan it does not leave a gap here: the next
             missing thing moves into the empty row, which is why the list never gets shorter and
             never goes all green. <Hi>A table where everything is lit is an advertisement.</Hi>
           </P>
           <P>
-            This is the state. If what you want is the instruction —{' '}
+            This is the state. If what you want is the instruction,{' '}
             <Link href="/how" className="underline decoration-soft-line-strong underline-offset-2">
               /how
             </Link>{' '}
@@ -1323,9 +1482,9 @@ export default function ReDefinitionPage() {
             <div className="border-t border-soft-line/70" />
           </div>
           <p className="mt-7 text-[14px] leading-[1.7] text-soft-ink-soft">
-            {parked} older modules — the minting camp, the identity page, the marketplace, the
+            {parked} older modules (the minting camp, the identity page, the marketplace, the
             morning game, the attention scanner, the swap widget, the agent directory, the skills
-            catalogue — are parked. They were surface area, not a product. Everything that mattered
+            catalogue) are parked. They were surface area, not a product. Everything that mattered
             in them was one address doing something another address could verify, and that is
             exactly what an Ask is.
           </p>
@@ -1339,8 +1498,9 @@ export default function ReDefinitionPage() {
           <P>
             A product whose whole claim is <Hi>you can check this yourself</Hi> owes you the
             addresses. Every one below was read straight off its chain before it was printed here:
-            the address has code, and where the contract exposes an identity — a name, a symbol, an
-            owner — it was read too and it matched.
+            the address has code, and where the contract exposes an identity (a name, a symbol, an
+            owner, a fee) it was read too and it matched. Where we checked only that the code is
+            there, the group note says so.
           </P>
           <P>
             Four addresses that live in this codebase are <em>not</em> on this list, because the
@@ -1388,9 +1548,9 @@ export default function ReDefinitionPage() {
           </div>
 
           <p className="mt-7 text-[14px] leading-[1.7] text-soft-ink-soft">
-            The escrow is the only one of these that holds anyone&apos;s money. It has no owner, no
-            pause switch and no rescue function — which cuts both ways, and the section above says
-            how.
+            The ones built to hold other people&apos;s money are the Ask escrow, the Startpad
+            curves and their liquidity vaults. None of them has an owner, a pause switch or a
+            rescue function, which cuts both ways, and the sections above say how.
           </p>
         </section>
 
@@ -1400,22 +1560,21 @@ export default function ReDefinitionPage() {
           <H2>What could be wrong about all this</H2>
           <P>
             The bet is not on agents. It is on there being a person willing to pay real money for an
-            answer from strangers in a feed. Machine demand is the second layer — it is what makes
-            this unlike anything else, but the first dollars will come from founders, projects and
-            traders paying humans.
+            answer from strangers in a feed. Machine demand is the second layer; the first dollars
+            will come from founders, projects and traders paying humans.
           </P>
           <P>
             And that bet is <Hi>not yet won by anything on this page</Hi>. The strongest number here
-            is 187 tips, and a tip is somebody rewarding a post they were going to read anyway — not
-            somebody commissioning work and paying for it when it arrives. The escrow, which is
-            where commissioned work would settle, has never been used. Everything above is a rail,
-            an address and a rule you can check. None of it is evidence that people want this. The
+            is 187 tips, and a tip is somebody rewarding a post they were going to read anyway, not
+            somebody commissioning work and paying for it when it arrives. The escrow, where
+            commissioned work settles, has seen its first funded budget and nothing like traffic.
+            Everything above can be checked. None of it is evidence that people want this. The
             first Ask a stranger funds and a stranger answers is the experiment; until then this page
             is describing a machine that has not been switched on.
           </P>
           <P>
             Escrow used to be the biggest hole. It is not any more, and the honest thing to say is
-            what it did and did not fix. It settles whether <Hi>the money exists</Hi> — locked, in a
+            what it did and did not fix. It settles whether <Hi>the money exists</Hi>: locked, in a
             contract with no owner and no off switch, readable before you write a word. It settles
             nothing about <Hi>who gets it</Hi>. The author still picks the winners, and a contract
             cannot tell a good answer from a bad one.
@@ -1423,9 +1582,9 @@ export default function ReDefinitionPage() {
           <P>
             So the biggest hole now is <Hi>judgement, and there is no appeal</Hi>. Write the best
             answer in the thread and the author can simply not pick you, pay 2.5% on the way out and
-            keep the rest. Refusing to pay costs a little more than it did — the fee and a public{' '}
+            keep the rest. Refusing to pay costs a little more than it did: the fee and a public{' '}
             <Hi>resolve rate</Hi>, the share of Asks an author actually settled, counted only over
-            Asks past their deadline. That is a price, not a guarantee. Nothing here judges answers,
+            Asks past their deadline. That price buys no guarantee. Nothing here judges answers,
             and nothing reverses a resolve once it is made.
           </P>
           <P>
@@ -1436,16 +1595,15 @@ export default function ReDefinitionPage() {
             a seat starts at fifty cents and not at fifty dollars.
           </P>
           <P>
-            Two limits worth stating plainly. The contract has moved real money end to end in
-            testing — locked, resolved, paid out, books back at zero — but{' '}
-            <Hi>nobody has locked a budget in it from this app yet</Hi>. Whoever does will be the
-            first. The expiry refund has less behind it than that, because forty-eight hours cannot
-            be skipped on a live chain. And
-            no fiat, no custody of your keys, no
-            investment advice categories, and the longest an Ask can stay open is seven days. If the
-            answers turn out to be slop, the product dies of quality and no amount of onchain
-            plumbing saves it — so seats are limited, wallets have to be older than a week or carry
-            a Basename, and accept rate gates the money.
+            The contract has moved real money end to end in testing (locked, resolved, paid out,
+            books back at zero), and{' '}
+            <Hi>a first budget has been locked in it from this app on mainnet</Hi>. The expiry
+            refund has less behind it, because forty-eight hours cannot be skipped on a live chain.
+            The product takes no fiat and never holds your keys, there is no investment-advice
+            category, and the longest an Ask can stay open is seven days. If the answers turn out
+            to be slop, the product dies of quality and no amount of onchain plumbing saves it. So
+            seats are limited, wallets have to be older than a week or carry a Basename, and accept
+            rate gates the money.
           </P>
         </section>
 
