@@ -10,8 +10,11 @@ import { ethers } from "hardhat";
  * Kroki (kazdy pomijany, gdy nie ma nic do zrobienia):
  *  1. per token z TOKENS: hook.settle + vault.harvest (odswieza salda przed
  *     snapshotem epoki) + hook.executeBuyback (auto-burn tokena),
- *  2. dostawy claimFor/claimEthFor na adresy z env (SAFE / REWARDS / ESCROW),
- *  3. SphereBuyback.execute (gdy BUYBACK ustawiony i checkpoint swiezy),
+ *  2. dostawy claimFor/claimEthFor/claimTokenFor na adresy z env
+ *     (SAFE / REWARDS / ESCROW) - ETH i tokeny,
+ *  2b. escrow.release() (ETH 50/50 pot/ops) + escrow.releaseToken() (tokeny
+ *     -> vesting) + vesting.release() po klifie - wszystko bezuprawnieniowe,
+ *  3. SphereBuyback: checkpoint (gdy ten klucz jest CHECKPOINTEREM) + execute,
  *  4. Distributor.activate (gdy pending root po oknie weta).
  *
  * Lifecycle graduacji robi istniejacy scripts/launchpad/keeper.ts - ten
@@ -20,7 +23,8 @@ import { ethers } from "hardhat";
  * Uzycie (dry-run bez KEEPER_CONFIRM=tak, konwencja keeper.ts):
  *   TOKENS=0x...,0x... KEEPER_CONFIRM=tak npx hardhat run scripts/sphere/sphereKeeper.ts --network base
  * Env: LAUNCHPAD, HOOK, VAULT (domyslnie wdrozenie Base), SAFE, REWARDS,
- *      ESCROW, BUYBACK, DISTRIBUTOR, TRANCHE_ETH (domyslnie 0.05).
+ *      ESCROW, VESTING, BUYBACK, DISTRIBUTOR, TRANCHE_ETH (domyslnie 0.05).
+ * Komplet dla SPHERE ustawia scripts/sphere/keeper.ps1 (Task Scheduler).
  */
 
 const PAD_ABI = [
@@ -37,13 +41,27 @@ const HOOK_ABI = [
   "event AutoBuyback(address indexed token, uint256 ethIn, uint256 tokensBought, address indexed caller)",
   "function claimableEth(address) view returns (uint256)",
   "function claimEthFor(address) external",
+  "function claimableToken(address,address) view returns (uint256)",
+  "function claimTokenFor(address,address) external",
 ];
 const VAULT_ABI = [
   "function seeded(address) view returns (bool)",
   "function harvest(address) external",
   "function claimableEth(address) view returns (uint256)",
   "function claimEthFor(address) external",
+  "function claimableToken(address,address) view returns (uint256)",
+  "function claimTokenFor(address,address) external",
 ];
+const ESCROW_ABI = [
+  "function sphereToken() view returns (address)",
+  "function release() external",
+  "function releaseToken(address) external",
+];
+const VESTING_ABI = [
+  "function releasable(address) view returns (uint256)",
+  "function release(address) external",
+];
+const ERC20_ABI = ["function balanceOf(address) view returns (uint256)"];
 const BUYBACK_ABI = [
   "function checkpoint() external",
   "function CHECKPOINTER() view returns (address)",
@@ -136,6 +154,19 @@ async function main() {
       log(`vault.claimEthFor(${name}): ${ethers.formatEther(vEth)} ETH`);
       if (execute) await (await vault.claimEthFor(addr)).wait();
     }
+    // Noga TOKENOWA oplat (hook 30/70, LP 30/70) - do 2.09.2026 keeper
+    // odbieral tylko ETH i 20.8M SPHERE lezalo w hooku/vaulcie.
+    for (const token of tokens) {
+      const [hTok, vTok] = [await hook.claimableToken(token, addr), await vault.claimableToken(token, addr)];
+      if (hTok > 0n) {
+        log(`hook.claimTokenFor(${name}): ${ethers.formatEther(hTok)} tokenow`);
+        if (execute) await (await hook.claimTokenFor(token, addr)).wait();
+      }
+      if (vTok > 0n) {
+        log(`vault.claimTokenFor(${name}): ${ethers.formatEther(vTok)} tokenow`);
+        if (execute) await (await vault.claimTokenFor(token, addr)).wait();
+      }
+    }
   }
 
   // ---- 3. SphereBuyback ----------------------------------------------------
@@ -172,6 +203,36 @@ async function main() {
       }
     } else if (bal > 0n) {
       log(`buyback: ${ethers.formatEther(bal)} ETH czeka, ale checkpoint nieswiezy, a ten klucz nie jest CHECKPOINTEREM`);
+    }
+  }
+
+  // ---- 2b. escrow release + vesting ---------------------------------------
+  // Wszystko bezuprawnieniowe, kierunki zamrozone: ETH escrow -> 50/50
+  // BUYBACK_POT/OPS (oba Safe), tokeny escrow -> vesting, vesting -> Safe
+  // po klifie. Keeper tylko placi gaz.
+  if (process.env.ESCROW) {
+    const escrow = new ethers.Contract(process.env.ESCROW, ESCROW_ABI, signer);
+    const escrowEth = await ethers.provider.getBalance(process.env.ESCROW);
+    if (escrowEth > 0n) {
+      log(`escrow.release(): ${ethers.formatEther(escrowEth)} ETH -> 50/50 pot/ops`);
+      if (execute) await (await escrow.release()).wait();
+    }
+    const sphere: string = await escrow.sphereToken();
+    if (sphere !== ethers.ZeroAddress) {
+      const tok = new ethers.Contract(sphere, ERC20_ABI, signer);
+      const escrowTok: bigint = await tok.balanceOf(process.env.ESCROW);
+      if (escrowTok > 0n) {
+        log(`escrow.releaseToken(): ${ethers.formatEther(escrowTok)} SPHERE -> vesting`);
+        if (execute) await (await escrow.releaseToken(ethers.ZeroAddress)).wait();
+      }
+      if (process.env.VESTING) {
+        const vesting = new ethers.Contract(process.env.VESTING, VESTING_ABI, signer);
+        const rel: bigint = await vesting.releasable(sphere);
+        if (rel > 0n) {
+          log(`vesting.release(): ${ethers.formatEther(rel)} SPHERE -> beneficjent (Safe)`);
+          if (execute) await (await vesting.release(sphere)).wait();
+        }
+      }
     }
   }
 
