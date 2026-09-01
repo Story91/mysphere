@@ -34,6 +34,7 @@ const HOOK_ABI = [
   "function pendingBuybackEth(address) view returns (uint256)",
   "function settle(address) external",
   "function executeBuyback(address,uint256,uint256) external returns (uint256)",
+  "event AutoBuyback(address indexed token, uint256 ethIn, uint256 tokensBought, address indexed caller)",
   "function claimableEth(address) view returns (uint256)",
   "function claimEthFor(address) external",
 ];
@@ -91,8 +92,27 @@ async function main() {
       // ETH NIE jest palone: hook kupuje za nie token w puli v4 i dopiero
       // KUPIONE TOKENY ida na 0xdEaD. Poprzedni skrot "ETH -> 0xdEaD"
       // wygladal jak spalenie ETH i wystraszyl wlasciciela 2.09.2026.
-      log(`executeBuyback(${token}): ${ethers.formatEther(buybackEth)} ETH kupuje token w puli v4 -> kupione tokeny na 0xdEaD`);
-      if (execute) await (await hook.executeBuyback(token, 1n, deadline)).wait();
+      // Kwota ponizej to KOLEJKA, nie wydatek: hook ma limit ruchu ceny
+      // w jednej transakcji i wydaje tylko tyle, ile pula zniesie - reszta
+      // zostaje w pendingBuybackEth na nastepny przebieg. Prawdziwe kwoty
+      // czytamy z eventu AutoBuyback PO transakcji (2.09.2026: keeper
+      // wypisal 0.1827 ETH z kolejki, swap wydal 0.035 ETH, a ta pierwsza
+      // liczba trafila do publicznego posta i wymagala sprostowania).
+      log(`executeBuyback(${token}): w kolejce ${ethers.formatEther(buybackEth)} ETH (kupuje token w puli v4, kupione tokeny -> 0xdEaD)`);
+      if (execute) {
+        const rc = await (await hook.executeBuyback(token, 1n, deadline)).wait();
+        for (const l of rc.logs) {
+          try {
+            const d = hook.interface.parseLog({ topics: [...l.topics], data: l.data });
+            if (d && d.name === "AutoBuyback") {
+              log(`  AutoBuyback: wydano ${ethers.formatEther(d.args.ethIn)} ETH, kupiono i spalono ${ethers.formatEther(d.args.tokensBought)} tokenow | tx ${rc.hash}`);
+            }
+          } catch {
+            /* log innego kontraktu */
+          }
+        }
+        log(`  zostaje w kolejce: ${ethers.formatEther(await hook.pendingBuybackEth(token))} ETH`);
+      }
     }
   }
 
