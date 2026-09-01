@@ -38,8 +38,13 @@ export const SPHERE_VESTING_ADDRESS = envAddress(
   'NEXT_PUBLIC_SPHERE_VESTING_ADDRESS',
   '0xB5dE95224F2bEDee2e7Ca7170F5B6a02641255AD'
 );
-/** Adres tokena SPHERE - znany dopiero po launchu (escrow.sphereToken()). */
-export const SPHERE_TOKEN_ADDRESS = envAddress('NEXT_PUBLIC_SPHERE_TOKEN_ADDRESS', '');
+/** Adres tokena SPHERE - launch 2026-09-01, blok 50749275, tx
+ * 0x5ce63026327044a3fda26f8f343a1a6382ab183bb37d7df0c5a57c23e1e592a5
+ * (escrow.sphereToken(), zgodny z predictVanityToken opublikowanym 1.09). */
+export const SPHERE_TOKEN_ADDRESS = envAddress(
+  'NEXT_PUBLIC_SPHERE_TOKEN_ADDRESS',
+  '0xB200000000000000000000BA5eDb84c678432476'
+);
 
 /** Wspolny Safe wszystkich rol (decyzje #12 i Gate 0 z 2026-08-31). */
 export const SPHERE_SAFE_ADDRESS = '0x83E2DE974FC6B866FDb78AEFa5596d58fDc4142F' as Address;
