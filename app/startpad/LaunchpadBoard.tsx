@@ -48,6 +48,7 @@ import {
   type LaunchpadToken,
 } from './config';
 import { fetchLogos, recallLogos, rememberLogos } from './logos';
+import { SPHERE_TOKEN_ADDRESS } from './sphere/sphereConfig';
 import { tokenAccent } from './metadata';
 import { browserStorage, flushPendingProfiles, postProfileWithRetry, sendTokenProfile } from './profileSync';
 import {
@@ -380,6 +381,24 @@ function curveStatusLabel(token: LaunchpadToken) {
   return { text: `${toGo.toFixed(2)} ${NATIVE_SYMBOL} to graduation`, className: 'text-sp-down' };
 }
 
+/** Czy wiersz boardu to token pada. Adres, nie symbol - symbol moze podrobic kazdy launch. */
+function isSphereRow(token: { address?: string | null }): boolean {
+  return Boolean(SPHERE_TOKEN_ADDRESS && token.address && token.address.toLowerCase() === SPHERE_TOKEN_ADDRESS.toLowerCase());
+}
+
+/**
+ * Plakietka tokena pada. Widoczna przy symbolu na karcie i w tabeli - razem
+ * z przypieciem na gorze listy to jedyne wyroznienie, jakie SPHERE dostaje;
+ * dane rynkowe liczone sa identycznie jak dla kazdego innego tokena.
+ */
+function SpherePill() {
+  return (
+    <span className="rounded-full bg-sp-brand/10 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.08em] text-sp-brand">
+      ✦ pad token
+    </span>
+  );
+}
+
 /**
  * Kafel rynku. Uklad kart jest tu ZAMIAST gestej tabeli, ktora ma dzis kazdy
  * launchpad - ta sama informacja, ale czytana wzrokiem, a nie skanowana
@@ -411,6 +430,7 @@ function LaunchCard({
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-2">
           <span className="truncate text-[15px] font-extrabold text-sp-ink">{token.symbol}</span>
+          {isSphereRow(token) && <SpherePill />}
           <StatePill state={token.state} />
           {sample && <SamplePill />}
         </span>
@@ -1002,7 +1022,7 @@ function LaunchTableRow({
     <>
       <TokenGlyph token={token} />
       <span className="min-w-0">
-        <span className="flex flex-wrap items-center gap-2"><span className="truncate text-[14px] font-extrabold text-sp-ink">{token.symbol}</span><StatePill state={token.state} />{sample && <SamplePill />}</span>
+        <span className="flex flex-wrap items-center gap-2"><span className="truncate text-[14px] font-extrabold text-sp-ink">{token.symbol}</span>{isSphereRow(token) && <SpherePill />}<StatePill state={token.state} />{sample && <SamplePill />}</span>
         <span className="mt-1 flex items-center gap-2 truncate text-[12px] text-sp-shade/50"><span>{token.name}</span><span aria-hidden="true">•</span><span>{token.age}</span></span>
       </span>
     </>
@@ -1981,9 +2001,20 @@ export default function LaunchpadBoard() {
   const visibleTokens = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     const matches = tokens.filter((token) => !normalized || `${token.name} ${token.symbol} ${token.creator}`.toLowerCase().includes(normalized));
+    // Token pada jest przypiety na gorze KAZDEJ zakladki - bez tego "New"
+    // zatopiloby go pod kolejnymi launchami. To jedyna ingerencja: dane
+    // rynkowe i sortowanie reszty listy zostaja nietkniete, a wyszukiwarka
+    // dziala normalnie (jesli fraza go nie lapie, nie ma go wcale).
+    const pinSphere = (rows: BoardToken[]) => {
+      const i = rows.findIndex(isSphereRow);
+      if (i <= 0) return rows;
+      const [sphere] = rows.splice(i, 1);
+      rows.unshift(sphere);
+      return rows;
+    };
     switch (tab) {
       case 'new':
-        return [...matches].sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0));
+        return pinSphere([...matches].sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0)));
       case 'trending': {
         const rows = [...matches].sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0));
         if (animationsOn) {
@@ -1994,14 +2025,14 @@ export default function LaunchpadBoard() {
           const heat = (row: BoardToken) => (row.lastTradeAt && now - row.lastTradeAt < HOT_TRADE_WINDOW_MS ? row.lastTradeAt : 0);
           rows.sort((a, b) => heat(b) - heat(a) || (b.volume ?? 0) - (a.volume ?? 0));
         }
-        return rows;
+        return pinSphere(rows);
       }
       case 'about':
-        return matches.filter((token) => token.state === 'Curve').sort((a, b) => b.raised - a.raised);
+        return pinSphere(matches.filter((token) => token.state === 'Curve').sort((a, b) => b.raised - a.raised));
       case 'graduated':
-        return matches.filter((token) => token.state === 'Graduated');
+        return pinSphere(matches.filter((token) => token.state === 'Graduated'));
       default:
-        return matches;
+        return pinSphere([...matches]);
     }
   }, [animationsOn, query, tab, tokens]);
 

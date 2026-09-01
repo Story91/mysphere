@@ -197,6 +197,11 @@ export default function Navigation() {
     // /asks: strona, do ktorej prowadzi wylacznie wpisanie adresu z palca,
     // z punktu widzenia uzytkownika nie istnieje.
     { href: '/startpad', label: 'Startpad' },
+    // $SPHERE zaraz za Startpadem: token pada zyje od 1.09.2026, a jedyna
+    // droga do huba byla opcja schowana w dropdownie sieci na boardzie -
+    // strona, do ktorej nie prowadzi zaden link, z punktu widzenia
+    // uzytkownika nie istnieje (ta sama zasada, co przy /startpad wyzej).
+    { href: '/startpad/sphere', label: '$SPHERE' },
     // "B20" jest CHWILOWO UKRYTE w belce (na zyczenie). Trasa /b20 DZIALA dalej
     // pod adresem - NIE dodajemy jej do DISABLED_ROUTES, wiec nie jest
     // przekierowana, tylko niepokazana w nawigacji. Powrot do belki =
@@ -220,7 +225,13 @@ export default function Navigation() {
     (link) => link.href === '#' || !isRouteDisabled(link.href)
   );
 
-  const isActiveLink = (href: string) => pathname === href || !!pathname?.startsWith(href + '/');
+  const isActiveLink = (href: string) => {
+    if (!pathname) return false;
+    // Hub $SPHERE ma wlasny wpis w belce, wiec prefiksowe dopasowanie
+    // /startpad nie moze zapalac dwoch pigulek naraz na /startpad/sphere/*.
+    if (href === '/startpad' && pathname.startsWith('/startpad/sphere')) return false;
+    return pathname === href || pathname.startsWith(href + '/');
+  };
 
   return (
     <div className="sticky top-0 z-50">
