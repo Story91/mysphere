@@ -2,6 +2,7 @@ import { ImageResponse } from 'next/og';
 import { getLeaderboard, formatReceived } from '../utils/tips/getLeaderboard';
 import { getIdentities } from '../utils/identity/getIdentities';
 import { shortAddress } from '../utils/posts/getPostForShare';
+import { ogFonts, DISPLAY_FAMILY, BODY_FAMILY } from '../components/og/fonts';
 
 /**
  * Karta OG rankingu.
@@ -94,7 +95,13 @@ export default async function Image() {
           justifyContent: 'space-between',
           background: '#F1EDFA',
           padding: '68px 72px',
-          fontFamily: 'sans-serif',
+          /**
+           * Nunito jako domyslny kroj kadru, Baloo 2 punktowo na naglowku i
+           * liczbach - te same role, co --font-soft-body i --font-soft-display
+           * w app/layout.tsx. Pliki dojezdzaja przez app/components/og/fonts.ts;
+           * uzasadnienie, dlaczego to w koncu dalo sie zrobic, jest tam.
+           */
+          fontFamily: BODY_FAMILY,
         }}
       >
         <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -104,6 +111,7 @@ export default async function Image() {
           <div
             style={{
               display: 'flex',
+              fontFamily: DISPLAY_FAMILY,
               fontSize: 72,
               fontWeight: 700,
               color: '#2E2A44',
@@ -128,6 +136,7 @@ export default async function Image() {
                 <div
                   style={{
                     display: 'flex',
+                    fontFamily: DISPLAY_FAMILY,
                     width: 34,
                     color: MEDALS[index] ?? '#6B6486',
                     fontWeight: 700,
@@ -136,7 +145,14 @@ export default async function Image() {
                   {index + 1}
                 </div>
                 <div style={{ display: 'flex', flex: 1, color: '#2E2A44' }}>{names[index]}</div>
-                <div style={{ display: 'flex', color: '#C2410C', fontWeight: 600 }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    fontFamily: DISPLAY_FAMILY,
+                    color: '#C2410C',
+                    fontWeight: 600,
+                  }}
+                >
                   {formatReceived(entry.received, 1)}
                 </div>
               </div>
@@ -153,6 +169,7 @@ export default async function Image() {
     ),
     {
       ...size,
+      fonts: await ogFonts(),
       // Godzina w cache CDN, doba na serwowanie nieswiezego w tle. Podglad linku
       // pobierany jest raz na wklejenie, wiec kazde renderowanie od zera byloby
       // czystym marnotrawstwem - a jednoczesnie karta ma nadazac za rankingiem.

@@ -2,6 +2,7 @@ import { ImageResponse } from 'next/og';
 import { getProfile } from '../../utils/profile/getProfile';
 import { getName } from '../../utils/identity/getName';
 import { shortAddress } from '../../utils/posts/getPostForShare';
+import { ogFonts, DISPLAY_FAMILY, BODY_FAMILY } from '../../components/og/fonts';
 
 /**
  * Karta OG per profil.
@@ -93,7 +94,13 @@ export default async function Image({ params }: { params: { address: string } })
           justifyContent: 'space-between',
           background: '#F1EDFA',
           padding: '72px',
-          fontFamily: 'sans-serif',
+          /**
+           * Nunito jako domyslny kroj kadru, Baloo 2 punktowo na naglowku i
+           * liczbach - te same role, co --font-soft-body i --font-soft-display
+           * w app/layout.tsx. Pliki dojezdzaja przez app/components/og/fonts.ts;
+           * uzasadnienie, dlaczego to w koncu dalo sie zrobic, jest tam.
+           */
+          fontFamily: BODY_FAMILY,
         }}
       >
         <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -145,6 +152,7 @@ export default async function Image({ params }: { params: { address: string } })
               <div
                 style={{
                   display: 'flex',
+                  fontFamily: DISPLAY_FAMILY,
                   fontSize: 40,
                   fontWeight: 700,
                   // RECEIVED to kwota, wiec pomaranczowy; reszta to zwykle liczby.
@@ -161,6 +169,6 @@ export default async function Image({ params }: { params: { address: string } })
         </div>
       </div>
     ),
-    size
+    { ...size, fonts: await ogFonts() }
   );
 }

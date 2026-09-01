@@ -1,3 +1,5 @@
+import { DISPLAY_FAMILY, BODY_FAMILY } from './fonts';
+
 /**
  * Karta udostepniania strony glownej - jedno zrodlo rysunku dla dwoch tras:
  * app/opengraph-image.tsx (1200x630) i app/miniapp-image/route.tsx (1200x800,
@@ -196,7 +198,13 @@ export function HomeShareCard() {
         justifyContent: 'space-between',
         background: CARD.bg,
         padding: `${PADDING}px`,
-        fontFamily: 'sans-serif',
+      /**
+       * Nunito jako domyslny kroj kadru, Baloo 2 punktowo na naglowku i
+       * liczbach - te same role, co --font-soft-body i --font-soft-display
+       * w app/layout.tsx. Pliki dojezdzaja przez app/components/og/fonts.ts;
+       * uzasadnienie, dlaczego to w koncu dalo sie zrobic, jest tam.
+       */
+        fontFamily: BODY_FAMILY,
       }}
     >
       {/* PASMO 1 - nadlinia. Zaden logotyp jako obrazek: pobranie pliku to
@@ -234,6 +242,7 @@ export function HomeShareCard() {
           <div
             style={{
               display: 'flex',
+              fontFamily: DISPLAY_FAMILY,
               fontSize: HEAD_SIZE,
               lineHeight: HEAD_LINE_HEIGHT,
               fontWeight: 700,

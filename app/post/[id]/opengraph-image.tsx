@@ -1,5 +1,6 @@
 import { ImageResponse } from 'next/og';
 import { getPostForShare, getPostTipTotals, shortAddress } from '../../utils/posts/getPostForShare';
+import { ogFonts, DISPLAY_FAMILY, BODY_FAMILY } from '../../components/og/fonts';
 
 /**
  * Karta OG generowana per post.
@@ -106,7 +107,13 @@ export default async function Image({ params }: { params: { id: string } }) {
           justifyContent: 'space-between',
           background: '#F1EDFA', // --soft-bg, jasne tlo produktu
           padding: '72px',
-          fontFamily: 'sans-serif',
+          /**
+           * Nunito jako domyslny kroj kadru, Baloo 2 punktowo na tresci posta
+           * i liczbach - te same role, co --font-soft-body i --font-soft-display
+           * w app/layout.tsx. Pliki dojezdzaja przez app/components/og/fonts.ts;
+           * uzasadnienie, dlaczego to w koncu dalo sie zrobic, jest tam.
+           */
+          fontFamily: BODY_FAMILY,
         }}
       >
         {/* Pasek marki. Blekit Base zostaje dokladnie taki, jaki byl na
@@ -137,6 +144,16 @@ export default async function Image({ params }: { params: { id: string } }) {
         <div
           style={{
             display: 'flex',
+            /**
+             * Tresc posta zostaje w Nunito, mimo ze zajmuje slot bohatera.
+             * To jedyny na wszystkich kartach napis pisany przez UZYTKOWNIKA,
+             * a nie przez nas: do 220 znakow ciaglej prozy. Baloo 2 ma
+             * zaokraglone konce kresek i jest krojem naglowkowym - caly akapit
+             * zlozony nim robi sie ciezki i zaczyna krzyczec zamiast dac sie
+             * przeczytac. Baloo 2 dostaja na tej karcie liczby (napiwek,
+             * polubienia, komentarze), bo one sa etykietami, nie zdaniem.
+             */
+            fontFamily: BODY_FAMILY,
             fontSize: content.length > 120 ? '44px' : '56px',
             lineHeight: 1.25,
             color: '#2E2A44', // --soft-ink, 11.9:1 - bohater karty
@@ -173,6 +190,7 @@ export default async function Image({ params }: { params: { id: string } }) {
                 <div
                   style={{
                     display: 'flex',
+                    fontFamily: DISPLAY_FAMILY,
                     color: '#C2410C', // --soft-accent-deep, 4.50:1 - KWOTA
                     fontWeight: 600,
                     fontSize: '28px',
@@ -181,13 +199,15 @@ export default async function Image({ params }: { params: { id: string } }) {
                   {tips} in tips
                 </div>
               )}
-              <div style={{ display: 'flex' }}>{post.likes} likes</div>
-              <div style={{ display: 'flex' }}>{post.commentCount} comments</div>
+              <div style={{ display: 'flex', fontFamily: DISPLAY_FAMILY }}>{post.likes} likes</div>
+              <div style={{ display: 'flex', fontFamily: DISPLAY_FAMILY }}>
+                {post.commentCount} comments
+              </div>
             </div>
           )}
         </div>
       </div>
     ),
-    size
+    { ...size, fonts: await ogFonts() }
   );
 }

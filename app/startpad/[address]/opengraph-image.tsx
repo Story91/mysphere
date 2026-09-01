@@ -1,6 +1,7 @@
 import { ImageResponse } from 'next/og';
 import { TokenShareCard, TokenShareFallback } from '../../components/og/TokenShareCard';
 import { loadTokenCard } from '../share/tokenCard';
+import { ogFonts } from '../../components/og/fonts';
 
 /**
  * Karta OG pojedynczego tokena launchpada.
@@ -33,6 +34,6 @@ export default async function Image({ params }: { params: { address: string } })
 
   return new ImageResponse(
     data ? <TokenShareCard data={data} height={size.height} /> : <TokenShareFallback />,
-    size
+    { ...size, fonts: await ogFonts() }
   );
 }
