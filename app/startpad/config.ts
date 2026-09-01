@@ -1048,6 +1048,10 @@ export const liquidityVaultAbi = [
   { type: 'function', name: 'harvest', stateMutability: 'nonpayable', inputs: [{ name: 'token', type: 'address' }], outputs: [] },
   { type: 'function', name: 'claimEth', stateMutability: 'nonpayable', inputs: [], outputs: [] },
   { type: 'function', name: 'claimToken', stateMutability: 'nonpayable', inputs: [{ name: 'token', type: 'address' }], outputs: [] },
+  // Dostawy "for": keeper i panele SPHERE wolaja je od 2.09.2026 - bez tych
+  // wpisow przycisk "Deliver hook/LP fees" konczyl sie "not found on ABI".
+  { type: 'function', name: 'claimEthFor', stateMutability: 'nonpayable', inputs: [{ name: 'account', type: 'address' }], outputs: [] },
+  { type: 'function', name: 'claimTokenFor', stateMutability: 'nonpayable', inputs: [{ name: 'token', type: 'address' }, { name: 'account', type: 'address' }], outputs: [] },
   { type: 'event', name: 'Harvested', inputs: [{ name: 'token', type: 'address', indexed: true }, { name: 'poolId', type: 'bytes32', indexed: true }, { name: 'caller', type: 'address', indexed: true }, { name: 'fee0', type: 'uint256', indexed: false }, { name: 'fee1', type: 'uint256', indexed: false }] },
 ] as const;
 
@@ -1086,6 +1090,10 @@ export const hookAbi = [
   { type: 'error', name: 'NothingToBuyback', inputs: [] },
   { type: 'function', name: 'claimEth', stateMutability: 'nonpayable', inputs: [], outputs: [] },
   { type: 'function', name: 'claimToken', stateMutability: 'nonpayable', inputs: [{ name: 'token', type: 'address' }], outputs: [] },
+  // Dostawy "for": keeper i panele SPHERE wolaja je od 2.09.2026 - bez tych
+  // wpisow przycisk "Deliver hook/LP fees" konczyl sie "not found on ABI".
+  { type: 'function', name: 'claimEthFor', stateMutability: 'nonpayable', inputs: [{ name: 'account', type: 'address' }], outputs: [] },
+  { type: 'function', name: 'claimTokenFor', stateMutability: 'nonpayable', inputs: [{ name: 'token', type: 'address' }, { name: 'account', type: 'address' }], outputs: [] },
   { type: 'event', name: 'HookFeeSettled', inputs: [{ name: 'token', type: 'address', indexed: true }, { name: 'ethToProtocol', type: 'uint256', indexed: false }, { name: 'ethToCreator', type: 'uint256', indexed: false }, { name: 'ethToBuyback', type: 'uint256', indexed: false }, { name: 'tokenToProtocol', type: 'uint256', indexed: false }, { name: 'tokenToCreator', type: 'uint256', indexed: false }] },
 ] as const;
 
