@@ -10,6 +10,42 @@ import { shortAddress } from '../../utils/posts/getPostForShare';
  * X albo w Base App renderuje sie jako obrazek, zanim ktokolwiek kliknie.
  * Dlatego lezy tu ten sam zestaw liczb, co na stronie - nic dodatkowego,
  * nic upiekszonego.
+ *
+ * === TLO: JASNE, NIE GRANATOWE (decyzja wlasciciela z 2026-09-01) ===
+ * Karta stala dotad na ciemnym granacie rodziny (#0A1024) i cala argumentacja
+ * kolorow byla liczona wzgledem niego. Wlasciciel zarzadzil 2026-09-01 przejscie
+ * na jasny grunt produktu; wszystkie SZESC kart .tsx (/, /leaderboard,
+ * /post/[id], /startpad/[address], /tip/[txHash], /u/[address]) przechodzi na
+ * niego RAZEM. Pojedyncza karta, ktora zostalaby ciemna, czytalaby sie w kanale
+ * jak obrazek z innego serwisu, wiec rodziny nie wolno rozjechac w czasie.
+ *
+ * Tlo to #F1EDFA, czyli --soft-bg z app/globals.css - dokladnie to samo tlo, co
+ * pod strona profilu, ktora ten obrazek zapowiada. Kontrasty ponizej sa liczone
+ * wzgledem NOWEGO tla i kazdy przechodzi 4.5:1:
+ *   #2E2A44  (--soft-ink)         11.9:1  - imie i wartosci statystyk,
+ *   #6B6486  (--soft-ink-muted)    4.8:1  - nadtytul, adres, etykiety,
+ *   #C2410C  (--soft-accent-deep)  4.50:1 - kwota.
+ * Stare wartosci (#EEF3FF, #5C6F94, #00E28A) byly policzone pod granat i na
+ * lawendzie nie znacza juz nic - dlatego znikly stad co do jednej.
+ *
+ * === DLACZEGO PRZEZROCZYSTOSCI SIE ODWRACAJA ===
+ * Kafle statystyk mialy wypelnienie rgba(255,255,255,0.03) i obwodke
+ * rgba(255,255,255,0.09). Na granacie to dzialalo, bo biel byla JASNIEJSZA od
+ * tla. Na #F1EDFA ta sama biel sklada sie do okolo #F2EEFA, czyli mniej wiecej
+ * 1.01:1 - kafel po prostu by zniknal. Na jasnym gruncie wypelnienie musi byc
+ * KRYJACE (#FFFFFF, --soft-surface), a obwodka CIEMNIEJSZA od tla (#B9B1D8,
+ * --soft-line-strong). To nie jest ta sama regula z inna liczba, tylko regula
+ * odwrocona - kto bedzie przenosil pozostale karty, niech nie probuje podkrecac
+ * alfy.
+ *
+ * === POMARANCZOWY ZNACZY KWOTE, NIE STAN ===
+ * Kafel RECEIVED pokazuje odebrany napiwek, czyli PIENIADZE - a w tym produkcie
+ * pomaranczowy jest zarezerwowany dla kwot i nigdzie indziej sie nie pojawia
+ * (regula spisana w app/admin/ops/OpsConsole.tsx:27). Dlatego zielen #00E28A
+ * idzie tu na #C2410C, a nie na zielen statusu. Gdyby to samo zielone oznaczalo
+ * STAN (kropka "ok", napis "SETTLED ONCHAIN"), musialoby pojsc na #1E7A55
+ * (4.59:1) - pomaranczowa odznaka stanu czytalaby sie jak kwota i karta
+ * klamalaby o sobie samej. W tej karcie zadnego stanu nie ma, jest tylko liczba.
  */
 
 export const runtime = 'nodejs';
@@ -55,7 +91,7 @@ export default async function Image({ params }: { params: { address: string } })
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
-          background: '#0A1024',
+          background: '#F1EDFA',
           padding: '72px',
           fontFamily: 'sans-serif',
         }}
@@ -66,7 +102,7 @@ export default async function Image({ params }: { params: { address: string } })
               display: 'flex',
               fontSize: 22,
               letterSpacing: 4,
-              color: '#5C6F94',
+              color: '#6B6486',
               marginBottom: 28,
             }}
           >
@@ -77,14 +113,14 @@ export default async function Image({ params }: { params: { address: string } })
               display: 'flex',
               fontSize: 78,
               fontWeight: 700,
-              color: '#EEF3FF',
+              color: '#2E2A44',
               lineHeight: 1.05,
             }}
           >
             {name}
           </div>
           {basename && (
-            <div style={{ display: 'flex', fontSize: 26, color: '#5C6F94', marginTop: 14 }}>
+            <div style={{ display: 'flex', fontSize: 26, color: '#6B6486', marginTop: 14 }}>
               {shortAddress(address)}
             </div>
           )}
@@ -99,8 +135,10 @@ export default async function Image({ params }: { params: { address: string } })
                 flexDirection: 'column',
                 padding: '22px 30px',
                 borderRadius: 16,
-                border: '1px solid rgba(255,255,255,0.09)',
-                background: 'rgba(255,255,255,0.03)',
+                // Obwodka ciemniejsza od tla, wypelnienie kryjace - na lawendzie
+                // biala poswiata nie odcina kafla, tylko go gasi (patrz naglowek).
+                border: '1px solid #B9B1D8',
+                background: '#FFFFFF',
                 minWidth: 190,
               }}
             >
@@ -109,12 +147,13 @@ export default async function Image({ params }: { params: { address: string } })
                   display: 'flex',
                   fontSize: 40,
                   fontWeight: 700,
-                  color: stat.label === 'RECEIVED' ? '#00E28A' : '#EEF3FF',
+                  // RECEIVED to kwota, wiec pomaranczowy; reszta to zwykle liczby.
+                  color: stat.label === 'RECEIVED' ? '#C2410C' : '#2E2A44',
                 }}
               >
                 {stat.value}
               </div>
-              <div style={{ display: 'flex', fontSize: 18, letterSpacing: 2, color: '#5C6F94', marginTop: 6 }}>
+              <div style={{ display: 'flex', fontSize: 18, letterSpacing: 2, color: '#6B6486', marginTop: 6 }}>
                 {stat.label}
               </div>
             </div>

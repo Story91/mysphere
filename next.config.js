@@ -73,17 +73,12 @@ const nextConfig = {
     serverComponentsExternalPackages: ['mongodb', 'firebase-admin', 'sharp'],
     // Kompiluje bundle klienta i serwera rownolegle, w osobnych workerach.
     webpackBuildWorker: true,
-    // Dolacza tla kart OG (public/backs/*) do bundla funkcji opengraph-image,
-    // zeby loadOgBg czytal je z DYSKU (fs), a nie pobieral po sieci - serwerowy
-    // fetch wlasnej domeny na Vercelu bywa zawodny (fall back na fetch zostaje).
-    outputFileTracingIncludes: {
-      '/asks/opengraph-image': ['./public/backs/**'],
-      '/money/opengraph-image': ['./public/backs/**'],
-      '/how/opengraph-image': ['./public/backs/**'],
-      '/startpad/opengraph-image': ['./public/backs/**'],
-      '/re-definition/opengraph-image': ['./public/backs/**'],
-      '/Docs/opengraph-image': ['./public/backs/**'],
-    },
+    // USUNIETE 2026-09-01. Byly tu wpisy outputFileTracingIncludes dolaczajace
+    // public/backs/** do funkcji /asks/opengraph-image i piatki siostrzanych.
+    // Wszystkie szesc tras to dzis STATYCZNE pliki opengraph-image.png, a nie
+    // funkcje - `loadOgBg`, ktory mial je czytac z dysku, nie istnieje juz
+    // nigdzie poza tamtym komentarzem. Katalog public/backs byl przy tym
+    // bajtowa kopia tych szesciu plikow (8.7 MB duplikatu) i zostal skasowany.
     // Pakiety z barrel files (index re-eksportujacy setki modulow). Bez tego
     // webpack musi przejsc caly barrel, zeby wyciagnac jeden import.
     // Lista wylacznie z tego, co faktycznie jest w repo.
