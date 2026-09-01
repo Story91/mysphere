@@ -97,6 +97,16 @@ const nextConfig = {
     // `opengraph-image.tsx` nie lapie zaden ksztalt klucza (sprawdzone na
     // dwoch buildach, szczegoly w naglowku app/components/og/fontData.ts).
     // Kroje jada wiec zwyklym importem base64.
+    //
+    // Manifesty epok sezonu $SPHERE (scripts/output/sphere-epochs/*.json,
+    // pisane przez scripts/sphere/publishEpoch.ts) czytane sa przez fs
+    // w /api/sphere/epochs - a fs w drzewie zrodel nie jest sledzone samo
+    // z siebie. To sa trasy z pliku route.ts, czyli wariant, dla ktorego
+    // ten mechanizm ZADZIALAL w tamtym pomiarze.
+    outputFileTracingIncludes: {
+      '/api/sphere/epochs': ['./scripts/output/sphere-epochs/*.json'],
+      '/api/sphere/epochs/[epoch]': ['./scripts/output/sphere-epochs/*.json'],
+    },
     // Pakiety z barrel files (index re-eksportujacy setki modulow). Bez tego
     // webpack musi przejsc caly barrel, zeby wyciagnac jeden import.
     // Lista wylacznie z tego, co faktycznie jest w repo.

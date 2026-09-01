@@ -14,15 +14,22 @@
  * Wykres wg dataviz: jedna seria (tytul nazywa, bez legendy), cienkie slupki
  * z zaokraglonymi koncami 4px, recesywna siatka, tooltip na hover, etykiety
  * bezposrednie; kolor marki #7c6bda (paleta zwalidowana skryptem skilla).
+ *
+ * 2026-09-01: sekcja "Previous epochs" - zamkniete tygodnie z linkami do
+ * kanonicznych manifestow (/api/sphere/epochs, publishEpoch.ts) i stanem
+ * odbioru konta po wdrozeniu dystrybutora. Patrz komentarz przy
+ * PastEpochsSection.
  */
 
 import { useEffect, useMemo, useState } from 'react';
 import { formatEther } from 'viem';
+import { useAccount, usePublicClient } from 'wagmi';
 import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { ChevronDown, ChevronUp, Info, Loader2, Trophy } from 'lucide-react';
 // Sezon liczy zrealizowane ETH z Base (/api/sphere/season, CHAIN_ID 8453) -
 // etykieta nie moze podazac za wybrana siecia tablicy.
-import { SPHERE_NATIVE_SYMBOL } from '../sphereChain';
+import { SPHERE_CHAIN, SPHERE_NATIVE_SYMBOL } from '../sphereChain';
+import { SPHERE_DISTRIBUTOR_ADDRESS, sphereDistributorReadsAbi } from '../sphereConfig';
 import { BigStat, LearnMore, PageHero } from '../SphereUI';
 
 type SeasonToken = {
@@ -54,6 +61,27 @@ type SeasonData = {
   creators: SeasonCreator[];
 };
 
+/** Ksztalt /api/sphere/epochs - podsumowania manifestow publishEpoch.ts. */
+type EpochManifestSummary = {
+  closedAtPublish: boolean;
+  externalVolumeEth: string;
+  protocolEth: string;
+  creators: number;
+  tokens: number;
+  poolSphere: string;
+  root: string | null;
+  manifestHash: string;
+  cumulative: Record<string, string>;
+  url: string;
+};
+
+type PastEpoch = { index: number; fromBlock: string; toBlock: string; manifest: EpochManifestSummary | null };
+
+type EpochsData = { currentEpochIndex: number; epochs: PastEpoch[] };
+
+/** Stan naleznosci konta w JEDNEJ epoce (tylko przy wdrozonym dystrybutorze). */
+type AccountEpochLine = { accrued: bigint; status: 'claimed' | 'claimable' | 'streaming' };
+
 const BRAND = '#7c6bda';
 
 /** Podium czyta sie w jednej klatce - medal zamiast numeru. */
@@ -70,6 +98,13 @@ function pts(weight: string) {
 
 function short(addr: string) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+}
+
+/** Kwoty SPHERE (18 dec) - separatory tysiecy, bez ogona osiemnastu zer. */
+function sphereAmt(wei: string | bigint) {
+  return Number(formatEther(typeof wei === 'bigint' ? wei : BigInt(wei))).toLocaleString('en-US', {
+    maximumFractionDigits: 2,
+  });
 }
 
 /**
@@ -170,6 +205,235 @@ function CreatorRow({ rank, c }: { rank: number; c: SeasonCreator }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Mala statystyka w wierszu epoki - odpowiednik kolumn leaderboardu. */
+function EpochStat({ label, value }: { label: string; value: string | number }) {
+  return (
+    <span className="text-right">
+      <span className="block font-mono text-[12px] font-bold text-sp-ink">{value}</span>
+      <span className="block text-[9.5px] font-bold uppercase tracking-[0.06em] text-sp-shade/40">{label}</span>
+    </span>
+  );
+}
+
+function PastEpochRow({ e, line }: { e: PastEpoch; line: AccountEpochLine | null }) {
+  const m = e.manifest;
+  return (
+    <div className="rounded-2xl bg-sp-shade/[0.03] px-3 py-2.5">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5">
+        <span className="min-w-[104px]">
+          <span className="block text-[13px] font-extrabold text-sp-ink">Week {e.index + 1}</span>
+          <span className="block font-mono text-[9.5px] text-sp-shade/40">
+            #{e.fromBlock} – #{e.toBlock}
+          </span>
+        </span>
+        {m ? (
+          <>
+            <EpochStat label={`volume (${SPHERE_NATIVE_SYMBOL})`} value={eth(m.externalVolumeEth, 3)} />
+            <EpochStat label="creators" value={m.creators} />
+            <EpochStat
+              label={m.poolSphere === '0' ? 'pool · shadow' : 'pool (SPHERE)'}
+              value={m.poolSphere === '0' ? '0' : sphereAmt(m.poolSphere)}
+            />
+            <a
+              href={m.url}
+              target="_blank"
+              rel="noreferrer"
+              className="ml-auto shrink-0 text-[10.5px] font-extrabold text-sp-shade/45 transition-colors hover:text-sp-brand"
+            >
+              Manifest ↗
+            </a>
+          </>
+        ) : (
+          <span className="text-[10.5px] font-bold text-sp-shade/40">
+            Manifest not published yet - the epoch can be recomputed from Base logs with the public formula at any time.
+          </span>
+        )}
+      </div>
+      {m && !m.closedAtPublish && (
+        <p className="mt-1.5 text-[10px] font-bold text-sp-shade/40">
+          Published as a mid-week snapshot - final numbers land when the closed epoch is republished.
+        </p>
+      )}
+      {line && (
+        <p className={`mt-1.5 text-[10.5px] font-bold ${line.status === 'claimed' ? 'text-sp-up' : 'text-sp-brand'}`}>
+          Your accrual: {sphereAmt(line.accrued)} SPHERE ·{' '}
+          {line.status === 'claimed'
+            ? 'claimed in full'
+            : line.status === 'streaming'
+              ? 'streaming - unlocks linearly through this week'
+              : 'claimable now - and it waits for you indefinitely'}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * "Previous epochs" - zamkniete tygodnie sezonu z linkami do kanonicznych
+ * manifestow (publishEpoch.ts) i podsumowaniem per epoka.
+ *
+ * KOMUNIKACJA GWARANCJI (spec 6.1): dystrybutor jest KUMULATYWNY - lisc to
+ * skumulowana naleznosc, monotonicznosc wymuszana przy claimie - wiec
+ * nieodebrane nagrody NIGDY nie przepadaja i jeden claim placi wszystko,
+ * co naroslo. Sekcja mowi to wprost, zeby nikt nie sadzil, ze musi
+ * odbierac co tydzien.
+ *
+ * Stan odbioru konta zapala sie dopiero po wdrozeniu
+ * SphereStreamingMerkleDistributor (SPHERE_DISTRIBUTOR_ADDRESS w
+ * sphereConfig); do tego czasu karta na dole uczciwie mowi "not live yet".
+ * Przyrost per epoka liczymy z map `cumulative` manifestow (cum_N - cum_
+ * poprzedniego roota), status z jednego skalara claimed(account) -
+ * kumulatywnosc rozlicza epoki od najstarszej.
+ */
+function PastEpochsSection() {
+  const [data, setData] = useState<EpochsData | null>(null);
+  const [failed, setFailed] = useState(false);
+  const readClient = usePublicClient({ chainId: SPHERE_CHAIN.id });
+  const { address: account } = useAccount();
+  const [claimedAmt, setClaimedAmt] = useState<bigint | null>(null);
+  const [vested, setVested] = useState<bigint | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    fetch('/api/sphere/epochs')
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((d: EpochsData) => {
+        if (alive) setData(d);
+      })
+      .catch(() => {
+        if (alive) setFailed(true);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Najnowszy opublikowany root (API zwraca epoki malejaco) - z niego bierze
+  // sie kumulatywna naleznosc konta i para (cum, prevCum) do vestedOf.
+  const rootedDesc = useMemo(() => (data?.epochs ?? []).filter((e) => e.manifest?.root), [data]);
+
+  useEffect(() => {
+    const dist = SPHERE_DISTRIBUTOR_ADDRESS;
+    if (!dist || !readClient || !account || rootedDesc.length === 0) return;
+    const key = account.toLowerCase();
+    const cum = BigInt(rootedDesc[0].manifest!.cumulative[key] ?? '0');
+    const prevCum = BigInt(rootedDesc[1]?.manifest?.cumulative[key] ?? '0');
+    let alive = true;
+    const load = async () => {
+      try {
+        const [c, v] = await Promise.all([
+          readClient.readContract({ address: dist, abi: sphereDistributorReadsAbi, functionName: 'claimed', args: [account] }) as Promise<bigint>,
+          cum > 0n
+            ? (readClient.readContract({ address: dist, abi: sphereDistributorReadsAbi, functionName: 'vestedOf', args: [cum, prevCum] }) as Promise<bigint>)
+            : Promise.resolve(0n),
+        ]);
+        if (alive) {
+          setClaimedAmt(c);
+          setVested(v);
+        }
+      } catch {
+        /* odczyt wroci przy nastepnym interwale */
+      }
+    };
+    void load();
+    const t = setInterval(load, 30_000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [readClient, account, rootedDesc]);
+
+  const accountLines = useMemo(() => {
+    const lines = new Map<number, AccountEpochLine>();
+    if (!SPHERE_DISTRIBUTOR_ADDRESS || !account || claimedAmt === null || rootedDesc.length === 0) return lines;
+    const key = account.toLowerCase();
+    const rootedAsc = [...rootedDesc].sort((a, b) => a.index - b.index);
+    const newest = rootedAsc[rootedAsc.length - 1].index;
+    let prev = 0n;
+    for (const e of rootedAsc) {
+      const cum = BigInt(e.manifest!.cumulative[key] ?? '0');
+      if (cum > prev) {
+        lines.set(e.index, {
+          accrued: cum - prev,
+          status: claimedAmt >= cum ? 'claimed' : e.index === newest ? 'streaming' : 'claimable',
+        });
+      }
+      prev = cum;
+    }
+    return lines;
+  }, [account, claimedAmt, rootedDesc]);
+
+  const myCum =
+    account && rootedDesc.length > 0 ? BigInt(rootedDesc[0].manifest!.cumulative[account.toLowerCase()] ?? '0') : 0n;
+  const claimableNow =
+    vested !== null && claimedAmt !== null ? (vested > claimedAmt ? vested - claimedAmt : 0n) : null;
+
+  return (
+    <section className="sph-card rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-[13.5px] font-extrabold text-sp-ink">Previous epochs</h3>
+        <span className="rounded-full bg-sp-up/10 px-2.5 py-1 text-[9.5px] font-extrabold uppercase tracking-[0.08em] text-sp-up">
+          Cumulative - nothing expires
+        </span>
+      </div>
+      <p className="mt-0.5 text-[10.5px] text-sp-shade/50">
+        Every closed week gets a canonical manifest anyone can recompute. Rewards are cumulative by design: each new
+        Merkle root carries your full history, so unclaimed SPHERE never expires and a single claim collects everything
+        ever accrued. Claiming weekly is not required.
+      </p>
+
+      <div className="mt-3 grid gap-1.5">
+        {failed ? (
+          <p className="py-6 text-center text-[12px] text-sp-shade/45">Epoch history unavailable - retry in a moment.</p>
+        ) : !data ? (
+          <p className="flex items-center justify-center gap-2 py-6 text-center text-[12px] text-sp-shade/45">
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Loading closed epochs…
+          </p>
+        ) : data.epochs.length === 0 ? (
+          <p className="py-6 text-center text-[12px] text-sp-shade/45">
+            The first week is still running - closed epochs will appear here with their manifests.
+          </p>
+        ) : (
+          data.epochs.map((e) => <PastEpochRow key={e.index} e={e} line={accountLines.get(e.index) ?? null} />)
+        )}
+      </div>
+
+      {SPHERE_DISTRIBUTOR_ADDRESS ? (
+        account ? (
+          <div className="mt-3 rounded-2xl bg-sp-brand/[0.06] p-3">
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-brand">Your claim state</p>
+            <div className="mt-1.5 flex flex-wrap gap-x-6 gap-y-1.5">
+              <EpochStat label="accrued all-time (SPHERE)" value={sphereAmt(myCum)} />
+              <EpochStat label="claimed (SPHERE)" value={claimedAmt === null ? '…' : sphereAmt(claimedAmt)} />
+              <EpochStat label="claimable now (SPHERE)" value={claimableNow === null ? '…' : sphereAmt(claimableNow)} />
+            </div>
+            <p className="mt-1.5 flex items-start gap-1.5 text-[10.5px] text-sp-shade/55">
+              <Info className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
+              One claim pays out everything accrued across all epochs. Each week&apos;s increment streams linearly
+              through the following week; whatever you leave unclaimed keeps waiting - it never expires.
+            </p>
+          </div>
+        ) : (
+          <p className="mt-3 rounded-2xl bg-sp-shade/[0.04] p-3 text-[10.5px] font-bold text-sp-shade/50">
+            Connect a wallet to see your claim state. Unclaimed rewards never expire - one claim collects every epoch.
+          </p>
+        )
+      ) : (
+        <div className="mt-3 rounded-2xl bg-sp-shade/[0.04] p-3">
+          <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/45">
+            Claiming - not live yet
+          </p>
+          <p className="mt-1 text-[10.5px] font-bold leading-relaxed text-sp-shade/50">
+            Payouts arrive with the streaming distributor (contract ready, awaiting deployment). Once funded epochs
+            start, every root stays cumulative: unclaimed rewards roll forward forever and a single claim pays out
+            everything accrued - you will never have to claim week by week.
+          </p>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -328,6 +592,9 @@ export default function SphereSeasonPanel() {
           )}
         </div>
       </section>
+
+      {/* POPRZEDNIE EPOKI: manifesty + gwarancja kumulatywnosci ------------- */}
+      <PastEpochsSection />
 
       <LearnMore>How scoring works - volume, trader multiplier and the 30% fee cap</LearnMore>
     </div>

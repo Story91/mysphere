@@ -49,6 +49,16 @@ export const SPHERE_TOKEN_ADDRESS = envAddress(
 /** Wspolny Safe wszystkich rol (decyzje #12 i Gate 0 z 2026-08-31). */
 export const SPHERE_SAFE_ADDRESS = '0x83E2DE974FC6B866FDb78AEFa5596d58fDc4142F' as Address;
 
+/**
+ * Dystrybutor wyplat volume mining (SphereStreamingMerkleDistributor,
+ * faza 1B). Kontrakt gotowy w contracts/launchpad/sphere/, JESZCZE
+ * niewdrozony - fallback pusty, wiec adres jest null i UI sezonu pokazuje
+ * uczciwe "claiming not live yet". Po wdrozeniu wystarczy wpisac adres
+ * (albo env), a stan odbioru przy epokach zapali sie bez zmian w kodzie -
+ * ten sam mechanizm trzech stanow co przy pozostalych peryferiach.
+ */
+export const SPHERE_DISTRIBUTOR_ADDRESS = envAddress('NEXT_PUBLIC_SPHERE_DISTRIBUTOR_ADDRESS', '');
+
 /** Czy peryferia sa wdrozone - od tego zalezy caly tryb strony. */
 export const SPHERE_LIVE = Boolean(
   SPHERE_REWARDS_ADDRESS && SPHERE_ESCROW_ADDRESS && SPHERE_VESTING_ADDRESS
@@ -68,6 +78,21 @@ export const SPHERE_PLAN = {
 /* ========================================================================== */
 /*  ABI - 1:1 z artefaktow kompilacji                                          */
 /* ========================================================================== */
+
+/**
+ * Odczytowy wycinek ABI dystrybutora - tylko to, czego potrzebuje stan
+ * odbioru w UI sezonu (claimed / vestedOf / metadane roota). Pelne ABI
+ * wejdzie 1:1 z artefaktu przy wdrozeniu, jak przy pozostalych peryferiach;
+ * sygnatury zgodne ze zrodlem SphereStreamingMerkleDistributor.sol.
+ */
+export const sphereDistributorReadsAbi = [
+  { type: 'function', name: 'claimed', stateMutability: 'view', inputs: [{ name: '', type: 'address' }], outputs: [{ name: '', type: 'uint256' }] },
+  { type: 'function', name: 'vestedOf', stateMutability: 'view', inputs: [{ name: 'cumulative', type: 'uint256' }, { name: 'prevCumulative', type: 'uint256' }], outputs: [{ name: '', type: 'uint256' }] },
+  { type: 'function', name: 'root', stateMutability: 'view', inputs: [], outputs: [{ name: '', type: 'bytes32' }] },
+  { type: 'function', name: 'epochId', stateMutability: 'view', inputs: [], outputs: [{ name: '', type: 'uint64' }] },
+  { type: 'function', name: 'activatedAt', stateMutability: 'view', inputs: [], outputs: [{ name: '', type: 'uint64' }] },
+  { type: 'function', name: 'STREAM_DURATION', stateMutability: 'view', inputs: [], outputs: [{ name: '', type: 'uint64' }] },
+] as const;
 
 export const sphereRewardsAbi = [{"inputs":[{"internalType":"address","name":"consumer_","type":"address"}],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[],"name":"EthTransferFailed","type":"error"},{"inputs":[],"name":"NotConsumer","type":"error"},{"inputs":[],"name":"NothingToPull","type":"error"},{"inputs":[],"name":"ZeroAddress","type":"error"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"},{"indexed":true,"internalType":"address","name":"caller","type":"address"}],"name":"Pulled","type":"event"},{"inputs":[],"name":"CONSUMER","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"pull","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"pullable","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"totalPulled","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"stateMutability":"payable","type":"receive"}] as const;
 
