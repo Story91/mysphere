@@ -101,7 +101,11 @@ export default function PoolTradeBox({ core, onAfterTx }: { core: CoreState; onA
       return;
     }
     let cancelled = false;
-    const t = setTimeout(() => {
+    let retry: ReturnType<typeof setTimeout> | null = null;
+    // Publiczne RPC Base odpowiada 429 przy serii odczytow strony tokena;
+    // jedna ponowna proba po 1.5 s zamienia "--" w liczbe zamiast zostawiac
+    // pusta wycene do nastepnego wpisanego znaku.
+    const ask = (attempt: number) => {
       readClient
         .readContract({
           address: v4.quoter,
@@ -113,12 +117,16 @@ export default function PoolTradeBox({ core, onAfterTx }: { core: CoreState; onA
           if (!cancelled) setQuote((res as readonly [bigint, bigint])[0]);
         })
         .catch(() => {
-          if (!cancelled) setQuote(null);
+          if (cancelled) return;
+          if (attempt < 2) retry = setTimeout(() => ask(attempt + 1), 1500);
+          else setQuote(null);
         });
-    }, 250);
+    };
+    const t = setTimeout(() => ask(0), 250);
     return () => {
       cancelled = true;
       clearTimeout(t);
+      if (retry) clearTimeout(retry);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [readClient, v4, side, buyAmount, sellAmount, decimals, core.token]);
