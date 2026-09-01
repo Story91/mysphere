@@ -40,43 +40,46 @@
  * kategorie i siec (slowa "social", "feed", "Base" nie padaja na obrazku ani
  * raz), opis dokłada napiwki i mechanike. Zmieniajac jedno, przeczytaj tamte.
  *
- * === DLACZEGO CIEMNA, SKORO BYLA JASNA LAWENDOWA ===
- * Zmiana zamowiona, ale nie jest sama kwestia gustu i ma dwa powody.
- * 1. RODZINA. Pozostale cztery karty (/leaderboard, /post, /tip, /u) maja
- *    wspolna oprawe: to samo tlo #0A1024, ten sam padding 72, ta sama gramatyka
- *    trzech pasm ze `space-between`, ta sama rozstrzelona nadlinia. Ta karta
- *    byla jedynym wyjatkiem i poprzedni komentarz sam nazywal koszt: piec kart
- *    wrzuconych w jeden watek wygladalo jak dwa produkty. Teraz jest ich piec
- *    z jednej rodziny, a wspolna oprawa zostala wspolna.
- * 2. CUDZY INTERFEJS. To jedyna powierzchnia ogladana WYLACZNIE u kogos innego.
- *    Na bialej osi czasu X-a ciemny prostokat jest figura - jasna karta zlewa
- *    sie z tlem i traci wlasna krawedz. Na ciemnej osi #0A1024 nie znika, bo
- *    jest granatem z fioletem (B=36 > G=16 > R=10), a nie czernia X-a; dodatkowo
- *    obrysowuje ja fioletowy krecoslup.
- * Ceną jest przeskok tonalny na pierwszym kliknieciu - produkt jest lawendowy
- * i jasny. Ten przeskok istnial juz wczesniej cztery razy (kazda karta danych),
- * a fiolet soft-primary na nadlinii i krecoslupie jest mostem miedzy ciemna
- * zajawka a jasnym produktem: kolor sie zgadza, zmienia sie tylko jasnosc.
+ * === DLACZEGO ZNOWU JASNA - ZMIANA ZAMOWIONA 2026-09-01 ===
+ * Wlasciciel odrzucil wersje ciemna wprost ("ciemne z fioletem"). Karta wraca
+ * na jasne tlo produktu. Ponizej sa oba poprzednie argumenty za ciemnym i to,
+ * co sie z nimi dzieje - zeby nikt nie cofal tej zmiany w ciemno.
+ * 1. RODZINA. Cztery karty danych (/leaderboard, /post, /tip, /u) NADAL maja
+ *    tlo #0A1024. Ta karta jest teraz jedynym wyjatkiem, czyli wraca dokladnie
+ *    ten koszt, ktory ciemna wersja usuwala: piec kart w jednym watku wyglada
+ *    jak dwa produkty. To jest ZNANA, przyjeta cena tej decyzji, a nie
+ *    przeoczenie. Wlasciwe domkniecie to przeniesienie tamtych czterech na te
+ *    sama jasna oprawe - osobne zadanie, bo dotyka czterech plikow i ich
+ *    wlasnych progow kontrastu.
+ * 2. CUDZY INTERFEJS. Argument brzmial: na bialej osi czasu X-a jasna karta
+ *    zlewa sie z tlem. Dlatego tlo NIE jest bialy #ffffff (--soft-surface),
+ *    tylko lawendowe #f1edfa (--soft-bg): wobec bieli X-a ma wlasna krawedz,
+ *    a wobec ciemnego motywu X-a jest jasnym prostokatem, czyli figura w obu
+ *    przypadkach. Krecoslup w --soft-primary-deep dodatkowo obrysowuje kadr.
+ * Zyskiem jest to, co ciemna wersja nazywala swoja cena: znika przeskok
+ * tonalny miedzy podgladem a produktem. Produkt jest lawendowy i jasny, wiec
+ * karta wyglada teraz jak on.
  *
  * === KONTRAST: KARTA JEST OGLADANA JAKO MINIATURA ===
  * X skaluje podglad do ~500 px szerokosci na pulpicie i ~360 px na telefonie,
  * czyli okolo 0.3-0.42 oryginalu. Kazda wartosc nizej jest wiec liczona przy
  * zalozeniu, ze zniknie wszystko cienkie i wyblakle. Zmierzone kontrasty na
- * tle #0A1024 (WCAG):
- *   #EEF3FF  17.0:1  naglowek
- *   #B9C6E0  11.0:1  druga linijka i stopka
- *   #9B8CEA   6.6:1  nadlinia i krecoslup
- * Dla porownania #5C6F94, ktorym cztery karty danych pisza swoje stopki, daje
- * na tym samym tle 3.7:1 - ponizej progu AA dla malego tekstu i realnie znika
- * w miniaturze. TU tego tonu nie ma; tamte cztery warto poprawic osobno.
- * Zaden tekst nie schodzi ponizej 30 px, bo 30 px w miniaturze to ~12 px.
+ * tle #F1EDFA (WCAG, policzone, nie oszacowane):
+ *   #2E2A44  11.9:1  naglowek
+ *   #6B6486   4.8:1  druga linijka i stopka - przechodzi AA takze dla malego
+ *   #5F4EC2   5.4:1  nadlinia i krecoslup
+ * Nadlinia NIE uzywa --soft-primary #7C6BDA, ktory na tym tle daje tylko
+ * 3.7:1: to przechodzi jedynie jako duzy tekst, a przy skalowaniu do miniatury
+ * (24 px * 0.35 = ~8 px) realnie by zniknal. Stad --soft-primary-deep.
+ * Zaden tekst nie schodzi ponizej 24 px w nadlinii i 30 px w tresci.
  */
 
 /**
- * Paleta. Tlo, atrament i padding sa PRZEPISANE z czterech kart danych
- * (np. app/leaderboard/opengraph-image.tsx:65 i :78) - to jest wspolna oprawa
- * rodziny i nie wolno jej tu rozjechac. Fiolet jest jedynym akcentem i pochodzi
- * z --soft-primary (app/globals.css:38), rozjasniony do progu czytelnosci.
+ * Paleta. Wszystkie cztery wartosci sa PRZEPISANE Z TOKENOW PRODUKTU
+ * (app/globals.css, wiersze 26-39): --soft-bg, --soft-ink, --soft-ink-muted
+ * i --soft-primary-deep. Nic tu nie jest dobrane na oko - karta ma wygladac
+ * jak strona, na ktora prowadzi. Padding 72 zostaje wspolny z czterema
+ * kartami danych, mimo ze tlo sie rozeszlo.
  *
  * POMARANCZU (--soft-accent #F5A73B) NA TEJ KARCIE NIE MA ANI RAZU - i to jest
  * decyzja, nie przeoczenie. W tym systemie pomarancz znaczy KWOTE. Na karcie
@@ -85,10 +88,10 @@
  * zlamanie tej samej reguly, ktora w tej sesji naprawiano szesc razy.
  */
 const CARD = {
-  bg: '#0A1024', // wspolne tlo rodziny kart
-  ink: '#EEF3FF', // 17.0:1 - naglowek
-  inkMuted: '#B9C6E0', // 11.0:1 - mechanizm i stopka
-  brand: '#9B8CEA', // 6.6:1 - --soft-primary rozjasniony, jedyny akcent
+  bg: '#F1EDFA', // --soft-bg, tlo produktu; NIE bialy, bo bialy zlewa sie z X-em
+  ink: '#2E2A44', // --soft-ink, 11.9:1 - naglowek
+  inkMuted: '#6B6486', // --soft-ink-muted, 4.8:1 - mechanizm i stopka
+  brand: '#5F4EC2', // --soft-primary-deep, 5.4:1 - jedyny akcent
 } as const;
 
 /**

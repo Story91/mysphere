@@ -22,9 +22,14 @@
  * launchpada: brak wykresu jest uczciwy, zmyslony wykres nie jest.
  */
 
-/** Wzrost i spadek w barwach rodziny kart OG (app/components/og/HomeShareCard.tsx). */
-const UP_COLOR = '#00E28A';
-const DOWN_COLOR = '#F2A33C';
+/**
+ * Wzrost i spadek w barwach startpada (--sp-up / --sp-down, globals.css:101
+ * i :106) - te same, ktorych uzywa TokenShareCard na mnozniku. Na jasnym tle
+ * #F1EDFA daja 3.17:1 i 3.29:1, czyli przechodza prog 3:1 dla grafiki.
+ * Trzymac zsynchronizowane z CARD.up / CARD.down.
+ */
+const UP_COLOR = '#0B9A51';
+const DOWN_COLOR = '#C76B12';
 
 /** Ile punktow trafia na obrazek. Wiecej nie doda ksztaltu, doda wagi pliku. */
 const MAX_POINTS = 64;

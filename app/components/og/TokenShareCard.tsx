@@ -22,24 +22,52 @@ import type { TokenCardData } from '../../startpad/share/tokenCard';
  * ===========================================================================
  * ZASADY RODZINY KART (nie lamac ich tutaj)
  * ===========================================================================
- * Tlo #0A1024, padding 72, trzy pasma ze `space-between`, rozstrzelona
- * nadlinia, `sans-serif` (Noto Sans wbudowane w @vercel/og). Ta karta jest
- * SZOSTA z rodziny i ma wygladac na rodzenstwo pozostalych pieciu.
+ * Padding 72, trzy pasma ze `space-between`, rozstrzelona nadlinia,
+ * `sans-serif` (Noto Sans wbudowane w @vercel/og). Ta karta jest SZOSTA
+ * z rodziny i ma wygladac na rodzenstwo pozostalych pieciu.
+ *
+ * TLO: #F1EDFA, nie #0A1024. Zmiana zamowiona przez wlasciciela 2026-09-01
+ * razem z HomeShareCard - uzasadnienie i przyjeta cena sa opisane tam.
+ * UWAGA: cztery karty danych (/leaderboard, /post, /tip, /u) SA JESZCZE
+ * ciemne, wiec rodzina jest chwilowo rozjechana 2:4. To jest znany dlug,
+ * nie przeoczenie.
  *
  * SATORI, NIE PRZEGLADARKA: kazdy kontener ma jawny `display`, zero klas
  * Tailwinda, zero cieni pod tekstem, zero jednostek innych niz liczby.
  */
 
+/**
+ * Paleta przepisana z tokenow produktu (app/globals.css). Kontrasty WCAG
+ * policzone wobec tla #F1EDFA, nie oszacowane:
+ *   #2E2A44  11.9:1  ink       - $SYMBOL 72/700 i wartosci kafli 34/700
+ *   #6B6486   4.8:1  inkMuted  - nazwa 28px, siec i stan 22px
+ *   #5F4EC2   5.4:1  brand     - nadlinia 24/700, SINCE LAUNCH 20px, etykiety 17px
+ * Nadlinia NIE uzywa --soft-primary #7C6BDA (3.67:1) - X skaluje podglad do
+ * ~0.35, wiec 24px robi sie 8px i taki fiolet znika. Ta sama decyzja co
+ * w HomeShareCard.
+ *
+ * KIERUNEK CENY jest SEMANTYCZNY i dlatego NIE idzie na tokeny --soft-*.
+ * Bierze wlasne barwy startpada (globals.css:101-108), czyli te same, ktorych
+ * uzywaja strony produktu:
+ *   --sp-up   #0B9A51  3.17:1  wzrost
+ *   --sp-down #C76B12  3.29:1  spadek
+ * Oba przechodza prog 3:1 dla mnoznika 104/700 i dla linii wykresu. NIE
+ * mapowac spadku na --soft-accent #F5A73B: to 1.74:1 (niewidoczne), a w tym
+ * systemie pomarancz znaczy KWOTE, nie kierunek.
+ *
+ * KAFLE: alfa sie odwraca. rgba(255,255,255,0.04) na jasnym tle daje ~1.01:1,
+ * czyli nic - kafel musi byc kryty, a wlos ciemniejszy od tla, nie jasniejszy.
+ */
 const CARD = {
-  bg: '#0A1024',
-  ink: '#EEF3FF',
-  inkMuted: '#B9C6E0',
-  brand: '#9B8CEA',
+  bg: '#F1EDFA', // --soft-bg
+  ink: '#2E2A44', // --soft-ink
+  inkMuted: '#6B6486', // --soft-ink-muted
+  brand: '#5F4EC2', // --soft-primary-deep
   /** Wzrost i spadek - te same barwy, co linia wykresu w chartSvg.ts. */
-  up: '#00E28A',
-  down: '#F2A33C',
-  line: 'rgba(255,255,255,0.10)',
-  panel: 'rgba(255,255,255,0.04)',
+  up: '#0B9A51', // --sp-up
+  down: '#C76B12', // --sp-down
+  line: '#B9B1D8', // --soft-line-strong, wlos CIEMNIEJSZY od tla
+  panel: '#FFFFFF', // --soft-surface, kryty
 } as const;
 
 const PADDING = 72;
@@ -75,7 +103,15 @@ function Glyph({ data }: { data: TokenCardData }) {
         justifyContent: 'center',
         fontSize: 40,
         fontWeight: 700,
-        color: '#FFFFFF',
+        /**
+         * Inicjaly ciemne, nie biale - i to nie jest kwestia motywu. Chipy
+         * (ACCENTS w app/startpad/metadata.ts) to sredniotonowe pastele:
+         * bialy tekst dawal na nich 2.74 / 2.84 / 2.94:1, czyli PONIZEJ progu
+         * 3:1 na trzech z szesciu, juz w wersji ciemnej. #2E2A44 daje
+         * 3.87-5.00:1 na wszystkich szesciu. Chipow NIE ruszamy - ich barwy sa
+         * wspolna tozsamoscia z tablica launchpada i strona tokena.
+         */
+        color: '#2E2A44',
       }}
     >
       {safeSymbol(data.symbol).slice(0, 2).toUpperCase()}
