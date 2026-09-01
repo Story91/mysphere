@@ -175,10 +175,35 @@ export async function POST(request: NextRequest) {
   const creator = resolution.creator;
 
   if (tokenDocId(creator) !== tokenDocId(author)) {
-    return NextResponse.json(
-      { error: 'Only the creator of this token can edit its profile.', code: 'not_creator' },
-      { status: 403, headers: NO_STORE }
-    );
+    // Wzorzec escrow-as-creator (SPHERE, sekcja 8 tokenomiki): tworca
+    // on-chain jest KONTRAKTEM, ktorym nikt nie podpisze sesji SIWE.
+    // Prawo do profilu ma wtedy adres, ktory ten kontrakt sam deklaruje
+    // jako LAUNCH_AUTHORITY() - odczyt z lancucha, nie pole z JSON-a.
+    // Dla tworcy-EOA odczyt rewertuje i zostaje stare 403.
+    let delegated: string | null = null;
+    try {
+      delegated = (await client.readContract({
+        address: creator as Address,
+        abi: [
+          {
+            type: 'function',
+            name: 'LAUNCH_AUTHORITY',
+            stateMutability: 'view',
+            inputs: [],
+            outputs: [{ type: 'address' }],
+          },
+        ] as const,
+        functionName: 'LAUNCH_AUTHORITY',
+      })) as string;
+    } catch {
+      delegated = null;
+    }
+    if (!delegated || tokenDocId(delegated) !== tokenDocId(author)) {
+      return NextResponse.json(
+        { error: 'Only the creator of this token can edit its profile.', code: 'not_creator' },
+        { status: 403, headers: NO_STORE }
+      );
+    }
   }
 
   // Logo -> Blob (CDN). Robimy to PRZED Firestore, bo obrazek ma sie zapisac
