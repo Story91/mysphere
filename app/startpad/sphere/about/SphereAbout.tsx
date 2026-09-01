@@ -80,8 +80,8 @@ export default function SphereAbout() {
           <p>
             <EnforcedBadge />{' '}
             <span className="ml-1">
-              Frozen fee split: curve fees route 60% to the rewards vault and 40% to the creator escrow - receivers are
-              baked into the launch forever.
+              Frozen fee split: the creator&apos;s 70% share of every curve fee routes 60% to the rewards vault and 40%
+              to the creator escrow (42% / 28% of the whole fee) - receivers are baked into the launch forever.
             </span>
           </p>
           <p>
@@ -92,9 +92,15 @@ export default function SphereAbout() {
             </span>
           </p>
           <p>
-            <EnforcedBadge />{' '}
+            {/* SphereBuyback jest napisany i przetestowany, ale NIE wdrozony
+                (faza 1B, po shadow). Etykieta "enforced" na niewdrozonym
+                kontrakcie lamalaby wlasna regule z sekcji 5 speca. */}
+            <span className="inline-flex items-center gap-1 rounded-full bg-sp-shade/10 px-2 py-0.5 text-[9.5px] font-extrabold uppercase tracking-[0.06em] text-sp-shade/60">
+              Written, not deployed yet
+            </span>{' '}
             <span className="ml-1">
-              Bought SPHERE splits in the buyback contract: 20% burned forever, 80% to the weekly creator reward pool.
+              Buyback contract (ships after shadow season): bought SPHERE splits 20% burned forever, 80% to the weekly
+              creator reward pool. Until it is live on Base, treat this as a plan, not a guarantee.
             </span>
           </p>
         </div>
@@ -144,9 +150,9 @@ export default function SphereAbout() {
             traders. Washing burns your ETH on fees and cannot raise that cap.
           </p>
           <p>
-            <span className="font-extrabold text-sp-ink">Streaming payouts:</span> each week&apos;s rewards unlock
-            linearly over the next one, inside the distributor contract - watch your balance tick up and claim whenever
-            you want.
+            <span className="font-extrabold text-sp-ink">Streaming payouts:</span> each week&apos;s rewards will unlock
+            linearly over the next one, inside a distributor contract that ships once shadow season proves the numbers.
+            Unclaimed rewards never expire - the ledger is cumulative, so one claim pays everything you have earned.
           </p>
           <p className="text-[11px] text-sp-shade/50">
             Shadow season runs now: scores are computed and published with no payouts while the formula calibrates on
@@ -188,7 +194,8 @@ export default function SphereAbout() {
           rel="noreferrer"
           className="mt-2 inline-flex items-center gap-1 text-[11.5px] font-bold text-sp-brand hover:underline"
         >
-          Rehearsal token 0xb20000…04aDBc on Sepolia BaseScan <ExternalLink className="h-3 w-3" aria-hidden="true" />
+          Rehearsal token 0xb20000…04aDBc on Sepolia BaseScan (testnet, worthless, not the token you buy){' '}
+          <ExternalLink className="h-3 w-3" aria-hidden="true" />
         </a>
       </Card>
     </div>
