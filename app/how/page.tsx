@@ -18,28 +18,34 @@ import Link from 'next/link';
  * nawet jako zapowiedz. Zapowiedzi sa na /re-definition, w tabeli ze statusami.
  *
  * === "DZIALA" TO NIE TO SAMO CO "KTOS PRZEZ TO PRZESZEDL" ===
- * Trzy kroki opisuja rzeczy, ktore dzialaja i przez ktore NIKT jeszcze nie
+ * Dwa kroki opisuja rzeczy, ktore dzialaja i przez ktore NIKT jeszcze nie
  * przeszedl, i kazdy musi to mowic W SWOIM KROKU, a nie w gwiazdce na dole:
  *
- *   krok 05 (escrow)  Kontrakt na Base stoi i ma zweryfikowane zrodlo, ale
- *                     eth_getLogs od bloku wdrozenia nie zwraca ani jednego
- *                     zdarzenia, a balanceOf(USDC) wynosi zero. Nikt nie
- *                     zablokowal tam ani centa.
  *   krok 07 (zwrot)   settleExpired ma przycisk na /money (page.tsx wola
  *                     settleExpiredAsk), ale ta noga nie przeszla na zadnej
  *                     prawdziwej sieci - wymaga terminu + 48h, czego nie da
  *                     sie przewinac. Jedyny dowod to test jednostkowy.
  *   krok 09 (graduacja)  Pelna sciezka launch -> pula -> wyplaty przeszla
- *                     na Sepolii na TYCH SAMYCH zrodlach, ale z mniejszym
- *                     celem zbiorki (mini-stack testowy). Na wdrozeniu
- *                     produkcyjnym zadna krzywa nie doszla jeszcze do
- *                     3.00 ETH, wiec nikt nie graduowal naprawde.
+ *                     na sieciach testowych (Sepolia; na Arc testnecie jeden
+ *                     token graduowal do zywej puli v4). Na Base mainnet skan
+ *                     eth_getLogs z 2026-09-01, kompletny od bloku wdrozenia
+ *                     do glowy lancucha, pokazal 8 zdarzen Launched i 0
+ *                     Graduated - nikt nie graduowal naprawde.
  *
- * === STARTPAD JEST NA BASE MAINNET (od 2026-08-11) ===
+ * Krok 05 (escrow) z tej listy wypadl 2026-09-01: budzet zostal zablokowany
+ * w kontrakcie z tej apki na Base mainnet (commity 2bc5781 i 1bd728b,
+ * 2026-08-07/08), wiec krok mowi teraz "nie bedziesz pierwszy" zamiast
+ * "kontrakt jest pusty".
+ *
+ * === STARTPAD: BASE MAINNET DOMYSLNIE, CZTERY SIECI W PRZELACZNIKU ===
  * Naglowek strony obiecuje, ze wszystko tu kosztuje prawdziwe pieniadze -
- * i Startpad (kroki 08-10) juz sie w to wpisuje: domyslnie chodzi na Base
- * mainnet z PRAWDZIWYM ETH. Base Sepolia zostaje jako opcja testowa. Pigulka
- * kroku 08 mowi "Gas on Base", a akapit kroku 08 mowi wprost, ze to realny ETH.
+ * i Startpad (kroki 08-10) sie w to wpisuje: domyslnie chodzi na Base
+ * mainnet z PRAWDZIWYM ETH. Przelacznik sieci na /startpad ma jeszcze
+ * Robinhood Chain (tez realne pieniadze) i dwa testnety: Base Sepolia i Arc.
+ * Kwoty ETH w krokach (3.00 ETH, 0.045 ETH) sa wartosciami Base - prog
+ * graduacji skaluje sie z siecia (Arc liczy krzywa w USDC), wiec kroki
+ * kotwicza liczby do Base zamiast udawac uniwersalne stale. Pigulka kroku
+ * 08 mowi "Gas only", a akapit kroku 08 mowi wprost, ze to realny ETH.
  *
  * Instrukcja, ktora przemilcza pustke po drugiej stronie przycisku, klamie
  * przez sugestie kolejki, ktorej nie ma. Czlowiek, ktory bedzie pierwszy, ma
@@ -149,29 +155,31 @@ const STEPS: StepMeta[] = [
    * === TRZY KROKI STARTPADA ===
    * Kolejnosc niesie zaleznosc, tak jak w calej tablicy: bez startu (08)
    * nie ma czym handlowac (09), bez handlu nie ma oplat do odebrania (10).
-   * Wszystkie trzy chodza domyslnie na Base mainnet (realny ETH); Base Sepolia
-   * jest opcja testowa. Uzasadnienie stoi w komentarzu naglowkowym pliku.
+   * Wszystkie trzy chodza domyslnie na Base mainnet (realny ETH); przelacznik
+   * na /startpad ma tez Robinhood Chain (mainnet) oraz testnety Base Sepolia
+   * i Arc. Uzasadnienie i zasada kotwiczenia kwot do Base stoja w komentarzu
+   * naglowkowym pliku.
    */
   {
     n: '08',
     id: 'launch',
     title: 'Launch a token on Startpad',
-    cost: 'Gas on Base',
-    note: 'Runs on Base mainnet with real ETH; a Base Sepolia testnet is there for practice',
+    cost: 'Gas only',
+    note: 'Base mainnet by default, with real ETH; Robinhood Chain and two testnets in the same switch',
   },
   {
     n: '09',
     id: 'trade',
     title: 'Trade a token on its curve',
     cost: '1% per trade',
-    note: 'Taken in ETH on every buy and sell',
+    note: 'Taken on every buy and sell, in ETH on Base',
   },
   {
     n: '10',
     id: 'earn',
     title: 'Collect what your token earned',
     cost: 'Gas only',
-    note: 'Paid in ETH, never in the token',
+    note: 'Paid in ETH on Base, never in the token',
   },
   /**
    * === JEDENASTY KROK LAMIE ZASADE KOLEJNOSCI I ROBI TO SWIADOMIE ===
@@ -190,7 +198,7 @@ const STEPS: StepMeta[] = [
     id: 'curators',
     title: 'Look up what changed in a vault',
     cost: 'Free',
-    note: 'No wallet, no signature, nothing to connect',
+    note: 'No wallet and no signature',
   },
 ];
 
@@ -346,8 +354,8 @@ export default function HowPage() {
         <p className="mb-4 max-w-[58ch] text-[16px] leading-[1.65] text-soft-ink-muted">
           Most feeds measure attention, which is free to give and therefore
           proves nothing. This one measures payments, which are not. Below is
-          every single thing you can do here today: what it costs, what you
-          sign, and where the receipt ends up.
+          everything you can do here today: what it costs, what you sign, and
+          where the receipt ends up.
         </p>
 
         <p className="max-w-[58ch] text-[14px] leading-[1.6] text-soft-ink-soft">
@@ -365,8 +373,8 @@ export default function HowPage() {
         </p>
 
         <p className="mt-3 max-w-[58ch] text-[14px] leading-[1.6] text-soft-ink-soft">
-          Want the deeper version — the flow, the fees, and the onchain proof for
-          each part? That is what the{' '}
+          The deeper version, with the flow, the fees and the onchain proof for
+          each part, is what the{' '}
           <Link
             href="/Docs"
             className="font-semibold text-soft-primary-deep underline decoration-soft-line underline-offset-4 hover:text-soft-primary"
@@ -423,8 +431,8 @@ export default function HowPage() {
             </P>
             <P>
               Every tip that settles shows up on <Hi>Paid</Hi>, a public
-              timeline of money that actually moved between two people. Names
-              and faces on both ends, and a transaction on every line.
+              timeline of money that moved between two people. Names and
+              faces on both ends, and a transaction on every line.
             </P>
             <Go href="/money?tab=paid">See what people paid each other</Go>
           </Step>
@@ -439,7 +447,7 @@ export default function HowPage() {
             <P>
               Write something above the paywall first, a line everyone can read.
               A locked box with no label gives nobody a reason to open it, and
-              the button will ask you for it.
+              the button asks you for it.
             </P>
             <P>
               The paid text is stored where the app itself cannot read it back
@@ -464,8 +472,8 @@ export default function HowPage() {
               seats and the deadline. On an empty form you also get a row of
               ready-made starters (<Hi>Vault risk</Hi>,{' '}
               <Hi>Is this yield real</Hi>, <Hi>What can the owner do</Hi> and
-              two more); tapping one fills in the question, the budget, the
-              seats and the deadline together, and you edit from there. They
+              two more); tapping one fills in all four together, and you edit
+              from there. They
               disappear the moment you start typing, so nothing you set gets
               overwritten.
             </P>
@@ -484,11 +492,11 @@ export default function HowPage() {
               and no off switch, so not even we can take it back out.
             </P>
             <P>
-              Worth knowing before you do it: <Hi>nobody has yet</Hi>. The
-              contract is deployed, its source is public and it is holding
-              exactly nothing. No transaction has ever touched it. That is a
-              working contract with no queue in front of it, not a busy one.
-              Whoever goes first goes first.
+              Worth knowing before you do it: <Hi>you would not be first</Hi>.
+              A budget has already been locked through this contract from this
+              app, on Base mainnet. The address and the source are public, so
+              none of this needs our word: open the contract and count the
+              events yourself.
             </P>
             <P>
               Answers stay <Hi>sealed</Hi> until you open them. Nobody reads
@@ -511,15 +519,17 @@ export default function HowPage() {
             <P>
               You do not have to hunt for one. Open asks sit in a strip above
               the feed, with an <Hi>Open</Hi> / <Hi>Resolved</Hi> switch on it.
+              An open one you can answer where you stand: the button on the
+              card opens the answer box in place, without leaving the feed.
               Resolved shows asks that are closed and paid. Nothing to answer
               there, but each accepted answer carries the transaction that paid
-              for it, which is the fastest way to see what this actually pays
-              before you write anything.
+              for it, which is the fastest way to see what this pays before
+              you write anything.
             </P>
             <P>
-              We are blunt about this: on an Ask without escrow, nothing is held
-              and nothing forces the author to pay. A seat starts at fifty cents
-              and not at fifty dollars for exactly that reason.
+              On an Ask without escrow, nothing is held and nothing forces the
+              author to pay. A seat starts at fifty cents and not at fifty
+              dollars for that reason.
             </P>
           </Step>
 
@@ -554,8 +564,10 @@ export default function HowPage() {
               <Hi>Startpad</Hi> launches a token on a bonding curve: one
               transaction mints the whole billion-token supply straight onto
               the curve, and nobody (you included) gets any of it for free.
-              It runs on <Hi>Base mainnet</Hi>, so the ETH you sign with here
-              is real. A Base Sepolia testnet is there if you want to practice first.
+              It runs on <Hi>Base mainnet</Hi> by default, so the ETH you sign
+              with is real. A switch on the page holds three more networks:
+              Robinhood Chain, where the money is also real, and two testnets
+              for practice, Base Sepolia and Arc.
             </P>
             <P>
               A <Hi>logo is required</Hi> before the launch button works.
@@ -583,6 +595,13 @@ export default function HowPage() {
               and only at launch, you can tighten that cap or switch the
               protection off entirely.
             </P>
+            <P>
+              One entry in that network switch is not a network.{' '}
+              <Hi>✦ $SPHERE</Hi> opens the hub for a token called $SPHERE:
+              its escrow, vesting and rewards contracts are deployed on Base
+              mainnet, and the panels there read them straight from the chain.
+              The token itself is not launched. There is nothing to buy.
+            </P>
             <Go href="/startpad">Open Startpad</Go>
           </Step>
 
@@ -592,28 +611,33 @@ export default function HowPage() {
               Every token page has a candlestick chart built from onchain
               events and a buy-and-sell panel next to it. The preview shows
               what you get before you sign, and each trade pays a 1% fee in
-              ETH, up to 70% of which goes to the token&apos;s creator.
+              the coin the curve trades in, ETH on Base. Up to 70% of that
+              fee goes to the token&apos;s creator.
             </P>
             <P>
-              The curve is the other side of every trade: a fixed formula, no
-              order book, nobody to wait for. Buys move the price up, sells
-              move it down, and the contract can always pay: selling every
-              circulating token back returns exactly the ETH it holds.
+              The curve is the other side of every trade: a fixed formula with
+              no order book. Buys move the price up, sells move it down, and
+              the contract can always pay: selling every circulating token
+              back returns exactly the reserve it holds.
             </P>
             <P>
-              At exactly <Hi>3.00 ETH</Hi> in the reserve the curve locks.
-              Buys stop; <Hi>selling keeps working</Hi>, so nobody is trapped
-              at the top. From then on anyone may call <Hi>graduate()</Hi>
-              (the caller earns 0.045 ETH for it) and the liquidity moves into
-              a Uniswap v4 pool that opens at the exact price the curve closed
+              The curve locks at a fixed target: on Base that is exactly{' '}
+              <Hi>3.00 ETH</Hi> in the reserve. The target scales with the
+              network, so the Arc testnet counts its curve in USDC. Buys stop;{' '}
+              <Hi>selling keeps working</Hi>, so nobody is trapped at the top.
+              From then on anyone may call <Hi>graduate()</Hi> (on Base the
+              caller earns 0.045 ETH for it) and the liquidity moves into a
+              Uniswap v4 pool that opens at the exact price the curve closed
               at, locked there forever.
             </P>
             <P>
-              Worth knowing before you chase that: <Hi>no token has graduated
-              on the live deployment yet</Hi>. The full path, launch to pool
-              to payout, has run end-to-end on the same code, but against a
-              smaller test target. The first curve to reach 3.00 ETH here will
-              be the first, and whoever fills it goes first.
+              Before you chase that: <Hi>no token has graduated on Base</Hi>.
+              We scanned every event the Base launchpad has emitted since it
+              was deployed: eight tokens launched, zero graduated. The full
+              path, launch to pool to payout, has run end to end on the same
+              code, but only on test networks, including one graduation into
+              a live v4 pool on the Arc testnet. Whoever fills the first
+              curve on Base is first.
             </P>
           </Step>
 
@@ -626,8 +650,9 @@ export default function HowPage() {
               graduation up to 70% of the 1% on every pool swap.
             </P>
             <P>
-              Claims are pull-based and paid in <Hi>ETH</Hi>, never in the
-              token. Nothing is pushed and nothing can be withheld: the
+              Claims are pull-based and paid in the curve&apos;s own currency
+              (<Hi>ETH</Hi> on Base), never in the token. Nothing is pushed
+              and nothing can be withheld: the
               contracts have no owner, no pause and no setter, so nobody,
               including us, stands between the balance and your claim.
             </P>
@@ -662,10 +687,10 @@ export default function HowPage() {
             <P>
               The dates are ranges, not moments. It is one reading a day
               compared with the previous one, so an entry says a change happened
-              between two dates, not the hour it happened. Worth knowing before
-              you open it: it started collecting recently, so it can honestly
-              have nothing in it. When that is the case, it tells you which
-              of the two it is, an empty record or a quiet month.
+              between two dates, not the hour it happened. It started
+              collecting recently, so it can honestly have nothing in it. When
+              that is the case, it tells you which of the two it is, an empty
+              record or a quiet month.
             </P>
             <P>
               There is nothing about you in there. It reads public vault
@@ -688,11 +713,11 @@ export default function HowPage() {
           </h2>
           <div className="max-w-[64ch]">
           <P>
-            <Hi>Nothing here judges answers.</Hi> Escrow settles whether the
-            money exists, locked and readable before you write. It settles nothing
-            about who deserves it. The author still picks, and there is no
-            appeal. The price of refusing to pay is a fee and a public resolve
-            rate, which is a price, not a guarantee.
+            <Hi>Nothing here judges answers.</Hi> Escrow proves the money
+            exists, locked and readable, before you write a word. Who deserves
+            it is still the author&apos;s call, and there is no appeal. The
+            price of refusing to pay is a fee and a public resolve rate, which
+            is a price, not a guarantee.
           </P>
           <P>
             <Hi>Onchain means permanent.</Hi> A post written to a contract does
