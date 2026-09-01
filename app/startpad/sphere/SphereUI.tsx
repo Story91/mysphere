@@ -182,8 +182,15 @@ export function KeeperSection({ children }: { children: ReactNode }) {
   );
 }
 
-/** Sekcja "Advanced" - konsola ABI schowana pod klik. */
+/**
+ * Sekcja "Advanced" - konsola ABI. WYLACZNIE dla tworcy (decyzja wlasciciela
+ * 2026-09-02): gosc nie widzi ani konsoli, ani naglowka, ani wzmianki, ze
+ * cokolwiek istnieje - zero szumu "to nie dla ciebie". Odczyty kontraktow
+ * sa i tak publiczne na Basescanie.
+ */
 export function AdvancedSection({ children }: { children: ReactNode }) {
+  const isCreator = useSphereCreator();
+  if (!isCreator) return null;
   return (
     <details className="group">
       <summary className="sph-card flex cursor-pointer list-none items-center justify-between rounded-[20px] border border-sp-shade/10 bg-sp-surface px-4 py-3 text-[12.5px] font-extrabold text-sp-shade/60 transition-colors hover:text-sp-brand [&::-webkit-details-marker]:hidden">
