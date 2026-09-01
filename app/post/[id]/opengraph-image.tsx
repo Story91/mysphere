@@ -12,6 +12,49 @@ import { getPostForShare, getPostTipTotals, shortAddress } from '../../utils/pos
  * bogaty embed jest realna powierzchnia dystrybucji, a nie ozdobnikiem.
  */
 
+/**
+ * === JASNE TLO - ZMIANA ZAMOWIONA PRZEZ WLASCICIELA 2026-09-01 ===
+ *
+ * Ta karta stala na wspolnym ciemnym granacie rodziny #0A1024. Wlasciciel
+ * odrzucil ciemna oprawe, wiec na jasne tlo produktu #F1EDFA (--soft-bg)
+ * przechodzi CALA szostka kart udostepniania naraz: strona glowna, token
+ * startpada, /leaderboard, /post, /tip i /u. Wspolne przejscie jest tu
+ * istotne, bo podglad linku ogladany jest w strumieniu obok innych podgladow:
+ * polowa rodziny w jednym tonie, a polowa w drugim czytalaby sie jak dwa
+ * rozne produkty.
+ *
+ * Podmieniamy WYLACZNIE barwy. Uklad, padding 72, stopnie pisma, grubosci,
+ * letterSpacing i tresc zostaja nietkniete, a kazdy nowy odcien jest
+ * przepisany z tokenu w app/globals.css.
+ *
+ * Tlo jest lawendowe #F1EDFA, a nie biale #FFFFFF (--soft-surface), z tego
+ * samego powodu, dla ktorego rodzina byla wczesniej ciemna: na bialej osi
+ * czasu X-a karta musi miec wlasna krawedz. Lawenda ja ma, biel by ja
+ * stracila. Zyskiem jest to, co ciemna wersja nazywala swoja cena - znika
+ * przeskok tonalny miedzy podgladem a produktem, do ktorego link prowadzi.
+ *
+ * Kontrasty policzone wzgledem NOWEGO tla #F1EDFA, a nie wobec starego
+ * #0A1024:
+ *   #2E2A44  11.9:1  --soft-ink          nazwa marki i tresc posta
+ *   #6B6486   4.8:1  --soft-ink-muted    autor, lajki, komentarze
+ *   #C2410C   4.50:1 --soft-accent-deep  kwota tipow
+ *   #0052FF   4.99:1 blekit Base - ZOSTAJE bez zmiany, to tozsamosc lancucha,
+ *                    a nie dekoracja, wiec nie podlega przemalowaniu
+ *
+ * === DAWNA ZIELEN #00E28A ===
+ * Na tej karcie miala tylko jedno wystapienie i nioslo ono KWOTE, wiec idzie
+ * na pomarancz. Obowiazuje ta sama zasada, co w konsoli operatora
+ * (app/admin/ops/OpsConsole.tsx): pomaranczowy znaczy KWOTE i nic wiecej.
+ * Wskaznika stanu ta karta dzis nie ma - gdyby kiedys doszedl (kropka albo
+ * napis o rozliczeniu onchain), ma dostac zielen "ok" #1E7A55 (4.59:1) z tej
+ * samej konsoli, a NIE pomarancz: pomaranczowa plakietka stanu czytalaby sie
+ * jak kwota i karta klamalaby o wlasnym stanie.
+ *
+ * Kafli ani wlosow z rgba bieli ta karta nie ma, wiec odwrocenie alfy, ktore
+ * trzeba bylo zrobic na kartach ze statystykami (rgba(255,255,255,0.04) na
+ * jasnym tle sklada sie do ~1.01:1 i kafel znika), nie ma tu czego dotyczyc.
+ */
+
 export const runtime = 'nodejs';
 // To samo okno co strona obok: crawlery kazdego komunikatora pobieraja karte
 // osobno, wiec bez revalidate jeden viralowy link generowal serie odczytow.
@@ -61,13 +104,15 @@ export default async function Image({ params }: { params: { id: string } }) {
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
-          background: '#0A1024',
+          background: '#F1EDFA', // --soft-bg, jasne tlo produktu
           padding: '72px',
           fontFamily: 'sans-serif',
         }}
       >
-        {/* Pasek marki. Blekit Base jest jedynym akcentem - reszta jest cicha,
-            zeby czytelna byla tresc posta, a nie ramka wokol niej. */}
+        {/* Pasek marki. Blekit Base zostaje dokladnie taki, jaki byl na
+            granacie - to tozsamosc lancucha, a nie odcien dobrany pod tlo, i
+            na jasnym #F1EDFA trzyma 4.99:1. Poza nim i kwota w stopce reszta
+            jest cicha, zeby czytelna byla tresc posta, a nie ramka wokol niej. */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <div
             style={{
@@ -81,7 +126,7 @@ export default async function Image({ params }: { params: { id: string } }) {
             style={{
               fontSize: '26px',
               fontWeight: 600,
-              color: '#EEF3FF',
+              color: '#2E2A44', // --soft-ink, 11.9:1
               letterSpacing: '-0.01em',
             }}
           >
@@ -94,7 +139,7 @@ export default async function Image({ params }: { params: { id: string } }) {
             display: 'flex',
             fontSize: content.length > 120 ? '44px' : '56px',
             lineHeight: 1.25,
-            color: '#EEF3FF',
+            color: '#2E2A44', // --soft-ink, 11.9:1 - bohater karty
             fontWeight: 600,
             letterSpacing: '-0.02em',
           }}
@@ -108,20 +153,27 @@ export default async function Image({ params }: { params: { id: string } }) {
             alignItems: 'center',
             justifyContent: 'space-between',
             fontSize: '24px',
-            color: '#93A5C9',
+            color: '#6B6486', // --soft-ink-muted, 4.8:1 - AA takze w miniaturze
           }}
         >
           <div style={{ display: 'flex' }}>{author}</div>
           {post && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '28px' }}>
-              {/* Kwota idzie PRZED lajkami i na zielono. To jedyna liczba na tej
-                  karcie, ktora kazdy moze sprawdzic u zrodla - i jedyna, dla
-                  ktorej ktos wysle ten link dalej. */}
+              {/* Kwota idzie PRZED lajkami i na pomaranczu. To jedyna liczba na
+                  tej karcie, ktora kazdy moze sprawdzic u zrodla - i jedyna, dla
+                  ktorej ktos wysle ten link dalej.
+                  Dawna zielen #00E28A byla policzona pod ciemny granat i na
+                  jasnym tle nie utrzymywala sie; jej miejsce zajmuje #C2410C
+                  (--soft-accent-deep, 4.50:1), ktory w tym systemie znaczy
+                  KWOTE i nic wiecej - ta sama zasada, co w konsoli operatora
+                  (app/admin/ops/OpsConsole.tsx). To nie jest kolor "zamiast
+                  zielonego": zielen zostala rozdzielona wedle znaczenia, a
+                  status na tej karcie dostalby #1E7A55, nie pomarancz. */}
               {tips && (
                 <div
                   style={{
                     display: 'flex',
-                    color: '#00E28A',
+                    color: '#C2410C', // --soft-accent-deep, 4.50:1 - KWOTA
                     fontWeight: 600,
                     fontSize: '28px',
                   }}

@@ -31,7 +31,38 @@ export const contentType = 'image/png';
  */
 export const dynamic = 'force-dynamic';
 
-const MEDALS = ['#F5C24C', '#C7D0E0', '#C98B5A'];
+/**
+ * KOLOR KARTY - jasne tlo produktu.
+ *
+ * Wlasciciel zdecydowal 2026-09-01, ze cala rodzina kart OG schodzi z ciemnego
+ * granatu na jasne tlo produktu (--soft-bg, #F1EDFA). Wszystkie szesc kart
+ * przechodzi razem i to jest tu istotne: podglad linku ogladany jest w
+ * strumieniu obok innych podgladow, wiec polowa rodziny w jednym tonie, a
+ * polowa w drugim czytalaby sie jak dwa rozne produkty.
+ *
+ * Kontrasty policzone wzgledem NOWEGO tla #F1EDFA:
+ *   #2E2A44  11.9:1  tytul i nazwy (--soft-ink)
+ *   #6B6486   4.8:1  nadtytul, stopka, numer poza podium (--soft-ink-muted)
+ *   #C2410C   4.50:1 KWOTY (--soft-accent-deep)
+ *
+ * Pomaranczowy jest tym samym pomaranczowym, co w konsoli operatora
+ * (app/admin/ops/OpsConsole.tsx) i obowiazuje ta sama zasada: pomaranczowy
+ * znaczy KWOTE i nic wiecej. Na tej karcie nie ma dzis zadnego wskaznika
+ * stanu, wiec nie ma tu tez zieleni statusu (#1E7A55). Gdyby kiedys doszedl
+ * napis o rozliczeniu onchain, ma dostac te zielen, a NIE pomaranczowy -
+ * pomaranczowa plakietka stanu czytalaby sie jak kwota i karta klamalaby o
+ * wlasnym stanie.
+ */
+
+/**
+ * Medale niosa MIEJSCE, a nie ozdobe, wiec musza zostac trzema rozroznialnymi
+ * metalami. Dawne, rozjasnione odcienie byly liczone pod ciemny granat i na
+ * jasnym tle zlewalyby sie z podlozem, wiec kazdy zostal przyciemniony.
+ * Wzgledem #F1EDFA: zloto #A16207 4.27:1, srebro #5A6478 5.17:1,
+ * braz #A0522D 4.88:1. Zloto siada ponizej 4.5:1, ale niesie pojedyncza cyfre
+ * w 38px o grubosci 700, czyli liczy sie jako duzy tekst - tam prog to 3:1.
+ */
+const MEDALS = ['#A16207', '#5A6478', '#A0522D'];
 
 export default async function Image() {
   const board = await getLeaderboard(3);
@@ -61,13 +92,13 @@ export default async function Image() {
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
-          background: '#0A1024',
+          background: '#F1EDFA',
           padding: '68px 72px',
           fontFamily: 'sans-serif',
         }}
       >
         <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', fontSize: 22, letterSpacing: 5, color: '#5C6F94' }}>
+          <div style={{ display: 'flex', fontSize: 22, letterSpacing: 5, color: '#6B6486' }}>
             MYSPHERE · {board.windowDays === null ? 'ALL TIME' : `LAST ${board.windowDays} DAYS`}
           </div>
           <div
@@ -75,7 +106,7 @@ export default async function Image() {
               display: 'flex',
               fontSize: 72,
               fontWeight: 700,
-              color: '#EEF3FF',
+              color: '#2E2A44',
               marginTop: 14,
             }}
           >
@@ -85,7 +116,7 @@ export default async function Image() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           {board.entries.length === 0 ? (
-            <div style={{ display: 'flex', fontSize: 34, color: '#5C6F94' }}>
+            <div style={{ display: 'flex', fontSize: 34, color: '#6B6486' }}>
               Nobody yet — the list is open.
             </div>
           ) : (
@@ -98,14 +129,14 @@ export default async function Image() {
                   style={{
                     display: 'flex',
                     width: 34,
-                    color: MEDALS[index] ?? '#3A4A6B',
+                    color: MEDALS[index] ?? '#6B6486',
                     fontWeight: 700,
                   }}
                 >
                   {index + 1}
                 </div>
-                <div style={{ display: 'flex', flex: 1, color: '#DDE6FA' }}>{names[index]}</div>
-                <div style={{ display: 'flex', color: '#00E28A', fontWeight: 600 }}>
+                <div style={{ display: 'flex', flex: 1, color: '#2E2A44' }}>{names[index]}</div>
+                <div style={{ display: 'flex', color: '#C2410C', fontWeight: 600 }}>
                   {formatReceived(entry.received, 1)}
                 </div>
               </div>
@@ -113,7 +144,7 @@ export default async function Image() {
           )}
         </div>
 
-        <div style={{ display: 'flex', fontSize: 22, color: '#5C6F94' }}>
+        <div style={{ display: 'flex', fontSize: 22, color: '#6B6486' }}>
           {board.totalTips > 0
             ? `${totalLine} settled across ${board.totalTips} tips · every number verifiable onchain`
             : 'Settled payments only · no points, no activity score'}
