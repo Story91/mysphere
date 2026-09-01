@@ -1,3 +1,5 @@
+import { DISPLAY_FAMILY, BODY_FAMILY } from './fonts';
+
 import { chartDataUri } from './chartSvg';
 import { mcapLabel, safeSymbol } from '../../startpad/shareText';
 import type { TokenCardData } from '../../startpad/share/tokenCard';
@@ -101,6 +103,7 @@ function Glyph({ data }: { data: TokenCardData }) {
         background: data.accent,
         alignItems: 'center',
         justifyContent: 'center',
+        fontFamily: DISPLAY_FAMILY,
         fontSize: 40,
         fontWeight: 700,
         /**
@@ -132,7 +135,7 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: str
         minWidth: 200,
       }}
     >
-      <div style={{ display: 'flex', fontSize: 34, fontWeight: 700, color: tone ?? CARD.ink }}>{value}</div>
+      <div style={{ display: 'flex', fontFamily: DISPLAY_FAMILY, fontSize: 34, fontWeight: 700, color: tone ?? CARD.ink }}>{value}</div>
       <div style={{ display: 'flex', fontSize: 17, letterSpacing: 2, color: CARD.brand, marginTop: 6 }}>{label}</div>
     </div>
   );
@@ -177,7 +180,7 @@ export function TokenShareCard({ data, height }: { data: TokenCardData; height: 
         justifyContent: 'space-between',
         background: CARD.bg,
         padding: PADDING,
-        fontFamily: 'sans-serif',
+        fontFamily: BODY_FAMILY,
       }}
     >
       {/* PASMO 1 - skad to jest i z ktorego lancucha. */}
@@ -195,7 +198,7 @@ export function TokenShareCard({ data, height }: { data: TokenCardData; height: 
         <div style={{ display: 'flex', alignItems: 'center', gap: 26 }}>
           <Glyph data={data} />
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', fontSize: 72, fontWeight: 700, color: CARD.ink, lineHeight: 1.05 }}>
+            <div style={{ display: 'flex', fontFamily: DISPLAY_FAMILY, fontSize: 72, fontWeight: 700, color: CARD.ink, lineHeight: 1.05 }}>
               ${symbol}
             </div>
             <div style={{ display: 'flex', fontSize: 28, color: CARD.inkMuted, marginTop: 8 }}>{name}</div>
@@ -206,7 +209,7 @@ export function TokenShareCard({ data, height }: { data: TokenCardData; height: 
             zostaje atramentowa, zeby to on byl widoczny w miniaturze. */}
         {data.multiple && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-            <div style={{ display: 'flex', fontSize: 104, fontWeight: 700, color: tone, lineHeight: 1 }}>
+            <div style={{ display: 'flex', fontFamily: DISPLAY_FAMILY, fontSize: 104, fontWeight: 700, color: tone, lineHeight: 1 }}>
               {data.multiple}
             </div>
             <div style={{ display: 'flex', fontSize: 20, letterSpacing: 3, color: CARD.brand, marginTop: 8 }}>
@@ -268,13 +271,13 @@ export function TokenShareFallback() {
         justifyContent: 'space-between',
         background: CARD.bg,
         padding: PADDING,
-        fontFamily: 'sans-serif',
+        fontFamily: BODY_FAMILY,
       }}
     >
       <div style={{ display: 'flex', fontSize: 24, fontWeight: 700, letterSpacing: 5, color: CARD.brand }}>
         MYSPHERE STARTPAD
       </div>
-      <div style={{ display: 'flex', fontSize: 66, fontWeight: 700, color: CARD.ink, lineHeight: 1.1 }}>
+      <div style={{ display: 'flex', fontFamily: DISPLAY_FAMILY, fontSize: 66, fontWeight: 700, color: CARD.ink, lineHeight: 1.1 }}>
         Launch a token on a curve. Graduate it to a live pool.
       </div>
       <div style={{ display: 'flex', fontSize: 26, color: CARD.inkMuted }}>mysphere.fun/startpad</div>

@@ -1,5 +1,6 @@
 import { ImageResponse } from 'next/og';
 import { HomeShareCard, OG_CACHE_HEADERS } from '../components/og/HomeShareCard';
+import { ogFonts } from '../components/og/fonts';
 
 /**
  * Ta sama karta w proporcji 3:2 - wylacznie dla embeddu miniappki.
@@ -27,6 +28,10 @@ export const dynamic = 'force-dynamic';
 
 const SIZE = { width: 1200, height: 800 };
 
-export function GET() {
-  return new ImageResponse(HomeShareCard(), { ...SIZE, headers: OG_CACHE_HEADERS });
+export async function GET() {
+  return new ImageResponse(HomeShareCard(), {
+    ...SIZE,
+    headers: OG_CACHE_HEADERS,
+    fonts: await ogFonts(),
+  });
 }

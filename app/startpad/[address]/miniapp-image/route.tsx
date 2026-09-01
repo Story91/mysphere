@@ -6,6 +6,7 @@ import {
   TOKEN_OG_CACHE_HEADERS,
 } from '../../../components/og/TokenShareCard';
 import { chainHintFrom, loadTokenCard } from '../../share/tokenCard';
+import { ogFonts } from '../../../components/og/fonts';
 
 /**
  * Ta sama karta tokena w proporcji 3:2 - wylacznie dla embeddu miniappki.
@@ -33,6 +34,6 @@ export async function GET(request: NextRequest, { params }: { params: { address:
 
   return new ImageResponse(
     data ? <TokenShareCard data={data} height={SIZE.height} /> : <TokenShareFallback />,
-    { ...SIZE, headers: TOKEN_OG_CACHE_HEADERS }
+    { ...SIZE, headers: TOKEN_OG_CACHE_HEADERS, fonts: await ogFonts() }
   );
 }

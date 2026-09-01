@@ -1,5 +1,6 @@
 import { ImageResponse } from 'next/og';
 import { HomeShareCard, OG_CACHE_HEADERS } from './components/og/HomeShareCard';
+import { ogFonts } from './components/og/fonts';
 
 /**
  * Karta OG korzenia serwisu.
@@ -54,6 +55,10 @@ export const contentType = 'image/png';
  */
 export const dynamic = 'force-dynamic';
 
-export default function Image() {
-  return new ImageResponse(HomeShareCard(), { ...size, headers: OG_CACHE_HEADERS });
+export default async function Image() {
+  return new ImageResponse(HomeShareCard(), {
+    ...size,
+    headers: OG_CACHE_HEADERS,
+    fonts: await ogFonts(),
+  });
 }

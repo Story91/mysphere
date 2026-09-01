@@ -73,12 +73,30 @@ const nextConfig = {
     serverComponentsExternalPackages: ['mongodb', 'firebase-admin', 'sharp'],
     // Kompiluje bundle klienta i serwera rownolegle, w osobnych workerach.
     webpackBuildWorker: true,
-    // USUNIETE 2026-09-01. Byly tu wpisy outputFileTracingIncludes dolaczajace
-    // public/backs/** do funkcji /asks/opengraph-image i piatki siostrzanych.
-    // Wszystkie szesc tras to dzis STATYCZNE pliki opengraph-image.png, a nie
-    // funkcje - `loadOgBg`, ktory mial je czytac z dysku, nie istnieje juz
-    // nigdzie poza tamtym komentarzem. Katalog public/backs byl przy tym
-    // bajtowa kopia tych szesciu plikow (8.7 MB duplikatu) i zostal skasowany.
+    // Dolacza kroje marki do bundla KAZDEJ funkcji rysujacej karte OG.
+    //
+    // Bez tego wpisu `readFile` w app/components/og/fonts.ts nie ma czego
+    // otworzyc: pliki .ttf lezace w drzewie zrodel NIE trafiaja same z siebie
+    // do bundla funkcji na Vercelu. To jest ta czwarta droga, ktorej brakowalo,
+    // gdy karty rysowaly w Noto Sans - `fs` z public/, fetch po sieci i
+    // `new URL(..., import.meta.url)` byly odrzucone, kazde z wlasnego powodu.
+    //
+    // Osiem tras, bo tyle jest funkcji rysujacych: dwie karty glowne, dwie
+    // startpadowe i cztery karty danych. Statyczne opengraph-image.png sekcji
+    // nie potrzebuja niczego - to gotowe pliki, nie funkcje.
+    //
+    // Poprzednio staly tu wpisy dolaczajace public/backs/** do szesciu tras
+    // sekcji. Usuniete: te trasy sa dzis statycznymi PNG, a `loadOgBg`, ktory
+    // mial czytac tamte tla z dysku, nie istnial juz nigdzie poza komentarzem.
+    // Nie ma tu juz outputFileTracingIncludes i to jest wynik pomiaru, nie
+    // przeoczenie. Staly tu wpisy dolaczajace public/backs/** do szesciu tras
+    // sekcji - te trasy sa dzis statycznymi PNG, a `loadOgBg`, ktory mial
+    // czytac tamte tla z dysku, nie istnial juz nigdzie poza komentarzem.
+    // Probowalismy tez dowiezc tym mechanizmem kroje marki do kart OG:
+    // dziala dla tras z pliku `route.tsx`, ale dla konwencji
+    // `opengraph-image.tsx` nie lapie zaden ksztalt klucza (sprawdzone na
+    // dwoch buildach, szczegoly w naglowku app/components/og/fontData.ts).
+    // Kroje jada wiec zwyklym importem base64.
     // Pakiety z barrel files (index re-eksportujacy setki modulow). Bez tego
     // webpack musi przejsc caly barrel, zeby wyciagnac jeden import.
     // Lista wylacznie z tego, co faktycznie jest w repo.

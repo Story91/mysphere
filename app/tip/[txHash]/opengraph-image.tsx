@@ -1,4 +1,5 @@
 import { ImageResponse } from 'next/og';
+import { DISPLAY_FAMILY, BODY_FAMILY, ogFonts } from '../../components/og/fonts';
 import { getTipReceipt } from '../../utils/tips/getTipReceipt';
 import { getName } from '../../utils/identity/getName';
 import { shortAddress } from '../../utils/posts/getPostForShare';
@@ -93,7 +94,13 @@ export default async function Image({ params }: { params: { txHash: string } }) 
           justifyContent: 'space-between',
           background: '#F1EDFA',
           padding: '72px',
-          fontFamily: 'sans-serif',
+          /**
+           * Nunito jako domyslny kroj kadru, Baloo 2 punktowo na naglowku i
+           * liczbach - te same role, co --font-soft-body i --font-soft-display
+           * w app/layout.tsx. Pliki dojezdzaja przez app/components/og/fonts.ts;
+           * uzasadnienie, dlaczego to w koncu dalo sie zrobic, jest tam.
+           */
+          fontFamily: BODY_FAMILY,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -107,10 +114,27 @@ export default async function Image({ params }: { params: { txHash: string } }) 
 
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 20 }}>
-            <div style={{ display: 'flex', fontSize: 150, fontWeight: 700, color: '#C2410C', lineHeight: 1 }}>
+            <div
+              style={{
+                display: 'flex',
+                fontFamily: DISPLAY_FAMILY,
+                fontSize: 150,
+                fontWeight: 700,
+                color: '#C2410C',
+                lineHeight: 1,
+              }}
+            >
               {amount}
             </div>
-            <div style={{ display: 'flex', fontSize: 44, fontWeight: 600, color: '#6B6486' }}>
+            <div
+              style={{
+                display: 'flex',
+                fontFamily: DISPLAY_FAMILY,
+                fontSize: 44,
+                fontWeight: 600,
+                color: '#6B6486',
+              }}
+            >
               {token}
             </div>
           </div>
@@ -126,6 +150,6 @@ export default async function Image({ params }: { params: { txHash: string } }) 
         </div>
       </div>
     ),
-    size
+    { ...size, fonts: await ogFonts() }
   );
 }
