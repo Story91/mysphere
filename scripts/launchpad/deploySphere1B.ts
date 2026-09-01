@@ -94,19 +94,27 @@ async function main() {
 
   console.log(`siec: ${network.name} (chainId ${chainId}) | wdrazajacy: ${deployer.address}`);
   console.log(`saldo: ${ethers.formatEther(await ethers.provider.getBalance(deployer.address))} ETH\n`);
-  console.log("DISTRIBUTOR  token=%s proposer=%s guardian=%s minDelay=%ss stream=%ss", sphere, proposer, guardian, minDelay, stream);
+  // String() na BigInt - inaczej %s drukuje "86400n" i wyglada jak jednostka.
+  console.log(
+    "DISTRIBUTOR  token=%s proposer=%s guardian=%s minDelay=%ss stream=%ss",
+    sphere,
+    proposer,
+    guardian,
+    String(minDelay),
+    String(stream)
+  );
   console.log(
     "BUYBACK      pool=%s/%s/%s operator=%s burn=%sbps tranche=%s ETH window=%s ETH/%ss checkpoint<=%ss maxDev=%sbps",
     BASE.poolFee,
     BASE.tickSpacing,
     BASE.hook,
     operator,
-    burnBps,
+    String(burnBps),
     ethers.formatEther(trancheMax),
     ethers.formatEther(windowBudget),
-    windowSeconds,
-    checkpointMaxAge,
-    maxDevBps
+    String(windowSeconds),
+    String(checkpointMaxAge),
+    String(maxDevBps)
   );
 
   if (!local && !confirm) {
