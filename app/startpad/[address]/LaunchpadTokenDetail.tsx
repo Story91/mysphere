@@ -234,8 +234,46 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
   const history = useTokenHistory(notFound ? null : tokenAddress, core?.startedAt ?? null);
   const { applyLive, reload: reloadHistory } = history;
 
-  /** Tworca tokena - jedyny, kto moze uzupelnic profil i linki. */
-  const isCreator = Boolean(account && core && account.toLowerCase() === core.creator.toLowerCase());
+  /**
+   * Tworca tokena - jedyny, kto moze uzupelnic profil i linki.
+   *
+   * Wzorzec escrow-as-creator (SPHERE): tworca on-chain jest KONTRAKTEM,
+   * ktorym nikt nie podpisze sesji. Wtedy prawo do profilu ma adres, ktory
+   * ten kontrakt deklaruje jako LAUNCH_AUTHORITY() - lustro tej samej bramki
+   * po stronie serwera (app/api/launchpad/token/route.ts). Odczyt leci tylko
+   * gdy zwykle porownanie zawiodlo, wiec typowe tokeny nie placa nic.
+   */
+  const [delegatedAuthority, setDelegatedAuthority] = useState<string | null>(null);
+  const directCreator = Boolean(account && core && account.toLowerCase() === core.creator.toLowerCase());
+  useEffect(() => {
+    setDelegatedAuthority(null);
+    if (!account || !core || directCreator || !readClient) return;
+    let stale = false;
+    readClient
+      .readContract({
+        address: core.creator as Address,
+        abi: [
+          {
+            type: 'function',
+            name: 'LAUNCH_AUTHORITY',
+            stateMutability: 'view',
+            inputs: [],
+            outputs: [{ type: 'address' }],
+          },
+        ] as const,
+        functionName: 'LAUNCH_AUTHORITY',
+      })
+      .then((authority) => {
+        if (!stale) setDelegatedAuthority((authority as string).toLowerCase());
+      })
+      .catch(() => {
+        /* tworca-EOA: odczyt rewertuje, zostaje zwykla sciezka */
+      });
+    return () => {
+      stale = true;
+    };
+  }, [account, core, directCreator, readClient]);
+  const isCreator = directCreator || Boolean(account && delegatedAuthority === account.toLowerCase());
 
   /**
    * Historia siega bloku startu tokena. Dopiero wtedy nasze salda sa PELNE, a
