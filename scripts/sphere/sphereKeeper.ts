@@ -105,7 +105,23 @@ async function main() {
         }
       }
     }
+    // BURN_ROUNDS > 1 = "wypalamy wszystko": hook i tak wydaje na jedno
+    // wywolanie tylko tyle, ile miesci sie w 1.5% ruchu sqrtP (~3% ceny),
+    // wiec jedyna droga do oproznienia kolejki jest kilka wywolan pod rzad.
+    // Kazde kolejne kupuje drozej - stad pauza BURN_PAUSE_S miedzy nimi
+    // i stop, gdy w kolejce zostaje mniej niz 0.002 ETH.
+    const burnRounds = Number(process.env.BURN_ROUNDS ?? "1");
+    const burnPauseMs = Number(process.env.BURN_PAUSE_S ?? "20") * 1000;
+    for (let round = 0; round < burnRounds; round++) {
     const buybackEth = await hook.pendingBuybackEth(token);
+    if (buybackEth <= 2_000_000_000_000_000n && round > 0) {
+      log(`  kolejka ${ethers.formatEther(buybackEth)} ETH - koniec rund`);
+      break;
+    }
+    if (round > 0) {
+      log(`  runda ${round + 1}/${burnRounds} za ${burnPauseMs / 1000}s (kolejka ${ethers.formatEther(buybackEth)} ETH)`);
+      if (execute) await new Promise((r) => setTimeout(r, burnPauseMs));
+    }
     if (buybackEth > 0n) {
       // ETH NIE jest palone: hook kupuje za nie token w puli v4 i dopiero
       // KUPIONE TOKENY ida na 0xdEaD. Poprzedni skrot "ETH -> 0xdEaD"
@@ -131,6 +147,7 @@ async function main() {
         }
         log(`  zostaje w kolejce: ${ethers.formatEther(await hook.pendingBuybackEth(token))} ETH`);
       }
+    }
     }
   }
 
