@@ -18,7 +18,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
 import { formatEther, parseEther, zeroAddress, type Abi, type AbiFunction, type Address } from 'viem';
 import { ChevronDown, ChevronUp, Loader2, PencilLine, RefreshCw } from 'lucide-react';
-import { LAUNCHPAD_CHAIN, LAUNCHPAD_EXPLORER_URL, NATIVE_SYMBOL } from '../config';
+// Hub SPHERE jest przybity do Base - uzasadnienie w ./sphereChain.ts.
+import { SPHERE_CHAIN, SPHERE_EXPLORER_URL, SPHERE_NATIVE_SYMBOL } from './sphereChain';
 import { SPHERE_FN_DOCS } from './sphereConfig';
 
 const inputClass =
@@ -61,7 +62,7 @@ function renderResult(value: unknown): string {
 function WriteRow({ address, abi, fn }: { address: Address; abi: Abi; fn: AbiFunction }) {
   const { address: account } = useAccount();
   const { data: walletClient } = useWalletClient();
-  const readClient = usePublicClient({ chainId: LAUNCHPAD_CHAIN.id });
+  const readClient = usePublicClient({ chainId: SPHERE_CHAIN.id });
   const [args, setArgs] = useState<string[]>(() => fn.inputs.map(() => ''));
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState(false);
@@ -82,7 +83,7 @@ function WriteRow({ address, abi, fn }: { address: Address; abi: Abi; fn: AbiFun
         functionName: fn.name,
         args: parsed,
         value: fn.stateMutability === 'payable' && value ? parseEther(value as `${number}`) : undefined,
-        chain: LAUNCHPAD_CHAIN,
+        chain: SPHERE_CHAIN,
         account,
       } as never);
       await readClient.waitForTransactionReceipt({ hash });
@@ -121,7 +122,7 @@ function WriteRow({ address, abi, fn }: { address: Address; abi: Abi; fn: AbiFun
           <input
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            placeholder={`value (${NATIVE_SYMBOL})`}
+            placeholder={`value (${SPHERE_NATIVE_SYMBOL})`}
             className={inputClass}
           />
         )}
@@ -145,7 +146,7 @@ function WriteRow({ address, abi, fn }: { address: Address; abi: Abi; fn: AbiFun
 }
 
 function ReadRow({ address, abi, fn }: { address: Address; abi: Abi; fn: AbiFunction }) {
-  const readClient = usePublicClient({ chainId: LAUNCHPAD_CHAIN.id });
+  const readClient = usePublicClient({ chainId: SPHERE_CHAIN.id });
   const [args, setArgs] = useState<string[]>(() => fn.inputs.map(() => ''));
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -220,7 +221,7 @@ export default function AbiConsole({ title, address, abi }: { title: string; add
           <p className="mt-0.5 text-[11px] text-sp-shade/50">
             Every function from the deployed ABI ({reads.length} reads, {writes.length} writes) ·{' '}
             <a
-              href={`${LAUNCHPAD_EXPLORER_URL}/address/${address}`}
+              href={`${SPHERE_EXPLORER_URL}/address/${address}`}
               target="_blank"
               rel="noreferrer"
               className="font-bold text-sp-brand hover:underline"

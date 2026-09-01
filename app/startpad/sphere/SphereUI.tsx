@@ -14,7 +14,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { ArrowUpRight, Copy, ExternalLink } from 'lucide-react';
-import { LAUNCHPAD_EXPLORER_URL } from '../config';
+import { SPHERE_EXPLORER_URL } from './sphereChain';
 import NumberTicker from './NumberTicker';
 
 /** Naglowek podstrony z poswiata - odpowiednik hero z Overview, nizszy. */
@@ -133,7 +133,7 @@ export function AddressPill({ address, label }: { address: string; label: string
         <Copy className="h-3 w-3" aria-hidden="true" />
       </button>
       <a
-        href={`${LAUNCHPAD_EXPLORER_URL}/address/${address}`}
+        href={`${SPHERE_EXPLORER_URL}/address/${address}`}
         target="_blank"
         rel="noreferrer"
         aria-label={`Open ${label} in explorer`}

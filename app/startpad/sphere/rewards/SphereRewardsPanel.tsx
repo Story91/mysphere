@@ -13,7 +13,8 @@
 
 import { formatEther, type Address } from 'viem';
 import { Coins } from 'lucide-react';
-import { LAUNCHPAD_ADDRESS, NATIVE_SYMBOL, launchpadAbi } from '../../config';
+import { launchpadAbi } from '../../config';
+import { SPHERE_LAUNCHPAD_ADDRESS, SPHERE_NATIVE_SYMBOL } from '../sphereChain';
 import AbiConsole from '../AbiConsole';
 import { SPHERE_LIVE, SPHERE_REWARDS_ADDRESS, sphereRewardsAbi } from '../sphereConfig';
 import { ActionButton, useSphereRead } from '../sphereActions';
@@ -34,7 +35,7 @@ export default function SphereRewardsPanel() {
       client.readContract({ address: rewards, abi: sphereRewardsAbi, functionName: 'pullable' }),
       client.readContract({ address: rewards, abi: sphereRewardsAbi, functionName: 'totalPulled' }),
       client.readContract({ address: rewards, abi: sphereRewardsAbi, functionName: 'CONSUMER' }),
-      client.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'claimable', args: [rewards] }),
+      client.readContract({ address: SPHERE_LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'claimable', args: [rewards] }),
     ]);
     return {
       pullable: pullable as bigint,
@@ -72,9 +73,9 @@ export default function SphereRewardsPanel() {
         badge={<TeamRunBadge />}
       >
         <div className="grid gap-3 sm:grid-cols-3">
-          <BigStat label="In the vault" value={toNumber(state?.pullable)} decimals={4} suffix={NATIVE_SYMBOL} tone="brand" />
-          <BigStat label="Waiting on curve" value={toNumber(state?.padClaimable)} decimals={4} suffix={NATIVE_SYMBOL} tone="up" />
-          <BigStat label="Pulled so far" value={toNumber(state?.totalPulled)} decimals={4} suffix={NATIVE_SYMBOL} />
+          <BigStat label="In the vault" value={toNumber(state?.pullable)} decimals={4} suffix={SPHERE_NATIVE_SYMBOL} tone="brand" />
+          <BigStat label="Waiting on curve" value={toNumber(state?.padClaimable)} decimals={4} suffix={SPHERE_NATIVE_SYMBOL} tone="up" />
+          <BigStat label="Pulled so far" value={toNumber(state?.totalPulled)} decimals={4} suffix={SPHERE_NATIVE_SYMBOL} />
         </div>
       </PageHero>
 
@@ -87,7 +88,7 @@ export default function SphereRewardsPanel() {
         <ActionCard title="Deliver curve fees" hint="Anyone can trigger this - you only pay gas, the ETH lands in the vault.">
           <ActionButton
             label="Deliver curve fees"
-            address={LAUNCHPAD_ADDRESS as Address}
+            address={SPHERE_LAUNCHPAD_ADDRESS as Address}
             abi={launchpadAbi}
             functionName="claimFor"
             args={[rewards]}

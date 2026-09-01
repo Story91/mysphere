@@ -17,6 +17,7 @@ const { themeKeyFor, networkThemeCss, NETWORK_THEMES } = require('../app/startpa
  */
 
 const ROBINHOOD = 4663;
+const ARC = 5042002;
 const BASE = 8453;
 
 describe('themeKeyFor', () => {
@@ -43,6 +44,20 @@ describe('themeKeyFor', () => {
 
   it('nieznana siec nie wywala funkcji', () => {
     expect(themeKeyFor('/startpad/', 999_999)).to.equal(null);
+  });
+
+  // Hub $SPHERE jest przybity do Base: SPHERE zyje tylko tam, wiec strony
+  // /startpad/sphere/* renderuja sie jak siec domyslna niezaleznie od tego,
+  // jaka siec tablicy jest wybrana.
+  it('hub $SPHERE nie dostaje motywu cudzej sieci', () => {
+    expect(themeKeyFor('/startpad/sphere/', ROBINHOOD)).to.equal(null);
+    expect(themeKeyFor('/startpad/sphere', ROBINHOOD)).to.equal(null);
+    expect(themeKeyFor('/startpad/sphere/season/', ARC)).to.equal(null);
+    expect(themeKeyFor('/startpad/sphere/escrow/', ARC)).to.equal(null);
+  });
+
+  it('sphere musi konczyc segment - token o nazwie spherex dalej dostaje motyw', () => {
+    expect(themeKeyFor('/startpad/spherex/', ROBINHOOD)).to.equal('robinhood');
   });
 });
 
