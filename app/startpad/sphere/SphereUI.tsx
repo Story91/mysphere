@@ -13,6 +13,7 @@
 
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { useSphereCreator } from './sphereActions';
 import { ArrowUpRight, Copy, ExternalLink } from 'lucide-react';
 import { SPHERE_EXPLORER_URL } from './sphereChain';
 import NumberTicker from './NumberTicker';
@@ -155,6 +156,29 @@ export function LearnMore({ children }: { children: ReactNode }) {
       <span>{children}</span>
       <ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" />
     </Link>
+  );
+}
+
+/**
+ * Sekcja operacji keeperowych. Dla TWORCY rozwinieta na stale (to jego
+ * codzienne narzedzia), dla gosci zwinieta pod jedna linijke - przyciski
+ * "deliver/release" sa permissionless i celowo publiczne (protokol ma
+ * przezyc milczenie zespolu), ale zwyklemu kupujacemu nic nie mowia
+ * i tylko zaslanialy tresc. Zwiniecie != ukrycie: kazdy moze rozwinac
+ * i zawolac, doktryna z sekcji 3 tokenomiki zostaje nietknieta.
+ */
+export function KeeperSection({ children }: { children: ReactNode }) {
+  const isCreator = useSphereCreator();
+  if (isCreator) return <>{children}</>;
+  return (
+    <details className="group">
+      <summary className="sph-card flex cursor-pointer list-none items-center justify-between rounded-[20px] border border-sp-shade/10 bg-sp-surface px-4 py-3 text-[12.5px] font-extrabold text-sp-shade/60 transition-colors hover:text-sp-brand [&::-webkit-details-marker]:hidden">
+        Keeper operations - anyone can run these, gas is the only cost
+        <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-sp-shade/40 group-open:hidden">show</span>
+        <span className="hidden text-[10px] font-bold uppercase tracking-[0.08em] text-sp-shade/40 group-open:inline">hide</span>
+      </summary>
+      <div className="mt-3">{children}</div>
+    </details>
   );
 }
 

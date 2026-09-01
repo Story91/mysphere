@@ -19,7 +19,7 @@ import AbiConsole from '../AbiConsole';
 import { SPHERE_LIVE, SPHERE_REWARDS_ADDRESS, sphereRewardsAbi } from '../sphereConfig';
 import { ActionButton, useSphereRead } from '../sphereActions';
 import { TeamRunBadge } from '../SphereShell';
-import { ActionCard, AddressPill, AdvancedSection, BigStat, LearnMore, PageHero } from '../SphereUI';
+import { ActionCard, AddressPill, AdvancedSection, BigStat, KeeperSection, LearnMore, PageHero } from '../SphereUI';
 
 /** Wei -> liczba dla NumberTicker; null zostaje null (szkielet ladowania). */
 function toNumber(wei: bigint | undefined): number | null {
@@ -84,6 +84,7 @@ export default function SphereRewardsPanel() {
         {state && <AddressPill address={state.consumer} label="key holder" />}
       </div>
 
+      <KeeperSection>
       <div className="grid gap-3 sm:grid-cols-2">
         <ActionCard title="Deliver curve fees" hint="Anyone can trigger this - you only pay gas, the ETH lands in the vault.">
           <ActionButton
@@ -102,6 +103,7 @@ export default function SphereRewardsPanel() {
           disabledNote="CONSUMER key only (Rewards Safe) - execute it from the console below."
         />
       </div>
+      </KeeperSection>
 
       <AdvancedSection>
         <AbiConsole title="SphereRewards" address={rewards} abi={sphereRewardsAbi} />

@@ -27,14 +27,21 @@ import AbiConsole from '../AbiConsole';
 import { SPHERE_ESCROW_ADDRESS, SPHERE_LIVE, SPHERE_PLAN, sphereCreatorEscrowAbi } from '../sphereConfig';
 import { ActionButton, useSphereRead } from '../sphereActions';
 import { EnforcedBadge } from '../SphereShell';
-import { ActionCard, AddressPill, AdvancedSection, BigStat, LearnMore, PageHero } from '../SphereUI';
+import { ActionCard, AddressPill, AdvancedSection, BigStat, KeeperSection, LearnMore, PageHero } from '../SphereUI';
 
 const HERO_ICON = <Landmark className="h-6 w-6 text-sp-brand" aria-hidden="true" />;
 const TAGLINE = "SPHERE's creator stream - immutable routing";
 
-/** Krotka liczba ETH do podpisu kafla - liczby > slowa. */
+/**
+ * Krotka liczba ETH do podpisu kafla - liczby > slowa. Drobne, ale REALNE
+ * kwoty (pierwsze fee z krzywej to dziesieciotysieczne czesci ETH) nie moga
+ * wyswietlac sie jako 0.0000 przy aktywnym przycisku - stad 6 miejsc, gdy
+ * wartosc jest niezerowa a mniejsza niz 0.0001.
+ */
 function eth(value: bigint) {
-  return `${Number(formatEther(value)).toFixed(4)} ${SPHERE_NATIVE_SYMBOL}`;
+  const n = Number(formatEther(value));
+  const digits = n > 0 && n < 0.0001 ? 6 : 4;
+  return `${n.toFixed(digits)} ${SPHERE_NATIVE_SYMBOL}`;
 }
 
 export default function SphereEscrowPanel() {
@@ -123,7 +130,7 @@ export default function SphereEscrowPanel() {
           <BigStat
             label="Waiting on curve"
             value={state ? Number(formatEther(state.padClaimable)) : null}
-            decimals={4}
+            decimals={state && state.padClaimable > 0n && state.padClaimable < 100000000000000n ? 6 : 4}
             suffix={SPHERE_NATIVE_SYMBOL}
             tone="up"
           />
@@ -138,7 +145,8 @@ export default function SphereEscrowPanel() {
         {state && state.tokenTarget !== zeroAddress && <AddressPill address={state.tokenTarget} label="Vesting" />}
       </div>
 
-      {/* AKCJE --------------------------------------------------------------- */}
+      {/* AKCJE - dla gosci zwiniete pod KeeperSection, tworca widzi od razu */}
+      <KeeperSection>
       <div className="grid gap-3 sm:grid-cols-2">
         <ActionCard
           title="Deliver curve fees"
@@ -207,11 +215,19 @@ export default function SphereEscrowPanel() {
           />
         </ActionCard>
 
-        {/* Akcja tokenowa dopiero po launchu - wczesniej sphereToken() = 0x0. */}
+        {/* Akcja tokenowa dopiero po launchu - wczesniej sphereToken() = 0x0.
+            Przy zerowym saldzie przycisk GASNIE zamiast konczyc sie rewertem
+            NothingToRelease - dev-buy pojechal do vestingu 1.09.2026, ale
+            escrow dalej dostaje SPHERE ze strumienia hooka po graduacji,
+            wiec karta wroci do zycia sama, gdy cos sie uzbiera. */}
         <ActionCard
           title="Release tokens → vesting"
           badge={<EnforcedBadge />}
-          hint="Whole SPHERE balance moves into the vesting contract"
+          hint={
+            state?.launched && state.tokenBalance === 0n
+              ? 'Nothing waiting - the dev-buy is already vesting; future SPHERE inflows land here'
+              : 'Whole SPHERE balance moves into the vesting contract'
+          }
           disabledNote={state?.launched ? undefined : 'Token not launched yet - unlocks after launch().'}
         >
           <ActionButton
@@ -220,9 +236,11 @@ export default function SphereEscrowPanel() {
             abi={sphereCreatorEscrowAbi}
             functionName="releaseToken"
             args={[zeroAddress]}
+            disabled={!state || state.tokenBalance === 0n}
           />
         </ActionCard>
       </div>
+      </KeeperSection>
 
       <AdvancedSection>
         <AbiConsole title="SphereCreatorEscrow" address={escrow} abi={sphereCreatorEscrowAbi} />
