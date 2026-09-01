@@ -9,8 +9,8 @@ import {
   DEFAULT_SLIPPAGE_BPS,
   fmtEth,
   fmtTokens,
+  GAS_RESERVE_WEI,
   SLIPPAGE_OPTIONS,
-  spendableEth,
   toWei,
   tradeErrorMessage,
   type CoreState,
@@ -306,7 +306,9 @@ export default function PoolTradeBox({ core, onAfterTx }: { core: CoreState; onA
     );
   }
 
-  const spendable = ethBalance !== null ? spendableEth(ethBalance) : 0n;
+  // Rezerwa na gaz jak w TradePanel - procenty licza sie od tego, co
+  // faktycznie da sie wydac, nie od calego salda.
+  const spendable = ethBalance !== null && ethBalance > GAS_RESERVE_WEI ? ethBalance - GAS_RESERVE_WEI : 0n;
   const setBuyPct = (pct: bigint) => {
     if (spendable <= 0n) return;
     const wei = (spendable * pct) / 100n;

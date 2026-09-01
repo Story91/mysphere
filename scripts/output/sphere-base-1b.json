@@ -1,0 +1,30 @@
+{
+  "chainId": 8453,
+  "network": "base",
+  "phase": "1B",
+  "deployer": "0xD4885A5aa53446843CABcDE1F35DE9b4E906030e",
+  "sphere": "0xB200000000000000000000BA5eDb84c678432476",
+  "distributor": "0xc0b018161bB48383c808Aa47923f5501758D3E9D",
+  "buyback": "0x98e51f42245Bf9A0b1e0005510aEE82C52bE8A7b",
+  "params": {
+    "proposer": "0xD4885A5aa53446843CABcDE1F35DE9b4E906030e",
+    "guardian": "0x83E2DE974FC6B866FDb78AEFa5596d58fDc4142F",
+    "operator": "0x83E2DE974FC6B866FDb78AEFa5596d58fDc4142F",
+    "checkpointer": "0xD4885A5aa53446843CABcDE1F35DE9b4E906030e",
+    "minDelaySeconds": "86400",
+    "streamSeconds": "604800",
+    "burnBps": "2000",
+    "trancheMaxWei": "50000000000000000",
+    "windowBudgetWei": "500000000000000000",
+    "windowSeconds": "604800",
+    "checkpointMaxAgeSeconds": "3600",
+    "maxDevBps": "400",
+    "pool": {
+      "manager": "0x498581fF718922c3f8e6A244956aF099B2652b2b",
+      "fee": 3000,
+      "tickSpacing": 60,
+      "hooks": "0x71028Ea6999e2c415b46cc022ED0A9fDca2e2044"
+    }
+  },
+  "deployedAt": "2026-09-01T23:03:58.062Z"
+}
