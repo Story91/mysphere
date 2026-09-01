@@ -88,7 +88,10 @@ async function main() {
     }
     const buybackEth = await hook.pendingBuybackEth(token);
     if (buybackEth > 0n) {
-      log(`executeBuyback(${token}): ${ethers.formatEther(buybackEth)} ETH -> 0xdEaD`);
+      // ETH NIE jest palone: hook kupuje za nie token w puli v4 i dopiero
+      // KUPIONE TOKENY ida na 0xdEaD. Poprzedni skrot "ETH -> 0xdEaD"
+      // wygladal jak spalenie ETH i wystraszyl wlasciciela 2.09.2026.
+      log(`executeBuyback(${token}): ${ethers.formatEther(buybackEth)} ETH kupuje token w puli v4 -> kupione tokeny na 0xdEaD`);
       if (execute) await (await hook.executeBuyback(token, 1n, deadline)).wait();
     }
   }
