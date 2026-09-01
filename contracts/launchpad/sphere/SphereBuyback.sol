@@ -9,6 +9,7 @@ import {
     BalanceDeltaLib,
     PoolStateReader
 } from "../interfaces/IPoolManagerV4.sol";
+import {FullMath} from "../lib/FullMath.sol";
 
 
 /**
@@ -32,9 +33,13 @@ import {
  * reszta do DISTRIBUTORA (buyback-and-redistribute - pula nagrod tworcow).
  *
  * NOGI TEAM-RUN, nazwane uczciwie (spec: tylko to, co wymusza lancuch, wolno
- * komunikowac jako gwarancje): checkpoint() i cancel() nalezy do OPERATORA
- * (Safe). cancel() zwraca NIEWYDANE ETH wylacznie do OPERATORA - to jego
- * wlasny przychod; nie ma zadnej drogi do cudzych srodkow.
+ * komunikowac jako gwarancje), ROZDZIELONE na dwa klucze (recenzja
+ * przedwdrozeniowa 2026-09-02): checkpoint() nalezy do CHECKPOINTERA -
+ * goracego klucza keepera, bo checkpoint musi byc swiezy (CHECKPOINT_MAX_AGE)
+ * i Safe nie zrobi go co godzine; cancel() nalezy do OPERATORA (Safe)
+ * i zwraca NIEWYDANE ETH wylacznie do OPERATORA - to jego wlasny przychod.
+ * Checkpointer nie ma zadnej drogi do srodkow: moze tylko wybrac MOMENT
+ * odczytu spotu, a zly moment ogranicza MAX_DEV_BPS i budzet okna.
  */
 contract SphereBuyback is IUnlockCallback {
     address public constant DEAD = 0x000000000000000000000000000000000000dEaD;
@@ -48,6 +53,7 @@ contract SphereBuyback is IUnlockCallback {
 
     address public immutable DISTRIBUTOR;
     address public immutable OPERATOR;
+    address public immutable CHECKPOINTER; // goracy klucz keepera: tylko checkpoint()
 
     uint16 public immutable BURN_BPS; // czesc kupionego palona (reszta -> distributor)
     uint256 public immutable TRANCHE_MAX; // wei na jedno wykonanie
@@ -79,6 +85,7 @@ contract SphereBuyback is IUnlockCallback {
     error ZeroAddress();
     error BadConfig();
     error NotOperator();
+    error NotCheckpointer();
     error NotPoolManager();
     error NotUnlocking();
     error Expired();
@@ -99,6 +106,7 @@ contract SphereBuyback is IUnlockCallback {
         address hooks_,
         address distributor_,
         address operator_,
+        address checkpointer_,
         uint16 burnBps_,
         uint256 trancheMax_,
         uint256 windowBudget_,
@@ -106,7 +114,10 @@ contract SphereBuyback is IUnlockCallback {
         uint64 checkpointMaxAge_,
         uint16 maxDevBps_
     ) {
-        if (poolManager_ == address(0) || sphere_ == address(0) || distributor_ == address(0) || operator_ == address(0)) {
+        if (
+            poolManager_ == address(0) || sphere_ == address(0) || distributor_ == address(0) || operator_ == address(0)
+                || checkpointer_ == address(0)
+        ) {
             revert ZeroAddress();
         }
         if (burnBps_ > 10_000 || maxDevBps_ >= 10_000 || trancheMax_ == 0 || windowBudget_ < trancheMax_ || windowSeconds_ == 0 || checkpointMaxAge_ == 0) {
@@ -119,6 +130,7 @@ contract SphereBuyback is IUnlockCallback {
         HOOKS = hooks_;
         DISTRIBUTOR = distributor_;
         OPERATOR = operator_;
+        CHECKPOINTER = checkpointer_;
         BURN_BPS = burnBps_;
         TRANCHE_MAX = trancheMax_;
         WINDOW_BUDGET = windowBudget_;
@@ -145,13 +157,19 @@ contract SphereBuyback is IUnlockCallback {
      * wlasnej transakcji.
      */
     function checkpoint() external {
-        if (msg.sender != OPERATOR) revert NotOperator();
+        if (msg.sender != CHECKPOINTER) revert NotCheckpointer();
         uint160 sqrtP = PoolStateReader.sqrtPriceX96(POOL_MANAGER, poolKey());
         if (sqrtP == 0) revert BadConfig();
-        // tokens/ETH = (2^96 / sqrtP)^2 = 2^192 / sqrtP^2, przeskalowane e18.
-        // Dzielimy dwustopniowo, zeby nie przepelnic: (2^192 * 1e18) nie miesci
-        // sie w uint256 dla malych sqrtP, wiec najpierw 2^192/sqrtP^2.
-        uint256 priceTokensPerEth = (uint256(1) << 192) / (uint256(sqrtP) * uint256(sqrtP) / 1e18);
+        // Uniswap v4: sqrtPriceX96 = sqrt(currency1 / currency0) * 2^96. W puli
+        // kanonicznej currency0 = ETH, currency1 = SPHERE (CurveLaunchpad
+        // buduje klucz z address(0) jako currency0), wiec
+        //   tokens/ETH = (sqrtP / 2^96)^2 = sqrtP^2 / 2^192.
+        // Poprzednia wersja liczyla ODWROTNOSC (2^192 / sqrtP^2), czyli ETH/token
+        // - testy tego nie lapaly, bo pula 1:1 daje ten sam wynik w obie strony,
+        // a na mainnecie straznik mialby prog ~1e16 razy za niski. Dwa mulDiv
+        // po 2^96, zeby sqrtP^2 (do 320 bitow) nie przepelnilo uint256.
+        uint256 sq = FullMath.mulDivDown(uint256(sqrtP), uint256(sqrtP), uint256(1) << 96);
+        uint256 priceTokensPerEth = FullMath.mulDivDown(sq, 1e18, uint256(1) << 96);
         checkpointTokensPerEthE18 = priceTokensPerEth;
         checkpointAt = uint64(block.timestamp);
         emit Checkpointed(priceTokensPerEth, msg.sender);

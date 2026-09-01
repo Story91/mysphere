@@ -7,33 +7,43 @@ import { dirname, join } from "path";
  *
  * Kolejnosc jest twarda: buyback dostaje adres dystrybutora w konstruktorze
  * (immutable), wiec dystrybutor idzie PIERWSZY. Oba kontrakty sa zero-admin
- * poza dwiema/trzema immutable rolami - kazdy parametr ponizej mrozi sie na
- * zawsze, stad dry-run drukuje komplet i wymaga CONFIRM=tak.
+ * poza immutable rolami - kazdy parametr ponizej mrozi sie na zawsze, stad
+ * dry-run drukuje komplet i wymaga CONFIRM=tak.
  *
  * Co ten skrypt NIE robi: nie proponuje zadnego roota (payouty dopiero po
  * min. czterech epokach shadow - doktryna fazy 1A) i nie wola execute()
  * buybacku (pula v4 istnieje dopiero po graduacji). Deploy jest niezalezny
  * od obu tych bram - adresy moga byc publiczne wczesniej.
  *
- * UZYCIE
- *   dry-run (nic nie wysyla):
- *     npx hardhat run scripts/launchpad/deploySphere1B.ts --network base
- *   deploy:
- *     CONFIRM=tak npx hardhat run scripts/launchpad/deploySphere1B.ts --network base
+ * ROLE (recenzja przedwdrozeniowa 2026-09-02, trzy niezalezne soczewki):
+ *   PROPOSER     = deployer (publikuje manifesty, wiec i rooty)
+ *   GUARDIAN     = Safe (weto; kontrakt wymusza GUARDIAN != PROPOSER)
+ *   OPERATOR     = Safe (cancel() - zwrot NIEWYDANEGO ETH; to protokolowe ETH,
+ *                  wiec NIE moze byc zwracane do goracego klucza)
+ *   CHECKPOINTER = deployer/keeper (checkpoint() co najwyzej CHECKPOINT_S
+ *                  przed transza - Safe nie zrobi tego co godzine)
  *
- * ENV (wszystko opcjonalne, domyslne = decyzje ze speca / fixture testow):
+ * UZYCIE (konwencja repo: ts-node przez hardhat.tsconfig.json)
+ *   dry-run (nic nie wysyla):   npm run launchpad:sphere:1b
+ *   deploy, PowerShell:         $env:CONFIRM='tak'; npm run launchpad:sphere:1b
+ *   deploy, bash:               CONFIRM=tak npm run launchpad:sphere:1b
+ *   wznowienie po padzie tx 2:  DISTRIBUTOR=0x... (pomija deploy dystrybutora,
+ *                               sprawdza jego parametry, wdraza tylko buyback)
+ *
+ * ENV (opcjonalne; domyslne = decyzje speca + wnioski z recenzji):
  *   SPHERE          token (domyslnie odczyt escrow.sphereToken())
- *   PROPOSER        kto proponuje rooty (domyslnie deployer = publikator manifestow)
- *   GUARDIAN        kto ma weto (domyslnie Safe; MUSI roznic sie od PROPOSER)
- *   OPERATOR        checkpoint()/cancel() buybacku (domyslnie deployer)
- *   MIN_DELAY_S     okno weta roota (domyslnie 86400 - decyzja #10)
- *   STREAM_S        streaming przyrostu epoki (domyslnie 7 dni - decyzja #15)
- *   BURN_BPS        czesc kupionego SPHERE palona (domyslnie 2000 = 20%)
- *   TRANCHE_ETH     max jedna transza (domyslnie 0.05)
- *   WINDOW_ETH      budzet okna (domyslnie 0.5)
- *   WINDOW_S        dlugosc okna budzetu (domyslnie 7 dni)
- *   CHECKPOINT_S    max wiek checkpointu ceny (domyslnie 3600)
- *   MAX_DEV_BPS     max odchylenie od checkpointu (domyslnie 150 = ~1.5%)
+ *   PROPOSER / GUARDIAN / OPERATOR / CHECKPOINTER   role jak wyzej
+ *   MIN_DELAY_S     okno weta roota (86400 - decyzja #10)
+ *   STREAM_S        streaming przyrostu epoki (7 dni - decyzja #15)
+ *   BURN_BPS        czesc kupionego SPHERE palona (2000 = 20%)
+ *   TRANCHE_ETH     max jedna transza (0.05)
+ *   WINDOW_ETH      budzet okna (0.5) - TWARDY SUFIT na zawsze, ~26 ETH/rok
+ *   WINDOW_S        dlugosc okna budzetu (7 dni)
+ *   CHECKPOINT_S    max wiek checkpointu ceny (3600)
+ *   MAX_DEV_BPS     max odchylenie od checkpointu (400): swap buybacku placi
+ *                   0.3% LP + 1% hooka = 130 bps ZANIM policzy sie poslizg,
+ *                   wiec 150 bps z fixture testow blokowaloby kazda transze
+ *                   powyzej ~0.006 ETH przy plynnosci z graduacji (~2.9 ETH)
  */
 
 const BASE = {
@@ -58,6 +68,19 @@ function envBig(name: string, fallback: bigint): bigint {
 function envEth(name: string, fallback: string): bigint {
   return ethers.parseEther((process.env[name] ?? fallback).trim());
 }
+/** Publiczny RPC Base potrafi oddac stan sprzed bloku tuz po deployu - powtarzamy odczyt. */
+async function readRetry<T>(fn: () => Promise<T>, attempts = 8, delayMs = 1500): Promise<T> {
+  let last: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      last = e;
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+  throw last;
+}
 
 async function main() {
   const [deployer] = await ethers.getSigners();
@@ -79,7 +102,8 @@ async function main() {
   // --- parametry (mroza sie na zawsze) ------------------------------------
   const proposer = envAddr("PROPOSER", deployer.address);
   const guardian = envAddr("GUARDIAN", BASE.safe);
-  const operator = envAddr("OPERATOR", deployer.address);
+  const operator = envAddr("OPERATOR", BASE.safe);
+  const checkpointer = envAddr("CHECKPOINTER", deployer.address);
   const minDelay = envBig("MIN_DELAY_S", DAY);
   const stream = envBig("STREAM_S", 7n * DAY);
   const burnBps = envBig("BURN_BPS", 2000n);
@@ -87,14 +111,21 @@ async function main() {
   const windowBudget = envEth("WINDOW_ETH", "0.5");
   const windowSeconds = envBig("WINDOW_S", 7n * DAY);
   const checkpointMaxAge = envBig("CHECKPOINT_S", 3600n);
-  const maxDevBps = envBig("MAX_DEV_BPS", 150n);
+  const maxDevBps = envBig("MAX_DEV_BPS", 400n);
 
+  // Lustro warunkow konstruktorow (ZeroAddress / BadConfig / BadSchedule) -
+  // PRZED pierwsza transakcja, zeby literowka w env nie osierocila dystrybutora.
   if (proposer.toLowerCase() === guardian.toLowerCase()) throw new Error("PROPOSER i GUARDIAN musza byc rozne (weto bez proponenta).");
+  if (minDelay === 0n || stream === 0n) throw new Error("MIN_DELAY_S i STREAM_S musza byc > 0.");
+  if (burnBps > 10_000n) throw new Error("BURN_BPS > 10000.");
+  if (maxDevBps >= 10_000n) throw new Error("MAX_DEV_BPS musi byc < 10000.");
+  if (trancheMax === 0n) throw new Error("TRANCHE_ETH musi byc > 0.");
   if (windowBudget < trancheMax) throw new Error("WINDOW_ETH < TRANCHE_ETH - kontrakt odrzuci (BadConfig).");
+  if (windowSeconds === 0n || checkpointMaxAge === 0n) throw new Error("WINDOW_S i CHECKPOINT_S musza byc > 0.");
+  if (maxDevBps < 200n) console.log("UWAGA: MAX_DEV_BPS < 200 nie pokrywa 130 bps oplat swapu - execute() bedzie rewertowac PriceGuard.\n");
 
   console.log(`siec: ${network.name} (chainId ${chainId}) | wdrazajacy: ${deployer.address}`);
   console.log(`saldo: ${ethers.formatEther(await ethers.provider.getBalance(deployer.address))} ETH\n`);
-  // String() na BigInt - inaczej %s drukuje "86400n" i wyglada jak jednostka.
   console.log(
     "DISTRIBUTOR  token=%s proposer=%s guardian=%s minDelay=%ss stream=%ss",
     sphere,
@@ -104,11 +135,12 @@ async function main() {
     String(stream)
   );
   console.log(
-    "BUYBACK      pool=%s/%s/%s operator=%s burn=%sbps tranche=%s ETH window=%s ETH/%ss checkpoint<=%ss maxDev=%sbps",
+    "BUYBACK      pool=%s/%s/%s operator=%s checkpointer=%s burn=%sbps tranche=%s ETH window=%s ETH/%ss checkpoint<=%ss maxDev=%sbps",
     BASE.poolFee,
     BASE.tickSpacing,
     BASE.hook,
     operator,
+    checkpointer,
     String(burnBps),
     ethers.formatEther(trancheMax),
     ethers.formatEther(windowBudget),
@@ -116,18 +148,38 @@ async function main() {
     String(checkpointMaxAge),
     String(maxDevBps)
   );
+  const reuse = (process.env.DISTRIBUTOR ?? "").trim();
+  if (reuse) console.log(`DISTRIBUTOR  istniejacy: ${reuse} (deploy pominiety, parametry zostana sprawdzone)`);
 
   if (!local && !confirm) {
     console.log("\nDry-run zakonczony. Deploy: CONFIRM=tak + te same env.");
     return;
   }
 
-  // --- 1. dystrybutor -----------------------------------------------------
+  // --- 1. dystrybutor (albo wznowienie na istniejacym) --------------------
   const D = await ethers.getContractFactory("SphereStreamingMerkleDistributor");
-  const dist = await D.deploy(sphere, proposer, guardian, minDelay, stream);
-  await dist.waitForDeployment();
-  const distAddr = await dist.getAddress();
-  console.log(`\nSphereStreamingMerkleDistributor: ${distAddr}`);
+  let distAddr: string;
+  let dist: any;
+  if (reuse) {
+    distAddr = ethers.getAddress(reuse);
+    dist = D.attach(distAddr);
+    const [t, p, g, md, sd] = await Promise.all([
+      dist.TOKEN(),
+      dist.PROPOSER(),
+      dist.GUARDIAN(),
+      dist.MIN_DELAY(),
+      dist.STREAM_DURATION(),
+    ]);
+    if (t !== sphere || p !== proposer || g !== guardian || BigInt(md) !== minDelay || BigInt(sd) !== stream) {
+      throw new Error("Istniejacy DISTRIBUTOR ma inne parametry niz zadane - STOP.");
+    }
+    console.log(`\nSphereStreamingMerkleDistributor: ${distAddr} (istniejacy, parametry zgodne)`);
+  } else {
+    dist = await D.deploy(sphere, proposer, guardian, minDelay, stream);
+    await dist.waitForDeployment();
+    distAddr = await dist.getAddress();
+    console.log(`\nSphereStreamingMerkleDistributor: ${distAddr}`);
+  }
 
   // --- 2. buyback (immutable wskazanie na dystrybutor) ---------------------
   const B = await ethers.getContractFactory("SphereBuyback");
@@ -139,6 +191,7 @@ async function main() {
     BASE.hook,
     distAddr,
     operator,
+    checkpointer,
     burnBps,
     trancheMax,
     windowBudget,
@@ -150,13 +203,7 @@ async function main() {
   const buybackAddr = await buyback.getAddress();
   console.log(`SphereBuyback:                    ${buybackAddr}`);
 
-  // --- 3. odczyty kontrolne - kazde wiazanie sprawdzone z zewnatrz ---------
-  const dOk = (await dist.TOKEN()) === sphere && (await dist.PROPOSER()) === proposer && (await dist.GUARDIAN()) === guardian;
-  const bOk = (await buyback.DISTRIBUTOR()) === distAddr && (await buyback.SPHERE()) === sphere && Number(await buyback.BURN_BPS()) === Number(burnBps);
-  if (!dOk || !bOk) throw new Error("Odczyt kontrolny nie zgadza sie z parametrami - NIE publikowac adresow.");
-  console.log("odczyty kontrolne: OK");
-
-  // --- 4. rekord + komendy weryfikacji ------------------------------------
+  // --- 3. rekord NAJPIERW (zeby pad RPC nie zgubil adresow), potem kontrola --
   const record = {
     chainId,
     network: network.name,
@@ -169,6 +216,7 @@ async function main() {
       proposer,
       guardian,
       operator,
+      checkpointer,
       minDelaySeconds: minDelay.toString(),
       streamSeconds: stream.toString(),
       burnBps: burnBps.toString(),
@@ -184,13 +232,27 @@ async function main() {
   const outPath = join(__dirname, "..", "output", `sphere-${network.name}-1b.json`);
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, JSON.stringify(record, null, 2) + "\n");
-  console.log(`\nrekord: ${outPath}`);
+  console.log(`rekord: ${outPath}`);
   console.log("\nweryfikacja zrodel na Basescanie:");
   console.log(`  npx hardhat verify --network ${network.name} ${distAddr} ${sphere} ${proposer} ${guardian} ${minDelay} ${stream}`);
   console.log(
-    `  npx hardhat verify --network ${network.name} ${buybackAddr} ${BASE.poolManager} ${sphere} ${BASE.poolFee} ${BASE.tickSpacing} ${BASE.hook} ${distAddr} ${operator} ${burnBps} ${trancheMax} ${windowBudget} ${windowSeconds} ${checkpointMaxAge} ${maxDevBps}`
+    `  npx hardhat verify --network ${network.name} ${buybackAddr} ${BASE.poolManager} ${sphere} ${BASE.poolFee} ${BASE.tickSpacing} ${BASE.hook} ${distAddr} ${operator} ${checkpointer} ${burnBps} ${trancheMax} ${windowBudget} ${windowSeconds} ${checkpointMaxAge} ${maxDevBps}`
   );
-  console.log("\nnastepne kroki: NEXT_PUBLIC_SPHERE_DISTRIBUTOR_ADDRESS / NEXT_PUBLIC_SPHERE_BUYBACK_ADDRESS w configu,");
+
+  const dOk = await readRetry(
+    async () => (await dist.TOKEN()) === sphere && (await dist.PROPOSER()) === proposer && (await dist.GUARDIAN()) === guardian
+  );
+  const bOk = await readRetry(
+    async () =>
+      (await buyback.DISTRIBUTOR()) === distAddr &&
+      (await buyback.SPHERE()) === sphere &&
+      (await buyback.OPERATOR()) === operator &&
+      (await buyback.CHECKPOINTER()) === checkpointer &&
+      Number(await buyback.BURN_BPS()) === Number(burnBps)
+  );
+  if (!dOk || !bOk) throw new Error("Odczyt kontrolny nie zgadza sie z parametrami - NIE publikowac adresow.");
+  console.log("\nodczyty kontrolne: OK");
+  console.log("nastepne kroki: NEXT_PUBLIC_SPHERE_DISTRIBUTOR_ADDRESS / NEXT_PUBLIC_SPHERE_BUYBACK_ADDRESS w configu,");
   console.log("keeper z env BUYBACK= i DISTRIBUTOR= (scripts/sphere/sphereKeeper.ts), pierwszy root dopiero po shadow.");
 }
 

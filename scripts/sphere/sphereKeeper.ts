@@ -44,6 +44,8 @@ const VAULT_ABI = [
   "function claimEthFor(address) external",
 ];
 const BUYBACK_ABI = [
+  "function checkpoint() external",
+  "function CHECKPOINTER() view returns (address)",
   "function checkpointAt() view returns (uint64)",
   "function CHECKPOINT_MAX_AGE() view returns (uint64)",
   "function TRANCHE_MAX() view returns (uint256)",
@@ -117,8 +119,21 @@ async function main() {
   if (process.env.BUYBACK) {
     const buyback = new ethers.Contract(process.env.BUYBACK, BUYBACK_ABI, signer);
     const bal = await ethers.provider.getBalance(process.env.BUYBACK);
-    const at = await buyback.checkpointAt();
-    const fresh = at > 0n && now - at <= (await buyback.CHECKPOINT_MAX_AGE());
+    let at = await buyback.checkpointAt();
+    const maxAge = await buyback.CHECKPOINT_MAX_AGE();
+    let fresh = at > 0n && now - at <= maxAge;
+    // checkpoint() nalezy do CHECKPOINTERA (goracy klucz keepera, rozdzielony
+    // od OPERATORA=Safe, ktory trzyma cancel()). Jesli ten klucz to my,
+    // odswiezamy referencje ceny tuz przed transza - inaczej execute()
+    // rewertuje CheckpointStale po CHECKPOINT_MAX_AGE.
+    if (bal > 0n && !fresh && (await buyback.CHECKPOINTER()).toLowerCase() === signer.address.toLowerCase()) {
+      log("buyback.checkpoint() - odswiezenie referencji ceny");
+      if (execute) {
+        await (await buyback.checkpoint()).wait();
+        at = await buyback.checkpointAt();
+        fresh = true;
+      }
+    }
     if (bal > 0n && fresh) {
       const trancheMax = await buyback.TRANCHE_MAX();
       const tranche = (ethers.parseEther(process.env.TRANCHE_ETH ?? "0.05") < trancheMax
@@ -133,7 +148,7 @@ async function main() {
         }
       }
     } else if (bal > 0n) {
-      log(`buyback: ${ethers.formatEther(bal)} ETH czeka, ale checkpoint nieswiezy - checkpoint() nalezy do OPERATORA (Safe)`);
+      log(`buyback: ${ethers.formatEther(bal)} ETH czeka, ale checkpoint nieswiezy, a ten klucz nie jest CHECKPOINTEREM`);
     }
   }
 
