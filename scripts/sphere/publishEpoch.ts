@@ -121,7 +121,41 @@ async function main() {
 
   const head = BigInt(await ethers.provider.getBlockNumber());
   const currentIdx = Number((head - SEASON_GENESIS_BLOCK) / EPOCH_BLOCKS);
-  const epochIdx = process.env.EPOCH ? Number(process.env.EPOCH) : currentIdx;
+  // AUTO=tak (harmonogram, scripts/sphere/epoch.ps1): ostatnia ZAMKNIETA
+  // epoka, pula = wolne saldo dystrybutora, VWAP z transz buybacku, propose
+  // kluczem PROPOSER. Idempotentne: jesli ta epoka jest juz zaproponowana
+  // albo poprzedni root czeka na aktywacje, przebieg konczy sie od razu -
+  // dlatego wolno go odpalac codziennie.
+  const auto = process.env.AUTO === "tak";
+  const epochIdx = process.env.EPOCH ? Number(process.env.EPOCH) : auto ? currentIdx - 1 : currentIdx;
+  const distributorAddr = process.env.DISTRIBUTOR ?? "0xc0b018161bB48383c808Aa47923f5501758D3E9D";
+  const buybackAddr = process.env.BUYBACK ?? "0x98e51f42245Bf9A0b1e0005510aEE82C52bE8A7b";
+  const publicDir = join(__dirname, "..", "..", "public", "sphere-epochs");
+  const latestPath = join(publicDir, "latest.json");
+  const distRead = new ethers.Contract(
+    distributorAddr,
+    [
+      "function TOKEN() view returns (address)",
+      "function epochId() view returns (uint64)",
+      "function totalCumulative() view returns (uint256)",
+      "function totalClaimed() view returns (uint256)",
+      "function pending() view returns (bytes32 root, bytes32 manifestHash, uint64 epochId, uint256 totalCumulative, uint64 validAt)",
+    ],
+    ethers.provider
+  );
+  if (auto) {
+    if (epochIdx < 0) throw new Error("Sezon jeszcze nie zamknal zadnej epoki.");
+    const prevLatest = existsSync(latestPath) ? JSON.parse(readFileSync(latestPath, "utf8")) : null;
+    if (prevLatest && Number(prevLatest.epoch) >= epochIdx && prevLatest.proposedAt) {
+      console.log(`AUTO: epoka ${epochIdx} juz zaproponowana (${prevLatest.proposedAt}) - nic do zrobienia.`);
+      return;
+    }
+    const pend = await distRead.pending();
+    if (Number(pend.validAt) > 0) {
+      console.log(`AUTO: poprzedni root czeka na aktywacje (weto do ${new Date(Number(pend.validAt) * 1000).toISOString()}) - keeper aktywuje, sprobuje jutro.`);
+      return;
+    }
+  }
   const fromBlock = SEASON_GENESIS_BLOCK + BigInt(epochIdx) * EPOCH_BLOCKS;
   const toBlock = fromBlock + EPOCH_BLOCKS - 1n;
   const scanTo = head < toBlock ? head : toBlock;
@@ -190,8 +224,36 @@ async function main() {
   const result = scoreEpoch(inputs, epochIdx, fromBlock, toBlock, endTs);
 
   // ---- nagrody i liscie (jesli pula > 0) -----------------------------------
-  const poolSphere = ethers.parseEther(process.env.POOL_SPHERE ?? "0");
-  const vwap = ethers.parseEther(process.env.VWAP_SPHERE_PER_ETH ?? "0"); // SPHERE za 1 ETH
+  let poolSphere = ethers.parseEther(process.env.POOL_SPHERE ?? "0");
+  let vwap = ethers.parseEther(process.env.VWAP_SPHERE_PER_ETH ?? "0"); // SPHERE za 1 ETH
+  if (auto) {
+    // Pula = to, co dystrybutor ma PONAD juz obiecane (totalCumulative -
+    // totalClaimed to zobowiazania z poprzednich epok, activate() sprawdza
+    // wyplacalnosc calosci).
+    const tokenAddr: string = await distRead.TOKEN();
+    const token = new ethers.Contract(tokenAddr, ["function balanceOf(address) view returns (uint256)"], ethers.provider);
+    const balance: bigint = await token.balanceOf(distributorAddr);
+    const owed: bigint = BigInt(await distRead.totalCumulative()) - BigInt(await distRead.totalClaimed());
+    poolSphere = balance > owed ? balance - owed : 0n;
+    // VWAP = laczny kurs transz SphereBuyback (event BuybackExecuted) - to
+    // jest cena, po ktorej pula faktycznie zostala kupiona; regula 0 tnie
+    // po niej sufit ETH -> SPHERE. Bez zadnej transzy nie ma po czym liczyc.
+    const bb = new ethers.Contract(
+      buybackAddr,
+      ["event BuybackExecuted(uint256 ethSpent, uint256 bought, uint256 burned, uint256 toDistributor, address indexed caller)"],
+      ethers.provider
+    );
+    const execs = await scanChunks(bb, bb.filters.BuybackExecuted(), 50_760_000n, head);
+    const sumEth = execs.reduce((a: bigint, l: any) => a + BigInt(l.args[0]), 0n);
+    const sumBought = execs.reduce((a: bigint, l: any) => a + BigInt(l.args[1]), 0n);
+    if (sumEth > 0n) vwap = (sumBought * 10n ** 18n) / sumEth;
+    console.log(
+      `AUTO: pula ${ethers.formatEther(poolSphere)} SPHERE (saldo ${ethers.formatEther(balance)} - obiecane ${ethers.formatEther(owed)}) | VWAP ${ethers.formatEther(vwap)} SPHERE/ETH z ${execs.length} transz`
+    );
+    if (poolSphere === 0n) {
+      console.log("AUTO: pula pusta - epoka zostaje shadow, dopoki skarbiec nie zasili buybacku.");
+    }
+  }
   const outDir = join(__dirname, "..", "output", "sphere-epochs");
   const prevPath = join(outDir, `epoch-${epochIdx - 1}.json`);
   const prevCums: Record<string, string> = existsSync(prevPath)
@@ -257,9 +319,31 @@ async function main() {
   // Kopia PUBLICZNA: przegladarka (przycisk Claim na /startpad/sphere/season)
   // bierze stad liscie i proofy. Statyczny plik pod public/ jedzie z deployem;
   // kazdy moze porownac jego manifestHash z tym, co stoi w dystrybutorze.
-  const publicDir = join(__dirname, "..", "..", "public", "sphere-epochs");
   mkdirSync(publicDir, { recursive: true });
   writeFileSync(join(publicDir, `epoch-${epochIdx}.json`), manifestJson);
+  // Blob (jesli jest token): przegladarka czyta manifest STAMTAD w pierwszej
+  // kolejnosci, wiec automat na maszynie wlasciciela nie potrzebuje commita
+  // ani deployu, zeby Claim mial swieze proofy. Plik w public/ zostaje jako
+  // kopia w repo i fallback.
+  const blobToken = (process.env.BLOB_READ_WRITE_TOKEN ?? "").trim();
+  if (!blobToken) console.log("blob: brak BLOB_READ_WRITE_TOKEN w env - manifest tylko w public/ (deploy przez git)");
+  const blobPut = async (name: string, body: string) => {
+    if (!blobToken) return null;
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { put } = require("@vercel/blob") as typeof import("@vercel/blob");
+    const res = await put(`sphere-epochs/${name}`, body, {
+      access: "public",
+      addRandomSuffix: false,
+      // latest.json nadpisujemy co tydzien, manifest epoki przy ponownym przebiegu.
+      allowOverwrite: true,
+      contentType: "application/json",
+      cacheControlMaxAge: 60,
+      token: blobToken,
+    });
+    return res.url;
+  };
+  const blobUrl = await blobPut(`epoch-${epochIdx}.json`, manifestJson);
+  if (blobUrl) console.log(`blob: ${blobUrl}`);
   console.log(`manifest: ${outPath} (+ public/sphere-epochs/epoch-${epochIdx}.json)`);
   console.log(`manifestHash: ${manifestHash}`);
   const totalCumulative = Object.values(cumulative).reduce((a, v) => a + BigInt(v), 0n);
@@ -274,7 +358,6 @@ async function main() {
   // epoki kalendarzowej - kontrakt wymaga dokladnie epochId+1. Mapowanie
   // kalendarz -> licznik zapisujemy w latest.json, zeby UI wiedzialo, ktory
   // manifest jest aktywny.
-  const distributorAddr = process.env.DISTRIBUTOR ?? "0xc0b018161bB48383c808Aa47923f5501758D3E9D";
   const [signer] = await ethers.getSigners();
   const dist = new ethers.Contract(
     distributorAddr,
@@ -297,8 +380,16 @@ async function main() {
     proposedAt: null as string | null,
   };
   if (process.env.PROPOSE !== "tak") {
-    writeFileSync(join(publicDir, "latest.json"), JSON.stringify(latest, null, 2) + "\n");
-    console.log(`propose: pominiete (PROPOSE=tak zeby wyslac). Nastepny on-chain epochId: ${onchainNext}`);
+    // Bez propose NIE nadpisujemy latest.json, ktory juz notuje propozycje
+    // tej (lub nowszej) epoki - inaczej dry-run kasowalby `proposedAt`,
+    // a automat proponowalby te sama epoke drugi raz (nowe okno weta).
+    const existing = existsSync(latestPath) ? JSON.parse(readFileSync(latestPath, "utf8")) : null;
+    if (existing && Number(existing.epoch) >= epochIdx && existing.proposedAt) {
+      console.log(`propose: pominiete; latest.json zostaje (epoka ${existing.epoch} zaproponowana ${existing.proposedAt}).`);
+    } else {
+      writeFileSync(latestPath, JSON.stringify(latest, null, 2) + "\n");
+      console.log(`propose: pominiete (PROPOSE=tak zeby wyslac). Nastepny on-chain epochId: ${onchainNext}`);
+    }
     return;
   }
   if ((await dist.PROPOSER()).toLowerCase() !== signer.address.toLowerCase()) {
@@ -308,7 +399,10 @@ async function main() {
   const rc = await tx.wait();
   const p = await dist.pending();
   latest.proposedAt = new Date().toISOString();
-  writeFileSync(join(publicDir, "latest.json"), JSON.stringify(latest, null, 2) + "\n");
+  const latestJson = JSON.stringify(latest, null, 2) + "\n";
+  writeFileSync(latestPath, latestJson);
+  const latestBlob = await blobPut("latest.json", latestJson);
+  if (latestBlob) console.log(`blob: ${latestBlob}`);
   console.log(`propose OK | tx ${rc.hash} | epochId ${onchainNext} | weto do ${new Date(Number(p.validAt) * 1000).toISOString()}`);
   console.log("po oknie weta keeper wola activate(); od tej chwili Claim na /startpad/sphere/season.");
 }

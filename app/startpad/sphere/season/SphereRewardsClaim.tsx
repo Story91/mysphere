@@ -119,8 +119,28 @@ export default function SphereRewardsClaim({ dist }: { dist: DistributorState | 
     let alive = true;
     (async () => {
       try {
-        const l = (await (await fetch('/sphere-epochs/latest.json', { cache: 'no-store' })).json()) as Latest;
-        const m = (await (await fetch(`/sphere-epochs/epoch-${l.epoch}.json`, { cache: 'no-store' })).json()) as { leaves?: Leaf[] };
+        // Blob najpierw (tam publikuje automat epoki bez deployu), potem kopia
+        // z repo pod public/. Oba to ten sam plik; manifestHash w kontrakcie
+        // rozstrzyga, ktory jest prawdziwy.
+        // Host Bloba to id sklepu bez prefiksu `store_`, malymi literami
+        // (env trzyma "store_SaqX..." - w cudzyslowie i z wielkimi literami).
+        const storeId = (process.env.NEXT_PUBLIC_VERCEL_BLOB_STORE_ID ?? '').replace(/["']/g, '').replace(/^store_/i, '').toLowerCase();
+        const sources = storeId ? [`https://${storeId}.public.blob.vercel-storage.com/sphere-epochs`, '/sphere-epochs'] : ['/sphere-epochs'];
+        const getJson = async <T,>(name: string): Promise<T> => {
+          let lastErr: unknown = null;
+          for (const base of sources) {
+            try {
+              const r = await fetch(`${base}/${name}`, { cache: 'no-store' });
+              if (r.ok) return (await r.json()) as T;
+              lastErr = new Error(String(r.status));
+            } catch (e) {
+              lastErr = e;
+            }
+          }
+          throw lastErr ?? new Error('manifest unavailable');
+        };
+        const l = await getJson<Latest>('latest.json');
+        const m = await getJson<{ leaves?: Leaf[] }>(`epoch-${l.epoch}.json`);
         if (!alive) return;
         setLatest(l);
         const mine = (m.leaves ?? []).find((x) => x.account.toLowerCase() === account.toLowerCase());
