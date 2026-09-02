@@ -88,7 +88,15 @@ const config = {
       chainId: 84532
     },
     base: {
-      url: process.env.BASE_RPC_URL || "https://mainnet.base.org",
+      // Kolejnosc: jawny BASE_RPC_URL -> dedykowany wezel Coinbase Developer
+      // Platform (klucz OnchainKit z .env.local; darmowe publiczne RPC padaly
+      // pod seria transakcji keepera: mainnet.base.org mieszal stan miedzy
+      // wezlami, publicnode blokowal paragony, drpc dawal 429) -> publiczny.
+      url:
+        process.env.BASE_RPC_URL ||
+        (process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY
+          ? `https://api.developer.coinbase.com/rpc/v1/base/${process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}`
+          : "https://mainnet.base.org"),
       accounts: deployerAccounts(),
       chainId: 8453
     },

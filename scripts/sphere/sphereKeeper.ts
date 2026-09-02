@@ -75,6 +75,9 @@ const DIST_ABI = [
   "function activate() external",
 ];
 
+/** Oddech miedzy transakcjami - seria kilkunastu tx pod rzad wywalala limity publicznych RPC. */
+const pace = () => new Promise<void>((r) => setTimeout(r, 700));
+
 async function main() {
   const [signer] = await ethers.getSigners();
   const execute = process.env.KEEPER_CONFIRM === "tak";
@@ -93,13 +96,13 @@ async function main() {
     const [pendingEth, pendingToken] = [await hook.pendingEth(token), await hook.pendingToken(token)];
     if (pendingEth > 0n || pendingToken > 0n) {
       log(`settle(${token}): ETH ${ethers.formatEther(pendingEth)} / token ${ethers.formatEther(pendingToken)}`);
-      if (execute) await (await hook.settle(token)).wait();
+      if (execute) await (await hook.settle(token)).wait(); await pace();
     }
     if (await vault.seeded(token)) {
       log(`harvest(${token})`);
       if (execute) {
         try {
-          await (await vault.harvest(token)).wait();
+          await (await vault.harvest(token)).wait(); await pace();
         } catch {
           log(`  harvest bez naroslych oplat - pomijam`);
         }
@@ -134,7 +137,7 @@ async function main() {
       // liczba trafila do publicznego posta i wymagala sprostowania).
       log(`executeBuyback(${token}): w kolejce ${ethers.formatEther(buybackEth)} ETH (kupuje token w puli v4, kupione tokeny -> 0xdEaD)`);
       if (execute) {
-        const rc = await (await hook.executeBuyback(token, 1n, deadline)).wait();
+        const rc = await (await hook.executeBuyback(token, 1n, deadline)).wait(); await pace();
         for (const l of rc.logs) {
           try {
             const d = hook.interface.parseLog({ topics: [...l.topics], data: l.data });
@@ -161,15 +164,15 @@ async function main() {
     const [c, hEth, vEth] = [await pad.claimable(addr), await hook.claimableEth(addr), await vault.claimableEth(addr)];
     if (c > 0n) {
       log(`pad.claimFor(${name}): ${ethers.formatEther(c)} ETH`);
-      if (execute) await (await pad.claimFor(addr)).wait();
+      if (execute) await (await pad.claimFor(addr)).wait(); await pace();
     }
     if (hEth > 0n) {
       log(`hook.claimEthFor(${name}): ${ethers.formatEther(hEth)} ETH`);
-      if (execute) await (await hook.claimEthFor(addr)).wait();
+      if (execute) await (await hook.claimEthFor(addr)).wait(); await pace();
     }
     if (vEth > 0n) {
       log(`vault.claimEthFor(${name}): ${ethers.formatEther(vEth)} ETH`);
-      if (execute) await (await vault.claimEthFor(addr)).wait();
+      if (execute) await (await vault.claimEthFor(addr)).wait(); await pace();
     }
     // Noga TOKENOWA oplat (hook 30/70, LP 30/70) - do 2.09.2026 keeper
     // odbieral tylko ETH i 20.8M SPHERE lezalo w hooku/vaulcie.
@@ -177,11 +180,11 @@ async function main() {
       const [hTok, vTok] = [await hook.claimableToken(token, addr), await vault.claimableToken(token, addr)];
       if (hTok > 0n) {
         log(`hook.claimTokenFor(${name}): ${ethers.formatEther(hTok)} tokenow`);
-        if (execute) await (await hook.claimTokenFor(token, addr)).wait();
+        if (execute) await (await hook.claimTokenFor(token, addr)).wait(); await pace();
       }
       if (vTok > 0n) {
         log(`vault.claimTokenFor(${name}): ${ethers.formatEther(vTok)} tokenow`);
-        if (execute) await (await vault.claimTokenFor(token, addr)).wait();
+        if (execute) await (await vault.claimTokenFor(token, addr)).wait(); await pace();
       }
     }
   }
@@ -200,7 +203,7 @@ async function main() {
     if (bal > 0n && !fresh && (await buyback.CHECKPOINTER()).toLowerCase() === signer.address.toLowerCase()) {
       log("buyback.checkpoint() - odswiezenie referencji ceny");
       if (execute) {
-        await (await buyback.checkpoint()).wait();
+        await (await buyback.checkpoint()).wait(); await pace();
         at = await buyback.checkpointAt();
         fresh = true;
       }
@@ -218,7 +221,7 @@ async function main() {
         // Przy drugiej probie czekamy 15 s i odswiezamy deadline.
         for (let attempt = 1; attempt <= 2; attempt++) {
           try {
-            const rc = await (await buyback.execute(tranche, 1n, deadline + BigInt(attempt) * 60n)).wait();
+            const rc = await (await buyback.execute(tranche, 1n, deadline + BigInt(attempt) * 60n)).wait(); await pace();
             log(`  BuybackExecuted | tx ${rc.hash}`);
             break;
           } catch (e) {
@@ -242,7 +245,7 @@ async function main() {
     const escrowEth = await ethers.provider.getBalance(process.env.ESCROW);
     if (escrowEth > 0n) {
       log(`escrow.release(): ${ethers.formatEther(escrowEth)} ETH -> 50/50 pot/ops`);
-      if (execute) await (await escrow.release()).wait();
+      if (execute) await (await escrow.release()).wait(); await pace();
     }
     const sphere: string = await escrow.sphereToken();
     if (sphere !== ethers.ZeroAddress) {
@@ -250,14 +253,14 @@ async function main() {
       const escrowTok: bigint = await tok.balanceOf(process.env.ESCROW);
       if (escrowTok > 0n) {
         log(`escrow.releaseToken(): ${ethers.formatEther(escrowTok)} SPHERE -> vesting`);
-        if (execute) await (await escrow.releaseToken(ethers.ZeroAddress)).wait();
+        if (execute) await (await escrow.releaseToken(ethers.ZeroAddress)).wait(); await pace();
       }
       if (process.env.VESTING) {
         const vesting = new ethers.Contract(process.env.VESTING, VESTING_ABI, signer);
         const rel: bigint = await vesting.releasable(sphere);
         if (rel > 0n) {
           log(`vesting.release(): ${ethers.formatEther(rel)} SPHERE -> beneficjent (Safe)`);
-          if (execute) await (await vesting.release(sphere)).wait();
+          if (execute) await (await vesting.release(sphere)).wait(); await pace();
         }
       }
     }
@@ -269,7 +272,7 @@ async function main() {
     const p = await dist.pending();
     if (p.validAt > 0n && now >= p.validAt) {
       log(`distributor.activate(): epoka ${p.epochId}, root ${p.root}`);
-      if (execute) await (await dist.activate()).wait();
+      if (execute) await (await dist.activate()).wait(); await pace();
     }
   }
 
