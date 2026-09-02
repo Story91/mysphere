@@ -50,6 +50,8 @@ export type DistributorState = {
   totalCumulative: bigint;
   totalClaimed: bigint;
   pendingValidAt: number;
+  pendingEpochId: number;
+  pendingTotalCumulative: bigint;
 };
 
 /** Stan dystrybutora - uzywany takze przez naglowek sezonu (plakietka shadow/live). */
@@ -80,6 +82,8 @@ export function useSphereDistributor(): DistributorState | null {
           totalCumulative,
           totalClaimed,
           pendingValidAt: Number(pending[4]),
+          pendingEpochId: Number(pending[2]),
+          pendingTotalCumulative: pending[3],
         });
       } catch {
         /* kolejny interwal */
@@ -110,10 +114,21 @@ export default function SphereRewardsClaim({ dist }: { dist: DistributorState | 
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
-  // Manifest aktywnej epoki -> lisc tego konta.
+  // Manifest aktywnej ALBO zaproponowanej epoki -> podsumowanie + lisc konta.
+  // Dla zaproponowanej (okno weta) pokazujemy podglad z tych samych danych,
+  // ktore za chwile beda plynac - zadnej atrapy, tylko liczby z manifestu,
+  // ktorego hash juz stoi w kontrakcie.
+  const [leaves, setLeaves] = useState<Leaf[] | null>(null);
+  const [tick, setTick] = useState(() => Date.now());
   useEffect(() => {
-    if (!dist?.live || !account) {
+    const t = setInterval(() => setTick(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
+  const hasEpoch = Boolean(dist && (dist.live || dist.pendingValidAt > 0));
+  useEffect(() => {
+    if (!hasEpoch) {
       setLeaf(null);
+      setLeaves(null);
       return;
     }
     let alive = true;
@@ -143,16 +158,25 @@ export default function SphereRewardsClaim({ dist }: { dist: DistributorState | 
         const m = await getJson<{ leaves?: Leaf[] }>(`epoch-${l.epoch}.json`);
         if (!alive) return;
         setLatest(l);
-        const mine = (m.leaves ?? []).find((x) => x.account.toLowerCase() === account.toLowerCase());
+        const all = m.leaves ?? [];
+        setLeaves(all);
+        if (!account) {
+          setLeaf(null);
+          return;
+        }
+        const mine = all.find((x) => x.account.toLowerCase() === account.toLowerCase());
         setLeaf(mine ?? 'none');
       } catch {
-        if (alive) setLeaf('none');
+        if (alive) {
+          setLeaves([]);
+          setLeaf('none');
+        }
       }
     })();
     return () => {
       alive = false;
     };
-  }, [dist?.live, dist?.epochId, account]);
+  }, [hasEpoch, dist?.live, dist?.epochId, dist?.pendingValidAt, account]);
 
   const refresh = useCallback(async () => {
     if (!client || !account || !leaf || leaf === 'none' || !SPHERE_DISTRIBUTOR_ADDRESS) return;
@@ -185,13 +209,79 @@ export default function SphereRewardsClaim({ dist }: { dist: DistributorState | 
   );
 
   if (!dist.live) {
+    if (dist.pendingValidAt === 0) {
+      return (
+        <section className={card}>
+          {head}
+          <p className="mt-1 text-[11.5px] text-sp-shade/55">
+            No paid epoch yet. Rewards start streaming once the first root is proposed and activated; nothing you earn expires.
+          </p>
+        </section>
+      );
+    }
+    // PODGLAD ZAPROPONOWANEJ EPOKI: dane z manifestu (hash w kontrakcie),
+    // harmonogram z kontraktu. Nic nie plynie, dopoki root nie jest aktywny -
+    // i tak to jest podpisane.
+    const startsAt = dist.pendingValidAt;
+    const endsAt = startsAt + dist.streamSeconds;
+    const secsLeft = Math.max(0, startsAt - Math.floor(tick / 1000));
+    const hLeft = Math.floor(secsLeft / 3600);
+    const mLeft = Math.floor((secsLeft % 3600) / 60);
+    const proposedTotal = dist.pendingTotalCumulative;
+    const mineLeaf = leaf && leaf !== 'none' ? leaf : null;
+    const mineTotal = mineLeaf ? BigInt(mineLeaf.cumulative) - BigInt(mineLeaf.prevCumulative) : 0n;
+    const perHour = mineLeaf && dist.streamSeconds > 0 ? (mineTotal * 3600n) / BigInt(dist.streamSeconds) : 0n;
     return (
       <section className={card}>
-        {head}
-        <p className="mt-1 text-[11.5px] text-sp-shade/55">
-          {dist.pendingValidAt > 0
-            ? `First paid epoch is proposed. The 24h veto window ends ${new Date(dist.pendingValidAt * 1000).toUTCString()}; claiming opens right after activation.`
-            : 'No paid epoch yet. Rewards start streaming once the first root is proposed and activated; nothing you earn expires.'}
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            {head}
+            <p className="mt-1 text-[11px] text-sp-shade/50">
+              Epoch #{dist.pendingEpochId} {latest ? `(week ${latest.epoch + 1})` : ''} · proposed, in the 24h veto window · nothing streams until activation
+            </p>
+          </div>
+          <span className="rounded-full bg-sp-brand/10 px-2.5 py-1 text-[9.5px] font-extrabold uppercase tracking-[0.08em] text-sp-brand">
+            {secsLeft > 0 ? `streaming starts in ${hLeft}h ${mLeft}m` : 'waiting for activation (anyone can call it)'}
+          </span>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[
+            ['Proposed this epoch', fmt(proposedTotal)],
+            ['Creators paid', String(leaves ? leaves.filter((x) => BigInt(x.cumulative) > BigInt(x.prevCumulative)).length : '…')],
+            ['Stream starts (UTC)', new Date(startsAt * 1000).toISOString().slice(5, 16).replace('T', ' ')],
+            ['Fully unlocked (UTC)', new Date(endsAt * 1000).toISOString().slice(5, 16).replace('T', ' ')],
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-2xl bg-sp-sunken p-3">
+              <p className="text-[9.5px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/45">{label}</p>
+              <p className="mt-1 font-soft-display text-[18px] font-extrabold leading-none text-sp-ink">
+                {value} {label === 'Proposed this epoch' && <span className="text-[11px] text-sp-shade/45">SPHERE</span>}
+              </p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3">
+          <div className="flex items-center justify-between text-[9.5px] font-extrabold uppercase tracking-[0.06em] text-sp-shade/45">
+            <span>stream progress</span>
+            <span>0% · linear over {Math.round(dist.streamSeconds / 86400)} days after activation</span>
+          </div>
+          <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-sp-shade/10">
+            <span className="block h-full w-0 bg-sp-brand" aria-hidden="true" />
+          </div>
+        </div>
+        <p className="mt-3 text-[11.5px] text-sp-shade/60">
+          {!account
+            ? 'Connect the wallet you launch tokens with to see your proposed allocation.'
+            : mineLeaf
+              ? `Your proposed allocation: ${fmt(mineTotal)} SPHERE. It will unlock at about ${fmt(perHour)} SPHERE per hour from activation; you can claim any time, and unclaimed rewards never expire.`
+              : leaf === null
+                ? 'Reading the epoch manifest...'
+                : 'This wallet has no allocation in the proposed epoch. Rewards go to creators whose tokens brought real external volume; see the leaderboard below.'}
+        </p>
+        <p className="mt-1 text-[10.5px] text-sp-shade/40">
+          The 24h window is enforced by the contract (MIN_DELAY is immutable): a wrong list can be stopped before any token moves. Root and manifest hash: distributor{' '}
+          <a href={`${SPHERE_EXPLORER_URL}/address/${SPHERE_DISTRIBUTOR_ADDRESS}`} target="_blank" rel="noreferrer" className="font-bold text-sp-brand hover:underline">
+            {SPHERE_DISTRIBUTOR_ADDRESS?.slice(0, 8)}…
+          </a>
         </p>
       </section>
     );
