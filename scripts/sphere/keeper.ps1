@@ -29,5 +29,9 @@ $env:KEEPER_CONFIRM = 'tak'
 
 $stamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
 $log = Join-Path $PWD 'scripts\output\keeper.log'
+# Jedno kodowanie (UTF-8) dla naglowka i tresci - Tee-Object w PS 5.1 pisze
+# UTF-16 i log wygladal jak "s p a c j e" miedzy literami.
 "=== $stamp ===" | Out-File -FilePath $log -Append -Encoding utf8
-npm run sphere:keeper 2>&1 | Tee-Object -FilePath $log -Append
+$out = npm run sphere:keeper 2>&1 | ForEach-Object { "$_" }
+$out | Out-File -FilePath $log -Append -Encoding utf8
+$out

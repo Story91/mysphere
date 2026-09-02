@@ -26,7 +26,9 @@ $env:PROPOSE = 'tak'
 $stamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
 $log = Join-Path $repo 'scripts\output\epoch.log'
 "=== $stamp ===" | Out-File -FilePath $log -Append -Encoding utf8
-$out = npm run sphere:epoch 2>&1 | Tee-Object -FilePath $log -Append
+$out = npm run sphere:epoch 2>&1 | ForEach-Object { "$_" }
+$out | Out-File -FilePath $log -Append -Encoding utf8
+$out
 
 if (($out | Out-String) -match 'propose OK') {
   # Publikacja manifestu na master bez ruszania biezacej galezi.

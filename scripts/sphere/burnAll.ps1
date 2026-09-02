@@ -28,4 +28,6 @@ $env:KEEPER_CONFIRM = 'tak'
 $stamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
 $log = Join-Path $PWD 'scripts\output\keeper.log'
 "=== $stamp (burnAll) ===" | Out-File -FilePath $log -Append -Encoding utf8
-npm run sphere:keeper 2>&1 | Tee-Object -FilePath $log -Append
+$out = npm run sphere:keeper 2>&1 | ForEach-Object { "$_" }
+$out | Out-File -FilePath $log -Append -Encoding utf8
+$out
