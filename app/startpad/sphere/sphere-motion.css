@@ -193,3 +193,42 @@
 @media (prefers-reduced-motion: reduce) {
   .sph-orb { animation: none; }
 }
+
+/* Strumien nagrod (StreamLane): krople plynace po torze od dystrybutora do
+   portfela. Aktywny = szybko i pelny kolor; nieaktywny (okno weta) = wolno
+   i wyblakle, zeby bylo widac, ze nic jeszcze nie plynie. */
+.sph-drop {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  margin-top: -5px;
+  border-radius: 9999px;
+  background: #7c6bda;
+  box-shadow: 0 0 8px rgba(124, 107, 218, 0.7);
+  animation: sph-flow 4.5s linear infinite;
+  will-change: transform, opacity;
+}
+.sph-lane[data-active='false'] .sph-drop {
+  opacity: 0.35;
+  animation-duration: 9s;
+  box-shadow: none;
+}
+@keyframes sph-flow {
+  0% { transform: translateX(-12px) scale(0.7); opacity: 0; }
+  10% { opacity: 1; transform: translateX(0) scale(1); }
+  90% { opacity: 1; }
+  100% { transform: translateX(calc(var(--lane-w, 100vw))) scale(0.7); opacity: 0; }
+}
+.sph-lane-track { --lane-w: 100%; }
+.sph-lane-track .sph-drop { animation-name: sph-flow-track; }
+@keyframes sph-flow-track {
+  0% { left: -12px; opacity: 0; transform: scale(0.7); }
+  10% { opacity: 1; transform: scale(1); }
+  90% { opacity: 1; }
+  100% { left: 100%; opacity: 0; transform: scale(0.7); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sph-drop { animation: none; opacity: 0.5; left: 50%; }
+}

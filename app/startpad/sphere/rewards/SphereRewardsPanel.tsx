@@ -20,6 +20,7 @@ import { SPHERE_LIVE, SPHERE_REWARDS_ADDRESS, sphereRewardsAbi } from '../sphere
 import { ActionButton, useSphereCreator, useSphereRead } from '../sphereActions';
 import { TeamRunBadge } from '../SphereShell';
 import { ActionCard, AddressPill, AdvancedSection, BigStat, KeeperSection, LearnMore, PageHero } from '../SphereUI';
+import { SphereRewardsClaimStandalone } from '../season/SphereRewardsClaim';
 
 /** Wei -> liczba dla NumberTicker; null zostaje null (szkielet ladowania). */
 function toNumber(wei: bigint | undefined): number | null {
@@ -79,6 +80,10 @@ export default function SphereRewardsPanel() {
           <BigStat label="Pulled so far" value={toNumber(state?.totalPulled)} decimals={4} suffix={SPHERE_NATIVE_SYMBOL} />
         </div>
       </PageHero>
+
+      {/* Nagrody TWORCOW w SPHERE (dystrybutor) - tu, bo "Rewards" to pierwsze
+          miejsce, w ktore ktos zajrzy po swoja nagrode; skarbonka ETH nizej. */}
+      <SphereRewardsClaimStandalone />
 
       <div className="flex flex-wrap items-center gap-2">
         <AddressPill address={rewards} label="vault" />

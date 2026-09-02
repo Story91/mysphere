@@ -22,6 +22,7 @@ import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
 import { Gift, Loader2 } from 'lucide-react';
 import { SPHERE_CHAIN, SPHERE_EXPLORER_URL } from '../sphereChain';
 import { SPHERE_DISTRIBUTOR_ADDRESS } from '../sphereConfig';
+import StreamLane from './StreamLane';
 
 const distributorAbi = parseAbi([
   'function root() view returns (bytes32)',
@@ -101,6 +102,12 @@ export function useSphereDistributor(): DistributorState | null {
 
 function fmt(wei: bigint, digits = 0) {
   return Number(formatEther(wei)).toLocaleString('en-US', { maximumFractionDigits: digits });
+}
+
+/** Ta sama karta bez zewnetrznego stanu - do osadzenia na innych podstronach (Rewards). */
+export function SphereRewardsClaimStandalone() {
+  const dist = useSphereDistributor();
+  return <SphereRewardsClaim dist={dist} />;
 }
 
 export default function SphereRewardsClaim({ dist }: { dist: DistributorState | null }) {
@@ -260,13 +267,18 @@ export default function SphereRewardsClaim({ dist }: { dist: DistributorState | 
           ))}
         </div>
         <div className="mt-3">
-          <div className="flex items-center justify-between text-[9.5px] font-extrabold uppercase tracking-[0.06em] text-sp-shade/45">
-            <span>stream progress</span>
-            <span>0% · linear over {Math.round(dist.streamSeconds / 86400)} days after activation</span>
-          </div>
-          <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-sp-shade/10">
-            <span className="block h-full w-0 bg-sp-brand" aria-hidden="true" />
-          </div>
+          <StreamLane
+            total={mineLeaf ? BigInt(mineLeaf.cumulative) : proposedTotal}
+            prev={mineLeaf ? BigInt(mineLeaf.prevCumulative) : 0n}
+            claimed={0n}
+            activatedAt={0}
+            streamSeconds={dist.streamSeconds}
+            active={false}
+            startsAt={startsAt}
+          />
+          {!mineLeaf && (
+            <p className="mt-1 text-[10px] text-sp-shade/40">The lane above shows the whole epoch&apos;s allocation; connect a creator wallet to see your own.</p>
+          )}
         </div>
         <p className="mt-3 text-[11.5px] text-sp-shade/60">
           {!account
@@ -366,11 +378,21 @@ export default function SphereRewardsClaim({ dist }: { dist: DistributorState | 
           distributor ↗
         </a>
       </div>
+      <div className="mt-3">
+        <StreamLane
+          total={total}
+          prev={prev}
+          claimed={claimedWei}
+          activatedAt={dist.activatedAt}
+          streamSeconds={dist.streamSeconds}
+          active
+        />
+      </div>
       <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
           ['Allocated (all epochs)', fmt(total)],
           ['This epoch', fmt(total - prev)],
-          ['Unlocked so far', fmt(vestedWei)],
+          ['Unlocked (chain read)', fmt(vestedWei)],
           ['Claimed', fmt(claimedWei)],
         ].map(([label, value]) => (
           <div key={label} className="rounded-2xl bg-sp-sunken p-3">
