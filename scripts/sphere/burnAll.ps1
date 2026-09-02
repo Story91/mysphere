@@ -22,6 +22,7 @@ $env:DISTRIBUTOR = '0xc0b018161bB48383c808Aa47923f5501758D3E9D'
 $env:TRANCHE_ETH = '0.05'
 $env:BURN_ROUNDS = '10'
 $env:BURN_PAUSE_S = '30'
+if (-not $env:BASE_RPC_URL) { $env:BASE_RPC_URL = 'https://base-rpc.publicnode.com' }
 $env:KEEPER_CONFIRM = 'tak'
 
 $stamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'

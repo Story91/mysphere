@@ -22,6 +22,9 @@ $env:VESTING     = '0xB5dE95224F2bEDee2e7Ca7170F5B6a02641255AD'
 $env:BUYBACK     = '0x98e51f42245Bf9A0b1e0005510aEE82C52bE8A7b'   # faza 1B
 $env:DISTRIBUTOR = '0xc0b018161bB48383c808Aa47923f5501758D3E9D'   # faza 1B
 $env:TRANCHE_ETH = '0.05'
+# Jeden staly wezel zamiast load-balansowanego mainnet.base.org - ten mieszal
+# stan miedzy wezlami (sphereToken()=0x0 po launchu, panic 0x11 przy execute).
+if (-not $env:BASE_RPC_URL) { $env:BASE_RPC_URL = 'https://base-rpc.publicnode.com' }
 $env:KEEPER_CONFIRM = 'tak'
 
 $stamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'

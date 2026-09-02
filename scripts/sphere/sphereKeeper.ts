@@ -212,10 +212,20 @@ async function main() {
         : trancheMax);
       log(`buyback.execute(${ethers.formatEther(tranche)} ETH)`);
       if (execute) {
-        try {
-          await (await buyback.execute(tranche, 1n, deadline)).wait();
-        } catch (e) {
-          log(`  buyback odbity (limit okna / straznik kursu): ${e instanceof Error ? e.message.split("\n")[0] : e}`);
+        // Dwie proby: 2.09.2026 pierwsza transza padla na estimateGas z
+        // "panic 0x11", a symulacja na spojnym stanie przechodzila - to byl
+        // load-balansowany publiczny RPC mieszajacy stan miedzy wezlami.
+        // Przy drugiej probie czekamy 15 s i odswiezamy deadline.
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            const rc = await (await buyback.execute(tranche, 1n, deadline + BigInt(attempt) * 60n)).wait();
+            log(`  BuybackExecuted | tx ${rc.hash}`);
+            break;
+          } catch (e) {
+            const msg = e instanceof Error ? e.message.split("\n")[0] : String(e);
+            log(`  buyback odbity (proba ${attempt}/2): ${msg}`);
+            if (attempt === 1) await new Promise((r) => setTimeout(r, 15_000));
+          }
         }
       }
     } else if (bal > 0n) {
