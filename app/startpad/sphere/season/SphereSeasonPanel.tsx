@@ -24,6 +24,7 @@ import { ChevronDown, ChevronUp, Info, Loader2, Trophy } from 'lucide-react';
 // etykieta nie moze podazac za wybrana siecia tablicy.
 import { SPHERE_NATIVE_SYMBOL } from '../sphereChain';
 import { BigStat, LearnMore, PageHero } from '../SphereUI';
+import SphereRewardsClaim, { useSphereDistributor } from './SphereRewardsClaim';
 
 type SeasonToken = {
   token: string;
@@ -176,6 +177,8 @@ function CreatorRow({ rank, c }: { rank: number; c: SeasonCreator }) {
 export default function SphereSeasonPanel() {
   const [data, setData] = useState<SeasonData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Stan dystrybutora: plakietka shadow/live w naglowku + karta Claim.
+  const dist = useSphereDistributor();
 
   useEffect(() => {
     let alive = true;
@@ -234,7 +237,7 @@ export default function SphereSeasonPanel() {
         icon={<Trophy className="h-6 w-6 text-sp-brand" aria-hidden="true" />}
         badge={
           <span className="rounded-full bg-sp-brand/10 px-2.5 py-1 text-[9.5px] font-extrabold uppercase tracking-[0.08em] text-sp-brand">
-            Shadow - no payouts yet
+            {dist?.live ? `Live · epoch #${dist.epochId} streaming` : dist && dist.pendingValidAt > 0 ? 'First paid epoch proposed · veto window' : 'Shadow - no payouts yet'}
           </span>
         }
       >
@@ -301,6 +304,9 @@ export default function SphereSeasonPanel() {
           )}
         </div>
       </section>
+
+      {/* CLAIM - nagrody w SPHERE tego konta (dystrybutor) ------------------- */}
+      <SphereRewardsClaim dist={dist} />
 
       {/* LEADERBOARD --------------------------------------------------------- */}
       <section className="sph-card rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">

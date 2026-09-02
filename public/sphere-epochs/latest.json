@@ -1,0 +1,9 @@
+{
+  "epoch": 2,
+  "onchainEpochId": "1",
+  "root": "0x05596d7f3f7d26f1ff450f4835a2e15b8490a3f02154ad4afd3dab0f1a94665e",
+  "manifestHash": "0x491a56abd02c3a04bc4f4b6ec0cbf4b10950c6ccb2a1dc41de9f913213f38e41",
+  "totalCumulative": "3029934760417365135000",
+  "poolSphere": "36509000000000000000000",
+  "proposedAt": null
+}

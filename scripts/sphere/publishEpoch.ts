@@ -252,11 +252,65 @@ async function main() {
 
   mkdirSync(outDir, { recursive: true });
   const outPath = join(outDir, `epoch-${epochIdx}.json`);
-  writeFileSync(outPath, JSON.stringify({ ...JSON.parse(canon), manifestHash, leaves }, null, 2) + "\n");
-  console.log(`manifest: ${outPath}`);
+  const manifestJson = JSON.stringify({ ...JSON.parse(canon), manifestHash, leaves }, null, 2) + "\n";
+  writeFileSync(outPath, manifestJson);
+  // Kopia PUBLICZNA: przegladarka (przycisk Claim na /startpad/sphere/season)
+  // bierze stad liscie i proofy. Statyczny plik pod public/ jedzie z deployem;
+  // kazdy moze porownac jego manifestHash z tym, co stoi w dystrybutorze.
+  const publicDir = join(__dirname, "..", "..", "public", "sphere-epochs");
+  mkdirSync(publicDir, { recursive: true });
+  writeFileSync(join(publicDir, `epoch-${epochIdx}.json`), manifestJson);
+  console.log(`manifest: ${outPath} (+ public/sphere-epochs/epoch-${epochIdx}.json)`);
   console.log(`manifestHash: ${manifestHash}`);
-  if (root) console.log(`root do propose(): ${root} (totalCumulative: ${Object.values(cumulative).reduce((a, v) => a + BigInt(v), 0n)})`);
-  else console.log("SHADOW: bez lisci (POOL_SPHERE=0). Udzialy i sufity w manifescie.");
+  const totalCumulative = Object.values(cumulative).reduce((a, v) => a + BigInt(v), 0n);
+  if (!root) {
+    console.log("SHADOW: bez lisci (POOL_SPHERE=0). Udzialy i sufity w manifescie.");
+    return;
+  }
+  console.log(`root do propose(): ${root} (totalCumulative: ${totalCumulative})`);
+
+  // ---- PROPOSE=tak: propozycja roota na dystrybutorze (klucz PROPOSER) ----
+  // On-chain epochId to LICZNIK wyplacalnych epok (0, 1, 2...), nie numer
+  // epoki kalendarzowej - kontrakt wymaga dokladnie epochId+1. Mapowanie
+  // kalendarz -> licznik zapisujemy w latest.json, zeby UI wiedzialo, ktory
+  // manifest jest aktywny.
+  const distributorAddr = process.env.DISTRIBUTOR ?? "0xc0b018161bB48383c808Aa47923f5501758D3E9D";
+  const [signer] = await ethers.getSigners();
+  const dist = new ethers.Contract(
+    distributorAddr,
+    [
+      "function epochId() view returns (uint64)",
+      "function PROPOSER() view returns (address)",
+      "function pending() view returns (bytes32 root, bytes32 manifestHash, uint64 epochId, uint256 totalCumulative, uint64 validAt)",
+      "function propose(bytes32 root_, bytes32 manifestHash_, uint64 epochId_, uint256 totalCumulative_)",
+    ],
+    signer
+  );
+  const onchainNext = BigInt(await dist.epochId()) + 1n;
+  const latest = {
+    epoch: epochIdx,
+    onchainEpochId: onchainNext.toString(),
+    root,
+    manifestHash,
+    totalCumulative: totalCumulative.toString(),
+    poolSphere: poolSphere.toString(),
+    proposedAt: null as string | null,
+  };
+  if (process.env.PROPOSE !== "tak") {
+    writeFileSync(join(publicDir, "latest.json"), JSON.stringify(latest, null, 2) + "\n");
+    console.log(`propose: pominiete (PROPOSE=tak zeby wyslac). Nastepny on-chain epochId: ${onchainNext}`);
+    return;
+  }
+  if ((await dist.PROPOSER()).toLowerCase() !== signer.address.toLowerCase()) {
+    throw new Error(`PROPOSER dystrybutora to nie ${signer.address} - ten klucz nie moze proponowac.`);
+  }
+  const tx = await dist.propose(root, manifestHash, onchainNext, totalCumulative);
+  const rc = await tx.wait();
+  const p = await dist.pending();
+  latest.proposedAt = new Date().toISOString();
+  writeFileSync(join(publicDir, "latest.json"), JSON.stringify(latest, null, 2) + "\n");
+  console.log(`propose OK | tx ${rc.hash} | epochId ${onchainNext} | weto do ${new Date(Number(p.validAt) * 1000).toISOString()}`);
+  console.log("po oknie weta keeper wola activate(); od tej chwili Claim na /startpad/sphere/season.");
 }
 
 main().catch((e) => {
