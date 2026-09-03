@@ -299,34 +299,85 @@ export default function SphereRewardsClaim({ dist }: { dist: DistributorState | 
     );
   }
 
-  if (!account) {
-    return (
-      <section className={card}>
+  // STRUMIEN EPOKI dla kazdego - takze bez portfela i bez wlasnej nagrody.
+  // To publiczne liczby z manifestu (hash stoi w kontrakcie), wiec nie ma
+  // powodu chowac ich za logowaniem; po aktywacji karta znikala gosciom i
+  // wygladalo to, jakby streaming przestal istniec. Wlasny udzial i Claim -
+  // nizej, tylko dla konta z lisciem.
+  const utc = (ts: number) => new Date(ts * 1000).toISOString().slice(5, 16).replace('T', ' ');
+  const liveElapsed = Math.max(0, Math.floor(tick / 1000) - dist.activatedAt);
+  const livePct = dist.streamSeconds > 0 ? Math.min(100, (liveElapsed / dist.streamSeconds) * 100) : 100;
+  const rows = leaves ?? [];
+  const epochTotal = rows.length ? rows.reduce((a, x) => a + BigInt(x.cumulative), 0n) : dist.totalCumulative;
+  const epochPrev = rows.length ? rows.reduce((a, x) => a + BigInt(x.prevCumulative), 0n) : 0n;
+  const paidCount = rows.filter((x) => BigInt(x.cumulative) > BigInt(x.prevCumulative)).length;
+  const epochHead = (
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div>
         {head}
-        <p className="mt-1 text-[11.5px] text-sp-shade/55">Connect the wallet you launch tokens with to see and claim your share.</p>
-      </section>
-    );
-  }
-
-  if (leaf === null) {
-    return (
-      <section className={card}>
-        {head}
-        <p className="mt-1 inline-flex items-center gap-2 text-[11.5px] text-sp-shade/55">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> Reading the epoch manifest...
+        <p className="mt-1 text-[11px] text-sp-shade/50">
+          Epoch #{dist.epochId} {latest ? `(week ${latest.epoch + 1})` : ''} · streaming {livePct.toFixed(0)}% · cumulative ledger, unclaimed never expires
         </p>
-      </section>
-    );
-  }
+      </div>
+      <a
+        href={`${SPHERE_EXPLORER_URL}/address/${SPHERE_DISTRIBUTOR_ADDRESS}`}
+        target="_blank"
+        rel="noreferrer"
+        className="text-[10.5px] font-extrabold text-sp-shade/45 hover:text-sp-brand"
+      >
+        distributor ↗
+      </a>
+    </div>
+  );
+  const reading = (
+    <section className={card}>
+      {epochHead}
+      <p className="mt-2 inline-flex items-center gap-2 text-[11.5px] text-sp-shade/55">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> Reading the epoch manifest...
+      </p>
+    </section>
+  );
+  const epochView = (note: string) => (
+    <section className={card}>
+      {epochHead}
+      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[
+          ['This epoch', fmt(epochTotal - epochPrev)],
+          ['Creators paid', String(paidCount)],
+          ['Streaming since (UTC)', utc(dist.activatedAt)],
+          ['Fully unlocked (UTC)', utc(dist.activatedAt + dist.streamSeconds)],
+        ].map(([label, value]) => (
+          <div key={label} className="rounded-2xl bg-sp-sunken p-3">
+            <p className="text-[9.5px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/45">{label}</p>
+            <p className="mt-1 font-soft-display text-[18px] font-extrabold leading-none text-sp-ink">
+              {value} {label === 'This epoch' && <span className="text-[11px] text-sp-shade/45">SPHERE</span>}
+            </p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3">
+        <StreamLane
+          total={epochTotal}
+          prev={epochPrev}
+          claimed={dist.totalClaimed}
+          activatedAt={dist.activatedAt}
+          streamSeconds={dist.streamSeconds}
+          active
+        />
+        <p className="mt-1 text-[10px] text-sp-shade/40">
+          The lane above is the whole epoch&apos;s allocation unlocking on chain; a creator wallet sees its own share and a Claim button here.
+        </p>
+      </div>
+      <p className="mt-3 text-[11.5px] text-sp-shade/60">{note}</p>
+    </section>
+  );
 
+  if (leaves === null) return reading;
+  if (!account) return epochView('Connect the wallet you launch tokens with to see and claim your share.');
+  if (leaf === null) return reading;
   if (leaf === 'none') {
-    return (
-      <section className={card}>
-        {head}
-        <p className="mt-1 text-[11.5px] text-sp-shade/55">
-          This wallet has no reward in the active epoch (#{dist.epochId}). Rewards go to creators whose tokens brought real external volume; see the leaderboard below.
-        </p>
-      </section>
+    return epochView(
+      `This wallet has no reward in the active epoch (#${dist.epochId}). Rewards go to creators whose tokens brought real external volume; see the leaderboard below.`
     );
   }
 

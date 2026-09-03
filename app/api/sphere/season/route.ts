@@ -11,6 +11,7 @@ import {
   EPOCH_BLOCKS,
   SEASON_GENESIS_BLOCK,
   epochRange,
+  EXCLUDED_TOKENS,
   scoreEpoch,
   type TokenEpochInput,
 } from '../../../startpad/sphere/season/epochMath';
@@ -225,7 +226,11 @@ export async function GET() {
   };
 
   const DAY_BLOCKS = EPOCH_BLOCKS / 7n;
+  // Histogram liczy to samo, co naglowek (scoreEpoch): bez self-trades i bez
+  // tokenow wykluczonych z sezonu (SPHERE) - inaczej slupek dnia 1 pokazywal
+  // 71 ETH obrotu SPHERE przy 1.3 ETH w podsumowaniu.
   const daily = Array.from({ length: 7 }, () => 0n);
+  const chartable = (token: string) => !EXCLUDED_TOKENS.has(token);
   const dayOf = (block: bigint) => Number((block - fromBlock) / DAY_BLOCKS);
 
   for (const log of bought) {
@@ -237,7 +242,7 @@ export async function GET() {
     else {
       row.curveBuyNet += net;
       row.traders.add(buyer);
-      daily[Math.min(6, dayOf(log.blockNumber!))] += net;
+      if (chartable(row.token)) daily[Math.min(6, dayOf(log.blockNumber!))] += net;
     }
   }
   for (const log of sold) {
@@ -249,7 +254,7 @@ export async function GET() {
     else {
       row.curveSellGross += gross;
       row.traders.add(seller);
-      daily[Math.min(6, dayOf(log.blockNumber!))] += gross;
+      if (chartable(row.token)) daily[Math.min(6, dayOf(log.blockNumber!))] += gross;
     }
   }
   for (const log of fees) {
@@ -260,7 +265,7 @@ export async function GET() {
     const row = ensure(log.args.token as string);
     if (!row) continue;
     row.hookEthFees += log.args.amount as bigint;
-    daily[Math.min(6, dayOf(log.blockNumber!))] += (log.args.amount as bigint) * 100n;
+    if (chartable(row.token)) daily[Math.min(6, dayOf(log.blockNumber!))] += (log.args.amount as bigint) * 100n;
   }
 
   const inputs: TokenEpochInput[] = [...perToken.values()].map((r) => ({ ...r, uniqueTraders: r.traders.size }));
