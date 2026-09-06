@@ -59,6 +59,8 @@ type SeasonData = {
   epoch: { index: number; endsAtUnix: string; progressBps: number };
   totals: { externalVolumeEth: string; protocolEth: string; creators: number; tokens: number };
   dailyVolumeEth: string[];
+  /** Wolumen tokenow wykluczonych z sezonu (SPHERE) - prawdziwa historia handlu. */
+  dailyExcludedVolumeEth?: string[];
   creators: SeasonCreator[];
 };
 
@@ -282,12 +284,11 @@ function PastEpochRow({ e, line }: { e: PastEpoch; line: AccountEpochLine | null
  * co naroslo. Sekcja mowi to wprost, zeby nikt nie sadzil, ze musi
  * odbierac co tydzien.
  *
- * Stan odbioru konta zapala sie dopiero po wdrozeniu
- * SphereStreamingMerkleDistributor (SPHERE_DISTRIBUTOR_ADDRESS w
- * sphereConfig); do tego czasu karta na dole uczciwie mowi "not live yet".
- * Przyrost per epoka liczymy z map `cumulative` manifestow (cum_N - cum_
- * poprzedniego roota), status z jednego skalara claimed(account) -
- * kumulatywnosc rozlicza epoki od najstarszej.
+ * Przyrost naleznosci konta per epoka liczymy z map `cumulative` manifestow
+ * (cum_N - cum poprzedniego roota), status z jednego skalara
+ * claimed(account) - kumulatywnosc rozlicza epoki od najstarszej. Osobisty
+ * stan odbioru i przycisk Claim mieszkaja w karcie "Your SPHERE rewards"
+ * wyzej (SphereRewardsClaim) - tu tylko historia per epoka.
  */
 function PastEpochsSection() {
   const [data, setData] = useState<EpochsData | null>(null);
@@ -295,7 +296,6 @@ function PastEpochsSection() {
   const readClient = usePublicClient({ chainId: SPHERE_CHAIN.id });
   const { address: account } = useAccount();
   const [claimedAmt, setClaimedAmt] = useState<bigint | null>(null);
-  const [vested, setVested] = useState<bigint | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -312,29 +312,23 @@ function PastEpochsSection() {
     };
   }, []);
 
-  // Najnowszy opublikowany root (API zwraca epoki malejaco) - z niego bierze
-  // sie kumulatywna naleznosc konta i para (cum, prevCum) do vestedOf.
+  // Najnowszy opublikowany root (API zwraca epoki malejaco) - z map
+  // cumulative liczy sie przyrost konta per epoka.
   const rootedDesc = useMemo(() => (data?.epochs ?? []).filter((e) => e.manifest?.root), [data]);
 
   useEffect(() => {
     const dist = SPHERE_DISTRIBUTOR_ADDRESS;
     if (!dist || !readClient || !account || rootedDesc.length === 0) return;
-    const key = account.toLowerCase();
-    const cum = BigInt(rootedDesc[0].manifest!.cumulative[key] ?? '0');
-    const prevCum = BigInt(rootedDesc[1]?.manifest?.cumulative[key] ?? '0');
     let alive = true;
     const load = async () => {
       try {
-        const [c, v] = await Promise.all([
-          readClient.readContract({ address: dist, abi: sphereDistributorReadsAbi, functionName: 'claimed', args: [account] }) as Promise<bigint>,
-          cum > 0n
-            ? (readClient.readContract({ address: dist, abi: sphereDistributorReadsAbi, functionName: 'vestedOf', args: [cum, prevCum] }) as Promise<bigint>)
-            : Promise.resolve(0n),
-        ]);
-        if (alive) {
-          setClaimedAmt(c);
-          setVested(v);
-        }
+        const c = (await readClient.readContract({
+          address: dist,
+          abi: sphereDistributorReadsAbi,
+          functionName: 'claimed',
+          args: [account],
+        })) as bigint;
+        if (alive) setClaimedAmt(c);
       } catch {
         /* odczyt wroci przy nastepnym interwale */
       }
@@ -367,11 +361,6 @@ function PastEpochsSection() {
     return lines;
   }, [account, claimedAmt, rootedDesc]);
 
-  const myCum =
-    account && rootedDesc.length > 0 ? BigInt(rootedDesc[0].manifest!.cumulative[account.toLowerCase()] ?? '0') : 0n;
-  const claimableNow =
-    vested !== null && claimedAmt !== null ? (vested > claimedAmt ? vested - claimedAmt : 0n) : null;
-
   return (
     <section className="sph-card rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -402,38 +391,6 @@ function PastEpochsSection() {
         )}
       </div>
 
-      {SPHERE_DISTRIBUTOR_ADDRESS ? (
-        account ? (
-          <div className="mt-3 rounded-2xl bg-sp-brand/[0.06] p-3">
-            <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-brand">Your claim state</p>
-            <div className="mt-1.5 flex flex-wrap gap-x-6 gap-y-1.5">
-              <EpochStat label="accrued all-time (SPHERE)" value={sphereAmt(myCum)} />
-              <EpochStat label="claimed (SPHERE)" value={claimedAmt === null ? '…' : sphereAmt(claimedAmt)} />
-              <EpochStat label="claimable now (SPHERE)" value={claimableNow === null ? '…' : sphereAmt(claimableNow)} />
-            </div>
-            <p className="mt-1.5 flex items-start gap-1.5 text-[10.5px] text-sp-shade/55">
-              <Info className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
-              One claim pays out everything accrued across all epochs. Each week&apos;s increment streams linearly
-              through the following week; whatever you leave unclaimed keeps waiting - it never expires.
-            </p>
-          </div>
-        ) : (
-          <p className="mt-3 rounded-2xl bg-sp-shade/[0.04] p-3 text-[10.5px] font-bold text-sp-shade/50">
-            Connect a wallet to see your claim state. Unclaimed rewards never expire - one claim collects every epoch.
-          </p>
-        )
-      ) : (
-        <div className="mt-3 rounded-2xl bg-sp-shade/[0.04] p-3">
-          <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/45">
-            Claiming - not live yet
-          </p>
-          <p className="mt-1 text-[10.5px] font-bold leading-relaxed text-sp-shade/50">
-            Payouts arrive with the streaming distributor (contract ready, awaiting deployment). Once funded epochs
-            start, every root stays cumulative: unclaimed rewards roll forward forever and a single claim pays out
-            everything accrued - you will never have to claim week by week.
-          </p>
-        </div>
-      )}
     </section>
   );
 }
@@ -472,9 +429,11 @@ export default function SphereSeasonPanel() {
       (data?.dailyVolumeEth ?? []).map((v, i) => ({
         day: `Day ${i + 1}`,
         volume: Number(formatEther(BigInt(v))),
+        sphere: Number(formatEther(BigInt(data?.dailyExcludedVolumeEth?.[i] ?? '0'))),
       })),
     [data]
   );
+  const hasExcluded = chartData.some((d) => d.sphere > 0);
 
   const countdown = useWeekCountdown(data?.epoch.endsAtUnix ?? null);
 
@@ -537,6 +496,7 @@ export default function SphereSeasonPanel() {
       {/* WYKRES: wolumen dzienny --------------------------------------------- */}
       <section className="sph-card rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
         <h3 className="text-[13.5px] font-extrabold text-sp-ink">Daily external volume ({SPHERE_NATIVE_SYMBOL})</h3>
+        <p className="mt-0.5 text-[10.5px] text-sp-shade/50">Season-eligible volume: creators&apos; tokens, self-trades excluded.</p>
         <div className="mt-3 h-56 w-full">
           {data ? (
             <ResponsiveContainer width="100%" height="100%">
@@ -567,6 +527,58 @@ export default function SphereSeasonPanel() {
             <div className="sph-skeleton h-full w-full" />
           )}
         </div>
+
+        {/* PRAWDZIWA HISTORIA: obrot SPHERE, wykluczony z punktacji sezonu.
+            Osobna mini-os, bo skala (dziesiatki ETH) zgniotlaby slupki sezonu
+            (pojedyncze ETH) do zera - a puste dni wygladaly jak brak danych. */}
+        {hasExcluded && (
+          <>
+            <h4 className="mt-4 text-[11.5px] font-extrabold text-sp-shade/60">
+              SPHERE volume ({SPHERE_NATIVE_SYMBOL}) - excluded from season scoring
+            </h4>
+            <p className="mt-0.5 text-[10px] text-sp-shade/45">
+              SPHERE cannot farm its own creator rewards, so its trading scores zero above - the history is still real
+              and shown here.
+            </p>
+            <div className="mt-2 h-28 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 16, right: 8, left: 0, bottom: 0 }} barCategoryGap="28%">
+                  <CartesianGrid vertical={false} stroke="rgba(0,0,0,0.05)" />
+                  <XAxis dataKey="day" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: 'rgba(0,0,0,0.4)' }} />
+                  <YAxis width={44} tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: 'rgba(0,0,0,0.4)' }} />
+                  <Tooltip
+                    cursor={{ fill: 'rgba(0,0,0,0.05)' }}
+                    formatter={(v: number) => [`${v.toFixed(4)} ${SPHERE_NATIVE_SYMBOL}`, 'SPHERE volume']}
+                    contentStyle={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.1)', fontSize: 11.5 }}
+                  />
+                  {/* Dzien 1 (dziesiatki ETH) zgniata pozniejsze dni do <2px -
+                      minPointSize daje niezerowym dniom widoczny slad, etykieta
+                      niesie dokladna wartosc. Bez animacji wejscia: seria jest
+                      recesywna, a synchroniczny montaz nie zalezy od rAF. */}
+                  <Bar
+                    dataKey="sphere"
+                    fill="rgba(0,0,0,0.30)"
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={40}
+                    isAnimationActive={false}
+                    minPointSize={(v: number | null | undefined) => (Number(v ?? 0) > 0 ? 2 : 0)}
+                  >
+                    <LabelList
+                      dataKey="sphere"
+                      position="top"
+                      formatter={(v: React.ReactNode) => {
+                        const n = Number(v);
+                        if (!Number.isFinite(n) || n <= 0) return '';
+                        return n >= 1 ? n.toFixed(1) : n.toFixed(2);
+                      }}
+                      style={{ fontSize: 9.5, fill: 'rgba(0,0,0,0.5)', fontWeight: 700 }}
+                    />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </>
+        )}
       </section>
 
       {/* CLAIM - nagrody w SPHERE tego konta (dystrybutor) ------------------- */}

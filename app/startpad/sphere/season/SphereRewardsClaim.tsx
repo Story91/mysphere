@@ -104,6 +104,99 @@ function fmt(wei: bigint, digits = 0) {
   return Number(formatEther(wei)).toLocaleString('en-US', { maximumFractionDigits: digits });
 }
 
+/**
+ * PERMISSIONLESS DELIVERY - przycisk Claim widoczny dla KAZDEGO, nie tylko
+ * dla tworcy. claim() w dystrybutorze jest bezuprawnieniowy jak claimFor
+ * w padzie: ktokolwiek placi gaz, tokeny ZAWSZE ida do konta z liscia
+ * (kontrakt sam wymusza odbiorce). Wczesniej goscie widzieli tylko tor
+ * strumienia i podpis "tworca zobaczy tu przycisk" - wygladalo, jakby
+ * przycisku nie bylo wcale. Doktryna KeeperSection (deliver/release sa
+ * celowo publiczne, protokol ma przezyc milczenie zespolu) w wersji nagrod.
+ */
+function DeliverRow({ leaf }: { leaf: Leaf }) {
+  const client = usePublicClient({ chainId: SPHERE_CHAIN.id });
+  const { data: walletClient } = useWalletClient();
+  const { address: caller } = useAccount();
+  const [claimable, setClaimable] = useState<bigint | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+
+  const load = useCallback(async () => {
+    if (!client || !SPHERE_DISTRIBUTOR_ADDRESS) return;
+    try {
+      const [c, v] = await Promise.all([
+        client.readContract({ address: SPHERE_DISTRIBUTOR_ADDRESS, abi: distributorAbi, functionName: 'claimed', args: [leaf.account as Address] }),
+        client.readContract({
+          address: SPHERE_DISTRIBUTOR_ADDRESS,
+          abi: distributorAbi,
+          functionName: 'vestedOf',
+          args: [BigInt(leaf.cumulative), BigInt(leaf.prevCumulative)],
+        }),
+      ]);
+      setClaimable(v > c ? v - c : 0n);
+    } catch {
+      /* kolejny interwal */
+    }
+  }, [client, leaf]);
+
+  useEffect(() => {
+    void load();
+    const t = setInterval(() => void load(), 30_000);
+    return () => clearInterval(t);
+  }, [load]);
+
+  const onDeliver = async () => {
+    if (!walletClient || !client || !caller || !SPHERE_DISTRIBUTOR_ADDRESS) return;
+    setBusy(true);
+    setNote(null);
+    try {
+      const hash = await walletClient.writeContract({
+        address: SPHERE_DISTRIBUTOR_ADDRESS,
+        abi: distributorAbi,
+        functionName: 'claim',
+        args: [leaf.account as Address, BigInt(leaf.cumulative), BigInt(leaf.prevCumulative), (leaf.proof ?? []) as `0x${string}`[]],
+        chain: SPHERE_CHAIN,
+        account: caller,
+      });
+      await client.waitForTransactionReceipt({ hash });
+      setNote({ kind: 'ok', text: `Delivered. tx ${hash.slice(0, 10)}…` });
+      await load();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message.split('\n')[0] : String(e);
+      setNote({ kind: 'error', text: msg.includes('NothingToClaim') ? 'Nothing unlocked since the last claim - the stream releases linearly.' : msg.slice(0, 140) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl bg-sp-sunken px-3 py-2">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        <span className="min-w-0">
+          <span className="block font-mono text-[11.5px] font-bold text-sp-ink">
+            {leaf.account.slice(0, 6)}…{leaf.account.slice(-4)}
+          </span>
+          <span className="block text-[9.5px] font-bold uppercase tracking-[0.06em] text-sp-shade/40">creator wallet</span>
+        </span>
+        <span className="ml-auto text-right">
+          <span className="block font-mono text-[11.5px] font-bold text-sp-ink">{claimable === null ? '…' : fmt(claimable, 2)}</span>
+          <span className="block text-[9.5px] font-bold uppercase tracking-[0.06em] text-sp-shade/40">claimable now (SPHERE)</span>
+        </span>
+        <button
+          type="button"
+          disabled={busy || !walletClient || claimable === null || claimable === 0n}
+          onClick={() => void onDeliver()}
+          className="inline-flex items-center gap-1.5 rounded-full bg-soft-primary px-3.5 py-1.5 text-[11.5px] font-extrabold text-sp-on-brand disabled:opacity-40"
+        >
+          {busy ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" /> : <Gift className="h-3 w-3" aria-hidden="true" />}
+          Claim for creator
+        </button>
+      </div>
+      {note && <p className={`mt-1.5 text-[10.5px] font-bold ${note.kind === 'ok' ? 'text-sp-up' : 'text-sp-down'}`}>{note.text}</p>}
+    </div>
+  );
+}
+
 /** Ta sama karta bez zewnetrznego stanu - do osadzenia na innych podstronach (Rewards). */
 export function SphereRewardsClaimStandalone() {
   const dist = useSphereDistributor();
@@ -365,9 +458,25 @@ export default function SphereRewardsClaim({ dist }: { dist: DistributorState | 
           active
         />
         <p className="mt-1 text-[10px] text-sp-shade/40">
-          The lane above is the whole epoch&apos;s allocation unlocking on chain; a creator wallet sees its own share and a Claim button here.
+          The lane above is the whole epoch&apos;s allocation unlocking on chain; a creator wallet additionally sees its own share here.
         </p>
       </div>
+      {rows.length > 0 && (
+        <div className="mt-3">
+          <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/45">
+            Deliver rewards - anyone can press this
+          </p>
+          <p className="mt-0.5 text-[10px] text-sp-shade/40">
+            claim() is permissionless: whoever clicks pays the gas, tokens always land in the creator&apos;s wallet.
+            {!account ? ' Connect any wallet to send it.' : ''}
+          </p>
+          <div className="mt-1.5 grid gap-1.5">
+            {rows.map((l) => (
+              <DeliverRow key={l.account} leaf={l} />
+            ))}
+          </div>
+        </div>
+      )}
       <p className="mt-3 text-[11.5px] text-sp-shade/60">{note}</p>
     </section>
   );

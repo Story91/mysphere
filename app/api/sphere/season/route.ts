@@ -145,7 +145,18 @@ export async function GET() {
     throw last;
   }
 
-  const head = await anyClient((c) => c.getBlockNumber());
+  /**
+   * Glowa lancucha = MAKSIMUM ze wszystkich transportow, nie pierwszy sukces.
+   * Zmierzone lokalnie 2026-09-06: jeden z publicznych RPC oddal blok
+   * 50752771 przy glowie ~50936k (PIEC DNI za lancuchem, bez zadnego bledu).
+   * Pierwszy-sukces zatruwal wtedy caly widok: skan konczyl sie na <1%
+   * tygodnia, "historia" znikala, a wynik szedl do cache jako pelnoprawny.
+   * Zawyzona glowa jest niegrozna - getLogs o nieistniejacy ogon oddaje
+   * pusto - zanizona kasuje historie, wiec max jest bezpiecznym wyborem.
+   */
+  const headVotes = await Promise.allSettled(clients.map((c) => c.getBlockNumber() as Promise<bigint>));
+  const head = headVotes.reduce<bigint>((max, h) => (h.status === 'fulfilled' && h.value > max ? h.value : max), 0n);
+  if (head === 0n) throw new Error('zaden RPC nie oddal numeru glowy lancucha');
   const { epochIndex, fromBlock, toBlock } = epochRange(head);
   const scanTo = head < toBlock ? head : toBlock;
 
@@ -228,10 +239,17 @@ export async function GET() {
   const DAY_BLOCKS = EPOCH_BLOCKS / 7n;
   // Histogram liczy to samo, co naglowek (scoreEpoch): bez self-trades i bez
   // tokenow wykluczonych z sezonu (SPHERE) - inaczej slupek dnia 1 pokazywal
-  // 71 ETH obrotu SPHERE przy 1.3 ETH w podsumowaniu.
+  // 71 ETH obrotu SPHERE przy 1.3 ETH w podsumowaniu. Wolumen wykluczonych
+  // NIE znika: idzie do dailyExcluded, zeby wykres mogl pokazac PRAWDZIWA
+  // historie handlu (SPHERE dominuje obrot) osobna, podpisana seria - puste
+  // dni sezonu wygladaly jak zepsute dane, a byly wykluczeniem.
   const daily = Array.from({ length: 7 }, () => 0n);
+  const dailyExcluded = Array.from({ length: 7 }, () => 0n);
   const chartable = (token: string) => !EXCLUDED_TOKENS.has(token);
   const dayOf = (block: bigint) => Number((block - fromBlock) / DAY_BLOCKS);
+  const chart = (token: string, block: bigint, amount: bigint) => {
+    (chartable(token) ? daily : dailyExcluded)[Math.min(6, dayOf(block))] += amount;
+  };
 
   for (const log of bought) {
     const row = ensure(log.args.token as string);
@@ -242,7 +260,7 @@ export async function GET() {
     else {
       row.curveBuyNet += net;
       row.traders.add(buyer);
-      if (chartable(row.token)) daily[Math.min(6, dayOf(log.blockNumber!))] += net;
+      chart(row.token, log.blockNumber!, net);
     }
   }
   for (const log of sold) {
@@ -254,7 +272,7 @@ export async function GET() {
     else {
       row.curveSellGross += gross;
       row.traders.add(seller);
-      if (chartable(row.token)) daily[Math.min(6, dayOf(log.blockNumber!))] += gross;
+      chart(row.token, log.blockNumber!, gross);
     }
   }
   for (const log of fees) {
@@ -265,7 +283,7 @@ export async function GET() {
     const row = ensure(log.args.token as string);
     if (!row) continue;
     row.hookEthFees += log.args.amount as bigint;
-    if (chartable(row.token)) daily[Math.min(6, dayOf(log.blockNumber!))] += (log.args.amount as bigint) * 100n;
+    chart(row.token, log.blockNumber!, (log.args.amount as bigint) * 100n);
   }
 
   const inputs: TokenEpochInput[] = [...perToken.values()].map((r) => ({ ...r, uniqueTraders: r.traders.size }));
@@ -293,6 +311,7 @@ export async function GET() {
       tokens: inputs.length,
     },
     dailyVolumeEth: daily.map((d) => d.toString()),
+    dailyExcludedVolumeEth: dailyExcluded.map((d) => d.toString()),
     creators: result.creators.slice(0, 50).map((c) => ({
       creator: c.creator,
       shareBps: Number(c.shareBps),

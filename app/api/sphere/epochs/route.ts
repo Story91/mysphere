@@ -80,7 +80,9 @@ function readManifests(): Map<number, ManifestSummary & { closedFlag: boolean }>
         root: raw.root ?? null,
         manifestHash: String(raw.manifestHash ?? ''),
         cumulative: (raw.cumulative ?? {}) as Record<string, string>,
-        url: `/api/sphere/epochs/${idx}`,
+        // Kanoniczny publiczny plik (publishEpoch pisze te sama tresc do
+        // public/sphere-epochs i na Blob) - statyczny, wiec tani i wieczny.
+        url: `/sphere-epochs/epoch-${idx}.json`,
       });
     } catch {
       /* uszkodzony plik nie moze polozyc calej listy */
@@ -89,7 +91,12 @@ function readManifests(): Map<number, ManifestSummary & { closedFlag: boolean }>
   return out;
 }
 
-/** Jeden getBlockNumber z rotacja transportow (doktryna historyRpc). */
+/**
+ * Glowa lancucha = MAKSIMUM ze wszystkich transportow, nie pierwszy sukces.
+ * Publiczny RPC potrafi byc DNI za lancuchem bez zadnego bledu (zmierzone
+ * 2026-09-06 w trasie sezonu) - pierwszy-sukces zanizalby wtedy numer
+ * biezacej epoki i lista "zamknietych" tygodni klamalaby.
+ */
 async function headBlock(): Promise<bigint | null> {
   const env = process.env as Record<string, string | undefined>;
   const urls = [
@@ -98,14 +105,11 @@ async function headBlock(): Promise<bigint | null> {
     'https://mainnet.base.org',
     'https://base-rpc.publicnode.com',
   ].filter((u, i, arr): u is string => Boolean(u) && arr.indexOf(u) === i);
-  for (const u of urls) {
-    try {
-      return await createPublicClient({ chain: base, transport: http(u) }).getBlockNumber();
-    } catch {
-      /* kolejny transport */
-    }
-  }
-  return null;
+  const votes = await Promise.allSettled(
+    urls.map((u) => createPublicClient({ chain: base, transport: http(u) }).getBlockNumber())
+  );
+  const head = votes.reduce<bigint>((max, h) => (h.status === 'fulfilled' && h.value > max ? h.value : max), 0n);
+  return head === 0n ? null : head;
 }
 
 export async function GET() {

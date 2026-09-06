@@ -63,16 +63,6 @@ export const SPHERE_BUYBACK_ADDRESS = envAddress(
 /** Wspolny Safe wszystkich rol (decyzje #12 i Gate 0 z 2026-08-31). */
 export const SPHERE_SAFE_ADDRESS = '0x83E2DE974FC6B866FDb78AEFa5596d58fDc4142F' as Address;
 
-/**
- * Dystrybutor wyplat volume mining (SphereStreamingMerkleDistributor,
- * faza 1B). Kontrakt gotowy w contracts/launchpad/sphere/, JESZCZE
- * niewdrozony - fallback pusty, wiec adres jest null i UI sezonu pokazuje
- * uczciwe "claiming not live yet". Po wdrozeniu wystarczy wpisac adres
- * (albo env), a stan odbioru przy epokach zapali sie bez zmian w kodzie -
- * ten sam mechanizm trzech stanow co przy pozostalych peryferiach.
- */
-export const SPHERE_DISTRIBUTOR_ADDRESS = envAddress('NEXT_PUBLIC_SPHERE_DISTRIBUTOR_ADDRESS', '');
-
 /** Czy peryferia sa wdrozone - od tego zalezy caly tryb strony. */
 export const SPHERE_LIVE = Boolean(
   SPHERE_REWARDS_ADDRESS && SPHERE_ESCROW_ADDRESS && SPHERE_VESTING_ADDRESS
