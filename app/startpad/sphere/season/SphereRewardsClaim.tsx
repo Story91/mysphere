@@ -40,9 +40,23 @@ const distributorAbi = parseAbi([
 
 const ZERO32 = `0x${'0'.repeat(64)}`;
 const erc20BalanceAbi = parseAbi(['function balanceOf(address) view returns (uint256)']);
+const erc20SymbolAbi = parseAbi(['function symbol() view returns (string)']);
 
 type Latest = { epoch: number; onchainEpochId: string; root: string; manifestHash: string; totalCumulative: string };
 type Leaf = { account: string; cumulative: string; prevCumulative: string; proof?: string[] };
+/** Manifest epoki - tylko pola, ktorych karta uzywa (pelny ksztalt: publishEpoch.ts). */
+type Manifest = {
+  leaves?: Leaf[];
+  inputs?: { token: string; creator: string }[];
+  result?: { creators?: { creator: string; shareBps: string }[] };
+};
+/**
+ * ZA CO ta nagroda: tokeny tworcy z manifestu (symbole czytane z lancucha),
+ * udzial w puli i tydzien. Bez tego wiersz pokazywal goly adres, a leaderboard
+ * nizej dotyczy INNEGO tygodnia (w toku) - wygladalo, jakby nagroda szla do
+ * kogos spoza listy tworcow.
+ */
+type Earned = { symbols: string[]; shareBps: number; week: number; manifestUrl: string };
 
 export type DistributorState = {
   live: boolean;
@@ -121,7 +135,7 @@ function fmt(wei: bigint, digits = 0) {
  * przycisku nie bylo wcale. Doktryna KeeperSection (deliver/release sa
  * celowo publiczne, protokol ma przezyc milczenie zespolu) w wersji nagrod.
  */
-function DeliverRow({ leaf }: { leaf: Leaf }) {
+function DeliverRow({ leaf, earned }: { leaf: Leaf; earned?: Earned }) {
   const client = usePublicClient({ chainId: SPHERE_CHAIN.id });
   const { data: walletClient } = useWalletClient();
   const { address: caller } = useAccount();
@@ -184,7 +198,21 @@ function DeliverRow({ leaf }: { leaf: Leaf }) {
           <span className="block font-mono text-[11.5px] font-bold text-sp-ink">
             {leaf.account.slice(0, 6)}…{leaf.account.slice(-4)}
           </span>
-          <span className="block text-[9.5px] font-bold uppercase tracking-[0.06em] text-sp-shade/40">creator wallet</span>
+          <span className="block text-[9.5px] font-bold uppercase tracking-[0.06em] text-sp-shade/40">
+            {!earned
+              ? 'creator wallet'
+              : earned.symbols.length === 0
+                ? `creator wallet · carried over from earlier weeks`
+                : `creator of ${earned.symbols.join(' · ')} · week ${earned.week} · ${(earned.shareBps / 100).toFixed(0)}% share`}
+            {earned && (
+              <>
+                {' · '}
+                <a href={earned.manifestUrl} target="_blank" rel="noreferrer" className="normal-case tracking-normal text-sp-brand hover:underline">
+                  why this amount ↗
+                </a>
+              </>
+            )}
+          </span>
         </span>
         <span className="ml-auto text-right">
           <span className="block font-mono text-[11.5px] font-bold text-sp-ink">{claimable === null ? '…' : fmt(claimable, 2)}</span>
@@ -227,6 +255,7 @@ export default function SphereRewardsClaim({ dist }: { dist: DistributorState | 
   // ktore za chwile beda plynac - zadnej atrapy, tylko liczby z manifestu,
   // ktorego hash juz stoi w kontrakcie.
   const [leaves, setLeaves] = useState<Leaf[] | null>(null);
+  const [earnedBy, setEarnedBy] = useState<Record<string, Earned>>({});
   const [tick, setTick] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => setTick(Date.now()), 30_000);
@@ -263,17 +292,39 @@ export default function SphereRewardsClaim({ dist }: { dist: DistributorState | 
           throw lastErr ?? new Error('manifest unavailable');
         };
         const l = await getJson<Latest>('latest.json');
-        const m = await getJson<{ leaves?: Leaf[] }>(`epoch-${l.epoch}.json`);
+        const m = await getJson<Manifest>(`epoch-${l.epoch}.json`);
         if (!alive) return;
         setLatest(l);
         const all = m.leaves ?? [];
         setLeaves(all);
-        if (!account) {
+        if (account) {
+          const mine = all.find((x) => x.account.toLowerCase() === account.toLowerCase());
+          setLeaf(mine ?? 'none');
+        } else {
           setLeaf(null);
-          return;
         }
-        const mine = all.find((x) => x.account.toLowerCase() === account.toLowerCase());
-        setLeaf(mine ?? 'none');
+
+        // "Za co": tokeny tworcy z manifestu + udzial z wyniku; symbole
+        // z lancucha (manifest ich nie trzyma - liczy sie z adresow).
+        const shares = new Map((m.result?.creators ?? []).map((c) => [c.creator.toLowerCase(), Number(c.shareBps)]));
+        const inputs = m.inputs ?? [];
+        const earned: Record<string, Earned> = {};
+        for (const lf of all) {
+          const key = lf.account.toLowerCase();
+          const tokens = inputs.filter((i) => i.creator.toLowerCase() === key).map((i) => i.token);
+          const symbols = await Promise.all(
+            tokens.map(async (t) => {
+              try {
+                if (!client) throw new Error('no client');
+                return (await client.readContract({ address: t as Address, abi: erc20SymbolAbi, functionName: 'symbol' })) as string;
+              } catch {
+                return `${t.slice(0, 6)}…${t.slice(-4)}`;
+              }
+            })
+          );
+          earned[key] = { symbols, shareBps: shares.get(key) ?? 0, week: l.epoch + 1, manifestUrl: `/sphere-epochs/epoch-${l.epoch}.json` };
+        }
+        if (alive) setEarnedBy(earned);
       } catch {
         if (alive) {
           setLeaves([]);
@@ -284,7 +335,7 @@ export default function SphereRewardsClaim({ dist }: { dist: DistributorState | 
     return () => {
       alive = false;
     };
-  }, [hasEpoch, dist?.live, dist?.epochId, dist?.pendingValidAt, account]);
+  }, [hasEpoch, dist?.live, dist?.epochId, dist?.pendingValidAt, account, client]);
 
   const refresh = useCallback(async () => {
     if (!client || !account || !leaf || leaf === 'none' || !SPHERE_DISTRIBUTOR_ADDRESS) return;
@@ -417,7 +468,7 @@ export default function SphereRewardsClaim({ dist }: { dist: DistributorState | 
       <div>
         {head}
         <p className="mt-1 text-[11px] text-sp-shade/50">
-          Epoch #{dist.epochId} {latest ? `(week ${latest.epoch + 1})` : ''} · streaming {livePct.toFixed(0)}% · pool for the next epochs {fmt(dist.poolFree)} SPHERE · unclaimed never expires
+          Epoch #{dist.epochId} {latest ? `(week ${latest.epoch + 1}, closed)` : ''} · streaming {livePct.toFixed(0)}% · pool for the next epochs {fmt(dist.poolFree)} SPHERE · unclaimed never expires
         </p>
       </div>
       <a
@@ -480,9 +531,17 @@ export default function SphereRewardsClaim({ dist }: { dist: DistributorState | 
           </p>
           <div className="mt-1.5 grid gap-1.5">
             {rows.map((l) => (
-              <DeliverRow key={l.account} leaf={l} />
+              <DeliverRow key={l.account} leaf={l} earned={earnedBy[l.account.toLowerCase()]} />
             ))}
           </div>
+          {/* Wyplaty ida z TYGODNIOWYM opoznieniem - ten strumien rozlicza
+              zamkniety tydzien z manifestu, a leaderboard nizej pokazuje tydzien
+              w toku. Bez tego zdania nagroda dla tworcy z 5. miejsca biezacej
+              listy wygladala jak nagroda dla kogos spoza listy. */}
+          <p className="mt-1.5 text-[10px] text-sp-shade/40">
+            Paid one week in arrears: this stream settles{latest ? ` week ${latest.epoch + 1}` : ' the last closed week'} from its
+            published manifest. The leaderboard below is the week in progress - it pays out after it closes.
+          </p>
         </div>
       )}
       <p className="mt-3 text-[11.5px] text-sp-shade/60">{note}</p>
@@ -534,7 +593,7 @@ export default function SphereRewardsClaim({ dist }: { dist: DistributorState | 
         <div>
           {head}
           <p className="mt-1 text-[11px] text-sp-shade/50">
-            Epoch #{dist.epochId} {latest ? `(week ${latest.epoch + 1})` : ''} · streaming {streamPct.toFixed(0)}% · cumulative ledger, unclaimed never expires
+            Epoch #{dist.epochId} {latest ? `(week ${latest.epoch + 1}, closed)` : ''} · streaming {streamPct.toFixed(0)}% · paid one week in arrears · cumulative ledger, unclaimed never expires
           </p>
         </div>
         <a
