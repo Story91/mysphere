@@ -92,6 +92,18 @@ export function epochRange(headBlock: bigint): { epochIndex: number; fromBlock: 
   return { epochIndex, fromBlock, toBlock: fromBlock + EPOCH_BLOCKS - 1n };
 }
 
+/**
+ * Tokeny wykluczone z volume mining - decyzja speca (sekcja 6.1: "SPHERE nie
+ * uczestniczy we wlasnym volume mining"). Tworca SPHERE to escrow protokolu,
+ * wiec bez tego wpisu protokol farmilby wlasna pule wlasnym tokenem - epoka 4
+ * shadow pokazala SPHERE z 20% puli, co jest dokladnie tym bledem. Lista jest
+ * CZESCIA publicznego algorytmu (wchodzi w keccak epochMath.ts w manifescie),
+ * dlatego adres stoi tu na sztywno, a nie w env - kazdy przeliczy to samo.
+ */
+export const EXCLUDED_TOKENS: ReadonlySet<string> = new Set([
+  '0xb200000000000000000000ba5edb84c678432476', // SPHERE (Base mainnet)
+]);
+
 export function scoreEpoch(
   inputs: TokenEpochInput[],
   epochIndex: number,
@@ -99,8 +111,11 @@ export function scoreEpoch(
   toBlock: bigint,
   epochEndUnix: bigint
 ): EpochResult {
+  // 0: wykluczenia (SPHERE) - przed jakimkolwiek liczeniem, zeby wykluczony
+  // token nie wchodzil nawet w mianownik capu.
+  const scored = inputs.filter((t) => !EXCLUDED_TOKENS.has(t.token.toLowerCase()));
   // 1-3: wolumen zewnetrzny, bramka wieku, waga tokena.
-  const tokens: TokenScore[] = inputs.map((t) => {
+  const tokens: TokenScore[] = scored.map((t) => {
     // Post-grad wolumen strony ETH ~= fee * 100 (HOOK_FEE_BPS=100).
     const hookVolume = t.hookEthFees * 100n;
     const externalVolume = t.curveBuyNet + t.curveSellGross + hookVolume;

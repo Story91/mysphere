@@ -219,17 +219,10 @@ export default function AbiConsole({ title, address, abi }: { title: string; add
   const reads = fns.filter((f) => f.stateMutability === 'view' || f.stateMutability === 'pure');
   const writes = fns.filter((f) => f.stateMutability !== 'view' && f.stateMutability !== 'pure');
 
-  if (!isCreator) {
-    return (
-      <p className="text-[11px] text-sp-shade/45">
-        Creator console hidden - it only renders for the SPHERE creator wallet. All reads are public on{' '}
-        <a href={`${SPHERE_EXPLORER_URL}/address/${address}`} target="_blank" rel="noreferrer" className="font-bold text-sp-brand hover:underline">
-          Basescan
-        </a>
-        .
-      </p>
-    );
-  }
+  // Zero sladu dla gosci - zadnej notki "schowane dla tworcy" (po co komus
+  // informacja o narzedziu, ktorego nie dostanie). AdvancedSection i tak
+  // znika pietro wyzej; ten return to druga linia obrony.
+  if (!isCreator) return null;
 
   return (
     <section className="sph-card rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4">

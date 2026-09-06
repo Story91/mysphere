@@ -1,0 +1,159 @@
+{
+  "algorithmHash": "0x010748ac7a969be03103795a2a3ce7fb7a24251694a85eafaaafe588d6dcb2e2",
+  "closed": false,
+  "cumulative": {},
+  "epoch": 3,
+  "fromBlock": "50750230",
+  "inputs": [
+    {
+      "creator": "0xe984986f4F1E067f697b548D5fe942813d03Da37",
+      "curveBuyNet": "4212357590381153917",
+      "curveSelfVolume": "0",
+      "curveSellGross": "1275717590381153904",
+      "hookEthFees": "611366318773120233",
+      "protocolFeeEth": "61582973350576440",
+      "startedAt": "1788287897",
+      "token": "0xb200000000000000000000ba5edb84c678432476",
+      "traders": {},
+      "uniqueTraders": 39
+    },
+    {
+      "creator": "0x9Dde9b991753aeFf62F5D869e873102861CFb5Cd",
+      "curveBuyNet": "608850000000000000",
+      "curveSelfVolume": "3855781643317043",
+      "curveSellGross": "608947001655667394",
+      "hookEthFees": "0",
+      "protocolFeeEth": "3683408349896957",
+      "startedAt": "1786485759",
+      "token": "0xb200000000000000000000ba5e9d437c77345c70",
+      "traders": {},
+      "uniqueTraders": 6
+    },
+    {
+      "creator": "0xa66dE81A3Ea3fe97cb6c9671C3fDC93D16c89998",
+      "curveBuyNet": "59400000000000000",
+      "curveSelfVolume": "351922328296785",
+      "curveSellGross": "0",
+      "hookEthFees": "0",
+      "protocolFeeEth": "181066431297870",
+      "startedAt": "1788238057",
+      "token": "0xb2000000000000000000000eb73b6c8a4a27a856",
+      "traders": {},
+      "uniqueTraders": 1
+    },
+    {
+      "creator": "0x53887f05b62294b168564EcF7b495b6FcE0bc880",
+      "curveBuyNet": "0",
+      "curveSelfVolume": "990000000000000",
+      "curveSellGross": "0",
+      "hookEthFees": "0",
+      "protocolFeeEth": "3000000000000",
+      "startedAt": "1788305933",
+      "token": "0xb2000000000000000000008ace1987335422fa4b",
+      "traders": {},
+      "uniqueTraders": 0
+    },
+    {
+      "creator": "0xe49fba906F3D2370cD1E7B4b4CFF259Ba98558c0",
+      "curveBuyNet": "0",
+      "curveSelfVolume": "0",
+      "curveSellGross": "589716966538533",
+      "hookEthFees": "0",
+      "protocolFeeEth": "1179433933078",
+      "startedAt": "1787690773",
+      "token": "0xb200000000000000000000c0f9b6a68ee78e2cd1",
+      "traders": {},
+      "uniqueTraders": 2
+    },
+    {
+      "creator": "0x502ce9FB1814cb03843967EC5E0D8F6AA3A3C2e1",
+      "curveBuyNet": "0",
+      "curveSelfVolume": "0",
+      "curveSellGross": "1344025639312987",
+      "hookEthFees": "0",
+      "protocolFeeEth": "4032076917939",
+      "startedAt": "1786564521",
+      "token": "0xb200000000000000000000ca260c0c67872a86d3",
+      "traders": {},
+      "uniqueTraders": 2
+    },
+    {
+      "creator": "0xb7eCf980a4732B75E57e2eC80903deE3964F2573",
+      "curveBuyNet": "0",
+      "curveSelfVolume": "0",
+      "curveSellGross": "1079126703480517",
+      "hookEthFees": "0",
+      "protocolFeeEth": "3237380110442",
+      "startedAt": "1786610937",
+      "token": "0xb20000000000000000000007e7d397e74494a171",
+      "traders": {},
+      "uniqueTraders": 1
+    },
+    {
+      "creator": "0x76211da24AEdaf913A7795E814E59011cdBC4264",
+      "curveBuyNet": "0",
+      "curveSelfVolume": "99444722296490",
+      "curveSellGross": "0",
+      "hookEthFees": "0",
+      "protocolFeeEth": "298334166890",
+      "startedAt": "1786502379",
+      "token": "0xb200000000000000000000ba5e093260f737ff04",
+      "traders": {},
+      "uniqueTraders": 0
+    }
+  ],
+  "poolSphere": "0",
+  "result": {
+    "creators": [
+      {
+        "creator": "0x9dde9b991753aeff62f5d869e873102861cfb5cd",
+        "netProtocolEth": "3683408349896957",
+        "rewardCapEth": "1105022504969087",
+        "shareBps": "2015"
+      },
+      {
+        "creator": "0xa66de81a3ea3fe97cb6c9671c3fdc93d16c89998",
+        "netProtocolEth": "181066431297870",
+        "rewardCapEth": "54319929389361",
+        "shareBps": "2015"
+      },
+      {
+        "creator": "0x502ce9fb1814cb03843967ec5e0d8f6aa3a3c2e1",
+        "netProtocolEth": "4032076917939",
+        "rewardCapEth": "1209623075381",
+        "shareBps": "2015"
+      },
+      {
+        "creator": "0xb7ecf980a4732b75e57e2ec80903dee3964f2573",
+        "netProtocolEth": "3237380110442",
+        "rewardCapEth": "971214033132",
+        "shareBps": "2015"
+      },
+      {
+        "creator": "0xe49fba906f3d2370cd1e7b4b4cff259ba98558c0",
+        "netProtocolEth": "1179433933078",
+        "rewardCapEth": "353830179923",
+        "shareBps": "1937"
+      },
+      {
+        "creator": "0x53887f05b62294b168564ecf7b495b6fce0bc880",
+        "netProtocolEth": "3000000000000",
+        "rewardCapEth": "900000000000",
+        "shareBps": "0"
+      },
+      {
+        "creator": "0x76211da24aedaf913a7795e814e59011cdbc4264",
+        "netProtocolEth": "298334166890",
+        "rewardCapEth": "89500250067",
+        "shareBps": "0"
+      }
+    ],
+    "totalExternalVolume": "1280209870964999431",
+    "totalProtocolEth": "3876222006323176"
+  },
+  "root": null,
+  "toBlock": "51052629",
+  "vwapSpherePerEth": "0",
+  "manifestHash": "0x8c7897591de7f8a433aead5f76800216e4efc20a4f54d4fbc5de3d1bc8453953",
+  "leaves": []
+}

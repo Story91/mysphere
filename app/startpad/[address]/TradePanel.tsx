@@ -43,6 +43,8 @@ import {
   type CoreState,
 } from './detailShared';
 import { quoteBuyLocal, quoteDrifts, quoteSellLocal } from './curveQuote';
+import { hasPool } from './poolPrice';
+import PoolTradeBox from './PoolTradeBox';
 
 /**
  * Panel handlu NA STRONIE tokena - koniec z odsylaniem do boardu. Wzorce
@@ -764,6 +766,11 @@ export default function TradePanel({
           </button>
         </div>
       )}
+
+      {/* Po graduacji handel NIE znika - przenosi sie do puli v4. Osobny box,
+          bo krzywa i pula maja rozne wyceny, rozne zatwierdzenia (Permit2)
+          i rozne kontrakty; wspolny jest tylko wyglad. */}
+      {core.state === 'Graduated' && hasPool(core.poolId) && <PoolTradeBox core={core} onAfterTx={onAfterTx} />}
 
       {core.state === 'Graduated' && (
         <div className="mt-4 rounded-xl bg-sp-brand-soft p-3">

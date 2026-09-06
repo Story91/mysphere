@@ -67,17 +67,29 @@ export default function PriceChart({
   lastPriceWei,
   loading,
   ethUsd,
+  poolId = null,
 }: {
   trades: TradeEntry[];
   startedAt: number;
   state: string;
   graduatedTs: number | null;
-  /** Aktualna cena spot z lancucha; po graduacji ostatnia cena krzywej. */
+  /** Aktualna cena z lancucha: spot krzywej, a po graduacji cena puli (slot0 / ostatni swap). */
   lastPriceWei: bigint;
   loading: boolean;
   /** Kurs ETH/USD do dopisku przy naglowku; null = dopisek znika. */
   ethUsd: number | null;
+  /** Po graduacji: poolId v4 = identyfikator pary na DexScreenerze (przelacznik zrodla wykresu). */
+  poolId?: string | null;
 }) {
+  // Zrodlo wykresu po graduacji: nasz (swapy z lancucha) albo osadzony
+  // DexScreener. DexScreener widzi wylacznie pule, wiec przelacznik istnieje
+  // tylko dla zgraduowanych tokenow na Base; krzywa zawsze jest nasza.
+  const [source, setSource] = useState<'native' | 'dexscreener'>('native');
+  const dexscreenerId =
+    state === 'Graduated' && ACTIVE_LAUNCHPAD_NETWORK.chain.id === 8453 && poolId && /^0x[0-9a-fA-F]{64}$/.test(poolId) && !/^0x0+$/.test(poolId)
+      ? poolId
+      : null;
+  const showDexscreener = source === 'dexscreener' && dexscreenerId !== null;
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const modRef = useRef<ChartModule | null>(null);
@@ -102,11 +114,14 @@ export default function PriceChart({
   const effInterval: IntervalSec = intervalSec ?? 60;
   const effStyle: Style = style ?? 'candles';
 
-  // Po graduacji krzywa jest historia - nie dociagamy plaskiej linii do
-  // "teraz", bo sugerowalaby, ze cena wciaz stoi na krzywej. Czas "teraz"
-  // jest sciety do pelnej minuty, zeby memo nie przeliczalo sie co render.
+  // Po graduacji punkty ida ze swapow puli v4 (ethReserveAfter == 0n) - wtedy
+  // wykres ciagnie sie do "teraz" jak na krzywej. Dopoki puli nie ma albo
+  // nie bylo w niej swapu, nie dociagamy plaskiej linii z ostatniej ceny
+  // krzywej, bo sugerowalaby, ze cena wciaz na niej stoi. Czas "teraz" jest
+  // sciety do pelnej minuty, zeby memo nie przeliczalo sie co render.
   const nowMinute = Math.floor(Date.now() / 60_000) * 60;
-  const endTs = state === 'Graduated' && graduatedTs !== null ? graduatedTs : nowMinute;
+  const hasPoolPoints = useMemo(() => trades.some((trade) => trade.ethReserveAfter === 0n), [trades]);
+  const endTs = state === 'Graduated' && graduatedTs !== null && !hasPoolPoints ? graduatedTs : nowMinute;
   const points = useMemo(
     () => toPricePoints(trades, startedAt, mode, endTs),
     [trades, startedAt, mode, endTs]
@@ -114,17 +129,21 @@ export default function PriceChart({
   const candles = useMemo(() => buildCandles(points, effInterval), [points, effInterval]);
   const linePoints = useMemo(() => buildLine(points), [points]);
 
+  // Naglowek: po graduacji zywa cena puli (slot0 / ostatni swap) wygrywa
+  // z ostatnia transakcja z listy - do pierwszego swapu w puli lista konczy
+  // sie na krzywej, a to juz nie jest cena tokena.
+  const headWei =
+    state === 'Graduated' && lastPriceWei > 0n
+      ? lastPriceWei
+      : trades.length
+        ? trades[trades.length - 1].priceWei
+        : lastPriceWei > 0n
+          ? lastPriceWei
+          : START_PRICE_WEI;
   const scale = mode === 'mcap' ? Number(SUPPLY_TOKENS) : 1;
-  const currentValue = trades.length
-    ? priceToNumber(trades[trades.length - 1].priceWei) * scale
-    : lastPriceWei > 0n
-      ? priceToNumber(lastPriceWei) * scale
-      : priceToNumber(START_PRICE_WEI) * scale;
-  const multiple = trades.length
-    ? Number(trades[trades.length - 1].priceWei) / Number(START_PRICE_WEI)
-    : lastPriceWei > 0n
-      ? Number(lastPriceWei) / Number(START_PRICE_WEI)
-      : 1;
+  const currentValue = priceToNumber(headWei) * scale;
+  const multiple = Number(headWei) / Number(START_PRICE_WEI);
+  const poolLive = state === 'Graduated' && (hasPoolPoints || lastPriceWei > 0n);
 
   useEffect(() => {
     const element = containerRef.current;
@@ -224,7 +243,7 @@ export default function PriceChart({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-sp-shade/40">
-            {mode === 'mcap' ? 'Market cap' : state === 'Graduated' ? 'Last curve price' : 'Price'}
+            {mode === 'mcap' ? 'Market cap' : state === 'Graduated' ? (poolLive ? 'Pool price' : 'Last curve price') : 'Price'}
           </p>
           <p className="mt-1 font-soft-display text-[26px] font-extrabold leading-none text-sp-ink">
             {fmtPrice(currentValue)} <span className="text-[14px] text-sp-shade/40">{NATIVE_SYMBOL}</span>
@@ -276,6 +295,22 @@ export default function PriceChart({
               <LineChartIcon className="h-3.5 w-3.5" aria-hidden="true" />
             </button>
           </span>
+          {dexscreenerId && (
+            <span className="inline-flex overflow-hidden rounded-full border border-sp-shade/10" role="tablist" aria-label="Chart source">
+              {(['native', 'dexscreener'] as const).map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  role="tab"
+                  aria-selected={source === item}
+                  onClick={() => setSource(item)}
+                  className={`px-2.5 py-1.5 text-[11px] font-extrabold transition-colors ${source === item ? 'bg-soft-primary text-sp-on-brand' : 'bg-sp-surface text-sp-shade/50 hover:text-soft-primary-deep'}`}
+                >
+                  {item === 'native' ? 'Onchain' : 'DexScreener'}
+                </button>
+              ))}
+            </span>
+          )}
           <span className="inline-flex overflow-hidden rounded-full border border-sp-shade/10" role="tablist" aria-label="Price or market cap">
             {(['price', 'mcap'] as const).map((item) => (
               <button
@@ -296,15 +331,28 @@ export default function PriceChart({
       <div className="relative mt-4">
         {state === 'Graduated' && (
           <span className="absolute left-2 top-2 z-10 rounded-full bg-sp-up-soft px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.06em] text-sp-up">
-            Graduated: trading moved to Uniswap v4
+            {poolLive ? 'Uniswap v4 pool · live' : 'Graduated: trading moved to Uniswap v4'}
           </span>
         )}
+        {showDexscreener && (
+          <iframe
+            title="DexScreener chart"
+            src={`https://dexscreener.com/base/${dexscreenerId}?embed=1&theme=light&trades=0&info=0`}
+            className="h-[320px] w-full rounded-xl border-0 sm:h-[380px]"
+            loading="lazy"
+            sandbox="allow-scripts allow-same-origin allow-popups"
+            referrerPolicy="no-referrer"
+          />
+        )}
+        {/* Kontener naszego wykresu zostaje w DOM (ukryty) - lightweight-charts
+            trzyma do niego referencje; odmontowanie i ponowne montowanie
+            przy kazdym przelaczeniu kosztowaloby pelna inicjalizacje. */}
         {chartError ? (
-          <div className="flex h-[320px] items-center justify-center rounded-xl bg-sp-sunken text-[12px] text-sp-shade/45">
+          <div className={`flex h-[320px] items-center justify-center rounded-xl bg-sp-sunken text-[12px] text-sp-shade/45 ${showDexscreener ? 'hidden' : ''}`}>
             The chart library failed to load. Trades below still show the full history.
           </div>
         ) : (
-          <div ref={containerRef} className="h-[320px] w-full sm:h-[380px]" />
+          <div ref={containerRef} className={`h-[320px] w-full sm:h-[380px] ${showDexscreener ? 'hidden' : ''}`} />
         )}
         {loading && trades.length === 0 && !chartError && (
           <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-sp-surface/70">
@@ -316,7 +364,7 @@ export default function PriceChart({
         )}
       </div>
       <p className="mt-2 text-[10.5px] text-sp-shade/35">
-        Every point is the exact post-trade curve price from Bought/Sold events. Timestamps are estimated from block numbers (~{SECONDS_PER_BLOCK}s per block).
+        Every point is the exact post-trade price: Bought/Sold events on the curve, Swap events in the Uniswap v4 pool after graduation. Timestamps are estimated from block numbers (~{SECONDS_PER_BLOCK}s per block).
       </p>
     </section>
   );

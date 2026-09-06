@@ -46,6 +46,20 @@ export const SPHERE_TOKEN_ADDRESS = envAddress(
   '0xB200000000000000000000BA5eDb84c678432476'
 );
 
+/** Faza 1B - wdrozenie Base mainnet 2026-09-02 (scripts/output/sphere-base-1b.json).
+ *  Dystrybutor: kumulatywny Merkle ze streamingiem (PROPOSER=deployer,
+ *  GUARDIAN=Safe, weto 24h). Buyback: transze <=0.05 ETH, okno 0.5 ETH/7d,
+ *  straznik 400 bps od checkpointu, 20% spalane / 80% do dystrybutora.
+ *  Oba zero-admin poza immutable rolami. */
+export const SPHERE_DISTRIBUTOR_ADDRESS = envAddress(
+  'NEXT_PUBLIC_SPHERE_DISTRIBUTOR_ADDRESS',
+  '0xc0b018161bB48383c808Aa47923f5501758D3E9D'
+);
+export const SPHERE_BUYBACK_ADDRESS = envAddress(
+  'NEXT_PUBLIC_SPHERE_BUYBACK_ADDRESS',
+  '0x98e51f42245Bf9A0b1e0005510aEE82C52bE8A7b'
+);
+
 /** Wspolny Safe wszystkich rol (decyzje #12 i Gate 0 z 2026-08-31). */
 export const SPHERE_SAFE_ADDRESS = '0x83E2DE974FC6B866FDb78AEFa5596d58fDc4142F' as Address;
 

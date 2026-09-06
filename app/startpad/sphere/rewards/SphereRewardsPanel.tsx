@@ -17,9 +17,10 @@ import { launchpadAbi } from '../../config';
 import { SPHERE_LAUNCHPAD_ADDRESS, SPHERE_NATIVE_SYMBOL } from '../sphereChain';
 import AbiConsole from '../AbiConsole';
 import { SPHERE_LIVE, SPHERE_REWARDS_ADDRESS, sphereRewardsAbi } from '../sphereConfig';
-import { ActionButton, useSphereRead } from '../sphereActions';
+import { ActionButton, useSphereCreator, useSphereRead } from '../sphereActions';
 import { TeamRunBadge } from '../SphereShell';
 import { ActionCard, AddressPill, AdvancedSection, BigStat, KeeperSection, LearnMore, PageHero } from '../SphereUI';
+import { SphereRewardsClaimStandalone } from '../season/SphereRewardsClaim';
 
 /** Wei -> liczba dla NumberTicker; null zostaje null (szkielet ladowania). */
 function toNumber(wei: bigint | undefined): number | null {
@@ -27,6 +28,7 @@ function toNumber(wei: bigint | undefined): number | null {
 }
 
 export default function SphereRewardsPanel() {
+  const isCreator = useSphereCreator();
   const rewards = SPHERE_REWARDS_ADDRESS;
 
   const state = useSphereRead(async (client) => {
@@ -79,6 +81,10 @@ export default function SphereRewardsPanel() {
         </div>
       </PageHero>
 
+      {/* Nagrody TWORCOW w SPHERE (dystrybutor) - tu, bo "Rewards" to pierwsze
+          miejsce, w ktore ktos zajrzy po swoja nagrode; skarbonka ETH nizej. */}
+      <SphereRewardsClaimStandalone />
+
       <div className="flex flex-wrap items-center gap-2">
         <AddressPill address={rewards} label="vault" />
         {state && <AddressPill address={state.consumer} label="key holder" />}
@@ -96,12 +102,16 @@ export default function SphereRewardsPanel() {
             disabled={!state || state.padClaimable === 0n}
           />
         </ActionCard>
-        <ActionCard
-          title="Pull to treasury"
-          badge={<TeamRunBadge />}
-          hint="Moves vault funds out to the creator rewards program."
-          disabledNote="CONSUMER key only (Rewards Safe) - execute it from the console below."
-        />
+        {/* Karta CONSUMER-only istnieje wylacznie dla tworcy - gosc nie
+            dostaje wzmianki o narzedziu, ktorego nie moze uzyc. */}
+        {isCreator && (
+          <ActionCard
+            title="Pull to treasury"
+            badge={<TeamRunBadge />}
+            hint="Moves vault funds out to the creator rewards program."
+            disabledNote="CONSUMER key only (Rewards Safe) - execute it from the console below."
+          />
+        )}
       </div>
       </KeeperSection>
 

@@ -29,6 +29,7 @@ import {
   LIQUIDITY_VAULT_ADDRESS,
   liquidityVaultAbi,
   LIVE_WATCH,
+  ACTIVE_LAUNCHPAD_NETWORK,
 } from '../config';
 import { parseMetadataUri, pickTokenImage } from '../metadata';
 import { fetchLogos } from '../logos';
@@ -57,7 +58,8 @@ import {
   type TradeEntry,
 } from './detailShared';
 import { applyClaimLogs, claimsNeedReload } from './liveClaims';
-import { hasPool, readPoolPriceWei } from './poolPrice';
+import { hasPool, poolPriceWeiFromSqrt, readPoolPriceWei } from './poolPrice';
+import { POOL_SWAP_EVENT } from './poolSwaps';
 import { useTokenHistory, type LiveLaunchpadLog } from './useTokenHistory';
 
 const EXPLORER = LAUNCHPAD_EXPLORER_URL;
@@ -239,8 +241,14 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
     void loadCore();
   }, [loadCore]);
 
-  const history = useTokenHistory(notFound ? null : tokenAddress, core?.startedAt ?? null);
-  const { applyLive, reload: reloadHistory } = history;
+  // Po graduacji hook historii dostaje pule: doklada swapy z v4 do wykresu.
+  const history = useTokenHistory(
+    notFound ? null : tokenAddress,
+    core?.startedAt ?? null,
+    core?.state === 'Graduated' && hasPool(core.poolId) ? core.poolId : null,
+    core?.decimals ?? 18
+  );
+  const { applyLive, applyPoolSwaps, reload: reloadHistory } = history;
 
   /**
    * Tworca tokena - jedyny, kto moze uzupelnic profil i linki.
@@ -402,6 +410,37 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
     };
   }, [readClient, tokenAddress, notFound, applyLive, loadCore, account, isCreator]);
 
+  /**
+   * NA ZYWO PO GRADUACJI: swapy puli v4. Osobna subskrypcja, bo to inny
+   * kontrakt (PoolManager) i filtr po temacie `id` = poolId, a nie po tokenie.
+   * Kazdy swap daje punkt na wykresie i od razu odswieza cene w naglowku
+   * z `sqrtPriceX96` zdarzenia - bez czekania na kolejny odczyt slot0.
+   */
+  useEffect(() => {
+    if (!readClient || !graduated || !hasPool(poolId)) return;
+    const unwatch = readClient.watchEvent({
+      address: ACTIVE_LAUNCHPAD_NETWORK.poolManager as Address,
+      event: POOL_SWAP_EVENT,
+      args: { id: poolId as `0x${string}` },
+      poll: LIVE_WATCH.poll,
+      pollingInterval: LIVE_WATCH.pollingInterval,
+      onError: () => {},
+      onLogs: (logs) => {
+        const scanLogs = logs as unknown as Parameters<typeof applyPoolSwaps>[0];
+        applyPoolSwaps(scanLogs);
+        const last = scanLogs[scanLogs.length - 1];
+        const sqrt = last?.args?.sqrtPriceX96 as bigint | undefined;
+        if (sqrt !== undefined) {
+          const price = poolPriceWeiFromSqrt(sqrt, tokenDecimals);
+          if (price > 0n) setPoolPriceWei(price);
+        }
+      },
+    });
+    return () => {
+      unwatch();
+    };
+  }, [readClient, graduated, poolId, tokenDecimals, applyPoolSwaps]);
+
   // Profil (opis, linki) z API + LOGO z Bloba (dokladnie jak tablica). Firestore
   // trzyma logoUrl: null, wiec bez dociagniecia z Bloba detal nie mial logo w
   // ogole - a na Robinhoodzie doszlo do tego, ze upload w ogole tam nie trafial
@@ -489,7 +528,8 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
                   startedAt={core.startedAt}
                   state={core.state}
                   graduatedTs={history.graduatedTs}
-                  lastPriceWei={core.spotPriceWei}
+                  lastPriceWei={poolPriceWei ?? core.spotPriceWei}
+                  poolId={core.poolId}
                   loading={history.loading}
                   ethUsd={ethUsd}
                 />

@@ -27,7 +27,10 @@ import {
   scanBackward,
   serializeBalances,
   serializeTrades,
+  type ScanLog,
 } from './historyScan';
+import { hasPool } from './poolPrice';
+import { scanPoolSwaps, swapLogToTrade } from './poolSwaps';
 
 /**
  * Historia jednego tokena: transakcje krzywej (wykres, lista) i salda holderow.
@@ -123,9 +126,21 @@ type CacheResponse = {
   tradeCount?: number;
 };
 
-export function useTokenHistory(tokenAddress: Address | null, startedAt: number | null) {
+export function useTokenHistory(
+  tokenAddress: Address | null,
+  startedAt: number | null,
+  /**
+   * Po graduacji: identyfikator puli v4 i decimals tokena. Z nimi hook
+   * doklada do historii swapy z puli (patrz ./poolSwaps.ts); bez nich
+   * (krzywa jeszcze zyje albo puli nie ma) zachowanie jest jak dawniej.
+   */
+  poolId: string | null = null,
+  decimals = 18
+) {
   const readClient = usePublicClient({ chainId: LAUNCHPAD_CHAIN.id });
   const [state, setState] = useState<TokenHistory>(EMPTY);
+  /** Najwyzszy blok, z ktorego mamy juz swapy puli; null = jeszcze nie skanowane. */
+  const poolCoverage = useRef<bigint | null>(null);
 
   /**
    * Ostatnio ZNANY stan pokrycia: do ktorego bloku mamy historie i czy mamy ja
@@ -198,6 +213,9 @@ export function useTokenHistory(tokenAddress: Address | null, startedAt: number 
     // Roznice wolno prosic TYLKO wtedy, gdy migawka trzyma komplet historii -
     // przyciety ogon plus sama roznica dalby wykres z dziura na poczatku.
     const since = coverage.current?.full ? coverage.current.highBlock : null;
+    // Pelne przeladowanie buduje liste od zera (base = []), wiec swapy puli
+    // tez trzeba dolozyc od nowa - backfill nizej startuje od graduacji.
+    if (!since) poolCoverage.current = null;
 
     try {
       const query = new URLSearchParams({
@@ -398,5 +416,83 @@ export function useTokenHistory(tokenAddress: Address | null, startedAt: number 
     });
   }, []);
 
-  return { ...state, reload: load, applyLive };
+  /**
+   * BACKFILL SWAPOW PULI. Po zaladowaniu historii krzywej (z cache albo ze
+   * skanu) dociagamy swapy puli od ostatniej transakcji krzywej do glowy
+   * lancucha i scalamy pod tym samym kluczem txHash-logIndex. Kolejne
+   * wywolania (po `reload`) biora tylko to, co powyzej `poolCoverage`.
+   */
+  const backfillPool = useCallback(async () => {
+    if (!readClient || !tokenAddress || !hasPool(poolId)) return;
+    const head = await readClient.getBlock({ blockTag: 'latest' });
+    const headBlock = head.number;
+    const headTs = Number(head.timestamp);
+    const estTs = (block: bigint) => Math.max(startedAt ?? 0, headTs - Number(headBlock - block) * SECONDS_PER_BLOCK);
+
+    let from: bigint;
+    if (poolCoverage.current !== null) {
+      from = poolCoverage.current + 1n;
+    } else {
+      // Pierwszy swap puli nie moze byc wczesniej niz ostatnia transakcja
+      // krzywej (graduacja zamyka krzywa, dopiero potem otwiera pule).
+      const curveTrades = state.trades.filter((trade) => trade.ethReserveAfter > 0n);
+      const lastCurveBlock = curveTrades.length ? curveTrades[curveTrades.length - 1].block : 0n;
+      if (lastCurveBlock > 0n) {
+        from = lastCurveBlock;
+      } else if (state.graduatedTs !== null) {
+        const age = BigInt(Math.max(0, Math.floor((headTs - state.graduatedTs) / SECONDS_PER_BLOCK)));
+        from = headBlock > age + LAUNCH_BLOCK_MARGIN ? headBlock - age - LAUNCH_BLOCK_MARGIN : 0n;
+      } else {
+        return;
+      }
+    }
+    if (from > headBlock) return;
+
+    try {
+      const swaps = await scanPoolSwaps(readClient, {
+        poolId: poolId as `0x${string}`,
+        decimals,
+        fromBlock: from,
+        toBlock: headBlock,
+        estTs,
+      });
+      poolCoverage.current = headBlock;
+      if (swaps.length === 0) return;
+      setState((prev) => ({ ...prev, trades: mergeTrades(prev.trades, swaps) }));
+    } catch {
+      // Publiczny RPC odbil - nastepny przebieg (reload / zywe zdarzenie) sprobuje znowu.
+    }
+  }, [readClient, tokenAddress, poolId, decimals, startedAt, state.trades, state.graduatedTs]);
+
+  useEffect(() => {
+    if (!state.loaded || state.loading) return;
+    void backfillPool();
+    // Celowo bez `backfillPool` w zaleznosciach: ma ruszac po kazdym
+    // zakonczonym ladowaniu, a nie po kazdej zmianie listy transakcji
+    // (ktora sam powoduje). Zmiana puli/tokena i tak przechodzi przez load.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.loaded, state.loading, poolId]);
+
+  /** Swapy puli na zywo (watchEvent na PoolManagerze) - bez ponownego skanu. */
+  const applyPoolSwaps = useCallback(
+    (logs: ScanLog[]) => {
+      const now = Math.floor(Date.now() / 1000);
+      const fresh: TradeEntry[] = [];
+      for (const log of logs) {
+        const trade = swapLogToTrade(log, decimals, now);
+        if (trade) fresh.push(trade);
+      }
+      if (fresh.length === 0) return;
+      const top = fresh.reduce((m, t) => (t.block > m ? t.block : m), 0n);
+      if (poolCoverage.current !== null && top > poolCoverage.current) poolCoverage.current = top;
+      setState((prev) => {
+        const seen = new Set(prev.trades.map((trade) => trade.id));
+        const add = fresh.filter((trade) => !seen.has(trade.id));
+        return add.length ? { ...prev, trades: mergeTrades(prev.trades, add) } : prev;
+      });
+    },
+    [decimals]
+  );
+
+  return { ...state, reload: load, applyLive, applyPoolSwaps };
 }

@@ -11,6 +11,7 @@ import {
   EPOCH_BLOCKS,
   SEASON_GENESIS_BLOCK,
   epochRange,
+  EXCLUDED_TOKENS,
   scoreEpoch,
   type TokenEpochInput,
 } from '../../../startpad/sphere/season/epochMath';
@@ -171,6 +172,13 @@ export async function GET() {
   for (const log of [...bought, ...sold, ...fees, ...hookFees]) {
     activeTokens.add((log.args.token as string).toLowerCase());
   }
+  // Nieudany odczyt launchOf (RPC: limit, lag) to NIE "token spoza wdrozenia".
+  // Do 2.09.2026 oba przypadki laczyl jeden `catch {}`: token wypadal z sumy,
+  // a niepelny wynik szedl do cache'u na REFRESH_MS - jedna instancja Vercela
+  // pokazywala 0.45 ETH / 2 tworcow, druga 1.34 ETH / 7. Teraz liczymy
+  // porazki: przy >0 wynik idzie z flaga `partial` i NIE trafia do cache'u,
+  // wiec nastepne zapytanie liczy od nowa.
+  let metaFailures = 0;
   await Promise.all(
     [...activeTokens]
       .filter((t) => !launches.has(t))
@@ -185,8 +193,9 @@ export async function GET() {
           if (creator && creator !== '0x0000000000000000000000000000000000000000') {
             launches.set(token, { creator, startedAt, symbol: symbol as string });
           }
+          // creator == 0x0 = launchpad nie zna tokena: legalne pominiecie.
         } catch {
-          /* token spoza wdrozenia - pomijamy */
+          metaFailures += 1;
         }
       })
   );
@@ -217,7 +226,11 @@ export async function GET() {
   };
 
   const DAY_BLOCKS = EPOCH_BLOCKS / 7n;
+  // Histogram liczy to samo, co naglowek (scoreEpoch): bez self-trades i bez
+  // tokenow wykluczonych z sezonu (SPHERE) - inaczej slupek dnia 1 pokazywal
+  // 71 ETH obrotu SPHERE przy 1.3 ETH w podsumowaniu.
   const daily = Array.from({ length: 7 }, () => 0n);
+  const chartable = (token: string) => !EXCLUDED_TOKENS.has(token);
   const dayOf = (block: bigint) => Number((block - fromBlock) / DAY_BLOCKS);
 
   for (const log of bought) {
@@ -229,7 +242,7 @@ export async function GET() {
     else {
       row.curveBuyNet += net;
       row.traders.add(buyer);
-      daily[Math.min(6, dayOf(log.blockNumber!))] += net;
+      if (chartable(row.token)) daily[Math.min(6, dayOf(log.blockNumber!))] += net;
     }
   }
   for (const log of sold) {
@@ -241,7 +254,7 @@ export async function GET() {
     else {
       row.curveSellGross += gross;
       row.traders.add(seller);
-      daily[Math.min(6, dayOf(log.blockNumber!))] += gross;
+      if (chartable(row.token)) daily[Math.min(6, dayOf(log.blockNumber!))] += gross;
     }
   }
   for (const log of fees) {
@@ -252,7 +265,7 @@ export async function GET() {
     const row = ensure(log.args.token as string);
     if (!row) continue;
     row.hookEthFees += log.args.amount as bigint;
-    daily[Math.min(6, dayOf(log.blockNumber!))] += (log.args.amount as bigint) * 100n;
+    if (chartable(row.token)) daily[Math.min(6, dayOf(log.blockNumber!))] += (log.args.amount as bigint) * 100n;
   }
 
   const inputs: TokenEpochInput[] = [...perToken.values()].map((r) => ({ ...r, uniqueTraders: r.traders.size }));
@@ -300,6 +313,9 @@ export async function GET() {
     })),
   };
 
-  g.__sphereSeasonV2 = { at: Date.now(), body };
-  return NextResponse.json(body, { headers: { 'x-sphere-cache': 'miss' } });
+  if (metaFailures === 0) {
+    g.__sphereSeasonV2 = { at: Date.now(), body };
+    return NextResponse.json(body, { headers: { 'x-sphere-cache': 'miss' } });
+  }
+  return NextResponse.json({ ...body, partial: true, partialTokens: metaFailures }, { headers: { 'x-sphere-cache': 'partial' } });
 }

@@ -744,3 +744,33 @@ i przecwiczone (kontrakty, testy, skrypty, proba Sepolia, shadow indexer):
 5. **Faza 2** (staking, bid wall, ecosystem buyback, NFT praw do fee,
    sezony punktowe) = osobne decyzje, kazda z wlasna bramka; nie blokuja
    niczego powyzej.
+
+## Dopiska 2026-09-02 - faza 1B wdrozona, graduacja, poprawki
+
+- **Graduacja SPHERE**: blok 50756771, 1.09.2026 22:48 UTC, ~4 h po
+  launchu, tx `0x774cf305a7754104891ec454e590e51caaee57b7de18a562c726637170fe39e7`,
+  wywolana przez obcy portfel (`0xdB58...76Ea` zgarnal 1.5% rezerwy).
+  2.91 ETH do puli, 155.2M SPHERE sparowane, 44.8M na 0xdEaD przy seedzie.
+  `hook.buybackBps(SPHERE)` = 5000 aktywne od tego bloku.
+- **Faza 1B wdrozona** (rekord `scripts/output/sphere-base-1b.json`,
+  zrodla zweryfikowane na Basescanie):
+  `SphereStreamingMerkleDistributor` `0xc0b018161bB48383c808Aa47923f5501758D3E9D`
+  (PROPOSER=deployer, GUARDIAN=Safe, MIN_DELAY 24h, STREAM 7d),
+  `SphereBuyback` `0x98e51f42245Bf9A0b1e0005510aEE82C52bE8A7b`
+  (OPERATOR=Safe, CHECKPOINTER=deployer, BURN 20%, transza 0.05 ETH,
+  okno 0.5 ETH/7d, checkpoint <= 1h, MAX_DEV 400 bps).
+- **Bug naprawiony przed deployem** (recenzja adwersaryjna, 3 soczewki):
+  `SphereBuyback.checkpoint()` liczyl odwrotnosc ceny (ETH/token zamiast
+  tokens/ETH); pula 1:1 w testach tego nie lapala. Test regresji stoi na
+  cenie graduacji. Rozdzielono `CHECKPOINTER` (goracy klucz keepera) od
+  `OPERATOR` (Safe, `cancel()`), bo checkpoint musi byc swiezy co godzine.
+- **MAX_DEV_BPS 400, nie 150**: swap buybacku placi 0.3% LP + 1% hooka
+  ZANIM policzy sie poslizg; przy 150 kazda transza > ~0.006 ETH
+  rewertowalaby PriceGuard przy plynnosci z graduacji.
+- **SPHERE wykluczony z volume mining w indekserze** (`epochMath.ts`,
+  `EXCLUDED_TOKENS`) - epoka 4 shadow pokazala token pada z 20% puli.
+  Lista jest czescia publicznego algorytmu (keccak w manifescie).
+- Decyzje wlasciciela odnotowane: GUARDIAN = operacyjny Safe (spec chcial
+  osobnego multisiga - swiadome odstepstwo), WINDOW 0.5 ETH/tydz. jako
+  trwaly sufit (~26 ETH/rok), deploy 1B przed zamknieciem 4 epok shadow
+  (payouty nadal dopiero po shadow - sam deploy adresow nie jest payoutem).
