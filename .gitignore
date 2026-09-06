@@ -226,3 +226,6 @@ next-env.d.ts
 base_pm.json
 cctp_recent.json
 impl.txt
+
+# znacznik alarmu gazu keepera (runtime)
+scripts/output/GAZ-NISKI.txt
