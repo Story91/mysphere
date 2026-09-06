@@ -68,6 +68,26 @@ Instalacja harmonogramu (raz, w PowerShellu, z katalogu repo):
 schtasks /Create /TN "SPHERE keeper" /SC HOURLY /TR "powershell -ExecutionPolicy Bypass -File \"$PWD\scripts\sphere\keeper.ps1\"" /F
 ```
 
+Po instalacji USTAWIENIA ZASILANIA (raz, dla obu zadan). Domyslnie Windows
+nie startuje zadania na baterii, zabija je po odlaczeniu ladowarki i nie
+nadrabia pominietych startow - tak keeper zamilkl na 36 h (4-5.09.2026)
+bez zadnego bledu w logu:
+
+```powershell
+foreach ($t in @("SPHERE keeper","SPHERE epoch")) {
+  $s = (Get-ScheduledTask -TaskName $t).Settings
+  $s.DisallowStartIfOnBatteries = $false; $s.StopIfGoingOnBatteries = $false
+  $s.StartWhenAvailable = $true; $s.WakeToRun = $true
+  Set-ScheduledTask -TaskName $t -Settings $s | Out-Null
+}
+```
+
+Kontrola: `schtasks /Query /TN "SPHERE keeper" /FO LIST /V` - "Last Run
+Time" nie starsze niz godzina, "Last Result" 0. Zamkniety laptop w trybie
+Standby (S0) budzi sie do zadania; hibernacja NIE - wtedy keeper nadrobi
+przy najblizszym wybudzeniu (StartWhenAvailable), a kolejka burna po
+prostu poczeka (nic nie przepada, hook trzyma ETH do nastepnego wywolania).
+
 Log: `scripts/output/keeper.log`. Po kazdym auto-burnie keeper drukuje
 REALNE kwoty z eventu `AutoBuyback` (wydane ETH, spalone tokeny, hash,
 reszta kolejki) - te liczby ida do postow, nic innego.
