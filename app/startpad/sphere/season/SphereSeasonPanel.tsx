@@ -464,7 +464,17 @@ export default function SphereSeasonPanel() {
           </span>
         }
       >
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          {/* Pula nagrod na pierwszym miejscu: od 6.09.2026 (8.34M ze skarbca) to
+              jest liczba, po ktora tworca tu przychodzi. Wolne saldo dystrybutora,
+              czyli dokladnie to, co automat wezmie jako pule nastepnej epoki. */}
+          <BigStat
+            label="Reward pool (SPHERE)"
+            value={dist ? Number(formatEther(dist.poolFree)) : null}
+            decimals={0}
+            tone="brand"
+            hint="for the next epochs · rule 0 caps payouts"
+          />
           <BigStat
             label={`External volume (${SPHERE_NATIVE_SYMBOL})`}
             value={totals ? Number(formatEther(BigInt(totals.externalVolumeEth))) : null}

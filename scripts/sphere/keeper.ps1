@@ -26,6 +26,8 @@ $env:TRANCHE_ETH = '0.05'
 # z .env.local). Publiczne wezly odpadly: mainnet.base.org mieszal stan,
 # publicnode blokowal paragony, drpc dawal 429. BASE_RPC_URL nadal nadpisuje.
 $env:KEEPER_CONFIRM = 'tak'
+# Prog alarmu gazu (ETH); mozna nadpisac z zewnatrz: $env:GAS_ALERT_ETH='0.01'.
+if (-not $env:GAS_ALERT_ETH) { $env:GAS_ALERT_ETH = '0.001' }
 
 $stamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
 $log = Join-Path $PWD 'scripts\output\keeper.log'
@@ -35,3 +37,30 @@ $log = Join-Path $PWD 'scripts\output\keeper.log'
 $out = npm run sphere:keeper 2>&1 | ForEach-Object { "$_" }
 $out | Out-File -FilePath $log -Append -Encoding utf8
 $out
+
+# Alarm gazu. Wlasciciel nie doladowuje z wyprzedzeniem ("jak sie skonczy, daj
+# znac" - 6.09.2026). sphereKeeper.ts drukuje "GAZ NISKI" ponizej progu, a przy
+# pustym portfelu ethers rzuca "insufficient funds". Tu: znacznik w
+# scripts\output\GAZ-NISKI.txt (kazdy bieg) + powiadomienie Windows (najwyzej
+# raz na 12 h, zeby nie meczyc co godzine). Zadanie jest "Interactive only",
+# wiec toast trafia na pulpit zalogowanego uzytkownika.
+$alertLine = $out | Where-Object { $_ -match 'GAZ NISKI|insufficient funds|INSUFFICIENT_FUNDS' } | Select-Object -First 1
+if ($alertLine) {
+  $marker = Join-Path $PWD 'scripts\output\GAZ-NISKI.txt'
+  $recent = (Test-Path $marker) -and ((Get-Date) - (Get-Item $marker).LastWriteTime).TotalHours -lt 12
+  "$stamp $alertLine" | Out-File -FilePath $marker -Append -Encoding utf8
+  if (-not $recent) {
+    try {
+      [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null
+      [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime] | Out-Null
+      $xml = New-Object Windows.Data.Xml.Dom.XmlDocument
+      $safeText = [System.Security.SecurityElement]::Escape("$alertLine")
+      $xml.LoadXml("<toast scenario=`"reminder`"><visual><binding template=`"ToastGeneric`"><text>SPHERE keeper: konczy sie gaz</text><text>$safeText</text><text>Doladuj 0xD4885A5aa53446843CABcDE1F35DE9b4E906030e na Base (np. 0.02 ETH ze Safe).</text></binding></visual></toast>")
+      $toast = New-Object Windows.UI.Notifications.ToastNotification $xml
+      [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe').Show($toast)
+      "$stamp toast: alarm gazu pokazany" | Out-File -FilePath $log -Append -Encoding utf8
+    } catch {
+      "$stamp toast nieudany: $($_.Exception.Message)" | Out-File -FilePath $log -Append -Encoding utf8
+    }
+  }
+}

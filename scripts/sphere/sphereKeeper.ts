@@ -83,6 +83,19 @@ async function main() {
   const execute = process.env.KEEPER_CONFIRM === "tak";
   const log = (m: string) => console.log(`${execute ? "" : "[dry-run] "}${m}`);
 
+  // Gaz keepera. Wlasciciel nie doladowuje z wyprzedzeniem ("jak sie skonczy,
+  // daj znac" - 6.09.2026), wiec kazdy bieg drukuje saldo, a ponizej progu
+  // (GAS_ALERT_ETH, domyslnie 0.001 ETH) linie "GAZ NISKI". keeper.ps1 zamienia
+  // ja na powiadomienie Windows. Linia na starcie jest wazna: przy pustym
+  // portfelu pierwsza transakcja wywali bieg, zanim dojdzie do konca.
+  const gasAlert = ethers.parseEther(process.env.GAS_ALERT_ETH ?? "0.001");
+  const gasLine = async (when: string) => {
+    const bal: bigint = await ethers.provider.getBalance(signer.address);
+    log(`keeper gaz (${when}): ${ethers.formatEther(bal)} ETH na ${signer.address}`);
+    if (bal < gasAlert) log(`GAZ NISKI: ${ethers.formatEther(bal)} ETH < ${ethers.formatEther(gasAlert)} ETH - doladuj ${signer.address}`);
+  };
+  await gasLine("start");
+
   const pad = new ethers.Contract(process.env.LAUNCHPAD ?? "0xCF541A7EcE881945833ff1680dFc067C5Dd4cE2D", PAD_ABI, signer);
   const hook = new ethers.Contract(process.env.HOOK ?? "0x71028Ea6999e2c415b46cc022ED0A9fDca2e2044", HOOK_ABI, signer);
   const vault = new ethers.Contract(process.env.VAULT ?? "0x6108aDCb176D2A4A6283A06bb0Dd468b86A6AB63", VAULT_ABI, signer);
@@ -276,6 +289,7 @@ async function main() {
     }
   }
 
+  await gasLine("koniec");
   log("keeper: koniec przebiegu");
 }
 
