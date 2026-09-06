@@ -21,7 +21,7 @@ import { formatEther, parseAbi, type Address } from 'viem';
 import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
 import { Gift, Loader2 } from 'lucide-react';
 import { SPHERE_CHAIN, SPHERE_EXPLORER_URL } from '../sphereChain';
-import { SPHERE_DISTRIBUTOR_ADDRESS } from '../sphereConfig';
+import { SPHERE_DISTRIBUTOR_ADDRESS, SPHERE_TOKEN_ADDRESS } from '../sphereConfig';
 import StreamLane from './StreamLane';
 
 const distributorAbi = parseAbi([
@@ -39,6 +39,7 @@ const distributorAbi = parseAbi([
 ]);
 
 const ZERO32 = `0x${'0'.repeat(64)}`;
+const erc20BalanceAbi = parseAbi(['function balanceOf(address) view returns (uint256)']);
 
 type Latest = { epoch: number; onchainEpochId: string; root: string; manifestHash: string; totalCumulative: string };
 type Leaf = { account: string; cumulative: string; prevCumulative: string; proof?: string[] };
@@ -53,6 +54,9 @@ export type DistributorState = {
   pendingValidAt: number;
   pendingEpochId: number;
   pendingTotalCumulative: bigint;
+  /** Wolna pula = saldo SPHERE dystrybutora minus to, co juz obiecane, a nieodebrane.
+   *  Automat epoki bierze dokladnie te liczbe jako pule nastepnej epoki. */
+  poolFree: bigint;
 };
 
 /** Stan dystrybutora - uzywany takze przez naglowek sezonu (plakietka shadow/live). */
@@ -65,7 +69,7 @@ export function useSphereDistributor(): DistributorState | null {
     const addr = SPHERE_DISTRIBUTOR_ADDRESS;
     const load = async () => {
       try {
-        const [root, epochId, activatedAt, stream, totalCumulative, totalClaimed, pending] = await Promise.all([
+        const [root, epochId, activatedAt, stream, totalCumulative, totalClaimed, pending, balance] = await Promise.all([
           client.readContract({ address: addr, abi: distributorAbi, functionName: 'root' }),
           client.readContract({ address: addr, abi: distributorAbi, functionName: 'epochId' }),
           client.readContract({ address: addr, abi: distributorAbi, functionName: 'activatedAt' }),
@@ -73,6 +77,9 @@ export function useSphereDistributor(): DistributorState | null {
           client.readContract({ address: addr, abi: distributorAbi, functionName: 'totalCumulative' }),
           client.readContract({ address: addr, abi: distributorAbi, functionName: 'totalClaimed' }),
           client.readContract({ address: addr, abi: distributorAbi, functionName: 'pending' }),
+          SPHERE_TOKEN_ADDRESS
+            ? client.readContract({ address: SPHERE_TOKEN_ADDRESS, abi: erc20BalanceAbi, functionName: 'balanceOf', args: [addr] })
+            : Promise.resolve(0n),
         ]);
         if (!alive) return;
         setState({
@@ -85,6 +92,7 @@ export function useSphereDistributor(): DistributorState | null {
           pendingValidAt: Number(pending[4]),
           pendingEpochId: Number(pending[2]),
           pendingTotalCumulative: pending[3],
+          poolFree: balance > totalCumulative - totalClaimed ? balance - (totalCumulative - totalClaimed) : 0n,
         });
       } catch {
         /* kolejny interwal */
@@ -316,7 +324,7 @@ export default function SphereRewardsClaim({ dist }: { dist: DistributorState | 
       <div>
         {head}
         <p className="mt-1 text-[11px] text-sp-shade/50">
-          Epoch #{dist.epochId} {latest ? `(week ${latest.epoch + 1})` : ''} · streaming {livePct.toFixed(0)}% · cumulative ledger, unclaimed never expires
+          Epoch #{dist.epochId} {latest ? `(week ${latest.epoch + 1})` : ''} · streaming {livePct.toFixed(0)}% · pool for the next epochs {fmt(dist.poolFree)} SPHERE · unclaimed never expires
         </p>
       </div>
       <a
