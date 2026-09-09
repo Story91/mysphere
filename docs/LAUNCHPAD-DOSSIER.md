@@ -12,12 +12,16 @@
 > · creator-first split 70/30 · buyback funded from the creator's share
 > · sniper protection is optional (creator can disable it at launch)
 
-MySphere Launchpad launches **B20 tokens** (Base's network-native, ERC-20-compatible standard — created by the network's factory precompile, born admin-less with supply cap = total supply) on a bonding curve. When the curve
-collects **exactly 3.00 ETH**, the token *graduates*: liquidity moves into a
-**Uniswap v4 pool** with a custom fee hook. There are **no admin keys, no pause,
-no upgrades** — every rule below is fixed in immutable contracts. All payouts are
-**pull-based** (you claim; nothing is pushed) and **creator earnings are paid in
-ETH**, not in the token.
+MySphere Launchpad launches **B20 tokens** on Base (the network-native,
+ERC-20-compatible standard created by the factory precompile, born admin-less
+with supply cap = total supply) and plain ERC-20s everywhere else, on a bonding
+curve. When the curve collects **`4 × R_VIRT`** — 3.00 ETH on Base, and a
+different figure on every network that deployed a different scale — the token
+*graduates*: liquidity moves into a **Uniswap v4 pool** with a custom fee hook.
+There are **no admin keys, no pause, no upgrades** — every rule below is fixed
+in immutable contracts. All payouts are **pull-based** (you claim; nothing is
+pushed). Curve earnings are paid in the native coin; **after graduation the hook
+and the vault also accrue the token side**, so a creator claims both.
 
 ## 1. Token lifecycle
 
@@ -45,7 +49,7 @@ Base it is `0.75 ETH`, which is what every number in the table below assumes.
 | --- | --- |
 | Total supply (minted once, to the curve) | 1,000,000,000 |
 | Sold on the curve | up to 800,000,000 (80%) |
-| Moved to the pool at graduation | 200,000,000 (20%) |
+| Moved to the vault at graduation | 200,000,000 (20%) — of which ~155M (~15.5%) enters the pool and ~45M is transferred to `0x…dEaD`; the exact split is in the `Graduated` event |
 | Starting price | 0.00000000075 ETH |
 | Starting market cap | 0.75 ETH |
 | Graduation trigger | reserve = **3.00 ETH exactly** |

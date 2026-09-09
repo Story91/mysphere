@@ -4,6 +4,88 @@ Krotki obraz calosci. Szczegoly i uzasadnienia decyzji sa w
 `HANDOFF-LAUNCHPAD-V2-2026-08-10.md`. Dokument dla uzytkownikow:
 `LAUNCHPAD-DOSSIER.md` (AKTUALIZOWAC przy kazdej zmianie launchpada).
 
+## WERYFIKACJA Z LANCUCHA - 2026-09-09
+
+Wszystkie ponizsze liczby odczytane tego dnia bezposrednio z wdrozonych
+kontraktow (`eth_call`), a nie przepisane z tego dokumentu.
+
+| siec | launchpad | `R_VIRT()` | prog `4 x R_VIRT` | zgodnosc z `app/startpad/config.ts` |
+| --- | --- | --- | --- | --- |
+| Base mainnet | `0xCF54...4cE2D` | 0.75 ETH | 3 ETH | ZGODNE (takze vault, hook, fabryka, `FEE_RECIPIENT` = Safe) |
+| Base Sepolia | `0x4Cc0...1A48` | 0.75 ETH | 3 ETH | to jest adres, ktory czyta apka |
+| Base Sepolia | `0xb890...3575` | 0.25 ETH | 1 ETH | NOWSZE wdrozenie z 2026-08-31, apka go NIE zna |
+| Robinhood | `0x712E...B22f` | 0.75 | 3 | ZGODNE |
+| Arc testnet | `0xe984...3Da37` | 250 USDC | 1000 USDC | ZGODNE |
+
+Parametry wspolne potwierdzone na Base: `FEE_BPS` 100, `CREATOR_FEE_BPS` 70,
+`GRAD_FEE_BPS` 300, `MIN_LP_ETH` 0.01 ETH, `MAX_BUY` 99 ETH, `POOL_FEE` 3000,
+`POOL_TICK_SPACING` 60, `T0` 1e9, `T_MIN` 200M, `WINDOW_ADDR_CAP` 16M,
+`LAUNCH_WINDOW` 300 s; vault i hook maja `PROTOCOL_SHARE_BPS` 3000 (30/70).
+
+### DO ROZSTRZYGNIECIA: dwa zywe launchpady na Sepolii
+
+`scripts/output/launchpad-base-sepolia.json` (2026-08-31) zapisuje wdrozenie
+`0xb890...3575` ze skala 0.25 ETH, a `app/startpad/config.ts` nadal wskazuje
+`0x4Cc0...1A48` ze skala 0.75. Oba maja kod i oba odpowiadaja. Tablica czyta
+JEDEN adres na siec, wiec dzis widac tokeny ze STAREGO wdrozenia, a nowe jest
+niewidoczne. Przelaczenie configu przeniesie testnet na pusta tablice (tokeny
+demo zostaja przy starym adresie), wiec to jest decyzja wlasciciela, a nie
+poprawka - i dlatego config nie zostal ruszony.
+
+### $SPHERE - stan faktyczny
+
+Token `0xB200000000000000000000BA5eDb84c678432476` jest w stanie **Graduated**
+na Base mainnet. Krzywa wyzerowana (`ethReserve` = `tokenReserve` = 0), pula
+otwarta pod `poolId`
+`0xb72656d58775fd33f6b155f1a836669e4c2a8ed436bf8267681df6a06af6a8f3`, pozycja
+vaulta pelnozakresowa (ticki -887220/887220). Buyback dziala: 13 862 304 SPHERE
+odkupione i wyslane na adres martwy; na adresie martwym lezy 58,67 mln sztuk.
+
+To wymusilo poprawke w tablicy: `raised` czytane wprost z `launchOf` pokazywalo
+dla tokena po graduacji **0**, bo `graduate()` zeruje rezerwy - czyli token,
+ktory przeszedl cala droge, mial pusty pasek i "0 ETH". Tablica pokazuje teraz
+w tym stanie prog. Dokladna rezerwa z chwili awansu stoi wylacznie w zdarzeniu
+`Graduated` (`ethToPool + gradFee`).
+
+### Arc testnet - dlaczego tablica byla pusta
+
+Tokeny Arc wystartowaly 2026-08-14 w okolicy bloku 56 741 000, a glowa lancucha
+to 61 276 179 - luka 4,41 mln blokow (Arc robi ~169 tys. blokow na dobe). Skan
+w przegladarce siega 9 500 x 60 = 570 tys. blokow, czyli ~3,4 doby, wiec nie ma
+jak dojsc do startow. Indeks serwerowy mial to nadrabiac porcjami, ale zapisywal
+postep TYLKO gdy jedno zadanie objelo caly zakres od bloku wdrozenia do glowy -
+przy 380 tys. blokow na zadanie nigdy, wiec znacznik zostawal na zerze i kazde
+wejscie skanowalo ten sam pas przy glowie. Na Base luka miesci sie w jednym
+zadaniu i dlatego bledu nie bylo widac.
+
+#### Drugie ograniczenie Arc: limit zapytan na jedynym endpoincie z historia
+
+Zmierzone 2026-09-09. Dwa publiczne endpointy Arc dziela sie tak, ze zaden nie
+wystarcza sam:
+
+| endpoint | `eth_blockNumber` | `getLogs` PRZY GLOWIE | `getLogs` przy starym bloku | limit zakresu |
+| --- | --- | --- | --- | --- |
+| `rpc.blockdaemon.testnet.arc.io` (pierwszy w definicji sieci) | tak | dziala | `4444 pruned history unavailable` | 50 000 przy glowie |
+| `rpc.testnet.arc.io` | tak | `-32014 requested data not available` | dziala, 354 logi w oknie przy bloku wdrozenia | ~10 000, ORAZ `-32005 rate limit exceeded` juz po kilku zapytaniach |
+
+TE DWA ENDPOINTY SA ROZLACZNE. Jeden ma glowe bez historii, drugi historie bez
+glowy - i zaden nie obsluzy calego zakresu sam. Wybieranie JEDNEGO endpointu na
+zadanie (egzamin z `getLogs` na najglebszym oknie planu) nie moze wiec przejsc
+na Arc niezaleznie od tego, jak dobrze zapisujemy postep: kandydat z historia
+oblewa egzamin przy glowie, a kandydat z glowa oblewa go w dole. Poprawnym
+ksztaltem jest przelaczanie endpointu NA OKNO, a nie na zadanie.
+
+Backfill 4,41 mln blokow to okolo 464 okien po 9 500, czyli setki zapytan do
+jedynego endpointu, ktory ma czym odpowiedziec - i on po kilkudziesieciu z nich
+zaczyna oddawac `-32005`. Kod moze to przezyc (ponowienia, mniej torow), ale
+zimny indeks Arc bedzie sie zapelnial przez wiele wejsc.
+
+Wlasciwe rozwiazanie operacyjne to ustawienie `ARC_TESTNET_RPC_URL` na endpoint
+z kluczem - `app/api/launchpad/historyRpc.ts` czyta wlasnie te nazwe dla
+chainId 5042002 i stawia ja na poczatku kolejki. Bez tego kazde wdrozenie na
+szybkim lancuchu z przycieta historia publicznych RPC bedzie mialo ten sam
+problem.
+
 ## Adresy - Base Sepolia (chainId 84532), wdrozenie v3 z 2026-08-10
 
 | kontrakt | adres |

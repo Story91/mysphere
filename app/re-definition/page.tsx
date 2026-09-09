@@ -830,7 +830,7 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
   {
     name: 'Startpad: launch a token',
     status: 'live',
-    note: 'A bonding curve that closes at a fixed target (exactly 3.00 ETH on Base; each network sets its own) and graduates into a Uniswap v4 pool. The 1% trading fee splits up to 70% to the creator and never less than 30% to the protocol, and the floor is in the contract, not the form. Live with real money on Base mainnet (the default) and on Robinhood Chain, with Base Sepolia and Arc Testnet there for testing. The full path (launch, curve close, graduation, pool swaps, buyback and burn, claims) has run end to end on test networks; on the real-money networks, launches and trading run, but no token has graduated yet.',
+    note: 'A bonding curve that closes at a fixed target (exactly 3.00 ETH on Base; each network sets its own) and graduates into a Uniswap v4 pool. The 1% trading fee splits up to 70% to the creator and never less than 30% to the protocol, and the floor is in the contract, not the form. Live with real money on Base mainnet (the default) and on Robinhood Chain, with Base Sepolia and Arc Testnet there for testing. The full path (launch, curve close, graduation, pool swaps, buyback and burn, claims) has run end to end on test networks, and on Base mainnet $SPHERE has now run it with real money: its curve closed, it graduated, and its Uniswap v4 pool is live. Most curves never fill, so a token still trading on its curve is the normal case.',
   },
   {
     name: 'Startpad on real money',
@@ -1439,8 +1439,9 @@ export default function ReDefinitionPage() {
             vault forever; only the fees it earns can ever be taken out. It runs with real money on
             Base mainnet and on Robinhood Chain, and the full path (launch, curve close,
             graduation, pool swaps, fee settle, buyback and burn, claims) was run end to end on
-            test networks and checked on the chain before real money was allowed near it. On the
-            real-money networks no token has graduated yet. Base Sepolia and Arc Testnet stay
+            test networks and checked on the chain before real money was allowed near it. On Base
+            mainnet $SPHERE has since gone the whole way and its pool is open; it is still the
+            exception, because most curves never fill. Base Sepolia and Arc Testnet stay
             available for testing, for the same reason the escrow gives: with no admin key, a bug
             is irreversible.
           </P>

@@ -590,17 +590,23 @@ export default function HowPage() {
               of it later means launching a new token.
             </P>
             <P>
-              <Hi>Sniper protection</Hi> is on by default: for the first 5
-              minutes one wallet can buy at most 16 million tokens. At launch,
-              and only at launch, you can tighten that cap or switch the
-              protection off entirely.
+              <Hi>Sniper protection</Hi> is a per-wallet buy cap for the first
+              5 minutes, and <Hi>Quick launch does not set one</Hi>: it sends
+              the launch with the cap equal to the whole supply, which is the
+              same as off. The contract&apos;s own default, 16 million tokens
+              per wallet, applies only to a direct call. Turn the cap on in
+              Creator setup, where you can size it &mdash; and size it above
+              your own pre-buy, because it counts against you too. Like
+              everything else, it is fixed at launch.
             </P>
             <P>
               One entry in that network switch is not a network.{' '}
               <Hi>✦ $SPHERE</Hi> opens the hub for a token called $SPHERE:
               its escrow, vesting and rewards contracts are deployed on Base
               mainnet, and the panels there read them straight from the chain.
-              The token itself is not launched. There is nothing to buy.
+              The token launched on 1 September 2026 and has since{' '}
+              <Hi>graduated</Hi> on Base mainnet: its curve is closed and it
+              trades in its own Uniswap v4 pool.
             </P>
             <Go href="/startpad">Open Startpad</Go>
           </Step>
@@ -625,19 +631,19 @@ export default function HowPage() {
               <Hi>3.00 ETH</Hi> in the reserve. The target scales with the
               network, so the Arc testnet counts its curve in USDC. Buys stop;{' '}
               <Hi>selling keeps working</Hi>, so nobody is trapped at the top.
-              From then on anyone may call <Hi>graduate()</Hi> (on Base the
-              caller earns 0.045 ETH for it) and the liquidity moves into a
+              From then on anyone may call <Hi>graduate()</Hi> (the caller
+              earns 1.5% of the reserve for it, so 0.045 ETH on a full 3 ETH
+              curve, less if people sold while it was locked) and the
+              liquidity moves into a
               Uniswap v4 pool that opens at the exact price the curve closed
               at, locked there forever.
             </P>
             <P>
-              Before you chase that: <Hi>no token has graduated on Base</Hi>.
-              We scanned every event the Base launchpad has emitted since it
-              was deployed: eight tokens launched, zero graduated. The full
-              path, launch to pool to payout, has run end to end on the same
-              code, but only on test networks, including one graduation into
-              a live v4 pool on the Arc testnet. Whoever fills the first
-              curve on Base is first.
+              The full path, launch to pool to payout, has run end to end on
+              Base mainnet: <Hi>$SPHERE graduated</Hi> there, and its pool
+              opened at the exact price its curve closed at. It is still the
+              exception. Most curves never fill, so a token still trading on
+              its curve is the normal case, not a stalled one.
             </P>
           </Step>
 
