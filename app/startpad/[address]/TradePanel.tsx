@@ -601,7 +601,10 @@ export default function TradePanel({
           {core.state === 'Curve'
             ? `${fmtEth(core.ethReserve)} of ${Number(formatEther(TARGET_WEI)).toFixed(2)} ${NATIVE_SYMBOL} · ${fmtEth(remaining)} ${NATIVE_SYMBOL} to graduation`
             : core.state === 'Locked'
-              ? `The curve is closed at 3.00 ${NATIVE_SYMBOL}. Anyone can open the Uniswap v4 pool below.`
+              // Rezerwa w stanie Locked NIE musi rownac sie progowi: sprzedaz
+              // dziala dalej, wiec moze byc nizsza. Stala "3.00" klamala tu
+              // podwojnie - i o skali sieci, i o tej rezerwie.
+              ? `The curve is full at ${fmtEth(core.ethReserve)} ${NATIVE_SYMBOL}. Anyone can open the Uniswap v4 pool below.`
               : 'Liquidity lives in the Uniswap v4 pool with the launch hook attached.'}
         </p>
       </div>
@@ -660,7 +663,7 @@ export default function TradePanel({
                 </div>
                 {shownBuy && shownBuy.refund > 0n && (
                   <div className="flex items-center justify-between">
-                    <span className="text-sp-shade/50">Refund (curve fills at 3 {NATIVE_SYMBOL})</span>
+                    <span className="text-sp-shade/50">Refund (curve fills at {Number(formatEther(TARGET_WEI)).toFixed(2)} {NATIVE_SYMBOL})</span>
                     <span className="font-bold text-sp-up">{fmtEth(shownBuy.refund)} {NATIVE_SYMBOL}</span>
                   </div>
                 )}
@@ -817,9 +820,26 @@ export default function TradePanel({
               )}
             </div>
           </div>
+          {/* Do 9 wrzesnia 2026 te dwa przyciski stały bez slowa wyjasnienia
+              przy KAZDYM gosciu strony tokena po graduacji. Zaden z nich nie
+              placi wolajacemu, wiec trzeba to powiedziec wprost. */}
+          <p className="mt-3 text-[10.5px] leading-[1.4] text-sp-shade/45">
+            Settle books the hook&apos;s 1% swap fees into claimable balances. Harvest pulls the
+            0.30% pool fees the locked position has earned. Anyone may call either one, and neither
+            pays the caller anything.
+          </p>
           <div className="mt-3 grid grid-cols-2 gap-2">
-            <button type="button" disabled={core.pendingEth === 0n || busy === 'settle' || !isConnected} onClick={settle} className="rounded-lg border border-sp-shade/10 bg-sp-surface px-2 py-2 text-[11px] font-extrabold text-sp-ink disabled:opacity-40">
-              {busy === 'settle' ? 'Settling...' : `Settle ${fmtEth(core.pendingEth)} ${NATIVE_SYMBOL}`}
+            {/* `settle()` rewertuje TYLKO wtedy, gdy obie strony sa zerowe
+                (B20LaunchHook: `if (eth == 0 && tok == 0) revert`). Warunek
+                patrzyl na sama strone ETH, wiec oplaty zebrane w TOKENIE - a
+                to normalny wynik kazdej sprzedazy w puli - nie dawaly sie
+                rozliczyc z interfejsu. SPHERE mial tak 1,26 mln tokenow. */}
+            <button type="button" disabled={(core.pendingEth === 0n && core.pendingToken === 0n) || busy === 'settle' || !isConnected} onClick={settle} className="rounded-lg border border-sp-shade/10 bg-sp-surface px-2 py-2 text-[11px] font-extrabold text-sp-ink disabled:opacity-40">
+              {busy === 'settle'
+                ? 'Settling...'
+                : core.pendingEth > 0n
+                  ? `Settle ${fmtEth(core.pendingEth)} ${NATIVE_SYMBOL}`
+                  : `Settle ${fmtTokens(core.pendingToken, decimals)} ${core.symbol}`}
             </button>
             <button type="button" disabled={busy === 'harvest' || !isConnected} onClick={harvest} className="rounded-lg border border-sp-shade/10 bg-sp-surface px-2 py-2 text-[11px] font-extrabold text-sp-ink disabled:opacity-40">
               {busy === 'harvest' ? 'Harvesting...' : 'Harvest LP fees'}

@@ -448,6 +448,30 @@ export function tradeErrorMessage(cause: unknown): string {
   if (/DeadlineExpired\(\)/.test(raw)) {
     return 'The transaction sat unsigned for too long. Send it again.';
   }
+  // Bledy CYKLU ZYCIA. Bez nich kupujacy, ktory trafil w 5-minutowe okno
+  // startowe, dostawal goly napis "WindowCap()" i nie mial jak zgadnac, ze
+  // to limit na portfel, a nie awaria.
+  if (/WindowCap\(\)/.test(raw)) {
+    return 'This launch caps how much one wallet can buy in the first 5 minutes, and you have reached that cap. Buy a smaller amount, or wait for the window to close.';
+  }
+  if (/CurveIsLocked\(\)/.test(raw)) {
+    return 'The curve is full, so buying is closed. Selling still works, and anyone can open the Uniswap v4 pool.';
+  }
+  if (/AlreadyGraduated\(\)/.test(raw)) {
+    return 'This token has graduated. The curve is closed for good and trading now happens in its Uniswap v4 pool.';
+  }
+  if (/NotLocked\(\)/.test(raw)) {
+    return 'The curve has not filled yet, so there is nothing to graduate.';
+  }
+  if (/ReserveTooSmallToGraduate\(\)/.test(raw)) {
+    return 'Too little is left in the reserve to open a pool with, so this curve cannot graduate. Selling stays open.';
+  }
+  if (/BuyTooLarge\(\)/.test(raw)) {
+    return 'That is above the per-transaction buy limit. Split it into smaller buys.';
+  }
+  if (/DustTrade\(\)/.test(raw)) {
+    return 'That amount is too small to move the curve at all. Try a larger one.';
+  }
   if (/insufficient funds/i.test(raw)) {
     return 'Not enough ETH to cover the amount plus gas.';
   }

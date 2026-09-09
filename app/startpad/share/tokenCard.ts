@@ -340,7 +340,14 @@ export async function loadTokenCard(
     symbol: symbol || '???',
     state: (LAUNCH_STATE[Number(stateIndex)] ?? 'Curve') as TokenCardData['state'],
     creator,
-    raised: Number(formatEther(ethReserve)),
+    // Ta sama regula, co na tablicy: `graduate()` ZERUJE rezerwy, wiec surowy
+    // odczyt kazalby karcie tokena, ktory przeszedl cala droge, pokazac
+    // "RAISED 0 / 3 ETH" - i to wlasnie szlo w podglad kazdego udostepnionego
+    // linku. Po graduacji zbiorka jest domknieta, wiec pokazujemy prog.
+    raised:
+      LAUNCH_STATE[Number(stateIndex)] === 'Graduated'
+        ? Number(formatEther(targetWeiFor(net.chain.id)))
+        : Number(formatEther(ethReserve)),
     target: Number(formatEther(targetWeiFor(net.chain.id))),
     priceEth,
     // Kapitalizacja Z CALEJ PODAZY - ta sama regula, co `mcapWei` na stronie

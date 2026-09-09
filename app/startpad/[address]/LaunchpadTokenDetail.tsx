@@ -39,6 +39,7 @@ import ShareToken from '../ShareToken';
 import DetailTabs from './DetailTabs';
 import PriceChart from './PriceChart';
 import TradePanel from './TradePanel';
+import { LifecycleGuide, STATE_HINT } from '../LifecycleGuide';
 import {
   fmtEth,
   fmtPrice,
@@ -539,6 +540,10 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
                 <div className="space-y-4 lg:sticky lg:top-4">
                   <TradePanel core={core} ethUsd={ethUsd} onAfterTx={() => void loadCore()} />
                   <StatsCard core={core} tokenAddress={tokenAddress} ethUsd={ethUsd} trades={history.trades} balances={history.balances} historyComplete={historyComplete} poolPriceWei={poolPriceWei} copied={copied} onCopy={() => void copyAddress()} />
+                  {/* Pod panelem handlu, bo tu padaja pytania, na ktore ten
+                      przewodnik odpowiada: co znaczy "Locked", czemu kupno
+                      rewertuje, i gdzie handlowac po graduacji. */}
+                  <LifecycleGuide />
                 </div>
               </div>
 
@@ -625,7 +630,9 @@ function TokenHeader({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="font-soft-display text-[26px] font-extrabold leading-tight text-sp-ink sm:text-[30px]">{core.symbol}</h1>
-              <span className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] ${stateClass}`}>{core.state}</span>
+              {/* Ta sama podpowiedz, co przy plakietce na tablicy - slowo
+                  "Locked" nie tlumaczy sie samo. */}
+              <span title={STATE_HINT[core.state]} className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] ${stateClass}`}>{core.state}</span>
             </div>
             <p className="mt-0.5 truncate text-[13px] text-sp-shade/50">
               {core.name} · launched {timeAgo(core.startedAt)}
