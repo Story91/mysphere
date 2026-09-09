@@ -1,7 +1,13 @@
 {
   "algorithmHash": "0x010748ac7a969be03103795a2a3ce7fb7a24251694a85eafaaafe588d6dcb2e2",
-  "closed": false,
-  "cumulative": {},
+  "closed": true,
+  "cumulative": {
+    "0x502ce9fb1814cb03843967ec5e0d8f6aa3a3c2e1": "55203898585737540994",
+    "0x9dde9b991753aeff62f5d869e873102861cfb5cd": "50430213792058509838348",
+    "0xa66de81a3ea3fe97cb6c9671c3fdc93d16c89998": "5033895338117327698260",
+    "0xb7ecf980a4732b75e57e2ec80903dee3964f2573": "44323560025652446909",
+    "0xe49fba906f3d2370cd1e7b4b4cff259ba98558c0": "3046082604953887580724"
+  },
   "epoch": 3,
   "fromBlock": "50750230",
   "inputs": [
@@ -10,7 +16,7 @@
       "curveBuyNet": "4212357590381153917",
       "curveSelfVolume": "0",
       "curveSellGross": "1275717590381153904",
-      "hookEthFees": "611366318773120233",
+      "hookEthFees": "656123468178880568",
       "protocolFeeEth": "61582973350576440",
       "startedAt": "1788287897",
       "token": "0xb200000000000000000000ba5edb84c678432476",
@@ -31,15 +37,15 @@
     },
     {
       "creator": "0xa66dE81A3Ea3fe97cb6c9671C3fDC93D16c89998",
-      "curveBuyNet": "59400000000000000",
-      "curveSelfVolume": "351922328296785",
-      "curveSellGross": "0",
+      "curveBuyNet": "61380000000000000",
+      "curveSelfVolume": "824539304430898",
+      "curveSellGross": "59729996446681668",
       "hookEthFees": "0",
-      "protocolFeeEth": "181066431297870",
+      "protocolFeeEth": "367674271566319",
       "startedAt": "1788238057",
       "token": "0xb2000000000000000000000eb73b6c8a4a27a856",
       "traders": {},
-      "uniqueTraders": 1
+      "uniqueTraders": 2
     },
     {
       "creator": "0x53887f05b62294b168564EcF7b495b6FcE0bc880",
@@ -102,38 +108,38 @@
       "uniqueTraders": 0
     }
   ],
-  "poolSphere": "0",
+  "poolSphere": "8374353391327890163434971",
   "result": {
     "creators": [
       {
         "creator": "0x9dde9b991753aeff62f5d869e873102861cfb5cd",
         "netProtocolEth": "3683408349896957",
         "rewardCapEth": "1105022504969087",
-        "shareBps": "2015"
+        "shareBps": "2016"
       },
       {
         "creator": "0xa66de81a3ea3fe97cb6c9671c3fdc93d16c89998",
-        "netProtocolEth": "181066431297870",
-        "rewardCapEth": "54319929389361",
-        "shareBps": "2015"
+        "netProtocolEth": "367674271566319",
+        "rewardCapEth": "110302281469895",
+        "shareBps": "2016"
       },
       {
         "creator": "0x502ce9fb1814cb03843967ec5e0d8f6aa3a3c2e1",
         "netProtocolEth": "4032076917939",
         "rewardCapEth": "1209623075381",
-        "shareBps": "2015"
+        "shareBps": "2016"
       },
       {
         "creator": "0xb7ecf980a4732b75e57e2ec80903dee3964f2573",
         "netProtocolEth": "3237380110442",
         "rewardCapEth": "971214033132",
-        "shareBps": "2015"
+        "shareBps": "2016"
       },
       {
         "creator": "0xe49fba906f3d2370cd1e7b4b4cff259ba98558c0",
         "netProtocolEth": "1179433933078",
         "rewardCapEth": "353830179923",
-        "shareBps": "1937"
+        "shareBps": "1934"
       },
       {
         "creator": "0x53887f05b62294b168564ecf7b495b6fce0bc880",
@@ -148,12 +154,61 @@
         "shareBps": "0"
       }
     ],
-    "totalExternalVolume": "1280209870964999431",
-    "totalProtocolEth": "3876222006323176"
+    "totalExternalVolume": "1341919867411681099",
+    "totalProtocolEth": "4062829846591625"
   },
-  "root": null,
+  "root": "0x4dc8527e34720c20255c1f9d949788d7bb9c412d932923616fecd47dcbedbd6f",
   "toBlock": "51052629",
-  "vwapSpherePerEth": "0",
-  "manifestHash": "0x8c7897591de7f8a433aead5f76800216e4efc20a4f54d4fbc5de3d1bc8453953",
-  "leaves": []
+  "vwapSpherePerEth": "45637273055782058357555000",
+  "manifestHash": "0x24c3255e534f0662c14620992f49370c93a30830730c0deb4388189ce57ce01b",
+  "leaves": [
+    {
+      "account": "0xe49fba906f3d2370cd1e7b4b4cff259ba98558c0",
+      "cumulative": "3046082604953887580724",
+      "prevCumulative": "3029934760417365135000",
+      "proof": [
+        "0x568834d87f77f6074e1b8b3864e871fd34e8c94cb1a691d5365af66d5e2d6d9b",
+        "0x5810a2c640fa1eb3073174a2204af668b267bf79e87a5743d69a69964fd2ad37",
+        "0xdaf09bb71c72c1568eb3a7c415df8cb0850a515fae4049ca62bc25f3b0eacd9e"
+      ]
+    },
+    {
+      "account": "0x9dde9b991753aeff62f5d869e873102861cfb5cd",
+      "cumulative": "50430213792058509838348",
+      "prevCumulative": "0",
+      "proof": [
+        "0x261bb0fb2e1543c1daac9fe9b97dfeb292c7626cbf59aa29e5da4933919d5684",
+        "0x5810a2c640fa1eb3073174a2204af668b267bf79e87a5743d69a69964fd2ad37",
+        "0xdaf09bb71c72c1568eb3a7c415df8cb0850a515fae4049ca62bc25f3b0eacd9e"
+      ]
+    },
+    {
+      "account": "0xa66de81a3ea3fe97cb6c9671c3fdc93d16c89998",
+      "cumulative": "5033895338117327698260",
+      "prevCumulative": "0",
+      "proof": [
+        "0x8ec3c8e32727a9f61f08648ed6655867f78ba7bf1d675107b63a5d2b3e7702bb"
+      ]
+    },
+    {
+      "account": "0x502ce9fb1814cb03843967ec5e0d8f6aa3a3c2e1",
+      "cumulative": "55203898585737540994",
+      "prevCumulative": "0",
+      "proof": [
+        "0x08bb5d11cf9b105c2932a0b692236cb31871f0b0c7422c143f32eba781847e3d",
+        "0xd05e35d84fcaa11ef2df2287e6c332878618bf3dd8c2e0671e45fcd2903c10c6",
+        "0xdaf09bb71c72c1568eb3a7c415df8cb0850a515fae4049ca62bc25f3b0eacd9e"
+      ]
+    },
+    {
+      "account": "0xb7ecf980a4732b75e57e2ec80903dee3964f2573",
+      "cumulative": "44323560025652446909",
+      "prevCumulative": "0",
+      "proof": [
+        "0x1faea5db50fe4c6a1dd8376878300c257d192afad2b3257b0fd80bc63c4306d8",
+        "0xd05e35d84fcaa11ef2df2287e6c332878618bf3dd8c2e0671e45fcd2903c10c6",
+        "0xdaf09bb71c72c1568eb3a7c415df8cb0850a515fae4049ca62bc25f3b0eacd9e"
+      ]
+    }
+  ]
 }
