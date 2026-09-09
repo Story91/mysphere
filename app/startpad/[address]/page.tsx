@@ -47,12 +47,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const symbol = `$${safeSymbol(data.symbol)}`;
   const title = data.multiple ? `${symbol} ${data.multiple} since launch` : `${symbol} on Startpad`;
+  // Trzy stany, trzy zdania. Wersja z jednym zdaniem na "nie-Graduated"
+  // pisala o tokenie w stanie Locked "... on the curve", chociaz krzywa jest
+  // wtedy DOMKNIETA i kupic sie juz nie da. `target` szlo tu tez surowo, wiec
+  // podglad linku pokazywal "3" i "1000" zamiast kwoty.
+  const nativeSymbol = LAUNCHPAD_NETWORKS[data.chainId]?.chain.nativeCurrency.symbol ?? 'ETH';
+  const targetText = data.target.toLocaleString('en-US', {
+    maximumFractionDigits: data.target < 10 ? 2 : 0,
+  });
   const curve =
     data.state === 'Graduated'
-      ? 'Graduated to a live pool.'
-      : `${data.raised.toFixed(2)} of ${data.target} ${
-          LAUNCHPAD_NETWORKS[data.chainId]?.chain.nativeCurrency.symbol ?? 'ETH'
-        } on the curve.`;
+      ? 'Graduated to a live Uniswap v4 pool.'
+      : data.state === 'Locked'
+        ? `Curve full at ${data.raised.toFixed(2)} ${nativeSymbol}, waiting for graduation.`
+        : `${data.raised.toFixed(2)} of ${targetText} ${nativeSymbol} on the curve.`;
   const description = `${data.name} on MySphere Startpad. ${curve} ${data.holders} buyers so far.`;
 
   const url = buildShareUrl({ address: data.address, chainId: data.chainId });

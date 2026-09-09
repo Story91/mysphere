@@ -73,11 +73,12 @@ import { fetchBoardStats, pickAggregateBase } from './boardStats';
 // Jedna, ZMIERZONA rezerwa na gaz i jedna arytmetyka procentow dla obu paneli
 // handlu - mini modala na tablicy i panelu na stronie tokena. Dwie kopie tej
 // samej liczby wlasnie kosztowaly nas przyciski, ktore wpisywaly zero.
-import { fractionOf, GAS_RESERVE_WEI, spendableEth, tapeAmount, totalEarned } from './[address]/detailShared';
+import { DEFAULT_SLIPPAGE_BPS, fractionOf, GAS_RESERVE_WEI, spendableEth, tapeAmount, totalEarned } from './[address]/detailShared';
 import { fetchHolderCounts } from './blockscout';
 import LaunchTokenModal from './LaunchTokenModal';
 import ShareToken from './ShareToken';
 import StartpadFooter from './StartpadFooter';
+import { LifecycleGuide, STATE_HINT } from './LifecycleGuide';
 import { formatUsd, useEthUsd } from './useEthUsd';
 
 const FIELD =
@@ -324,7 +325,7 @@ function StatePill({ state }: { state: LaunchpadToken['state'] }) {
     Graduated: { label: 'Graduated', className: 'bg-sp-up-soft text-sp-up' },
   }[state];
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] ${meta.className}`}>
+    <span title={STATE_HINT[state]} className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] ${meta.className}`}>
       {state === 'Graduated' && <GraduationCap className="h-3 w-3" aria-hidden="true" />}
       {meta.label}
     </span>
@@ -1153,7 +1154,7 @@ function TradePanel({
           ktore licza z salda - ale samego salda nie pokazywal, wiec nie bylo od
           czego ich odniesc. Na stronie tokena stoi to od poczatku; tutaj
           brakowalo. */}
-        <span className="text-[11px] text-sp-shade/45">{ethBalance ? `Balance ${Number(formatEther(ethBalance.value)).toLocaleString('en-US', { maximumFractionDigits: 4 })} ${NATIVE_SYMBOL}` : '0.5% slippage buffer'}</span></div>
+        <span className="text-[11px] text-sp-shade/45">{ethBalance ? `Balance ${Number(formatEther(ethBalance.value)).toLocaleString('en-US', { maximumFractionDigits: 4 })} ${NATIVE_SYMBOL}` : `${(DEFAULT_SLIPPAGE_BPS / 100).toFixed(1)}% slippage buffer`}</span></div>
       <div className="mt-2 flex gap-2"><div className="relative flex-1"><input inputMode="decimal" value={buyAmount} onChange={(event) => setBuyAmount(event.target.value)} className={`${FIELD} pr-14`} /><span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[12px] font-extrabold text-sp-shade/40">{NATIVE_SYMBOL}</span></div><button type="button" disabled={busy === 'buy'} onClick={onBuy} className="inline-flex items-center gap-2 rounded-xl bg-soft-primary px-4 text-[13px] font-extrabold text-sp-on-brand disabled:opacity-60">{busy === 'buy' ? 'Buying...' : 'Buy'}<ArrowUpRight className="h-4 w-4" aria-hidden="true" /></button></div>
       <div className="mt-2 flex flex-wrap gap-1.5">
         {(['25', '50', '100'] as const).map((pct) => <button key={pct} type="button" disabled={spendable <= 0n} onClick={() => setBuyFraction(BigInt(pct), 100n)} className="rounded-full border border-sp-shade/10 px-2.5 py-1 text-[10.5px] font-bold text-sp-shade/60 hover:border-soft-primary disabled:opacity-40">{pct}%</button>)}
@@ -1171,7 +1172,7 @@ function TradePanel({
 
     {token.state === 'Locked' && <div className="mt-5 rounded-xl border border-sp-down-line bg-sp-down-soft p-3"><div className="flex items-start gap-2"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-sp-down" aria-hidden="true" /><div className="min-w-0 flex-1"><p className="text-[12px] font-extrabold text-sp-down-deep">Ready for graduation</p><p className="mt-1 text-[11px] leading-[1.4] text-sp-shade/55">Anyone can open the pool. Caller reward: {gradReward === null ? '--' : `${formatEther(gradReward)} ${NATIVE_SYMBOL}`}.</p></div><button type="button" disabled={busy === 'graduate'} onClick={onGraduate} className="rounded-full bg-sp-down px-3 py-2 text-[11px] font-extrabold text-sp-on-brand disabled:opacity-50">{busy === 'graduate' ? 'Opening...' : 'Graduate'}</button></div></div>}
 
-    {token.state === 'Graduated' && <div className="mt-5 rounded-xl bg-sp-brand-soft p-3"><div className="flex items-start gap-2"><Layers3 className="mt-0.5 h-4 w-4 shrink-0 text-soft-primary" aria-hidden="true" /><div className="min-w-0 flex-1"><p className="text-[12px] font-extrabold text-sp-ink">Live pool with hook</p><p className="mt-1 text-[11px] leading-[1.4] text-sp-shade/55">{details?.poolId && details.poolId !== `0x${'0'.repeat(64)}` ? `Pool ${details.poolId.slice(0, 10)}...` : 'Pool position is loading.'}</p></div></div><div className="mt-3 grid grid-cols-2 gap-2"><button type="button" disabled={!details?.pendingEth || busy === 'settle'} onClick={onSettle} className="rounded-lg border border-sp-shade/10 bg-sp-surface px-2 py-2 text-[11px] font-extrabold text-sp-ink disabled:opacity-40">{busy === 'settle' ? 'Settling...' : `Settle ${details ? formatEther(details.pendingEth) : '0'} ${NATIVE_SYMBOL}`}</button><button type="button" disabled={busy === 'harvest'} onClick={onHarvest} className="rounded-lg border border-sp-shade/10 bg-sp-surface px-2 py-2 text-[11px] font-extrabold text-sp-ink disabled:opacity-40">{busy === 'harvest' ? 'Harvesting...' : 'Harvest LP fees'}</button></div></div>}
+    {token.state === 'Graduated' && <div className="mt-5 rounded-xl bg-sp-brand-soft p-3"><div className="flex items-start gap-2"><Layers3 className="mt-0.5 h-4 w-4 shrink-0 text-soft-primary" aria-hidden="true" /><div className="min-w-0 flex-1"><p className="text-[12px] font-extrabold text-sp-ink">Live pool with hook</p><p className="mt-1 text-[11px] leading-[1.4] text-sp-shade/55">{details?.poolId && details.poolId !== `0x${'0'.repeat(64)}` ? `Pool ${details.poolId.slice(0, 10)}...` : 'Pool position is loading.'}</p></div></div><p className="mt-2 text-[10.5px] leading-[1.4] text-sp-shade/45">Settle books the hook&apos;s swap fees into claimable balances; Harvest pulls the pool fees the locked position earned. Both are open to anyone and pay the caller nothing.</p><div className="mt-3 grid grid-cols-2 gap-2"><button type="button" disabled={(!details?.pendingEth && !details?.pendingToken) || busy === 'settle'} onClick={onSettle} className="rounded-lg border border-sp-shade/10 bg-sp-surface px-2 py-2 text-[11px] font-extrabold text-sp-ink disabled:opacity-40">{busy === 'settle' ? 'Settling...' : details && details.pendingEth === 0n && details.pendingToken > 0n ? 'Settle token fees' : `Settle ${details ? formatEther(details.pendingEth) : '0'} ${NATIVE_SYMBOL}`}</button><button type="button" disabled={busy === 'harvest'} onClick={onHarvest} className="rounded-lg border border-sp-shade/10 bg-sp-surface px-2 py-2 text-[11px] font-extrabold text-sp-ink disabled:opacity-40">{busy === 'harvest' ? 'Harvesting...' : 'Harvest LP fees'}</button></div></div>}
 
     {isConnected && details && <div className="mt-5 border-t border-sp-shade/10 pt-4"><div className="flex items-center justify-between"><span className="text-[12px] font-extrabold text-sp-ink">Available claims</span><CheckCircle2 className="h-4 w-4 text-sp-up-vivid" aria-hidden="true" /></div><div className="mt-2 space-y-1.5">{claimRows.map((row) => <div key={row.label} className="flex items-center justify-between gap-2 text-[11px]"><span className="text-sp-shade/50">{row.label}</span><span className="flex items-center gap-2 font-extrabold text-sp-ink"><span>{row.value}</span><button type="button" disabled={row.amount === 0n} onClick={() => onClaim(row.source)} className="rounded-full border border-sp-shade/10 px-2 py-1 text-[10px] text-soft-primary-deep disabled:opacity-30">Claim</button></span></div>)}</div></div>}
   </>;
@@ -1590,7 +1591,19 @@ export default function LaunchpadBoard() {
           symbol: meta.symbol,
           creator,
           state: LAUNCH_STATE[state] as LaunchpadToken['state'],
-          raised: Number(formatEther(ethReserve)),
+          // `graduate()` ZERUJE obie rezerwy w kontrakcie (CurveLaunchpad:
+          // l.ethReserve = 0), wiec surowy odczyt kaze tokenowi, ktory wlasnie
+          // przeszedl cala droge, pokazac "0 ETH" i pusty pasek. Dokladnie to
+          // stalo sie SPHERE'owi, przypietemu na gorze tablicy.
+          //
+          // Po graduacji zbiorka jest z definicji domknieta, wiec pokazujemy
+          // prog - tak jak robi to kazdy launchpad, u ktorego pasek po
+          // graduacji stoi na 100%, a nie wraca do zera. Zastrzezenie, ktore
+          // trzeba znac: jesli ktos sprzedawal w stanie Locked, realna rezerwa
+          // w chwili awansu byla nizsza, a dokladna liczba stoi w zdarzeniu
+          // `Graduated` (ethToPool + gradFee) i tylko tam.
+          raised:
+            LAUNCH_STATE[state] === 'Graduated' ? CURVE_TARGET_ETH : Number(formatEther(ethReserve)),
           target: CURVE_TARGET_ETH,
           holders: buyers.get(token)?.size ?? 0,
           volume: activity.get(token)?.volume ?? 0,
@@ -2028,7 +2041,15 @@ export default function LaunchpadBoard() {
         return pinSphere(rows);
       }
       case 'about':
-        return pinSphere(matches.filter((token) => token.state === 'Curve').sort((a, b) => b.raised - a.raised));
+        // Locked to token, ktory ma krzywa DOMKNIETA i czeka juz tylko na
+        // `graduate()` - czyli najblizszy awansu ze wszystkich. Filtr bral
+        // sam stan Curve, wiec taki token nie pojawial sie ani tutaj, ani w
+        // "Graduated", i znikal z tablicy poza zakladki New/Trending/All.
+        return pinSphere(
+          matches
+            .filter((token) => token.state === 'Curve' || token.state === 'Locked')
+            .sort((a, b) => Number(b.state === 'Locked') - Number(a.state === 'Locked') || b.raised - a.raised)
+        );
       case 'graduated':
         return pinSphere(matches.filter((token) => token.state === 'Graduated'));
       default:
@@ -2295,7 +2316,10 @@ export default function LaunchpadBoard() {
     setNotice(null);
     try {
       const quote = await readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'quoteBuy', args: [selected.address, value] });
-      const minTokensOut = (quote[0] * 9950n) / 10_000n;
+      // Ten sam bufor, co na stronie tokena. Stalo tu 0,5% na sztywno, czyli
+      // dokladnie ta wartosc, ktora 13 sierpnia wywalala co czwarta transakcje
+      // na ruchliwej krzywej (uzasadnienie przy DEFAULT_SLIPPAGE_BPS).
+      const minTokensOut = (quote[0] * BigInt(10_000 - DEFAULT_SLIPPAGE_BPS)) / 10_000n;
       const hash = await walletClient.writeContract({
         address: LAUNCHPAD_ADDRESS as Address,
         abi: launchpadAbi,
@@ -2374,7 +2398,7 @@ export default function LaunchpadBoard() {
       }
       setBusy('sell');
       const quote = await readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'quoteSell', args: [selected.address as Address, amount] });
-      const minEthOut = (quote[0] * 9950n) / 10_000n;
+      const minEthOut = (quote[0] * BigInt(10_000 - DEFAULT_SLIPPAGE_BPS)) / 10_000n;
       const hash = await walletClient.writeContract({
         address: LAUNCHPAD_ADDRESS as Address,
         abi: launchpadAbi,
@@ -2672,6 +2696,13 @@ export default function LaunchpadBoard() {
 
         {notice && <div role="status" aria-live="polite" className={`lp-toast-in fixed right-4 top-4 z-[80] flex max-w-[min(92vw,360px)] items-start gap-2 rounded-xl border px-3.5 py-3 text-[12.5px] shadow-[0_14px_44px_rgba(0,0,0,0.18)] ${notice.kind === 'success' ? 'border-sp-up-line bg-sp-up-soft text-sp-up' : 'border-sp-down-line bg-sp-down-soft text-sp-down-deep'}`}><span className="mt-0.5">{notice.kind === 'success' ? <Check className="h-4 w-4" aria-hidden="true" /> : <Sparkles className="h-4 w-4" aria-hidden="true" />}</span><span className="min-w-0 flex-1">{notice.text}</span><button type="button" onClick={() => setNotice(null)} className="ml-1 shrink-0 opacity-50 hover:opacity-100" aria-label="Dismiss"><X className="h-3.5 w-3.5" aria-hidden="true" /></button></div>}
         {(loadingBoard || boardError) && <div className="mb-4 flex items-center gap-2 rounded-xl border border-sp-shade/10 bg-sp-surface px-3.5 py-2.5 text-[11.5px] text-sp-shade/55"><RefreshCw className={`h-3.5 w-3.5 ${loadingBoard ? 'animate-spin text-soft-primary' : 'text-sp-down'}`} aria-hidden="true" /><span suppressHydrationWarning>{loadingBoard ? `Reading Launchpad activity from ${NET}...` : `Live data unavailable. ${boardError}`}</span></div>}
+
+        {/* Przewodnik po cyklu zycia NAD rynkiem, zwiniety. Slowa "Curve",
+            "Locked" i "Graduated" stoja na kazdej karcie i do 9 wrzesnia 2026
+            nie mialy w calym interfejsie ani jednego zdania wyjasnienia -
+            jedyny opis lezal w stopce i na /Docs, do ktorego stad nie bylo
+            odnosnika. Zwiniety `details` zajmuje jeden wiersz. */}
+        <LifecycleGuide className="mb-4" />
 
         {/* Rynek na CALA szerokosc - Live tape zjechal na gorny ticker, wiec nie
             ma juz prawej kolumny; grid tokenow wypelnia caly ekran. */}

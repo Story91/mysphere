@@ -41,7 +41,12 @@ function shortAddr(address: string): string {
  * przecinku i separator tysiecy.
  */
 function curveAmount(value: number): string {
-  return value.toLocaleString('en-US', { maximumFractionDigits: value < 10 ? 2 : 0 });
+  // Trzy progi, bo ta sama funkcja pisze i 0.045, i 6250. Przy dwoch miejscach
+  // po przecinku nagroda za `graduate()` (1,5% z 3) wychodzila "0.05" - liczba
+  // ladna, ale nieprawdziwa i nie do odnalezienia w zdarzeniu na lancuchu.
+  return value.toLocaleString('en-US', {
+    maximumFractionDigits: value < 1 ? 3 : value < 100 ? 2 : 0,
+  });
 }
 
 /* Krok cyklu zycia - chip z podpisem. Strzalki rysuje rodzic. */
@@ -151,7 +156,7 @@ export default function StartpadFooter() {
             </>
           )}{' '}
           The launchpad sells it on a bonding curve, and at exactly{' '}
-          <strong className="text-sp-ink">3.00 {NATIVE_SYMBOL}</strong> raised the token graduates into a
+          <strong className="text-sp-ink">{curveAmount(CURVE_TARGET_ETH)} {NATIVE_SYMBOL}</strong> raised the token graduates into a
           Uniswap v4 pool whose liquidity is locked forever. No admin keys, no upgrades: every rule
           below is fixed in immutable contracts, and all payouts are claim-based, in {NATIVE_SYMBOL}.
           {isB20
@@ -162,13 +167,13 @@ export default function StartpadFooter() {
 
       {/* ===== CYKL ZYCIA - diagram z dossiera ===== */}
       <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-stretch sm:gap-3">
-        <Step title="1 · Launch" note="One transaction. The network mints the token, the curve gets the full supply. Optional pre-buy on the same curve as everyone." />
+        <Step title="1 · Launch" note={`One transaction. ${isB20 ? 'The network mints the token' : 'The launchpad factory deploys the token'}, the curve gets the full supply. Optional pre-buy on the same curve as everyone.`} />
         <Arrow />
-        <Step title="2 · Curve" note="Buy and sell against the curve. 1% trading fee. Price rises with every buy along a constant-product curve." />
+        <Step title="2 · Curve" note="Buy and sell against the curve. Trading fee up to 1%, fixed by the creator at launch. Price rises with every buy along a constant-product curve." />
         <Arrow />
-        <Step title="3 · Locked" note={`Reserve hits exactly 3.00 ${NATIVE_SYMBOL}. Buys revert, sells still work. The token waits for graduation.`} />
+        <Step title="3 · Locked" note={`Reserve hits ${curveAmount(CURVE_TARGET_ETH)} ${NATIVE_SYMBOL}. Buys revert, sells still work. The token waits for graduation.`} />
         <Arrow />
-        <Step title="4 · Graduated" note={`Anyone may call graduate() and earns 0.045 ${NATIVE_SYMBOL} for it. Liquidity moves to a Uniswap v4 pool at the exact closing price.`} />
+        <Step title="4 · Graduated" note={`Anyone may call graduate() and earns 1.5% of the reserve, ${curveAmount(CURVE_TARGET_ETH * 0.015)} ${NATIVE_SYMBOL} off a full curve. Liquidity moves to a Uniswap v4 pool at the exact closing price.`} />
       </div>
 
       <div className="mt-6">
@@ -180,7 +185,10 @@ export default function StartpadFooter() {
                 {[
                   ['Total supply (minted once, to the curve)', '1,000,000,000'],
                   ['Sold on the curve', 'up to 800,000,000 (80%)'],
-                  ['Moved to the pool at graduation', '200,000,000 (20%)'],
+                  // Do puli wchodzi tyle tokenow, ile v4 przyjmie po stronie ETH przy
+                  // cenie zamkniecia - okolo 155M. Reszta z 200M idzie na 0x...dEaD.
+                  // Stalo tu "200,000,000 (20%)" i to bylo po prostu nieprawda.
+                  ['Moved to the pool at graduation', '~155,000,000 (~15.5%), the rest to 0x…dEaD'],
                   ['Starting market cap', `${curveAmount(R_VIRT_NATIVE)} ${NATIVE_SYMBOL}`],
                   ['Graduation trigger', `reserve = ${curveAmount(CURVE_TARGET_ETH)} ${NATIVE_SYMBOL} exactly`],
                   ['Market cap at graduation', `${curveAmount(R_VIRT_NATIVE * 25)} ${NATIVE_SYMBOL} (25×)`],
@@ -214,16 +222,21 @@ export default function StartpadFooter() {
               <p className="text-[12px] font-extrabold text-sp-ink">Graduation · 3% of reserve, once</p>
               <SplitBar creator={50} protocol={50} />
               <p className="mt-2 text-[11.5px] text-sp-shade/55">
-                0.09 {NATIVE_SYMBOL} total: half to whoever calls graduate(), half to the protocol. The remaining
-                ~2.91 {NATIVE_SYMBOL} plus 200M tokens become the locked pool.
+                {curveAmount(CURVE_TARGET_ETH * 0.03)} {NATIVE_SYMBOL} off a full curve: half to whoever calls graduate(), half to the
+                protocol. The remaining ~{curveAmount(CURVE_TARGET_ETH * 0.97)} {NATIVE_SYMBOL} and about 155M tokens become the
+                locked pool. Sells during Locked lower the reserve, so the fee and the reward
+                scale down with it.
               </p>
             </div>
             <div className="rounded-xl border border-sp-shade/10 bg-sp-surface p-3">
-              <p className="text-[12px] font-extrabold text-sp-ink">Pool swap · 1% hook fee</p>
+              <p className="text-[12px] font-extrabold text-sp-ink">Pool swap · 1.3% total</p>
               <SplitBar creator={70} protocol={30} />
               <p className="mt-2 text-[11.5px] text-sp-shade/55">
-                Protocol always receives its full 30%. The creator&apos;s 70% is split by the
-                creator&apos;s own launch-time choice between “paid to me in {NATIVE_SYMBOL}” and the auto-buyback.
+                A swap pays 0.30% to the pool&apos;s own liquidity and 1% to the hook. Both streams
+                split the same way and the protocol always receives its full 30%. The creator&apos;s
+                70% of the hook fee is split by the creator&apos;s own launch-time choice between
+                “paid to me in {NATIVE_SYMBOL}” and the auto-buyback; the 0.30% accrues to the
+                locked LP position and is collected with Harvest.
               </p>
             </div>
           </div>
@@ -231,7 +244,7 @@ export default function StartpadFooter() {
             Auto-buyback is funded only from the creator&apos;s share: at a 50% setting, of a 1% swap
             fee 0.30% goes to the protocol, 0.35% buys &amp; burns the token (sent to 0x…dEaD), 0.35%
             is paid to the creator. Anyone may execute a pending buyback; price impact per execution
-            is capped, so it cannot be used to sandwich the pool.
+            is capped at 1.5%, which limits what a sandwich can take but does not remove it.
           </p>
         </DocSection>
 
@@ -253,7 +266,7 @@ export default function StartpadFooter() {
           <ul className="list-disc space-y-1 pl-5">
             <li><strong className="text-sp-ink">The token cannot be inflated.</strong> It is born with supply cap = total supply and no MINT role held by anyone. The launchpad verifies this on-chain in the launch transaction and reverts if it is not true.</li>
             <li><strong className="text-sp-ink">No roles anywhere.</strong> No owner, no pauser, no upgrader on the token, the launchpad, the vault or the hook. The fee caps bind us too.</li>
-            <li><strong className="text-sp-ink">LP is locked forever.</strong> The vault&apos;s only path to the pool has the liquidity change hard-coded to zero: it can harvest fees, never withdraw capital.</li>
+            <li><strong className="text-sp-ink">LP is locked, not burned.</strong> The vault adds liquidity once, at graduation; its only other path to the pool passes a literal zero. It can harvest fees, never withdraw capital, and no function anywhere takes a negative liquidity change from anyone.</li>
             <li><strong className="text-sp-ink">Pull payments only.</strong> You claim your {NATIVE_SYMBOL}; nothing is pushed. Anyone may pay gas to deliver your balance to you, never to themselves.</li>
             <li><strong className="text-sp-ink">What this is not:</strong> most tokens here will never trade meaningfully, a curve token has no external chart until it graduates, and nothing on this page is a recommendation.</li>
           </ul>

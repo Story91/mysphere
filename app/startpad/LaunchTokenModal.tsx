@@ -46,6 +46,7 @@ import {
   LAUNCHPAD_ADDRESS,
   LAUNCHPAD_CHAIN,
   LAUNCHPAD_TOKEN_STANDARD,
+  R_VIRT_NATIVE,
   hookAbi,
   launchpadAbi,
   type LaunchpadToken,
@@ -416,7 +417,10 @@ export default function LaunchTokenModal({
   });
   // Stale krzywej sluza WYLACZNIE do podgladu pre-buya. Liczba wiazaca jest
   // zawsze ta z lancucha - tu pokazujemy szacunek, nie obietnice.
-  const [curve, setCurve] = useState({ t0: TOTAL_SUPPLY_TOKENS, rVirt: 0.75 });
+  // Skala startowa z KONFIGURACJI SIECI, nie stala 0.75: na Arc `R_VIRT` to
+  // 250, wiec zaszyta wartosc Base wyceniala pierwszy render pre-buya na
+  // krzywej innej sieci. Odczyt z lancucha i tak ja zaraz nadpisze.
+  const [curve, setCurve] = useState({ t0: TOTAL_SUPPLY_TOKENS, rVirt: R_VIRT_NATIVE });
   // T0 w wei - dokladna wartosc windowCap przy wylaczonej ochronie. Porownania
   // robimy na bigintach, zeby float nie zgubil koncowki i nie odbil sie na
   // lancuchu o jeden wei.
@@ -2177,12 +2181,18 @@ export default function LaunchTokenModal({
                             ))}
                           </tbody>
                         </table>
-                        <p className="mt-2 text-[12px] font-extrabold text-sp-up">Creator earnings are paid in {NATIVE_SYMBOL}, not tokens.</p>
+                        {/* "Paid in ETH, not tokens" bylo prawda TYLKO na krzywej.
+                            Po graduacji hook i vault naliczaja takze strone
+                            tokenowa, a strona tokena pokazuje ja wprost w
+                            wierszach "Hook <SYM>" i "Vault <SYM>". */}
+                        <p className="mt-2 text-[12px] font-extrabold text-sp-up">Curve earnings are paid in {NATIVE_SYMBOL}. After graduation the pool pays you in both {NATIVE_SYMBOL} and your token.</p>
                         <span className={HINT}>
                           Curve earnings are exact for the fee you picked. Pool earnings assume the hook&apos;s{' '}
                           {(hookSplit.feeBps / 100).toFixed(2)}% swap fee and your{' '}
                           {((10_000 - hookSplit.protocolShareBps) / 100).toFixed(0)}% share of it, after your{' '}
-                          {Number(buybackPct) || 0}% buyback allocation.
+                          {Number(buybackPct) || 0}% buyback allocation. They leave out a second stream you also
+                          earn: the pool&apos;s own 0.30% fee on every swap, which accrues to the locked position
+                          and is split the same way, so the real figure is higher than the one shown.
                         </span>
                       </div>
                     </fieldset>

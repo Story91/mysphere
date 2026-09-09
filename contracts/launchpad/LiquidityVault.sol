@@ -73,7 +73,10 @@ interface ILiquidityVault {
  * token zaczyna zyc. Odczyt z mainnetu pokazal, ze `modifyLiquidity` z delta 0
  * zwraca same narosle oplaty (feesAccrued0 = 99999999999999 po jednym swapie).
  * Ta konstrukcja daje wiec jedno i drugie naraz: kapitalu nie da sie ruszyc,
- * a oplaty plyna - dzielone 60/40 miedzy protokol i tworce, w ETH i w tokenie.
+ * a oplaty plyna - dzielone wedlug `PROTOCOL_SHARE_BPS` miedzy protokol i
+ * tworce, w ETH i w tokenie. Kazde wdrozenie do tej pory ustawilo 3000, czyli
+ * 30% protokol i 70% tworca; stalo tu "60/40" z czasow przed zmiana proporcji
+ * i bylo to juz nieprawda o samym sobie.
  *
  * ===========================================================================
  * ZERO PUSHA
@@ -210,7 +213,7 @@ contract LiquidityVault is IUnlockCallback {
     /** Zapadka jednokierunkowa: drugi `seed` tego samego tokena rewertuje. */
     mapping(address => bool) public seeded;
 
-    /** Komu naliczyc 40% oplat LP. Zapisane raz, przy zasileniu. */
+    /** Komu naliczyc dzialke tworcy z oplat LP. Zapisane raz, przy zasileniu. */
     mapping(address => address) public creatorOf;
 
     mapping(address => uint256) public claimableEth;
@@ -342,8 +345,8 @@ contract LiquidityVault is IUnlockCallback {
 
         // Hook dostaje odbiorce oplaty i udzial protokolu wlasnymi argumentami
         // (patrz uzasadnienie w jego konstruktorze), wiec da sie je przekrecic
-        // niezaleznie od tego, co ma vault. Tu sie to zamyka: dwa "60/40"
-        // w jednym systemie nie przejda przez deploy.
+        // niezaleznie od tego, co ma vault. Tu sie to zamyka: dwa rozne
+        // podzialy oplat w jednym systemie nie przejda przez deploy.
         if (B20LaunchHook(payable(hook)).FEE_RECIPIENT() != feeRecipient_) revert HookConfigMismatch();
         if (B20LaunchHook(payable(hook)).PROTOCOL_SHARE_BPS() != protocolShareBps_) revert HookConfigMismatch();
         // PoolManager tez. Hook wola `take` na SWOIM adresie, wiec rozjazd
@@ -556,7 +559,8 @@ contract LiquidityVault is IUnlockCallback {
     /* ---------------------------------------------------------------------- */
 
     /**
-     * Sciaga narosle oplaty LP i ksieguje je 60/40.
+     * Sciaga narosle oplaty LP i ksieguje je wedlug `PROTOCOL_SHARE_BPS`
+     * (dotad zawsze 30% protokol / 70% tworca).
      *
      * Wolac moze ktokolwiek i nie dostaje za to nic - kierunek ksiegowania jest
      * zaszyty (`FEE_RECIPIENT` immutable, `creatorOf[token]` zapisane przy
