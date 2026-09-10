@@ -2,7 +2,7 @@ import { getAbiItem, type Address } from 'viem';
 import { ACTIVE_LAUNCHPAD_NETWORK } from '../config';
 import { poolPriceWeiFromSqrt } from './poolPrice';
 import type { TradeEntry } from './detailShared';
-import { tradeId, type ScanClient, type ScanLog } from './historyScan';
+import { parseTrades, tradeId, type ScanLog } from './historyScan';
 
 /**
  * HISTORIA CEN PO GRADUACJI - ze swapow w puli Uniswap v4.
@@ -75,42 +75,49 @@ export function swapLogToTrade(log: ScanLog, decimals: number, ts: number): Trad
 export type PoolScanOptions = {
   poolId: `0x${string}`;
   decimals: number;
+  /** Podloga skanu: blok graduacji. */
   fromBlock: bigint;
+  /** Gorny koniec; serwer i tak nie wyjdzie ponad glowe lancucha. */
   toBlock: bigint;
-  estTs: (block: bigint) => number;
+  /** Start tokena - serwer nie datuje transakcji wczesniej. */
+  startedAt: number;
 };
 
 /**
- * Wszystkie swapy puli w [fromBlock, toBlock], oknami wielkosci skanu sieci.
- * Puli zaklada sie nie wiecej niz kilka tysiecy blokow po graduacji, wiec
- * to zwykle jedno-dwa zapytania; sufit okien chroni przed odjechaniem, gdy
- * ktos otworzy strone tygodnie pozniej z pusta migawka.
+ * Swapy puli - z serwerowej trasy `/api/launchpad/pool-swaps`.
+ *
+ * Do 10.09.2026 ten skan chodzil TUTAJ, w przegladarce: 90 kolejnych
+ * `getLogs` po 2 000 blokow na PoolManagerze, z publicznego RPC. Nie konczyl
+ * sie w rozsadnym czasie, a jego bledy ladowaly w cichym `catch` - efekt byl
+ * taki, ze zakladka "Trades" na zgraduowanym $SPHERE pokazywala 74 transakcje
+ * z krzywej i ani jednej z 2 562 swapow puli z ostatnich osmiu dni.
+ *
+ * Skan robi teraz serwer, tym samym wezlem CDP co historia krzywej, od
+ * najnowszych blokow w dol, a odpowiedz stoi w cache'u brzegowym. Klient
+ * dostaje gotowe wiersze w tym samym kodowaniu, co historia krzywej.
  */
-export async function scanPoolSwaps(client: ScanClient, opts: PoolScanOptions): Promise<TradeEntry[]> {
-  // Okno mniejsze niz skan krzywej (9 500 na Base): PoolManager to najbardziej
-  // ruchliwy kontrakt sieci i publiczny RPC odbija szerokie zapytania 413,
-  // nawet z filtrem po temacie. 800 blokow schodzi w ~0.6 s; 2 000 to 3-4
-  // zapytania od graduacji do teraz.
-  const window = 2_000n;
-  const maxWindows = ACTIVE_LAUNCHPAD_NETWORK.maxScanWindows;
-  const out: TradeEntry[] = [];
-  let from = opts.fromBlock;
-  let windows = 0;
-  while (from <= opts.toBlock && windows < maxWindows) {
-    const to = from + window - 1n < opts.toBlock ? from + window - 1n : opts.toBlock;
-    const logs = await client.getLogs({
-      address: ACTIVE_LAUNCHPAD_NETWORK.poolManager,
-      event: POOL_SWAP_EVENT,
-      args: { id: opts.poolId },
-      fromBlock: from,
-      toBlock: to,
-    });
-    for (const log of logs) {
-      const trade = swapLogToTrade(log, opts.decimals, opts.estTs(log.blockNumber ?? to));
-      if (trade) out.push(trade);
-    }
-    from = to + 1n;
-    windows += 1;
+export async function scanPoolSwaps(opts: PoolScanOptions): Promise<{ trades: TradeEntry[]; scannedFrom: bigint }> {
+  const query = new URLSearchParams({
+    chainId: String(ACTIVE_LAUNCHPAD_NETWORK.chain.id),
+    poolId: opts.poolId,
+    decimals: String(opts.decimals),
+    fromBlock: opts.fromBlock.toString(),
+    toBlock: opts.toBlock.toString(),
+    startedAt: String(opts.startedAt),
+  });
+  // Sufit czasu jak przy historii krzywej: dluzsze czekanie przestaje byc
+  // przyspieszeniem, a strona ma sie zbudowac z tego, co juz jest.
+  const response = await fetch(`/api/launchpad/pool-swaps?${query.toString()}`, {
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!response.ok) throw new Error(`Pool swaps route responded ${response.status}.`);
+  const data = (await response.json()) as { swaps?: unknown[]; scannedFrom?: string };
+  const trades = parseTrades(Array.isArray(data.swaps) ? data.swaps : []);
+  let scannedFrom = opts.toBlock + 1n;
+  try {
+    if (typeof data.scannedFrom === 'string') scannedFrom = BigInt(data.scannedFrom);
+  } catch {
+    /* zostaje wartosc zachowawcza: nic nie uznajemy za pokryte */
   }
-  return out;
+  return { trades, scannedFrom };
 }

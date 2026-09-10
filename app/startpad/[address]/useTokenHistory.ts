@@ -140,7 +140,10 @@ export function useTokenHistory(
   const readClient = usePublicClient({ chainId: LAUNCHPAD_CHAIN.id });
   const [state, setState] = useState<TokenHistory>(EMPTY);
   /** Najwyzszy blok, z ktorego mamy juz swapy puli; null = jeszcze nie skanowane. */
-  const poolCoverage = useRef<bigint | null>(null);
+  // Pokrycie swapow puli jako PRZEDZIAL, nie pojedynczy blok. Sam gorny
+  // koniec klamal: skan urwany sufitem okien i tak zapisywal glowe lancucha
+  // jako pokryta, wiec luka po srodku nie zasklepiala sie nigdy.
+  const poolCoverage = useRef<{ from: bigint; to: bigint } | null>(null);
 
   /**
    * Ostatnio ZNANY stan pokrycia: do ktorego bloku mamy historie i czy mamy ja
@@ -417,10 +420,13 @@ export function useTokenHistory(
   }, []);
 
   /**
-   * BACKFILL SWAPOW PULI. Po zaladowaniu historii krzywej (z cache albo ze
-   * skanu) dociagamy swapy puli od ostatniej transakcji krzywej do glowy
-   * lancucha i scalamy pod tym samym kluczem txHash-logIndex. Kolejne
-   * wywolania (po `reload`) biora tylko to, co powyzej `poolCoverage`.
+   * BACKFILL SWAPOW PULI, dwukierunkowy.
+   *
+   * Najpierw domykamy gore (od konca pokrycia do glowy lancucha), bo tam sa
+   * transakcje, po ktore ludzie tu przychodza. Potem, jesli zostal budzet
+   * okien, schodzimy w dol ku graduacji. Pokrycie rozszerza sie o tyle, ile
+   * skan NAPRAWDE objal - `scanPoolSwaps` zwraca `scannedFrom`, wiec urwanie
+   * na sufcie okien zostawia dziure zapamietana, a nie zamieciona.
    */
   const backfillPool = useCallback(async () => {
     if (!readClient || !tokenAddress || !hasPool(poolId)) return;
@@ -429,34 +435,55 @@ export function useTokenHistory(
     const headTs = Number(head.timestamp);
     const estTs = (block: bigint) => Math.max(startedAt ?? 0, headTs - Number(headBlock - block) * SECONDS_PER_BLOCK);
 
-    let from: bigint;
-    if (poolCoverage.current !== null) {
-      from = poolCoverage.current + 1n;
+    // Podloga skanu: pierwszy swap puli nie moze byc wczesniej niz ostatnia
+    // transakcja krzywej (graduacja zamyka krzywa, dopiero potem otwiera pule).
+    let floor: bigint;
+    const curveTrades = state.trades.filter((trade) => trade.ethReserveAfter > 0n);
+    const lastCurveBlock = curveTrades.length ? curveTrades[curveTrades.length - 1].block : 0n;
+    if (lastCurveBlock > 0n) {
+      floor = lastCurveBlock;
+    } else if (state.graduatedTs !== null) {
+      const age = BigInt(Math.max(0, Math.floor((headTs - state.graduatedTs) / SECONDS_PER_BLOCK)));
+      floor = headBlock > age + LAUNCH_BLOCK_MARGIN ? headBlock - age - LAUNCH_BLOCK_MARGIN : 0n;
     } else {
-      // Pierwszy swap puli nie moze byc wczesniej niz ostatnia transakcja
-      // krzywej (graduacja zamyka krzywa, dopiero potem otwiera pule).
-      const curveTrades = state.trades.filter((trade) => trade.ethReserveAfter > 0n);
-      const lastCurveBlock = curveTrades.length ? curveTrades[curveTrades.length - 1].block : 0n;
-      if (lastCurveBlock > 0n) {
-        from = lastCurveBlock;
-      } else if (state.graduatedTs !== null) {
-        const age = BigInt(Math.max(0, Math.floor((headTs - state.graduatedTs) / SECONDS_PER_BLOCK)));
-        from = headBlock > age + LAUNCH_BLOCK_MARGIN ? headBlock - age - LAUNCH_BLOCK_MARGIN : 0n;
-      } else {
-        return;
-      }
+      return;
     }
-    if (from > headBlock) return;
 
-    try {
-      const swaps = await scanPoolSwaps(readClient, {
+    const scan = async (fromBlock: bigint, toBlock: bigint) => {
+      if (fromBlock > toBlock) return null;
+      return scanPoolSwaps({
         poolId: poolId as `0x${string}`,
         decimals,
-        fromBlock: from,
-        toBlock: headBlock,
-        estTs,
+        fromBlock,
+        toBlock,
+        startedAt: startedAt ?? 0,
       });
-      poolCoverage.current = headBlock;
+    };
+
+    try {
+      const covered = poolCoverage.current;
+      // 1. Gora: od konca pokrycia (albo od glowy, gdy pokrycia nie ma) w dol.
+      const topFrom = covered ? covered.to + 1n : floor;
+      const top = await scan(topFrom, headBlock);
+      let next = covered
+        ? { from: covered.from, to: headBlock > covered.to ? headBlock : covered.to }
+        : top
+          ? { from: top.scannedFrom, to: headBlock }
+          : null;
+      let swaps = top?.trades ?? [];
+
+      // 2. Dol: dociagamy starsze, dopoki nie dojdziemy do podlogi. Jedno
+      //    wywolanie schodzi tyle, ile pozwoli sufit okien; reszta przy
+      //    nastepnym odswiezeniu strony.
+      if (next && next.from > floor) {
+        const deeper = await scan(floor, next.from - 1n);
+        if (deeper) {
+          swaps = swaps.concat(deeper.trades);
+          next = { from: deeper.scannedFrom, to: next.to };
+        }
+      }
+
+      if (next) poolCoverage.current = next;
       if (swaps.length === 0) return;
       setState((prev) => ({ ...prev, trades: mergeTrades(prev.trades, swaps) }));
     } catch {
@@ -483,8 +510,11 @@ export function useTokenHistory(
         if (trade) fresh.push(trade);
       }
       if (fresh.length === 0) return;
+      // Zywe zdarzenie przesuwa GORNY koniec pokrycia; dolny zostaje, bo
+      // backfill moze wciaz schodzic ku graduacji.
       const top = fresh.reduce((m, t) => (t.block > m ? t.block : m), 0n);
-      if (poolCoverage.current !== null && top > poolCoverage.current) poolCoverage.current = top;
+      const covered = poolCoverage.current;
+      if (covered !== null && top > covered.to) poolCoverage.current = { from: covered.from, to: top };
       setState((prev) => {
         const seen = new Set(prev.trades.map((trade) => trade.id));
         const add = fresh.filter((trade) => !seen.has(trade.id));

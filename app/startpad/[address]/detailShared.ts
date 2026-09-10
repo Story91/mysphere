@@ -265,13 +265,35 @@ export type Candle = { time: number; open: number; high: number; low: number; cl
  * wykresie gieldowym; puste kubelki sa pomijane, lightweight-charts sam
  * zostawia w tym miejscu przerwe.
  */
+/**
+ * Swiece z punktow cenowych, Z WYPELNIENIEM PUSTYCH OKRESOW.
+ *
+ * lightweight-charts rozstawia slupki po INDEKSIE, nie po czasie: dwie swiece
+ * obok siebie wygladaja na sasiednie minuty takze wtedy, gdy dzieli je szesc
+ * godzin ciszy. Do 10.09.2026 budowalismy swiece wylacznie tam, gdzie byla
+ * transakcja, wiec wykres sciskal noc do jednego slupka i klamal o tempie
+ * handlu - obok DexScreenera, ktory rysuje kazdy okres, wygladalo to na
+ * zepsute. Puste okresy dostaja teraz plaska swiece na ostatniej cenie, czyli
+ * dokladnie to, co robi kazda gielda.
+ */
 export function buildCandles(points: PricePoint[], intervalSec: number): Candle[] {
   const candles: Candle[] = [];
+  // Sufit na wypadek starego rynku ogladanego w 1m (20 000 swiec to ~14 dni
+  // minutowych). Powyzej i tak trzeba zmienic interwal, zeby cokolwiek zobaczyc.
+  const MAX_CANDLES = 20_000;
   for (const point of points) {
     const bucket = Math.floor(point.ts / intervalSec) * intervalSec;
     const last = candles[candles.length - 1];
-    if (!last || bucket > last.time) {
-      const open = last ? last.close : point.price;
+    if (!last) {
+      candles.push({ time: bucket, open: point.price, high: point.price, low: point.price, close: point.price });
+      continue;
+    }
+    if (bucket > last.time) {
+      for (let t = last.time + intervalSec; t < bucket && candles.length < MAX_CANDLES; t += intervalSec) {
+        const close = candles[candles.length - 1].close;
+        candles.push({ time: t, open: close, high: close, low: close, close });
+      }
+      const open = candles[candles.length - 1].close;
       candles.push({
         time: bucket,
         open,

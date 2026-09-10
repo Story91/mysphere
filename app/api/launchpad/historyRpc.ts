@@ -63,7 +63,21 @@ export function rpcCandidates(
   const name = ENV_BY_CHAIN[chainId];
   const configured = name ? env[name]?.trim() : undefined;
 
-  const queue: (string | undefined)[] = configured ? [configured, undefined] : [undefined];
+  // Wezel CDP z klucza OnchainKit, gdy nie ma osobnej zmiennej.
+  //
+  // Ten sam fallback ma hardhat.config od 2.09.2026 i z tego samego powodu:
+  // publiczny RPC Base odbija `eth_getLogs` na PoolManagerze bledem 413 juz
+  // przy oknie 5 000 blokow, wiec trasa bez wlasnego wezla nie jest w stanie
+  // przeczytac historii puli. Klucz i tak siedzi w tym samym pliku srodowiska
+  // (uzywa go caly frontend), wiec brak `BASE_RPC_URL` nie musi znaczyc "tylko
+  // publiczny".
+  const cdpKey = chainId === 8453 ? env.NEXT_PUBLIC_ONCHAINKIT_API_KEY?.replace(/["']/g, "").trim() : undefined;
+  const cdp = cdpKey ? `https://api.developer.coinbase.com/rpc/v1/base/${cdpKey}` : undefined;
+
+  const queue: (string | undefined)[] = [];
+  if (configured) queue.push(configured);
+  if (cdp && cdp !== configured) queue.push(cdp);
+  queue.push(undefined);
 
   // Pierwszy adres sieci jest juz reprezentowany przez `undefined`, wiec
   // dokladamy wylacznie te dalsze - i tylko rozne od wlasnego endpointu.

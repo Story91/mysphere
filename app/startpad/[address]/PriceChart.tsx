@@ -56,6 +56,12 @@ const CHART =
 // 0,1 s. Zdanie tlumaczy, skad na wykresie biora sie czasy, wiec nie moze klamac.
 const SECONDS_PER_BLOCK = ACTIVE_LAUNCHPAD_NETWORK.secondsPerBlock;
 
+/**
+ * Ile slupkow widac po otwarciu. Tyle, co domyslny widok gieldy - reszta
+ * historii czeka po lewej dla tego, kto przewinie.
+ */
+const VISIBLE_BARS = 180;
+
 const UP = CHART.up;
 const DOWN = CHART.down;
 
@@ -95,6 +101,13 @@ export default function PriceChart({
   const modRef = useRef<ChartModule | null>(null);
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | ISeriesApi<'Line'> | null>(null);
   const [ready, setReady] = useState(false);
+  // Klucz widoku, dla ktorego juz ustawilismy zakres osi czasu. Zmiana
+  // interwalu/stylu/trybu przestawia widok; sam naplyw nowych swiec NIE, bo
+  // inaczej kazde odswiezenie wyrywaloby uzytkownika z miejsca, w ktore sam
+  // sie przewinal.
+  const rangeKey = useRef<string | null>(null);
+  /** Ile slupkow mial wykres w poprzednim przebiegu - do wykrycia prawej krawedzi. */
+  const prevBars = useRef(0);
   const [chartError, setChartError] = useState(false);
   // null = wybor automatyczny; user nadpisuje raz i jego wybor zostaje.
   const [intervalSec, setIntervalSec] = useState<IntervalSec | null>(null);
@@ -187,6 +200,11 @@ export default function PriceChart({
     const chart = chartRef.current;
     const mod = modRef.current;
     if (!ready || !chart || !mod) return;
+    // Zakres SPRZED podmiany danych. `setData` w lightweight-charts sam
+    // przestawia os czasu na cala zawartosc - bez tej migawki kazde
+    // odswiezenie (co 30 s albo po zywej transakcji) wyrzucaloby widok z
+    // powrotem na cala historie scisnieta do szerokosci ekranu.
+    const beforeRange = seriesRef.current ? chart.timeScale().getVisibleLogicalRange() : null;
     if (seriesRef.current) {
       chart.removeSeries(seriesRef.current);
       seriesRef.current = null;
@@ -235,8 +253,47 @@ export default function PriceChart({
         ]);
       }
     }
-    chart.timeScale().fitContent();
-  }, [ready, effStyle, mode, candles, linePoints, graduatedTs]);
+    // DOMYSLNE OKNO: ostatnie VISIBLE_BARS slupkow, nie cala historia.
+    //
+    // `fitContent()` upychal wszystko na jednym ekranie - przy 1m i osmiu
+    // dniach zycia tokena to ponad 11 000 swiec, kazda ponizej piksela.
+    // Wykres wygladal jak kreska z klaksem po prawej. Kazda gielda pokazuje
+    // okno ostatnich kilkuset slupkow i pozwala odjechac w lewo; robimy tak
+    // samo, a przy krotkiej historii zostaje `fitContent`.
+    const bars = effStyle === 'candles' ? candles.length : linePoints.length;
+    const key = `${effStyle}|${mode}|${effInterval}`;
+    // Przelaczenie interwalu/stylu/trybu zawsze wraca na swiezy koniec.
+    const switched = rangeKey.current !== key;
+    rangeKey.current = key;
+    // "Stoi przy prawej krawedzi" = przed podmiana danych widzial ostatni
+    // slupek. Kto odjechal w lewo, ma tam zostac.
+    const atRightEdge = !beforeRange || beforeRange.to >= prevBars.current - 2;
+
+    const applyRange = () => {
+      // Wykres mogl w miedzyczasie zniknac (przelaczenie na DexScreener,
+      // odmontowanie strony) - wtedy nie ma czego ustawiac.
+      if (chartRef.current !== chart) return;
+      if (bars <= VISIBLE_BARS) {
+        chart.timeScale().fitContent();
+      } else if (switched || atRightEdge) {
+        // Prawy margines na kilka slupkow, zeby swieza swieca nie kleila sie
+        // do krawedzi - tak samo jak `rightOffset` na gieldach.
+        chart.timeScale().setVisibleLogicalRange({ from: bars - VISIBLE_BARS, to: bars + 3 });
+      } else if (beforeRange) {
+        chart.timeScale().setVisibleLogicalRange(beforeRange);
+      }
+    };
+
+    // DWA RAZY, i to nie z ostroznosci. Przy pierwszym renderze kontener ma
+    // jeszcze zerowa szerokosc (`autoSize` czeka na ResizeObserver), a os
+    // czasu bez wymiarow nie przyjmuje zakresu - `getVisibleLogicalRange()`
+    // oddaje wtedy `null` i ustawienie przepada. Drugie podejscie leci po
+    // ulozeniu layoutu i to ono decyduje.
+    applyRange();
+    const raf = requestAnimationFrame(applyRange);
+    prevBars.current = bars;
+    return () => cancelAnimationFrame(raf);
+  }, [ready, effStyle, mode, effInterval, candles, linePoints, graduatedTs]);
 
   return (
     <section className="rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
