@@ -1,5 +1,6 @@
 'use client';
 
+import StartpadTicker from '../startpad/StartpadTicker';
 import { useState, useRef, useEffect, useCallback, useMemo, Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import PremiumComposer, { EMPTY_PREMIUM, type PremiumComposerValue } from '../components/monetization/PremiumComposer';
@@ -34,7 +35,6 @@ import {
 import { doc, updateDoc, serverTimestamp, getDoc, setDoc, increment } from 'firebase/firestore';
 import { Post, Stats } from '../types';
 import { UserRank } from '../utils/ranking';
-import Script from 'next/script';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import BanMessage from '../admin/components/BanMessage';
@@ -111,12 +111,6 @@ import { ROBINHOOD_CHAIN_ID } from './Robinhood/config/RobinhoodNetworkConfig';
 declare global {
   namespace JSX {
     interface IntrinsicElements {
-      'gecko-coin-price-marquee-widget': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & {
-        locale?: string;
-        outlined?: string;
-        'coin-ids'?: string;
-        'initial-currency'?: string;
-      };
     }
   }
 }
@@ -3157,7 +3151,6 @@ function BaseChatContent() {
 
 
       <BanPage>
-        <Script src="https://widgets.coingecko.com/gecko-coin-price-marquee-widget.js" />
         
         {/* Komunikat powitalny dla użytkowników z linku referalowego */}
         {showWelcomeMessage && (
@@ -3194,24 +3187,12 @@ function BaseChatContent() {
           <div className={`relative z-10 ${isAppleDevice ? 'reduce-animation' : ''}`}>
             {/* Widgets */}
             <div className="w-full space-y-1">
-              <div className="w-full bg-soft-surface border-b border-soft-line py-1">
-                <gecko-coin-price-marquee-widget
-                  locale="en"
-                  outlined="true"
-                  coin-ids="bitcoin,ethereum,binancecoin,ripple,cardano,solana,polkadot,dogecoin"
-                  initial-currency="usd"
-                />
-              </div>
-              {/* Second marquee disabled
-              <div className="w-full bg-white/[.02] py-1">
-                <gecko-coin-price-marquee-widget 
-                  locale="en" 
-                  outlined="true"
-                  coin-ids="official-trump,american-coin,maga,ondo-finance,fartcoin,department-of-government-efficiency,ai16z,dogelon-mars,jupiter-exchange-solana,dogecoin,griffain,virtual-protocol,aixbt" 
-                  initial-currency="usd"
-                />
-              </div>
-              */}
+              {/* Pasek zdarzen Startpada zamiast kursow z CoinGecko.
+                  Tamten widget pokazywal bitcoina, solane i dogecoina - rzeczy,
+                  na ktore nie mamy wplywu i o ktorych nie mamy nic do powiedzenia,
+                  a przy okazji ciagnal obcy skrypt na kazde wejscie. Tu leci to,
+                  co dzieje sie u nas, z linkiem prosto do tokena. */}
+              <StartpadTicker />
             </div>
 
             {/* ===== UKLAD DESKTOP: DWIE KOLUMNY, NIE TRZY =====

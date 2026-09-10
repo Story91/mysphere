@@ -57,10 +57,21 @@ const CHART =
 const SECONDS_PER_BLOCK = ACTIVE_LAUNCHPAD_NETWORK.secondsPerBlock;
 
 /**
- * Ile slupkow widac po otwarciu. Tyle, co domyslny widok gieldy - reszta
- * historii czeka po lewej dla tego, kto przewinie.
+ * ILE CZASU WIDAC PO OTWARCIU, per interwal.
+ *
+ * Stalo tu sztywne 180 slupkow, co przy minutach dawalo trzy godziny i - przy
+ * waskim kontenerze - wygladalo na kilkanascie minut. Za ciasno: wykres tokena
+ * ma na pierwszy rzut oka pokazac, co sie z nim dzialo, a nie ostatni kwadrans.
+ *
+ * Okno liczymy w CZASIE, nie w slupkach, wiec przelaczenie interwalu zmienia
+ * gestosc swiec, a nie horyzont: minuty pokazuja dobe, piec minut trzy dni,
+ * godziny caly miesiac. Kto chce blizej, przybliza; kto chce dalej, przewija.
  */
-const VISIBLE_BARS = 180;
+const DEFAULT_SPAN_SEC: Record<IntervalSec, number> = {
+  60: 24 * 3600,
+  300: 3 * 24 * 3600,
+  3600: 30 * 24 * 3600,
+};
 
 const UP = CHART.up;
 const DOWN = CHART.down;
@@ -288,12 +299,15 @@ export default function PriceChart({
       // Wykres mogl w miedzyczasie zniknac (przelaczenie na DexScreener,
       // odmontowanie strony) - wtedy nie ma czego ustawiac.
       if (chartRef.current !== chart) return;
-      if (bars <= VISIBLE_BARS) {
+      // Slupki mieszczace sie w domyslnym horyzoncie tego interwalu. Swiece sa
+      // wypelniane takze w ciszy, wiec liczba slupkow odpowiada czasowi.
+      const windowBars = Math.ceil(DEFAULT_SPAN_SEC[effInterval] / effInterval);
+      if (bars <= windowBars) {
         chart.timeScale().fitContent();
       } else if (switched || atRightEdge) {
         // Prawy margines na kilka slupkow, zeby swieza swieca nie kleila sie
         // do krawedzi - tak samo jak `rightOffset` na gieldach.
-        chart.timeScale().setVisibleLogicalRange({ from: bars - VISIBLE_BARS, to: bars + 3 });
+        chart.timeScale().setVisibleLogicalRange({ from: bars - windowBars, to: bars + 3 });
       } else if (beforeRange) {
         chart.timeScale().setVisibleLogicalRange(beforeRange);
       }
