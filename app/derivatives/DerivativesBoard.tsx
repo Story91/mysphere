@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, Plus, RefreshCw, ShieldCheck, Sprout } from 'lucide-react';
+import { AlertTriangle, LineChart, Plus, RefreshCw, ShieldCheck, Sprout } from 'lucide-react';
 import type { Address } from 'viem';
 import { usePublicClient } from 'wagmi';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import '../startpad/sphere/sphere-motion.css';
 import {
   DEPLOYED,
   DERIV_CHAIN,
@@ -114,35 +115,50 @@ export default function DerivativesBoard() {
   }, [load]);
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-8">
-      <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
+    <div className="sphere-shell sph-stagger mx-auto w-full max-w-6xl px-4 py-8">
+      <header className="mb-7 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Arc Derivatives</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-sp-brand-soft px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-sp-brand-deep">
+            <span className="h-1.5 w-1.5 rounded-full bg-sp-brand" />
+            Arc testnet
+          </span>
+          <h1 className="mt-2.5 text-[28px] font-extrabold tracking-tight text-sp-ink">Arc Derivatives</h1>
+          <p className="mt-1 text-[13px] text-sp-ink-soft">
             Perpetualy na vAMM. Kazdy moze wystawic feed z kaucja i zarabiac na oplatach z handlu.
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void load()}
+            disabled={loading}
+            className="rounded-full border-sp-shade/15 bg-sp-surface text-sp-ink hover:bg-sp-hover"
+          >
+            <RefreshCw className={`mr-2 h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
             Odswiez
           </Button>
-          <Button size="sm" onClick={() => setCreateOpen(true)} disabled={!DEPLOYED}>
-            <Plus className="mr-2 h-4 w-4" />
+          <Button
+            size="sm"
+            onClick={() => setCreateOpen(true)}
+            disabled={!DEPLOYED}
+            className="rounded-full bg-sp-brand text-white hover:bg-sp-brand-deep"
+          >
+            <Plus className="mr-2 h-3.5 w-3.5" />
             Nowy rynek
           </Button>
         </div>
       </header>
 
       {!DEPLOYED && (
-        <Card className="mb-6 border-amber-500/40">
+        <Card className="mb-6 rounded-[18px] border-amber-500/30 bg-amber-500/[0.06]">
           <CardContent className="flex items-start gap-3 py-4 text-sm">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-            <span>
+            <span className="text-sp-ink-soft">
               Modul nie jest jeszcze wdrozony na tej sieci. Uruchom{' '}
-              <code className="rounded bg-muted px-1 py-0.5 text-xs">scripts/deploy-derivative-market.ts</code> i wpisz
-              adresy do <code className="rounded bg-muted px-1 py-0.5 text-xs">NEXT_PUBLIC_DERIV_FACTORY</code> oraz{' '}
-              <code className="rounded bg-muted px-1 py-0.5 text-xs">NEXT_PUBLIC_DERIV_ORACLE</code>.
+              <code className="rounded bg-sp-shade/[0.06] px-1 py-0.5 text-xs">scripts/deploy-derivative-market.ts</code> i
+              wpisz adresy do <code className="rounded bg-sp-shade/[0.06] px-1 py-0.5 text-xs">NEXT_PUBLIC_DERIV_FACTORY</code>{' '}
+              oraz <code className="rounded bg-sp-shade/[0.06] px-1 py-0.5 text-xs">NEXT_PUBLIC_DERIV_ORACLE</code>.
             </span>
           </CardContent>
         </Card>
@@ -151,12 +167,12 @@ export default function DerivativesBoard() {
       {/* Pauza globalna dotyczy WSZYSTKICH rynkow naraz - musi byc widoczna
           na tablicy, a nie dopiero przy nieudanej transakcji. */}
       {health?.paused && (
-        <Card className="mb-6 border-destructive/50 bg-destructive/5">
+        <Card className="mb-6 rounded-[18px] border-destructive/40 bg-destructive/5">
           <CardContent className="flex items-start gap-3 py-4 text-sm">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
             <div>
-              <p className="font-medium text-destructive">Nowe pozycje wstrzymane na calym module</p>
-              <p className="mt-1 text-muted-foreground">
+              <p className="font-semibold text-destructive">Nowe pozycje wstrzymane na calym module</p>
+              <p className="mt-1 text-sp-ink-soft">
                 Fundusz ubezpieczeniowy ma {fmtUsdc(health.balance)} przy wymaganych {fmtUsdc(health.required)} dla
                 biezacego OI. Zamykanie pozycji i likwidacje dzialaja normalnie.
               </p>
@@ -166,23 +182,44 @@ export default function DerivativesBoard() {
       )}
 
       {health && !health.paused && (
-        <p className="mb-4 text-xs text-muted-foreground">
-          Fundusz ubezpieczeniowy: {fmtUsdc(health.balance)} / wymagane {fmtUsdc(health.required)}
-        </p>
+        <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-sp-shade/10 bg-sp-surface py-1.5 pl-1.5 pr-3.5 text-xs shadow-chip">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-sp-brand-soft text-sp-brand-deep">
+            <ShieldCheck className="h-3.5 w-3.5" />
+          </span>
+          <span className="text-sp-ink-soft">Fundusz ubezpieczeniowy</span>
+          <span className="font-bold tabular-nums text-sp-ink">{fmtUsdc(health.balance)}</span>
+          <span className="text-sp-ink-soft">/ {fmtUsdc(health.required)} wymagane</span>
+        </div>
       )}
 
       {error && (
-        <Card className="mb-6 border-destructive/50">
+        <Card className="mb-6 rounded-[18px] border-destructive/40">
           <CardContent className="py-4 text-sm text-destructive">{error}</CardContent>
         </Card>
       )}
 
-      {loading && rows.length === 0 && <p className="py-12 text-center text-sm text-muted-foreground">Wczytuje rynki...</p>}
+      {loading && rows.length === 0 && (
+        <p className="py-12 text-center text-sm text-sp-ink-soft">Wczytuje rynki...</p>
+      )}
 
       {!loading && DEPLOYED && rows.length === 0 && !error && (
-        <Card>
-          <CardContent className="py-12 text-center text-sm text-muted-foreground">
-            Nie ma jeszcze zadnego rynku. Zaloz pierwszy.
+        <Card className="rounded-[22px] border-dashed border-sp-shade/20 bg-sp-surface">
+          <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
+            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-sp-brand-soft text-sp-brand-deep">
+              <LineChart className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="font-bold text-sp-ink">Zadnego rynku jeszcze nie ma</p>
+              <p className="mt-1 text-sm text-sp-ink-soft">Zglos feed cenowy i zalozony rynek jest gotowy do handlu.</p>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => setCreateOpen(true)}
+              className="mt-1 rounded-full bg-sp-brand text-white hover:bg-sp-brand-deep"
+            >
+              <Plus className="mr-2 h-3.5 w-3.5" />
+              Zaloz pierwszy rynek
+            </Button>
           </CardContent>
         </Card>
       )}
@@ -192,55 +229,55 @@ export default function DerivativesBoard() {
           const pct = oiPercent(row.openInterest, row.maxOpenInterest);
           return (
             <Link key={row.address} href={`/derivatives/${row.address}`} className="block">
-              <Card className="transition-colors hover:border-primary/50">
+              <Card className="sph-card rounded-[18px] border-sp-shade/10 bg-sp-surface shadow-none">
                 <CardContent className="grid grid-cols-2 gap-4 py-4 md:grid-cols-6 md:items-center">
                   <div className="col-span-2 md:col-span-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold">{row.symbol}</span>
+                      <span className="font-bold text-sp-ink">{row.symbol}</span>
                       {row.slashed ? (
-                        <Badge variant="destructive">sciety</Badge>
+                        <Badge variant="destructive" className="rounded-full">sciety</Badge>
                       ) : row.frozen ? (
-                        <Badge variant="destructive">zamrozony</Badge>
+                        <Badge variant="destructive" className="rounded-full">zamrozony</Badge>
                       ) : row.mature ? (
-                        <Badge variant="secondary" className="gap-1">
+                        <Badge className="gap-1 rounded-full border-transparent bg-sp-brand-soft text-sp-brand-deep hover:bg-sp-brand-soft">
                           <ShieldCheck className="h-3 w-3" />
                           dojrzaly
                         </Badge>
                       ) : (
-                        <Badge variant="outline" className="gap-1">
+                        <Badge variant="outline" className="gap-1 rounded-full border-sp-shade/15 text-sp-ink-soft">
                           <Sprout className="h-3 w-3" />
                           probacja
                         </Badge>
                       )}
                     </div>
-                    <p className="mt-1 text-xs text-muted-foreground">
+                    <p className="mt-1 text-xs text-sp-ink-soft">
                       {fmtAge(row.createdAt)} - {row.updateCount} cen
                     </p>
                   </div>
 
                   <div>
-                    <p className="text-xs text-muted-foreground">Mark</p>
-                    <p className="font-medium">{fmtPrice(row.markPrice)}</p>
+                    <p className="text-xs text-sp-ink-soft">Mark</p>
+                    <p className="font-semibold tabular-nums text-sp-ink">{fmtPrice(row.markPrice)}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Index</p>
-                    <p className="font-medium">{fmtPrice(row.indexPrice)}</p>
+                    <p className="text-xs text-sp-ink-soft">Index</p>
+                    <p className="font-semibold tabular-nums text-sp-ink">{fmtPrice(row.indexPrice)}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Kaucja</p>
-                    <p className="font-medium">{fmtUsdc(row.bond)}</p>
+                    <p className="text-xs text-sp-ink-soft">Kaucja</p>
+                    <p className="font-semibold tabular-nums text-sp-ink">{fmtUsdc(row.bond)}</p>
                   </div>
                   <div className="col-span-2 md:col-span-1">
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-sp-ink-soft">
                       OI {fmtWadCompact(row.openInterest)} / {fmtWadCompact(row.maxOpenInterest)}
                     </p>
-                    <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                    <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-sp-shade/[0.07]">
                       <div
-                        className={`h-full rounded-full ${pct > 85 ? 'bg-destructive' : 'bg-primary'}`}
+                        className={`h-full rounded-full ${pct > 85 ? 'bg-destructive' : 'bg-sp-brand'}`}
                         style={{ width: `${pct}%` }}
                       />
                     </div>
-                    <p className="mt-1 text-[11px] text-muted-foreground">
+                    <p className="mt-1 text-[11px] text-sp-ink-soft">
                       tworca {shortAddress(row.creator)}
                     </p>
                   </div>
