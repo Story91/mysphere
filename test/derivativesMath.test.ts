@@ -1,3 +1,5 @@
+export {};
+
 // Czysta matematyka modulu perps (app/derivatives/[market]/math.ts) - bez
 // lancucha. `previewOpen` to lustro `DerivativeMarket.openPosition`, wiec
 // pilnujemy tu kierunkow i powodow odrzucenia, nie konkretnych cyfr (te
