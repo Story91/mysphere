@@ -22,10 +22,10 @@ export default function Sparkline({
   if (points.length < 2) {
     return (
       <div
-        className="flex items-center justify-center rounded-lg border border-dashed border-border text-xs text-muted-foreground"
+        className="flex items-center justify-center rounded-[14px] border border-dashed border-sp-shade/20 text-xs text-sp-ink-soft"
         style={{ height }}
       >
-        za malo cen, zeby narysowac wykres
+        Not enough price points to draw a chart
       </div>
     );
   }
@@ -44,7 +44,7 @@ export default function Sparkline({
   });
 
   const up = values[values.length - 1] >= values[0];
-  const stroke = up ? '#16a34a' : '#dc2626';
+  const stroke = up ? '#059669' : '#dc2626';
   const areaPath = `M0,${height} L${coords.join(' L')} L${width},${height} Z`;
 
   return (
@@ -53,7 +53,7 @@ export default function Sparkline({
       preserveAspectRatio="none"
       className="h-[120px] w-full"
       role="img"
-      aria-label="Wykres ceny"
+      aria-label="Price chart"
     >
       <defs>
         <linearGradient id="deriv-spark" x1="0" y1="0" x2="0" y2="1">

@@ -74,7 +74,7 @@ export default function CreateMarketModal({
     if (!wallet || !client || !ready || !bondAmount || !startPrice || !vliq) return;
     setError(null);
     try {
-      setBusy('Sprawdzam zgode na USDC...');
+      setBusy('Checking USDC allowance...');
       const allowance = (await client.readContract({
         address: USDC_ADDRESS,
         abi: erc20Abi,
@@ -83,7 +83,7 @@ export default function CreateMarketModal({
       })) as bigint;
 
       if (allowance < bondAmount) {
-        setBusy('Zatwierdz USDC dla rejestru...');
+        setBusy('Approve USDC for the registry...');
         const hash = await wallet.writeContract({
           address: USDC_ADDRESS,
           abi: erc20Abi,
@@ -95,7 +95,7 @@ export default function CreateMarketModal({
         await client.waitForTransactionReceipt({ hash });
       }
 
-      setBusy('Rejestruje feed i wplacam kaucje...');
+      setBusy('Registering feed and posting bond...');
       const registerHash = await wallet.writeContract({
         address: ORACLE_ADDRESS,
         abi: oracleAbi,
@@ -113,7 +113,7 @@ export default function CreateMarketModal({
         functionName: 'marketCount',
       })) as bigint;
 
-      setBusy('Stawiam vAMM...');
+      setBusy('Deploying the vAMM...');
       const createHash = await wallet.writeContract({
         address: FACTORY_ADDRESS,
         abi: factoryAbi,
@@ -128,7 +128,7 @@ export default function CreateMarketModal({
       onCreated();
     } catch (e: any) {
       setBusy(null);
-      setError(e?.shortMessage || e?.message || 'Transakcja odrzucona.');
+      setError(e?.shortMessage || e?.message || 'Transaction rejected.');
     }
   }
 
@@ -136,9 +136,10 @@ export default function CreateMarketModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Nowy rynek</DialogTitle>
+          <DialogTitle>New market</DialogTitle>
           <DialogDescription>
-            Wystawiasz feed ceny i stawiasz na nim vAMM. Kaucja zostaje w rejestrze i wyznacza limit OI rynku.
+            You&apos;re listing a price feed and launching a vAMM on it. The bond stays in the registry and sets the
+            market&apos;s open-interest cap.
           </DialogDescription>
         </DialogHeader>
 
@@ -147,7 +148,7 @@ export default function CreateMarketModal({
             <Label htmlFor="deriv-symbol">Symbol</Label>
             <Input
               id="deriv-symbol"
-              placeholder="kASK-USD"
+              placeholder="ARC-USD"
               value={symbol}
               onChange={(e) => setSymbol(e.target.value)}
               maxLength={24}
@@ -155,7 +156,7 @@ export default function CreateMarketModal({
           </div>
 
           <div className="grid gap-1.5">
-            <Label htmlFor="deriv-price">Cena startowa (USD)</Label>
+            <Label htmlFor="deriv-price">Starting price (USD)</Label>
             <Input
               id="deriv-price"
               inputMode="decimal"
@@ -163,11 +164,11 @@ export default function CreateMarketModal({
               value={price}
               onChange={(e) => setPrice(e.target.value)}
             />
-            {price && !startPrice && <p className="text-xs text-destructive">To nie jest liczba dziesietna.</p>}
+            {price && !startPrice && <p className="text-xs text-destructive">That&apos;s not a valid decimal number.</p>}
           </div>
 
           <div className="grid gap-1.5">
-            <Label htmlFor="deriv-bond">Kaucja (USDC)</Label>
+            <Label htmlFor="deriv-bond">Bond (USDC)</Label>
             <Input
               id="deriv-bond"
               inputMode="decimal"
@@ -177,16 +178,16 @@ export default function CreateMarketModal({
             />
             {bondAmount ? (
               <p className="text-xs text-muted-foreground">
-                Limit OI: {fmtWadCompact(probationCap)} na probacji, {fmtWadCompact(matureCap)} po dojrzeniu
-                (7 dni i 50 przyjetych cen bez zgloszenia).
+                Open-interest cap: {fmtWadCompact(probationCap)} on probation, {fmtWadCompact(matureCap)} once mature
+                (7 days and 50 accepted prices with no challenge).
               </p>
             ) : (
-              <p className="text-xs text-destructive">Minimum to 100 USDC.</p>
+              <p className="text-xs text-destructive">Minimum is 100 USDC.</p>
             )}
           </div>
 
           <div className="grid gap-1.5">
-            <Label htmlFor="deriv-liq">Glebokosc vAMM (USD)</Label>
+            <Label htmlFor="deriv-liq">vAMM depth (USD)</Label>
             <Input
               id="deriv-liq"
               inputMode="decimal"
@@ -195,22 +196,22 @@ export default function CreateMarketModal({
               onChange={(e) => setLiquidity(e.target.value)}
             />
             <p className="text-xs text-muted-foreground">
-              Im wieksza, tym mniejszy poslizg. Minimum 1 000 USD.
+              Bigger means less slippage. Minimum 1,000 USD.
             </p>
           </div>
 
           {wrongChain && (
-            <p className="text-xs text-destructive">Przelacz portfel na siec {DERIV_CHAIN.name}.</p>
+            <p className="text-xs text-destructive">Switch your wallet to {DERIV_CHAIN.name}.</p>
           )}
           {error && <p className="text-xs text-destructive">{error}</p>}
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={Boolean(busy)}>
-            Anuluj
+            Cancel
           </Button>
           <Button onClick={() => void submit()} disabled={!ready || Boolean(busy)}>
-            {busy ?? 'Zaloz rynek'}
+            {busy ?? 'Create market'}
           </Button>
         </DialogFooter>
       </DialogContent>

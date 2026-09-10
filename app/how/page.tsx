@@ -200,6 +200,26 @@ const STEPS: StepMeta[] = [
     cost: 'Free',
     note: 'No wallet and no signature',
   },
+  /**
+   * === DWUNASTY KROK: DERYWATY NA ARC TESTNET ===
+   * Zero zaleznosci od poprzednich jedenastu, tak jak krok 11 - i podobnie
+   * jak Startpad (08-10), calosc modulu opisuje JEDEN krok zamiast trzech,
+   * bo nie ma tu osobnej "zaloz" / "handluj" / "odbierz" sciezki wartej
+   * osobnych numerow na TEJ liscie (maja swoje miejsce na /derivatives).
+   *
+   * Uczciwosc o "nikt jeszcze nie przeszedl" (patrz naglowek pliku) dotyczy
+   * TEGO wdrozenia: kontrakty przeszly wlasna automatyczna weryfikacje
+   * skryptu wdrozeniowego i maja 36 testow jednostkowych za soba, ale zadna
+   * pozycja nie zostala jeszcze otwarta ani zlikwidowana na tym konkretnym
+   * deploymencie w chwili pisania tego kroku.
+   */
+  {
+    n: '12',
+    id: 'derivatives',
+    title: 'Open a perpetual position on Arc',
+    cost: 'Gas to trade',
+    note: 'Listing a new feed needs a 100 USDC bond · Arc testnet, not real money',
+  },
 ];
 
 function Step({ meta, children }: { meta: StepMeta; children: React.ReactNode }) {
@@ -704,6 +724,50 @@ export default function HowPage() {
               wallet, yours or anyone else&apos;s.
             </P>
             <Go href="/asks?tab=curators">Open the curator record</Go>
+          </Step>
+
+          {/* ---------------------------------------------------------- */}
+          <Step meta={STEPS[11]}>
+            <P lead>
+              <Hi>Arc Derivatives</Hi> is a small vAMM perps module: virtual
+              reserves set a mark price the same way a constant-product pool
+              would, and a funding payment between longs and shorts
+              continuously pulls that price toward an index feed so it
+              cannot drift too far from reality. Open one position per
+              market, long or short, up to 10x leverage, with at least{' '}
+              <Hi>10 USDC</Hi> margin.
+            </P>
+            <P>
+              Anyone can list a market. Post a USDC bond (<Hi>100
+              minimum</Hi>) to the price registry and you control that feed
+              as its publisher; a second transaction then deploys the actual
+              tradeable pool on top of it. The bond is what keeps a feed
+              honest: a successful price challenge slashes it and disables
+              the feed for good, and it directly sets how much open interest
+              the market can carry &mdash; 2x the bond on probation, 8x once
+              the feed turns <Hi>mature</Hi> after 7 clean days and 50
+              accepted prices with zero challenges.
+            </P>
+            <P>
+              A position becomes liquidatable once its margin ratio drops
+              under 6.25%, and anyone can call the liquidation and keep 1.25%
+              of the notional for doing it &mdash; there is no permissioned
+              keeper list. Any shortfall is covered by a shared{' '}
+              <Hi>insurance fund</Hi>; if that fund ever falls short of what
+              it is backing, new positions pause across every market at once
+              until someone tops it up.
+            </P>
+            <P>
+              <Hi>This deployment is new.</Hi> The contracts are live on Arc
+              testnet (chainId 5042002) and passed every check the deploy
+              script runs automatically, and the underlying logic carries 36
+              unit tests. What has not happened yet, as of writing this: nobody
+              has opened, closed, or liquidated a real position on this
+              specific deployment. Addresses and the full mechanics &mdash;
+              challenges, funding, fees &mdash; are on the module&apos;s own
+              page.
+            </P>
+            <Go href="/derivatives">Open Arc Derivatives</Go>
           </Step>
         </div>
 

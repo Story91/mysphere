@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import '../../startpad/sphere/sphere-motion.css';
 import {
   DERIV_CHAIN,
   FACTORY_ADDRESS,
@@ -204,7 +205,7 @@ export default function MarketDetail({ market }: { market: Address }) {
       await fn();
       await load();
     } catch (e: any) {
-      setError(e?.shortMessage || e?.message || 'Transakcja odrzucona.');
+      setError(e?.shortMessage || e?.message || 'Transaction rejected.');
     } finally {
       setBusy(null);
     }
@@ -215,7 +216,7 @@ export default function MarketDetail({ market }: { market: Address }) {
     const lev = Number(leverage);
     if (!wallet || !client || !address || !marginAmount || !Number.isInteger(lev)) return;
 
-    await withBusy('Otwieram pozycje...', async () => {
+    await withBusy('Opening position...', async () => {
       const allowance = (await client.readContract({
         address: USDC_ADDRESS,
         abi: erc20Abi,
@@ -247,7 +248,7 @@ export default function MarketDetail({ market }: { market: Address }) {
 
   async function close() {
     if (!wallet || !client || !address) return;
-    await withBusy('Zamykam pozycje...', async () => {
+    await withBusy('Closing position...', async () => {
       const hash = await wallet.writeContract({
         address: market,
         abi: marketAbi,
@@ -262,7 +263,7 @@ export default function MarketDetail({ market }: { market: Address }) {
   async function submitPrice() {
     const price = wad(newPrice);
     if (!wallet || !client || !address || !price || !snap) return;
-    await withBusy('Wysylam cene...', async () => {
+    await withBusy('Submitting price...', async () => {
       const hash = await wallet.writeContract({
         address: ORACLE_ADDRESS,
         abi: oracleAbi,
@@ -277,15 +278,15 @@ export default function MarketDetail({ market }: { market: Address }) {
   }
 
   if (loading && !snap) {
-    return <p className="py-16 text-center text-sm text-muted-foreground">Wczytuje rynek...</p>;
+    return <p className="py-16 text-center text-sm text-sp-ink-soft">Loading market...</p>;
   }
 
   if (!snap) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-16 text-center">
-        <p className="text-sm text-destructive">{error ?? 'Nie znaleziono rynku.'}</p>
+        <p className="text-sm text-destructive">{error ?? 'Market not found.'}</p>
         <Link href="/derivatives" className="mt-4 inline-block text-sm underline">
-          Wroc do tablicy
+          Back to markets
         </Link>
       </div>
     );
@@ -302,46 +303,52 @@ export default function MarketDetail({ market }: { market: Address }) {
   const overCap = snap.oi + notional > snap.cap;
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-8">
-      <Link href="/derivatives" className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+    <div className="sphere-shell sph-stagger mx-auto w-full max-w-5xl px-4 py-8">
+      <Link href="/derivatives" className="mb-4 inline-flex items-center gap-1.5 text-sm text-sp-ink-soft hover:text-sp-ink">
         <ArrowLeft className="h-4 w-4" />
-        Wszystkie rynki
+        All markets
       </Link>
 
       <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight">{snap.symbol}</h1>
+          <h1 className="text-[26px] font-extrabold tracking-tight text-sp-ink">{snap.symbol}</h1>
           {snap.slashed ? (
-            <Badge variant="destructive">sciety</Badge>
+            <Badge variant="destructive" className="rounded-full">slashed</Badge>
           ) : snap.frozen ? (
-            <Badge variant="destructive">feed zamrozony</Badge>
+            <Badge variant="destructive" className="rounded-full">feed frozen</Badge>
           ) : snap.mature ? (
-            <Badge variant="secondary" className="gap-1">
+            <Badge className="gap-1 rounded-full border-transparent bg-sp-brand-soft text-sp-brand-deep hover:bg-sp-brand-soft">
               <ShieldCheck className="h-3 w-3" />
-              dojrzaly
+              mature
             </Badge>
           ) : (
-            <Badge variant="outline" className="gap-1">
+            <Badge variant="outline" className="gap-1 rounded-full border-sp-shade/15 text-sp-ink-soft">
               <Sprout className="h-3 w-3" />
-              probacja
+              probation
             </Badge>
           )}
         </div>
-        <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => void load()}
+          disabled={loading}
+          className="rounded-full border-sp-shade/15 bg-sp-surface text-sp-ink hover:bg-sp-hover"
+        >
           <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          Odswiez
+          Refresh
         </Button>
       </header>
 
       {snap.paused && (
-        <Card className="mb-6 border-destructive/50 bg-destructive/5">
+        <Card className="mb-6 rounded-[18px] border-destructive/40 bg-destructive/5">
           <CardContent className="flex items-start gap-3 py-4 text-sm">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
             <div>
-              <p className="font-medium text-destructive">Nowe pozycje wstrzymane na calym module</p>
-              <p className="mt-1 text-muted-foreground">
-                Fundusz ma {fmtUsdc(snap.insuranceBalance)} przy wymaganych {fmtUsdc(snap.insuranceRequired)}.
-                Zamykanie pozycji dziala normalnie.
+              <p className="font-semibold text-destructive">New positions are paused across the module</p>
+              <p className="mt-1 text-sp-ink-soft">
+                The insurance fund holds {fmtUsdc(snap.insuranceBalance)} against {fmtUsdc(snap.insuranceRequired)}{' '}
+                required. Closing positions still works normally.
               </p>
             </div>
           </CardContent>
@@ -349,63 +356,67 @@ export default function MarketDetail({ market }: { market: Address }) {
       )}
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Card className="md:col-span-2">
+        <Card className="sph-card rounded-[20px] border-sp-shade/10 bg-sp-surface shadow-none md:col-span-2">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Cena</CardTitle>
+            <CardTitle className="text-sm font-bold uppercase tracking-wide text-sp-ink-soft">Price</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="mb-3 flex flex-wrap gap-6 text-sm">
               <div>
-                <p className="text-xs text-muted-foreground">Mark (vAMM)</p>
-                <p className="text-lg font-semibold">{fmtPrice(snap.mark)}</p>
+                <p className="text-xs text-sp-ink-soft">Mark (vAMM)</p>
+                <p className="text-lg font-bold tabular-nums text-sp-ink">{fmtPrice(snap.mark)}</p>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Index (TWAP feedu)</p>
-                <p className="text-lg font-semibold">{fmtPrice(snap.index)}</p>
+                <p className="text-xs text-sp-ink-soft">Index (feed TWAP)</p>
+                <p className="text-lg font-bold tabular-nums text-sp-ink">{fmtPrice(snap.index)}</p>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Premia</p>
-                <p className="text-lg font-semibold">{fmtSignedWad(snap.mark - snap.index)}</p>
+                <p className="text-xs text-sp-ink-soft">Premium</p>
+                <p
+                  className={`text-lg font-bold tabular-nums ${snap.mark - snap.index >= 0n ? 'text-emerald-600' : 'text-red-600'}`}
+                >
+                  {fmtSignedWad(snap.mark - snap.index)}
+                </p>
               </div>
             </div>
             <Sparkline points={history} />
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="sph-card rounded-[20px] border-sp-shade/10 bg-sp-surface shadow-none">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Limit OI</CardTitle>
+            <CardTitle className="text-sm font-bold uppercase tracking-wide text-sp-ink-soft">Open interest cap</CardTitle>
           </CardHeader>
           <CardContent className="text-sm">
-            <p className="font-medium">
+            <p className="font-bold tabular-nums text-sp-ink">
               {fmtWadCompact(snap.oi)} / {fmtWadCompact(snap.cap)}
             </p>
-            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted">
+            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-sp-shade/[0.07]">
               <div
-                className={`h-full rounded-full ${pct > 85 ? 'bg-destructive' : 'bg-primary'}`}
+                className={`h-full rounded-full ${pct > 85 ? 'bg-destructive' : 'bg-sp-brand'}`}
                 style={{ width: `${pct}%` }}
               />
             </div>
-            <dl className="mt-4 grid gap-1.5 text-xs text-muted-foreground">
+            <dl className="mt-4 grid gap-1.5 text-xs text-sp-ink-soft">
               <div className="flex justify-between">
-                <dt>Kaucja feedu</dt>
-                <dd className="text-foreground">{fmtUsdc(snap.bond)}</dd>
+                <dt>Feed bond</dt>
+                <dd className="font-medium text-sp-ink">{fmtUsdc(snap.bond)}</dd>
               </div>
               <div className="flex justify-between">
-                <dt>Stopien</dt>
-                <dd className="text-foreground">{snap.mature ? 'dojrzaly (8x)' : 'probacja (2x)'}</dd>
+                <dt>Status</dt>
+                <dd className="font-medium text-sp-ink">{snap.mature ? 'mature (8x)' : 'probation (2x)'}</dd>
               </div>
               <div className="flex justify-between">
-                <dt>Przyjete ceny</dt>
-                <dd className="text-foreground">{snap.updateCount}</dd>
+                <dt>Prices accepted</dt>
+                <dd className="font-medium text-sp-ink">{snap.updateCount}</dd>
               </div>
               <div className="flex justify-between">
-                <dt>Sufit tworcy</dt>
-                <dd className="text-foreground">{fmtWadCompact(snap.creatorCap)}</dd>
+                <dt>Creator cap</dt>
+                <dd className="font-medium text-sp-ink">{fmtWadCompact(snap.creatorCap)}</dd>
               </div>
               <div className="flex justify-between">
-                <dt>Tworca</dt>
-                <dd className="text-foreground">{shortAddress(snap.creator)}</dd>
+                <dt>Creator</dt>
+                <dd className="font-medium text-sp-ink">{shortAddress(snap.creator)}</dd>
               </div>
             </dl>
           </CardContent>
@@ -413,100 +424,122 @@ export default function MarketDetail({ market }: { market: Address }) {
       </div>
 
       <div className="mt-4 grid gap-4 md:grid-cols-2">
-        <Card>
+        <Card className="sph-card rounded-[20px] border-sp-shade/10 bg-sp-surface shadow-none">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Otworz pozycje</CardTitle>
+            <CardTitle className="text-sm font-bold uppercase tracking-wide text-sp-ink-soft">Open a position</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3">
             <div className="grid grid-cols-2 gap-2">
-              <Button variant={side === 'long' ? 'default' : 'outline'} onClick={() => setSide('long')}>
+              <Button
+                variant={side === 'long' ? 'default' : 'outline'}
+                onClick={() => setSide('long')}
+                className={
+                  side === 'long'
+                    ? 'rounded-full bg-emerald-600 text-white hover:bg-emerald-700'
+                    : 'rounded-full border-sp-shade/15 text-sp-ink'
+                }
+              >
                 Long
               </Button>
-              <Button variant={side === 'short' ? 'default' : 'outline'} onClick={() => setSide('short')}>
+              <Button
+                variant={side === 'short' ? 'default' : 'outline'}
+                onClick={() => setSide('short')}
+                className={
+                  side === 'short'
+                    ? 'rounded-full bg-red-600 text-white hover:bg-red-700'
+                    : 'rounded-full border-sp-shade/15 text-sp-ink'
+                }
+              >
                 Short
               </Button>
             </div>
 
             <div className="grid gap-1.5">
-              <Label htmlFor="deriv-margin">Depozyt (USDC)</Label>
+              <Label htmlFor="deriv-margin">Margin (USDC)</Label>
               <Input id="deriv-margin" inputMode="decimal" value={margin} onChange={(e) => setMargin(e.target.value)} />
             </div>
 
             <div className="grid gap-1.5">
-              <Label htmlFor="deriv-lev">Dzwignia (1-{snap.maxLeverage})</Label>
+              <Label htmlFor="deriv-lev">Leverage (1-{snap.maxLeverage})</Label>
               <Input id="deriv-lev" inputMode="numeric" value={leverage} onChange={(e) => setLeverage(e.target.value)} />
             </div>
 
-            <p className="text-xs text-muted-foreground">
-              Notional: {fmtWadCompact(notional)} - minimalny depozyt {fmtUsdc(snap.minMargin)}
+            <p className="text-xs text-sp-ink-soft">
+              Notional: {fmtWadCompact(notional)} &middot; min. margin {fmtUsdc(snap.minMargin)}
             </p>
 
             {overCreatorCap && (
               <p className="text-xs text-destructive">
-                Jestes tworca tego feedu - twoj sufit to {fmtWadCompact(snap.creatorCap)} notionalu.
+                You created this feed - your cap is {fmtWadCompact(snap.creatorCap)} of notional.
               </p>
             )}
             {overCap && !overCreatorCap && (
-              <p className="text-xs text-destructive">Ta pozycja przekracza limit OI rynku.</p>
+              <p className="text-xs text-destructive">This position exceeds the market&apos;s open-interest cap.</p>
             )}
-            {wrongChain && <p className="text-xs text-destructive">Przelacz portfel na {DERIV_CHAIN.name}.</p>}
+            {wrongChain && <p className="text-xs text-destructive">Switch your wallet to {DERIV_CHAIN.name}.</p>}
 
             <Button
               onClick={() => void open()}
               disabled={
                 Boolean(busy) || !address || wrongChain || snap.paused || snap.slashed || overCreatorCap || overCap
               }
+              className={`rounded-full text-white ${side === 'long' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'}`}
             >
-              {busy ?? `Otworz ${side}`}
+              {busy ?? `Open ${side}`}
             </Button>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="sph-card rounded-[20px] border-sp-shade/10 bg-sp-surface shadow-none">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Twoja pozycja</CardTitle>
+            <CardTitle className="text-sm font-bold uppercase tracking-wide text-sp-ink-soft">Your position</CardTitle>
           </CardHeader>
           <CardContent className="text-sm">
-            {!address && <p className="text-muted-foreground">Podlacz portfel.</p>}
-            {address && !position && <p className="text-muted-foreground">Brak otwartej pozycji.</p>}
+            {!address && <p className="text-sp-ink-soft">Connect your wallet.</p>}
+            {address && !position && <p className="text-sp-ink-soft">No open position.</p>}
             {position && (
               <>
                 <dl className="grid gap-1.5">
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Kierunek</dt>
-                    <dd className={position.size > 0n ? 'text-green-600' : 'text-red-600'}>
+                    <dt className="text-sp-ink-soft">Side</dt>
+                    <dd className={position.size > 0n ? 'font-semibold text-emerald-600' : 'font-semibold text-red-600'}>
                       {position.size > 0n ? 'Long' : 'Short'} {Number(formatEther(position.size < 0n ? -position.size : position.size)).toFixed(4)}
                     </dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Cena wejscia</dt>
-                    <dd>{fmtPrice(position.entryPrice)}</dd>
+                    <dt className="text-sp-ink-soft">Entry price</dt>
+                    <dd className="tabular-nums text-sp-ink">{fmtPrice(position.entryPrice)}</dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Notional</dt>
-                    <dd>{fmtWadCompact(position.openNotional)}</dd>
+                    <dt className="text-sp-ink-soft">Notional</dt>
+                    <dd className="tabular-nums text-sp-ink">{fmtWadCompact(position.openNotional)}</dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Depozyt</dt>
-                    <dd>{fmtWadCompact(position.margin)}</dd>
+                    <dt className="text-sp-ink-soft">Margin</dt>
+                    <dd className="tabular-nums text-sp-ink">{fmtWadCompact(position.margin)}</dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Wynik (mark)</dt>
-                    <dd className={position.pnl >= 0n ? 'text-green-600' : 'text-red-600'}>
+                    <dt className="text-sp-ink-soft">PnL (mark)</dt>
+                    <dd className={position.pnl >= 0n ? 'font-semibold tabular-nums text-emerald-600' : 'font-semibold tabular-nums text-red-600'}>
                       {fmtSignedWad(position.pnl)}
                     </dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Funding do zaplaty</dt>
-                    <dd>{fmtSignedWad(position.funding)}</dd>
+                    <dt className="text-sp-ink-soft">Funding owed</dt>
+                    <dd className="tabular-nums text-sp-ink">{fmtSignedWad(position.funding)}</dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Cena likwidacji</dt>
-                    <dd>{position.liqPrice === 0n ? 'nieosiagalna' : fmtPrice(position.liqPrice)}</dd>
+                    <dt className="text-sp-ink-soft">Liquidation price</dt>
+                    <dd className="tabular-nums text-sp-ink">{position.liqPrice === 0n ? 'unreachable' : fmtPrice(position.liqPrice)}</dd>
                   </div>
                 </dl>
-                <Button className="mt-4 w-full" variant="outline" onClick={() => void close()} disabled={Boolean(busy) || wrongChain}>
-                  {busy ?? 'Zamknij pozycje'}
+                <Button
+                  className="mt-4 w-full rounded-full border-sp-shade/15 text-sp-ink"
+                  variant="outline"
+                  onClick={() => void close()}
+                  disabled={Boolean(busy) || wrongChain}
+                >
+                  {busy ?? 'Close position'}
                 </Button>
               </>
             )}
@@ -517,13 +550,13 @@ export default function MarketDetail({ market }: { market: Address }) {
       {/* Panel wystawcy ceny. Widoczny tylko dla tworcy feedu - i to jest cala
           jego wladza nad tym rynkiem: nie ma tu ani pauzy, ani likwidacji. */}
       {isCreator && (
-        <Card className="mt-4">
+        <Card className="sph-card mt-4 rounded-[20px] border-sp-shade/10 bg-sp-surface shadow-none">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Panel wystawcy ceny</CardTitle>
+            <CardTitle className="text-sm font-bold uppercase tracking-wide text-sp-ink-soft">Price feed panel</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3 md:max-w-sm">
             <div className="grid gap-1.5">
-              <Label htmlFor="deriv-newprice">Nowa cena (USD)</Label>
+              <Label htmlFor="deriv-newprice">New price (USD)</Label>
               <Input
                 id="deriv-newprice"
                 inputMode="decimal"
@@ -532,16 +565,17 @@ export default function MarketDetail({ market }: { market: Address }) {
                 onChange={(e) => setNewPrice(e.target.value)}
               />
             </div>
-            <p className="text-xs text-muted-foreground">
-              Najwyzej 10% od poprzedniej ceny i nie czesciej niz raz na minute. Kazdy moze zakwestionowac
-              aktualizacje przez godzine - wtedy feed zamarza do rozstrzygniecia.
+            <p className="text-xs text-sp-ink-soft">
+              Up to 10% away from the last price, at most once a minute. Anyone can challenge an update within an
+              hour - the feed freezes until it&apos;s resolved.
             </p>
-            {snap.frozen && <p className="text-xs text-destructive">Feed jest zamrozony zgloszeniem.</p>}
+            {snap.frozen && <p className="text-xs text-destructive">Feed is frozen by a challenge.</p>}
             <Button
               onClick={() => void submitPrice()}
               disabled={Boolean(busy) || !wad(newPrice) || snap.frozen || snap.slashed || wrongChain}
+              className="rounded-full bg-sp-brand text-white hover:bg-sp-brand-deep"
             >
-              {busy ?? 'Wyslij cene'}
+              {busy ?? 'Submit price'}
             </Button>
           </CardContent>
         </Card>
