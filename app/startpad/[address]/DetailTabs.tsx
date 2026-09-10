@@ -391,7 +391,10 @@ export default function DetailTabs({
                       <span className="ml-1 text-[11px] font-bold text-sp-shade/40">· {usdSuffix(core.config.pendingBuybackEth, ethUsd)}</span>
                     )}
                   </p>
-                  <p className="mt-0.5 text-[10.5px] text-sp-shade/45">set aside from the creator&apos;s {NATIVE_SYMBOL} share at settle; anyone can execute</p>
+                  {/* "anyone can execute" bylo prawda, ale bez wskazania GDZIE
+                      - kontrolka powstala dopiero 10 wrzesnia 2026 w panelu
+                      handlu, przy Settle i Harvest. */}
+                  <p className="mt-0.5 text-[10.5px] text-sp-shade/45">set aside from the creator&apos;s {NATIVE_SYMBOL} share at settle; anyone can run it from the trade panel</p>
                 </div>
                 <div className="rounded-xl bg-sp-sunken p-3">
                   <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/40">Burned so far</p>

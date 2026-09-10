@@ -45,6 +45,7 @@ import {
 import { quoteBuyLocal, quoteDrifts, quoteSellLocal } from './curveQuote';
 import { hasPool } from './poolPrice';
 import PoolTradeBox from './PoolTradeBox';
+import { canonicalPoolKey, V4_BY_CHAIN, v4QuoterAbi } from './v4Swap';
 
 /**
  * Panel handlu NA STRONIE tokena - koniec z odsylaniem do boardu. Wzorce
@@ -56,7 +57,7 @@ const FIELD =
   'w-full rounded-xl border border-sp-shade/10 bg-sp-surface px-3.5 py-3 text-[14px] text-sp-ink outline-none transition-colors placeholder:text-sp-shade/35 focus:border-sp-brand';
 
 type Side = 'buy' | 'sell';
-type Busy = 'buy' | 'approve' | 'sell' | 'graduate' | 'settle' | 'harvest' | 'claim' | null;
+type Busy = 'buy' | 'approve' | 'sell' | 'graduate' | 'settle' | 'harvest' | 'claim' | 'buyback' | null;
 type ClaimSource = 'launch' | 'hookEth' | 'hookToken' | 'vaultEth' | 'vaultToken';
 
 // Rezerwa na gaz stala tu jako 0,005 ETH i byla wieksza niz cale saldo malego
@@ -427,6 +428,61 @@ export default function TradePanel({
       const hash = await walletClient.writeContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'settle', args: [core.token], chain: LAUNCHPAD_CHAIN, account });
       await readClient.waitForTransactionReceipt({ hash });
       setNotice({ kind: 'success', text: `Hook fees settled. ${hash.slice(0, 10)}...` });
+      onAfterTx();
+    } catch (cause) {
+      fail(cause);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /**
+   * ODPALENIE BUYBACKU - akcja, ktora interfejs OBIECYWAL, nie dajac jej.
+   *
+   * Zakladka Info pisze przy odlozonej kwocie "anyone can execute", ale w calej
+   * aplikacji nie bylo ani jednej kontrolki, ktora by to robila - trzeba bylo
+   * wolac kontrakt z boku. Odlozone ETH lezalo wiec do czasu, az ktos zrobi to
+   * recznie, chociaz kazdy przechodzien mogl spalic je na tokeny.
+   *
+   * `minTokensOut` liczymy z V4Quotera i scinamy o wybrany bufor poslizgu.
+   * Wycena Quotera jest ZANIZONA wzgledem realnego wyniku, bo symuluje swap
+   * z oplata hooka, a wlasny swap buybacku hook zwalnia z oplaty - minimum
+   * wychodzi wiec ostrozne z samej konstrukcji. Druga barierka i tak stoi w
+   * kontrakcie: hook ogranicza cene do 1,5% ponizej spotu niezaleznie od tego,
+   * co poda wolajacy.
+   */
+  const executeBuyback = async () => {
+    if (!account || !walletClient || !readClient) {
+      setNotice({ kind: 'error', text: 'Connect a wallet before running the buyback.' });
+      return;
+    }
+    if (!(await ensureChain())) return;
+    setBusy('buyback');
+    try {
+      const pending = core.config.pendingBuybackEth;
+      const v4 = V4_BY_CHAIN[ACTIVE_LAUNCHPAD_NETWORK.chain.id];
+      let minTokensOut = 0n;
+      if (v4) {
+        const poolKey = canonicalPoolKey(core.token, LAUNCH_HOOK_ADDRESS as Address);
+        const quoted = (await readClient.readContract({
+          address: v4.quoter,
+          abi: v4QuoterAbi,
+          functionName: 'quoteExactInputSingle',
+          args: [{ poolKey, zeroForOne: true, exactAmount: pending, hookData: '0x' }],
+        })) as readonly [bigint, bigint];
+        minTokensOut = applySlippage(quoted[0], slippageBps);
+      }
+      const deadline = BigInt(Math.floor(Date.now() / 1000) + 600);
+      const hash = await walletClient.writeContract({
+        address: LAUNCH_HOOK_ADDRESS as Address,
+        abi: hookAbi,
+        functionName: 'executeBuyback',
+        args: [core.token, minTokensOut, deadline],
+        chain: LAUNCHPAD_CHAIN,
+        account,
+      });
+      await readClient.waitForTransactionReceipt({ hash });
+      setNotice({ kind: 'success', text: `Buyback executed, tokens burned. ${hash.slice(0, 10)}...` });
       onAfterTx();
     } catch (cause) {
       fail(cause);
@@ -845,6 +901,20 @@ export default function TradePanel({
               {busy === 'harvest' ? 'Harvesting...' : 'Harvest LP fees'}
             </button>
           </div>
+          {/* Buyback pokazujemy TYLKO wtedy, gdy jest co palic - pusty przycisk
+              przy zerowej kwocie bylby kolejna obietnica bez pokrycia. */}
+          {core.config.pendingBuybackEth > 0n && (
+            <button
+              type="button"
+              disabled={busy === 'buyback' || !isConnected}
+              onClick={executeBuyback}
+              className="mt-2 w-full rounded-lg border border-sp-shade/10 bg-sp-surface px-2 py-2 text-[11px] font-extrabold text-sp-ink disabled:opacity-40"
+            >
+              {busy === 'buyback'
+                ? 'Buying and burning...'
+                : `Run buyback: ${fmtEth(core.config.pendingBuybackEth)} ${NATIVE_SYMBOL} to buy & burn`}
+            </button>
+          )}
         </div>
       )}
 

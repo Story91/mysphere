@@ -104,34 +104,40 @@ export const sphereCreatorEscrowAbi = [{"inputs":[{"internalType":"address","nam
 
 export const sphereTokenVestingAbi = [{"inputs":[{"internalType":"address","name":"beneficiary_","type":"address"},{"internalType":"uint64","name":"start_","type":"uint64"},{"internalType":"uint64","name":"cliff_","type":"uint64"},{"internalType":"uint64","name":"duration_","type":"uint64"}],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[],"name":"BadSchedule","type":"error"},{"inputs":[],"name":"NothingToRelease","type":"error"},{"inputs":[],"name":"TokenTransferFailed","type":"error"},{"inputs":[],"name":"ZeroAddress","type":"error"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"token","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"},{"indexed":true,"internalType":"address","name":"caller","type":"address"}],"name":"TokensReleased","type":"event"},{"inputs":[],"name":"BENEFICIARY","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"CLIFF","outputs":[{"internalType":"uint64","name":"","type":"uint64"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"DURATION","outputs":[{"internalType":"uint64","name":"","type":"uint64"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"START","outputs":[{"internalType":"uint64","name":"","type":"uint64"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"token","type":"address"}],"name":"releasable","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"token","type":"address"}],"name":"release","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"released","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"token","type":"address"}],"name":"totalReceived","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"token","type":"address"},{"internalType":"uint64","name":"timestamp","type":"uint64"}],"name":"vestedAmount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}] as const;
 
-/** Opisy funkcji dla konsoli ABI - jezyk ludzki obok surowej powierzchni. */
+/**
+ * Opisy funkcji dla konsoli ABI.
+ *
+ * PO ANGIELSKU, bo caly interfejs jest po angielsku - te zdania renderuja sie
+ * pod nazwa funkcji w AbiConsole i do 10 wrzesnia 2026 byly jedynym polskim
+ * tekstem, jaki uzytkownik mogl tam zobaczyc.
+ */
 export const SPHERE_FN_DOCS: Record<string, string> = {
   // SphereRewards
-  CONSUMER: 'Jedyny adres z prawem poboru (Rewards Safe). Immutable.',
-  pull: 'Pobor ETH ze skarbonki na wskazany adres. Tylko CONSUMER.',
-  pullable: 'Ile ETH lezy w skarbonce teraz.',
-  totalPulled: 'Suma dotychczasowych poborow (obserwowalnosc, nie rozliczenia).',
+  CONSUMER: 'The only address allowed to pull. It is the operational Safe, immutable.',
+  pull: 'Pulls ETH from the vault to a chosen address. CONSUMER only, and the destination is its choice.',
+  pullable: 'How much ETH sits in the vault right now.',
+  totalPulled: 'Everything pulled so far. For observability, not accounting.',
   // SphereCreatorEscrow
-  launch: 'Jednorazowy start SPHERE z zapieta konfiguracja + atomowy dev-buy (msg.value). Tylko LAUNCH_AUTHORITY. NIEODWRACALNE.',
-  launched: 'Czy launch juz sie odbyl (zapadka one-shot).',
-  release: 'Wyplata calego ETH escrow: split BUYBACK_POT / OPS_TARGET wg ETH_POT_BPS. Bezuprawnieniowa.',
-  releaseToken: 'Wyplata calego salda tokena do TOKEN_TARGET (vesting). address(0) = token SPHERE. Bezuprawnieniowa.',
-  sphereToken: 'Adres tokena SPHERE (po launchu).',
-  receiverConfig: 'Zamrozeni odbiorcy fee z krzywej + ich udzialy bps.',
-  BUYBACK_POT: 'Dokad idzie czesc buyback przy release().',
-  OPS_TARGET: 'Dokad idzie czesc operacyjna przy release().',
-  TOKEN_TARGET: 'Dokad ida tokeny przy releaseToken() (SphereTokenVesting).',
-  LAUNCH_AUTHORITY: 'Kto moze zawolac launch() (jednorazowo).',
-  ETH_POT_BPS: 'Udzial buybacku w splicie ETH (bps z 10000).',
-  WINDOW_CAP: 'Cap tokenow per adres w oknie startowym (300 s).',
-  VANITY_SALT: 'Salt vanity zapiety w konstruktorze.',
+  launch: 'One-shot SPHERE launch with the frozen config plus an atomic dev-buy (msg.value). LAUNCH_AUTHORITY only. IRREVERSIBLE.',
+  launched: 'Whether the launch already happened (one-shot latch).',
+  release: 'Pays out the escrow ETH, split between BUYBACK_POT and OPS_TARGET by ETH_POT_BPS. Anyone can call it.',
+  releaseToken: 'Sends the whole token balance to TOKEN_TARGET (the vesting lock). address(0) means the SPHERE token. Anyone can call it.',
+  sphereToken: 'The SPHERE token address, set at launch.',
+  receiverConfig: 'The frozen curve-fee receivers and their shares in bps.',
+  BUYBACK_POT: 'Where the buyback share goes on release().',
+  OPS_TARGET: 'Where the operational share goes on release().',
+  TOKEN_TARGET: 'Where tokens go on releaseToken(): the SphereTokenVesting lock.',
+  LAUNCH_AUTHORITY: 'Who may call launch(), once.',
+  ETH_POT_BPS: 'The buyback share of the ETH split, in bps out of 10000.',
+  WINDOW_CAP: 'Per-address token cap during the 300-second launch window.',
+  VANITY_SALT: 'The vanity salt frozen into the constructor.',
   // SphereTokenVesting
-  BENEFICIARY: 'Jedyny odbiorca wyplat z vestingu (Safe).',
-  START: 'Poczatek zegara vestingu (unix).',
-  CLIFF: 'Okres klifu w sekundach - wczesniej nie wychodzi nic.',
-  DURATION: 'Pelny czas vestingu w sekundach (liniowo).',
-  releasable: 'Ile danego tokena mozna wyplacic TERAZ.',
-  released: 'Ile danego tokena juz wyplacono.',
-  totalReceived: 'Podstawa vestingu: saldo + wyplacone.',
-  vestedAmount: 'Ile z podstawy jest odblokowane w zadanym momencie.',
+  BENEFICIARY: 'The only address vested tokens can ever land on (the Safe).',
+  START: 'When the vesting clock starts (unix seconds).',
+  CLIFF: 'Cliff length in seconds. Nothing vests before it ends.',
+  DURATION: 'Full vesting length in seconds, released linearly.',
+  releasable: 'How much of the token can be released right now.',
+  released: 'How much of the token has already been released.',
+  totalReceived: 'The vesting base: current balance plus everything already released.',
+  vestedAmount: 'How much of the base is unlocked at a given timestamp.',
 };

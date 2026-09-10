@@ -19,6 +19,32 @@
  * kanonicznych manifestow (/api/sphere/epochs, publishEpoch.ts) i stanem
  * odbioru konta po wdrozeniu dystrybutora. Patrz komentarz przy
  * PastEpochsSection.
+ *
+ * ===========================================================================
+ * 2026-09-10: "CO SIE STALO?" - CZTERY POPRAWKI
+ * ===========================================================================
+ *  1. PUSTY STAN MUSI SIE TLUMACZYC. Piec zerowych liczb w naglowku plus pusty
+ *     wykres nad niepustym jest NIEODROZNIALNE od zepsutej strony - wlasciciel
+ *     przyslal zrzut z pytaniem "co sie stalo?". Nic sie nie stalo: w epoce 4
+ *     jedynym tokenem z obrotem jest SPHERE, a SPHERE jest wykluczony z
+ *     wlasnego sezonu (EXCLUDED_TOKENS w epochMath), wiec sezonowi nie liczy
+ *     sie nic. ZeroEpochNotice mowi to jednym zdaniem i znika SAM, gdy tylko
+ *     jakikolwiek inny token zrobi transakcje (warunek: creators.length === 0).
+ *  2. "funds the future pool" bylo obietnica, nie faktem. Przychod protokolu
+ *     laduje na Safie 1/1 i trafia do puli TYLKO, gdy Safe tak zdecyduje -
+ *     tokenomika (sekcja 4/5, Gate 0 pkt 2) wymaga oznaczania takich rzeczy
+ *     jako uznaniowe. Podpis mowi teraz "discretionary".
+ *  3. NUMERACJA EPOK. Epoka to okno 302 400 blokow liczone od bloku deployu
+ *     pada (SEASON_GENESIS_BLOCK), a nie tydzien kalendarzowy - "Week 4"
+ *     sugerowalo poniedzialek-niedziela i nie zgadzalo sie z niczym, co
+ *     czytelnik moze sprawdzic. Wybor: mowimy "Epoch N" (ten sam indeks, co
+ *     w API, manifestach i epochMath) I pokazujemy dokladne okno blokow z
+ *     kotwica. Sam opis anchor-a nie wystarczyl, bo bez zakresu blokow nie da
+ *     sie tego zweryfikowac na Basescanie; sam zakres bez zdania o kotwicy nie
+ *     tlumaczy, skad sie wzial.
+ *  4. KSIEGA PULI. Strona pokazywala wolne saldo dystrybutora i nic wiecej -
+ *     ile faktycznie wyplacono, ile jeszcze wisi i co czeka w oknie weta bylo
+ *     niewidoczne. PoolLedger czyta to wprost z kontraktu.
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -29,9 +55,10 @@ import { ChevronDown, ChevronUp, Info, Loader2, Trophy } from 'lucide-react';
 // Sezon liczy zrealizowane ETH z Base (/api/sphere/season, CHAIN_ID 8453) -
 // etykieta nie moze podazac za wybrana siecia tablicy.
 import { SPHERE_CHAIN, SPHERE_NATIVE_SYMBOL } from '../sphereChain';
-import { SPHERE_DISTRIBUTOR_ADDRESS, sphereDistributorReadsAbi } from '../sphereConfig';
-import { BigStat, LearnMore, PageHero } from '../SphereUI';
-import SphereRewardsClaim, { useSphereDistributor } from './SphereRewardsClaim';
+import { SPHERE_DISTRIBUTOR_ADDRESS, SPHERE_SAFE_ADDRESS, sphereDistributorReadsAbi } from '../sphereConfig';
+import { AddressPill, BigStat, LearnMore, PageHero } from '../SphereUI';
+import { EPOCH_BLOCKS, SEASON_GENESIS_BLOCK } from './epochMath';
+import SphereRewardsClaim, { useSphereDistributor, type DistributorState } from './SphereRewardsClaim';
 
 type SeasonToken = {
   token: string;
@@ -56,7 +83,8 @@ type SeasonCreator = {
 
 type SeasonData = {
   shadow: boolean;
-  epoch: { index: number; endsAtUnix: string; progressBps: number };
+  /** fromBlock/toBlock sa w odpowiedzi API od poczatku - teraz je pokazujemy. */
+  epoch: { index: number; fromBlock: string; toBlock: string; endsAtUnix: string; progressBps: number };
   totals: { externalVolumeEth: string; protocolEth: string; creators: number; tokens: number };
   dailyVolumeEth: string[];
   /** Wolumen tokenow wykluczonych z sezonu (SPHERE) - prawdziwa historia handlu. */
@@ -104,18 +132,23 @@ function short(addr: string) {
 }
 
 /** Kwoty SPHERE (18 dec) - separatory tysiecy, bez ogona osiemnastu zer. */
-function sphereAmt(wei: string | bigint) {
+function sphereAmt(wei: string | bigint, digits = 2) {
   return Number(formatEther(typeof wei === 'bigint' ? wei : BigInt(wei))).toLocaleString('en-US', {
-    maximumFractionDigits: 2,
+    maximumFractionDigits: digits,
   });
 }
 
+/** Numery blokow z separatorem - 51,052,630 czyta sie, 51052630 nie. */
+const blockNo = (b: string | bigint) => BigInt(b).toLocaleString('en-US');
+
+const utcStamp = (ts: number) => new Date(ts * 1000).toISOString().slice(0, 16).replace('T', ' ');
+
 /**
- * Odliczanie do konca tygodnia jako tekst - PageHero bierze tagline
- * stringiem, wiec hook zamiast komponentu. Wolany bezwarunkowo na gorze
- * panelu (dane moga byc jeszcze null), zeby nie lamac zasad hookow.
+ * Odliczanie do konca epoki jako tekst - PageHero bierze tagline stringiem,
+ * wiec hook zamiast komponentu. Wolany bezwarunkowo na gorze panelu (dane
+ * moga byc jeszcze null), zeby nie lamac zasad hookow.
  */
-function useWeekCountdown(endsAtUnix: string | null) {
+function useEpochCountdown(endsAtUnix: string | null) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30_000);
@@ -126,7 +159,7 @@ function useWeekCountdown(endsAtUnix: string | null) {
   if (left <= 0) return 'Closing now - final numbers settle in a moment';
   const d = Math.floor(left / 86_400_000);
   const h = Math.floor((left % 86_400_000) / 3_600_000);
-  return `Ends in ${d}d ${h}h · shares settle when the week closes`;
+  return `Ends in ${d}d ${h}h · shares settle when the epoch closes`;
 }
 
 function CreatorRow({ rank, c }: { rank: number; c: SeasonCreator }) {
@@ -202,12 +235,163 @@ function CreatorRow({ rank, c }: { rank: number; c: SeasonCreator }) {
           <p className="mt-2 flex items-start gap-1.5 text-[10.5px] text-sp-shade/55">
             <Info className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
             Reward never exceeds 30% of the fees this creator&apos;s tokens actually contributed to the
-            protocol this week ({eth(c.netProtocolEth)} {SPHERE_NATIVE_SYMBOL} contributed → cap {eth(c.rewardCapEth)} {SPHERE_NATIVE_SYMBOL}
+            protocol this epoch ({eth(c.netProtocolEth)} {SPHERE_NATIVE_SYMBOL} contributed → cap {eth(c.rewardCapEth)} {SPHERE_NATIVE_SYMBOL}
             {c.capBinding ? ' - cap is binding for this creator' : ''}). Wash trading pays more in fees than it can ever get back.
           </p>
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * ZEROWA EPOKA, WYTLUMACZONA. Warunek to `creators.length === 0` - dokladnie
+ * to, co robi z danych zero w naglowku - wiec komunikat znika SAM, gdy tylko
+ * jakikolwiek punktowany token zrobi obrot. Zadnej flagi do recznego gaszenia.
+ *
+ * Nazwa "SPHERE" jest tu uzasadniona: EXCLUDED_TOKENS w epochMath zawiera
+ * dokladnie jeden adres i jest CZESCIA publicznego algorytmu (wchodzi w
+ * algorithmHash manifestu), wiec nie zmieni sie po cichu.
+ */
+function ZeroEpochNotice({
+  data,
+  scoredTokens,
+  excludedVolumeWei,
+}: {
+  data: SeasonData;
+  scoredTokens: number;
+  excludedVolumeWei: bigint;
+}) {
+  const excludedTokens = Math.max(0, data.totals.tokens - scoredTokens);
+  const nothingAtAll = data.totals.tokens === 0;
+  return (
+    <section className="sph-card rounded-[20px] border border-sp-brand/25 bg-sp-brand/[0.05] p-4 sm:p-5">
+      <h3 className="flex items-center gap-2 text-[13.5px] font-extrabold text-sp-ink">
+        <Info className="h-4 w-4 text-sp-brand" aria-hidden="true" />
+        Nothing scored this epoch - and that is the real number, not a broken page
+      </h3>
+      <p className="mt-1.5 text-[11.5px] leading-relaxed text-sp-shade/60">
+        {nothingAtAll ? (
+          <>
+            Not a single curve trade happened on the launchpad between blocks {blockNo(data.epoch.fromBlock)} and{' '}
+            {blockNo(data.epoch.toBlock)}, so external volume, protocol revenue, creators and tokens are all genuinely 0.
+          </>
+        ) : (
+          <>
+            {excludedTokens === 1 ? 'The only token' : `All ${excludedTokens} tokens`} with any activity between blocks{' '}
+            {blockNo(data.epoch.fromBlock)} and {blockNo(data.epoch.toBlock)}{' '}
+            {excludedTokens === 1 ? 'is SPHERE itself, and SPHERE is' : 'are excluded tokens, and they are'} barred from
+            its own season so the protocol cannot farm its own creator rewards - which is why external volume, protocol
+            revenue and creator count all read 0.
+            {excludedVolumeWei > 0n && (
+              <>
+                {' '}
+                SPHERE&apos;s real trading this epoch, {Number(formatEther(excludedVolumeWei)).toFixed(4)}{' '}
+                {SPHERE_NATIVE_SYMBOL}, is charted below under &quot;excluded from season scoring&quot;.
+              </>
+            )}
+          </>
+        )}
+      </p>
+      <p className="mt-1.5 text-[10.5px] text-sp-shade/45">
+        The moment any other token trades on the curve, it scores, the leaderboard fills and this notice disappears on
+        its own. Rewards already streaming from earlier epochs are unaffected - see the ledger below.
+      </p>
+    </section>
+  );
+}
+
+/**
+ * KSIEGA PULI - odpowiedz na "ile z tego naprawde wyplacono?".
+ *
+ * Kazda liczba to odczyt z SphereStreamingMerkleDistributor (useSphereDistributor):
+ * saldo tokena, totalCumulative, totalClaimed i pending(). Nic tu nie jest
+ * szacowane ani wpisane recznie - dlatego karta pokazuje adres kontraktu obok
+ * naglowka, zeby kazda pozycje dalo sie odbic na Basescanie.
+ */
+function PoolLedger({ dist }: { dist: DistributorState | null }) {
+  if (!dist || !SPHERE_DISTRIBUTOR_ADDRESS) return null;
+  const owed = dist.totalCumulative > dist.totalClaimed ? dist.totalCumulative - dist.totalClaimed : 0n;
+  // Procent wyplacony liczymy w bigincie (bez floata na 18 decimals).
+  const paidPct =
+    dist.totalCumulative > 0n ? Number((dist.totalClaimed * 10_000n) / dist.totalCumulative) / 100 : 0;
+  const pendingDelta =
+    dist.pendingValidAt > 0 && dist.pendingTotalCumulative > dist.totalCumulative
+      ? dist.pendingTotalCumulative - dist.totalCumulative
+      : 0n;
+
+  const tiles: { label: string; value: string; hint: string }[] = [
+    {
+      label: 'Distributor holds',
+      value: sphereAmt(dist.balance),
+      hint: 'SPHERE sitting in the contract',
+    },
+    {
+      label: 'Allocated to creators',
+      value: sphereAmt(dist.totalCumulative),
+      hint: `cumulative after ${dist.epochId} paid epoch${dist.epochId === 1 ? '' : 's'}`,
+    },
+    {
+      label: 'Claimed so far',
+      value: sphereAmt(dist.totalClaimed),
+      hint: `${paidPct.toFixed(2)}% of what is allocated`,
+    },
+    {
+      label: 'Allocated, unclaimed',
+      value: sphereAmt(owed),
+      hint: 'streaming or waiting for a claim',
+    },
+    {
+      label: 'Free pool',
+      value: sphereAmt(dist.poolFree, 0),
+      hint: 'balance minus what is owed - funds the next epochs',
+    },
+    {
+      label: pendingDelta > 0n ? 'Proposed, not yet live' : 'Nothing proposed',
+      value: pendingDelta > 0n ? sphereAmt(pendingDelta) : '0',
+      hint:
+        pendingDelta > 0n
+          ? `epoch #${dist.pendingEpochId} · claimable from ${utcStamp(dist.pendingValidAt)} UTC`
+          : 'no root is waiting in the veto window',
+    },
+  ];
+
+  return (
+    <section className="sph-card rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-[13.5px] font-extrabold text-sp-ink">Reward pool ledger (SPHERE)</h3>
+        <AddressPill address={SPHERE_DISTRIBUTOR_ADDRESS} label="distributor" />
+      </div>
+      <p className="mt-0.5 text-[10.5px] text-sp-shade/50">
+        Every figure is a live read from the distributor contract - balance, cumulative allocation, claims and the
+        proposed root. Nothing on this card is estimated.
+      </p>
+
+      <div className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-6">
+        {tiles.map((t) => (
+          <div key={t.label} className="rounded-2xl bg-sp-sunken p-3">
+            <p className="text-[9.5px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/45">{t.label}</p>
+            <p className="mt-1 font-soft-display text-[17px] font-extrabold leading-none text-sp-ink">{t.value}</p>
+            <p className="mt-1 text-[9.5px] font-bold leading-snug text-sp-shade/40">{t.hint}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Ile z obiecanego naprawde wyszlo - jeden pasek zamiast akapitu. */}
+      <div className="mt-3 flex items-center gap-3">
+        <div className="h-2 flex-1 overflow-hidden rounded-full bg-sp-shade/10">
+          <div className="h-full rounded-full bg-sp-up transition-[width] duration-700" style={{ width: `${Math.min(100, paidPct)}%` }} />
+        </div>
+        <span className="shrink-0 text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/45">
+          {sphereAmt(dist.totalClaimed)} / {sphereAmt(dist.totalCumulative)} paid out
+        </span>
+      </div>
+      <p className="mt-2 text-[10.5px] text-sp-shade/45">
+        Active root: epoch #{dist.epochId}, activated {utcStamp(dist.activatedAt)} UTC, unlocking linearly over{' '}
+        {Math.round(dist.streamSeconds / 86_400)} days. Veto window before any root goes live:{' '}
+        {Math.round(dist.minDelaySeconds / 3600)}h, immutable in the contract.
+      </p>
+    </section>
   );
 }
 
@@ -227,18 +411,19 @@ function PastEpochRow({ e, line }: { e: PastEpoch; line: AccountEpochLine | null
     <div className="rounded-2xl bg-sp-shade/[0.03] px-3 py-2.5">
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5">
         <span className="min-w-[104px]">
-          <span className="block text-[13px] font-extrabold text-sp-ink">Week {e.index + 1}</span>
+          <span className="block text-[13px] font-extrabold text-sp-ink">Epoch {e.index}</span>
           <span className="block font-mono text-[9.5px] text-sp-shade/40">
-            #{e.fromBlock} – #{e.toBlock}
+            #{blockNo(e.fromBlock)} – #{blockNo(e.toBlock)}
           </span>
         </span>
         {m ? (
           <>
             <EpochStat label={`volume (${SPHERE_NATIVE_SYMBOL})`} value={eth(m.externalVolumeEth, 3)} />
+            <EpochStat label={`protocol (${SPHERE_NATIVE_SYMBOL})`} value={eth(m.protocolEth, 4)} />
             <EpochStat label="creators" value={m.creators} />
             <EpochStat
               label={m.poolSphere === '0' ? 'pool · shadow' : 'pool (SPHERE)'}
-              value={m.poolSphere === '0' ? '0' : sphereAmt(m.poolSphere)}
+              value={m.poolSphere === '0' ? '0' : sphereAmt(m.poolSphere, 0)}
             />
             <a
               href={m.url}
@@ -257,7 +442,7 @@ function PastEpochRow({ e, line }: { e: PastEpoch; line: AccountEpochLine | null
       </div>
       {m && !m.closedAtPublish && (
         <p className="mt-1.5 text-[10px] font-bold text-sp-shade/40">
-          Published as a mid-week snapshot - final numbers land when the closed epoch is republished.
+          Published as a mid-epoch snapshot - final numbers land when the closed epoch is republished.
         </p>
       )}
       {line && (
@@ -266,8 +451,8 @@ function PastEpochRow({ e, line }: { e: PastEpoch; line: AccountEpochLine | null
           {line.status === 'claimed'
             ? 'claimed in full'
             : line.status === 'streaming'
-              ? 'streaming - unlocks linearly through this week'
-              : 'claimable now - and it waits for you indefinitely'}
+              ? 'streaming - unlocks linearly through this epoch'
+              : 'claimable now - no deadline while this root is active'}
         </p>
       )}
     </div>
@@ -275,14 +460,19 @@ function PastEpochRow({ e, line }: { e: PastEpoch; line: AccountEpochLine | null
 }
 
 /**
- * "Previous epochs" - zamkniete tygodnie sezonu z linkami do kanonicznych
+ * "Previous epochs" - zamkniete epoki sezonu z linkami do kanonicznych
  * manifestow (publishEpoch.ts) i podsumowaniem per epoka.
  *
- * KOMUNIKACJA GWARANCJI (spec 6.1): dystrybutor jest KUMULATYWNY - lisc to
- * skumulowana naleznosc, monotonicznosc wymuszana przy claimie - wiec
- * nieodebrane nagrody NIGDY nie przepadaja i jeden claim placi wszystko,
- * co naroslo. Sekcja mowi to wprost, zeby nikt nie sadzil, ze musi
- * odbierac co tydzien.
+ * KOMUNIKACJA GWARANCJI (spec 6.1) - POPRAWIONA 2026-09-10. Bylo: "nagrody
+ * NIGDY nie przepadaja". To jest mocniejsze niz kontrakt. Co naprawde daje
+ * SphereStreamingMerkleDistributor.sol:
+ *   - `propose` odrzuca root o mniejszym totalCumulative (ShrinkingTotal),
+ *     wiec GLOBALNA suma nie moze sie skurczyc;
+ *   - `claim` weryfikuje proof przeciw AKTYWNEMU rootowi, wiec saldo
+ *     KONKRETNEGO konta jedzie dalej tylko wtedy, gdy proposer wpisze je do
+ *     kolejnego roota.
+ * Czyli: nie ma zegara wygasania, ale nie ma tez on-chainowej gwarancji
+ * przeniesienia salda. Mowimy oba zdania.
  *
  * Przyrost naleznosci konta per epoka liczymy z map `cumulative` manifestow
  * (cum_N - cum poprzedniego roota), status z jednego skalara
@@ -366,13 +556,16 @@ function PastEpochsSection() {
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="text-[13.5px] font-extrabold text-sp-ink">Previous epochs</h3>
         <span className="rounded-full bg-sp-up/10 px-2.5 py-1 text-[9.5px] font-extrabold uppercase tracking-[0.08em] text-sp-up">
-          Cumulative - nothing expires
+          Cumulative · no claim deadline
         </span>
       </div>
-      <p className="mt-0.5 text-[10.5px] text-sp-shade/50">
-        Every closed week gets a canonical manifest anyone can recompute. Rewards are cumulative by design: each new
-        Merkle root carries your full history, so unclaimed SPHERE never expires and a single claim collects everything
-        ever accrued. Claiming weekly is not required.
+      <p className="mt-0.5 text-[10.5px] leading-relaxed text-sp-shade/50">
+        Every closed epoch gets a canonical manifest anyone can recompute, and every epoch window is{' '}
+        {EPOCH_BLOCKS.toLocaleString('en-US')} blocks long, counted from launchpad deploy block{' '}
+        {blockNo(SEASON_GENESIS_BLOCK)}. Rewards are cumulative: one claim collects everything accrued under the active
+        root, and nothing forces you to claim every epoch. What the contract enforces is that a new root may not carry a
+        smaller total than the one before it (<span className="font-mono">ShrinkingTotal</span>); carrying your own
+        balance forward is the proposer&apos;s job, not the contract&apos;s.
       </p>
 
       <div className="mt-3 grid gap-1.5">
@@ -384,7 +577,7 @@ function PastEpochsSection() {
           </p>
         ) : data.epochs.length === 0 ? (
           <p className="py-6 text-center text-[12px] text-sp-shade/45">
-            The first week is still running - closed epochs will appear here with their manifests.
+            The first epoch is still running - closed epochs will appear here with their manifests.
           </p>
         ) : (
           data.epochs.map((e) => <PastEpochRow key={e.index} e={e} line={accountLines.get(e.index) ?? null} />)
@@ -398,7 +591,7 @@ function PastEpochsSection() {
 export default function SphereSeasonPanel() {
   const [data, setData] = useState<SeasonData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // Stan dystrybutora: plakietka shadow/live w naglowku + karta Claim.
+  // Stan dystrybutora: plakietka shadow/live w naglowku + karta Claim + ksiega.
   const dist = useSphereDistributor();
 
   useEffect(() => {
@@ -434,8 +627,23 @@ export default function SphereSeasonPanel() {
     [data]
   );
   const hasExcluded = chartData.some((d) => d.sphere > 0);
+  /** Suma wolumenu wykluczonego - do zdania w ZeroEpochNotice. */
+  const excludedVolumeWei = useMemo(
+    () => (data?.dailyExcludedVolumeEth ?? []).reduce((a, v) => a + BigInt(v), 0n),
+    [data]
+  );
+  /**
+   * Tokeny PUNKTOWANE vs tokeny Z OBROTEM. API oddaje w totals.tokens wszystko,
+   * co mialo aktywnosc (razem z wykluczonymi), a creators[] powstaje juz PO
+   * wykluczeniach - roznica tych dwoch liczb to caly powod, dla ktorego
+   * naglowek pokazywal "tokens 1, creators 0" i wygladalo to na awarie.
+   */
+  const scoredTokens = useMemo(
+    () => (data ? data.creators.reduce((a, c) => a + c.tokens.length, 0) : 0),
+    [data]
+  );
 
-  const countdown = useWeekCountdown(data?.epoch.endsAtUnix ?? null);
+  const countdown = useEpochCountdown(data?.epoch.endsAtUnix ?? null);
 
   if (error) {
     return (
@@ -453,9 +661,11 @@ export default function SphereSeasonPanel() {
 
   return (
     <div className="sph-stagger grid gap-4">
-      {/* HERO: tydzien, odliczanie i cztery wielkie liczby ------------------- */}
+      {/* HERO: epoka, odliczanie i szesc wielkich liczb --------------------- */}
       <PageHero
-        title={data ? `Week ${data.epoch.index + 1}` : 'This week'}
+        // "Epoch N", nie "Week N": okno liczy sie w BLOKACH od deployu pada,
+        // wiec nie pokrywa sie z tygodniem kalendarzowym - patrz naglowek pliku.
+        title={data ? `Epoch ${data.epoch.index}` : 'This epoch'}
         tagline={countdown}
         icon={<Trophy className="h-6 w-6 text-sp-brand" aria-hidden="true" />}
         badge={
@@ -464,7 +674,7 @@ export default function SphereSeasonPanel() {
           </span>
         }
       >
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
           {/* Pula nagrod na pierwszym miejscu: od 6.09.2026 (8.34M ze skarbca) to
               jest liczba, po ktora tworca tu przychodzi. Wolne saldo dystrybutora,
               czyli dokladnie to, co automat wezmie jako pule nastepnej epoki. */}
@@ -473,35 +683,78 @@ export default function SphereSeasonPanel() {
             value={dist ? Number(formatEther(dist.poolFree)) : null}
             decimals={0}
             tone="brand"
-            hint="for the next epochs · rule 0 caps payouts"
+            hint="free balance · funds the next epochs"
+          />
+          {/* Dwie liczby, ktore NIE sa zerem nawet w cichej epoce - naglowek
+              przestaje wygladac na martwy, a obie sa odczytem z kontraktu. */}
+          <BigStat
+            label="Paid to creators (SPHERE)"
+            value={dist ? Number(formatEther(dist.totalClaimed)) : null}
+            decimals={2}
+            tone="up"
+            hint={
+              dist && dist.totalCumulative > 0n
+                ? `of ${sphereAmt(dist.totalCumulative)} allocated so far`
+                : 'claimed from the distributor'
+            }
           />
           <BigStat
             label={`External volume (${SPHERE_NATIVE_SYMBOL})`}
             value={totals ? Number(formatEther(BigInt(totals.externalVolumeEth))) : null}
-            decimals={3}
-            hint="self-trades excluded"
+            decimals={4}
+            hint="this epoch · self-trades and SPHERE excluded"
           />
           <BigStat
             label={`Protocol revenue (${SPHERE_NATIVE_SYMBOL})`}
             value={totals ? Number(formatEther(BigInt(totals.protocolEth))) : null}
             decimals={4}
-            tone="up"
-            hint="funds the future pool"
+            // BYLO: "funds the future pool" - obietnica, ktorej nikt nie
+            // egzekwuje on-chain. Przychod ida na Safe 1/1; zasilenie puli
+            // jest decyzja Safe'a, wiec podpis mowi "discretionary".
+            hint="this epoch · collected by the Safe · funding the pool is discretionary"
           />
-          <BigStat label="Creators" value={totals ? totals.creators : null} decimals={0} hint="in the running" />
-          <BigStat label="Tokens" value={totals ? totals.tokens : null} decimals={0} hint=">48h old to enter" />
+          <BigStat label="Creators" value={totals ? totals.creators : null} decimals={0} hint="scoring this epoch" />
+          <BigStat
+            label="Tokens scoring"
+            value={data ? scoredTokens : null}
+            decimals={0}
+            hint={totals ? `of ${totals.tokens} with volume · >48h old to enter` : '>48h old to enter'}
+          />
         </div>
 
-        {/* Pasek postepu tygodnia - zegar sezonu pod liczbami. */}
+        {/* Pasek postepu epoki - zegar sezonu pod liczbami. */}
         <div className="mt-3 flex items-center gap-3">
           <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/60">
             <div className="sph-progress h-full rounded-full bg-sp-brand" style={{ width: `${progress}%` }} />
           </div>
           <span className="shrink-0 text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/45">
-            {data ? `${Math.round(progress)}% elapsed` : 'syncing'}
+            {data ? `${progress.toFixed(2)}% elapsed` : 'syncing'}
           </span>
         </div>
+
+        {/* KOTWICA EPOKI: dokladne okno blokow + skad sie bierze. Bez tego
+            "Epoch 4" jest slowem, ktorego czytelnik nie moze sprawdzic. */}
+        {data && (
+          <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] text-sp-shade/45">
+            <span className="font-mono">
+              blocks {blockNo(data.epoch.fromBlock)} – {blockNo(data.epoch.toBlock)}
+            </span>
+            <span>
+              · epochs are fixed {EPOCH_BLOCKS.toLocaleString('en-US')}-block windows counted from launchpad deploy block{' '}
+              {blockNo(SEASON_GENESIS_BLOCK)}, not calendar weeks
+            </span>
+            <AddressPill address={SPHERE_SAFE_ADDRESS} label="revenue safe" />
+          </p>
+        )}
       </PageHero>
+
+      {/* PUSTY STAN, KTORY SIE TLUMACZY - znika sam, gdy cokolwiek zapunktuje. */}
+      {data && data.creators.length === 0 && (
+        <ZeroEpochNotice data={data} scoredTokens={scoredTokens} excludedVolumeWei={excludedVolumeWei} />
+      )}
+
+      {/* KSIEGA PULI: ile obiecane, ile wyplacone, ile czeka --------------- */}
+      <PoolLedger dist={dist} />
 
       {/* WYKRES: wolumen dzienny --------------------------------------------- */}
       <section className="sph-card rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
@@ -537,6 +790,13 @@ export default function SphereSeasonPanel() {
             <div className="sph-skeleton h-full w-full" />
           )}
         </div>
+        {/* Pusty wykres MUSI powiedziec, ze jest pusty celowo - inaczej czyta
+            sie jak brak danych, zwlaszcza tuz nad niepusta seria SPHERE. */}
+        {data && chartData.every((d) => d.volume === 0) && (
+          <p className="mt-1 text-[10.5px] font-bold text-sp-shade/45">
+            Flat at zero for all seven days: no season-eligible token traded in this epoch.
+          </p>
+        )}
 
         {/* PRAWDZIWA HISTORIA: obrot SPHERE, wykluczony z punktacji sezonu.
             Osobna mini-os, bo skala (dziesiatki ETH) zgniotlaby slupki sezonu
@@ -544,7 +804,8 @@ export default function SphereSeasonPanel() {
         {hasExcluded && (
           <>
             <h4 className="mt-4 text-[11.5px] font-extrabold text-sp-shade/60">
-              SPHERE volume ({SPHERE_NATIVE_SYMBOL}) - excluded from season scoring
+              SPHERE volume ({SPHERE_NATIVE_SYMBOL}) - excluded from season scoring ·{' '}
+              {Number(formatEther(excludedVolumeWei)).toFixed(4)} {SPHERE_NATIVE_SYMBOL} this epoch
             </h4>
             <p className="mt-0.5 text-[10px] text-sp-shade/45">
               SPHERE cannot farm its own creator rewards, so its trading scores zero above - the history is still real
@@ -611,10 +872,13 @@ export default function SphereSeasonPanel() {
         <div className="mt-3 grid gap-1.5">
           {!data ? (
             <p className="flex items-center justify-center gap-2 py-8 text-center text-[12px] text-sp-shade/45">
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Indexing this week&apos;s volume from Base…
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Indexing this epoch&apos;s volume from Base…
             </p>
           ) : data.creators.length === 0 ? (
-            <p className="py-8 text-center text-[12px] text-sp-shade/45">No eligible volume this week yet.</p>
+            <p className="py-8 text-center text-[12px] text-sp-shade/45">
+              No creator scored in epoch {data.epoch.index}: {data.totals.tokens === 0 ? 'no token traded on the curve' : `the only ${data.totals.tokens - scoredTokens === 1 ? 'token' : 'tokens'} with volume ${data.totals.tokens - scoredTokens === 1 ? 'is' : 'are'} excluded from scoring`}
+              . The board fills as soon as an eligible token trades.
+            </p>
           ) : (
             data.creators.map((c, i) => <CreatorRow key={c.creator} rank={i + 1} c={c} />)
           )}
