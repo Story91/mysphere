@@ -45,6 +45,7 @@ import {
   LIVE_WATCH,
   previewTokens,
   setLaunchpadChain,
+  STATE_VIEW_ADDRESS,
   type LaunchpadToken,
 } from './config';
 import { fetchLogos, recallLogos, rememberLogos } from './logos';
@@ -60,13 +61,23 @@ import {
   saveSnapshot,
 } from './snapshot';
 import {
+  applySwapLogs,
+  applyTransferLogs,
+  BURN_SINK,
+  holderCount,
+  logRangeLimitFrom,
   mergeAggregates,
   parseAggregate,
+  parseExtras,
   planBoardScan,
+  planExtrasScan,
+  poolVolumeEth,
   reduceBoardLogs,
   scanIsTrustworthy,
   serializeAggregate,
+  serializeExtras,
   shouldKeepUnscanned,
+  type TokenExtras,
 } from './boardScan';
 // Agregat wspolny dla wszystkich urzadzen - patrz naglowek `boardStats`.
 import { fetchBoardStats, pickAggregateBase } from './boardStats';
@@ -74,7 +85,11 @@ import { fetchBoardStats, pickAggregateBase } from './boardStats';
 // handlu - mini modala na tablicy i panelu na stronie tokena. Dwie kopie tej
 // samej liczby wlasnie kosztowaly nas przyciski, ktore wpisywaly zero.
 import { DEFAULT_SLIPPAGE_BPS, fractionOf, GAS_RESERVE_WEI, spendableEth, tapeAmount, totalEarned } from './[address]/detailShared';
-import { fetchHolderCounts } from './blockscout';
+import { fetchTokenCountersBatch, indexLooksCaughtUp } from './blockscout';
+// Ta sama arytmetyka ceny puli, co na stronie tokena - jedna kopia, zeby karta
+// i strona nie mogly pokazac dwoch roznych cen tego samego tokena.
+import { poolPriceWeiFromSqrt, stateViewAbi } from './[address]/poolPrice';
+import { POOL_SWAP_EVENT } from './[address]/poolSwaps';
 import LaunchTokenModal from './LaunchTokenModal';
 import ShareToken from './ShareToken';
 import StartpadFooter from './StartpadFooter';
@@ -187,6 +202,32 @@ type BoardToken = LaunchpadToken & {
    * "My tokens" nie musiala liczyc niczego od nowa.
    */
   creatorAccruedWei?: bigint;
+  /**
+   * ===================================================================
+   * LICZBA POD SLOWEM MUSI BYC TA, KTORA TO SLOWO NAZYWA
+   * ===================================================================
+   * `holders` z `LaunchpadToken` bylo do 10 wrzesnia 2026 liczba KONT
+   * HANDLUJACYCH NA KRZYWEJ, wystawiona pod nazwa posiadaczy. Rozdzielamy to
+   * na dwa pola o dwoch roznych nazwach, bo to sa dwie rozne wielkosci:
+   *
+   *   `traders`     - ile kont handlowalo na krzywej (to, co bylo);
+   *   `holderCount` - ile adresow ma DZIS dodatnie saldo (to, co obiecywalismy).
+   *
+   * `holderCount === null` znaczy "jeszcze nie policzone" i wtedy karta ma
+   * pokazac `traders` POD SLOWEM "traders" - nigdy jednej liczby pod druga
+   * nazwa. Pole `holders` z typu bazowego zostaje jako to, co idzie na ekran.
+   */
+  traders?: number;
+  holderCount?: number | null;
+  /**
+   * Wolumen puli po graduacji (ETH), suma `|amount0|` swapow. `null` = zakres
+   * jeszcze niepoliczony, wiec karta mowi "curve vol", a nie "vol".
+   */
+  poolVolume?: number | null;
+  /** Cena z `slot0` puli (ETH za token). Po graduacji to JEDYNA zywa cena. */
+  poolPrice?: number;
+  /** Kapitalizacja w ETH: cena puli razy calkowita podaz. */
+  marketCapEth?: number;
 };
 
 /**
@@ -424,7 +465,8 @@ function LaunchCard({
   const status = curveStatusLabel(token);
   const sample = !token.live;
   const raisedNote = usdNote(token.raised, ethUsd);
-  const volNote = usdNote(token.volume ?? 0, ethUsd);
+  const vol = volumeParts(token);
+  const volNote = usdNote(vol.eth, ethUsd);
   const header = (
     <>
       <TokenGlyph token={token} />
@@ -474,11 +516,20 @@ function LaunchCard({
           <span className="text-[17px] font-extrabold text-sp-ink">{formatEth(token.raised)}{raisedNote && <span className="text-[11px] font-bold text-sp-shade/40"> · {raisedNote}</span>}</span>
           <span className={`ml-auto shrink-0 text-[11px] font-extrabold ${status.className}`}>{status.text}</span>
         </div>
+        {/* Po graduacji liczba wyzej to ZBIORKA, ktora sie domknela - stala
+            historyczna, nie kurs. Kapitalizacja z ceny puli jest tym, czego tu
+            szuka wzrok, wiec stoi osobno i pod wlasna nazwa. */}
+        {token.marketCapEth != null && (
+          <div className="mt-1 text-[11px] text-sp-shade/45">
+            <span className="font-bold text-sp-ink">{formatEth(token.marketCapEth)}</span>
+            {usdNote(token.marketCapEth, ethUsd) ? ` (${usdNote(token.marketCapEth, ethUsd)})` : ''} market cap
+          </div>
+        )}
         <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-sp-shade/8">
           <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${progress}%`, backgroundColor: token.accent }} />
         </div>
         <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-sp-shade/45">
-          <span className="min-w-0 truncate">{formatEth(token.volume ?? 0)}{volNote ? ` (${volNote})` : ''} vol · {token.holders} holders · {token.age}</span>
+          <span className="min-w-0 truncate">{formatEth(vol.eth)}{volNote ? ` (${volNote})` : ''} {vol.label} · {peopleNote(token)} · {token.age}</span>
           <Sparkline prices={token.prices ?? []} />
         </div>
       </div>
@@ -574,7 +625,8 @@ function KingOfTheHill({ token, ethUsd, onTrade, onDetails }: { token: BoardToke
   const progress = curvePercent(token);
   const toGo = Math.max(0, token.target - token.raised);
   const raisedNote = usdNote(token.raised, ethUsd);
-  const volNote = usdNote(token.volume ?? 0, ethUsd);
+  const vol = volumeParts(token);
+  const volNote = usdNote(vol.eth, ethUsd);
   return (
     <section className="relative mt-5 overflow-hidden rounded-[20px] border border-soft-primary/30 bg-sp-surface p-4 sm:p-5" aria-label="King of the hill">
       <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-16 h-48 w-48 rounded-full bg-soft-primary/[0.08] blur-2xl" />
@@ -589,7 +641,7 @@ function KingOfTheHill({ token, ethUsd, onTrade, onDetails }: { token: BoardToke
               <span className="text-[17px] font-extrabold text-sp-ink">{token.symbol}</span>
               <StatePill state={token.state} />
             </div>
-            <p className="mt-0.5 truncate text-[12px] text-sp-shade/50">{token.name} · {token.holders} holders · {formatEth(token.volume ?? 0)}{volNote ? ` (${volNote})` : ''} vol · {token.age}</p>
+            <p className="mt-0.5 truncate text-[12px] text-sp-shade/50">{token.name} · {peopleNote(token)} · {formatEth(vol.eth)}{volNote ? ` (${volNote})` : ''} {vol.label} · {token.age}</p>
           </div>
         </div>
         <div className="w-full sm:w-[240px]">
@@ -782,7 +834,7 @@ function TopLaunches({ tokens, onOpen }: { tokens: BoardToken[]; onOpen: (token:
 }
 
 function VolumePanel({ tokens, onOpen }: { tokens: BoardToken[]; onOpen: (token: BoardToken) => void }) {
-  const top = [...tokens].sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0)).slice(0, 3);
+  const top = [...tokens].sort((a, b) => volumeParts(b).eth - volumeParts(a).eth).slice(0, 3);
   const rowClass = 'grid w-full grid-cols-[1fr_auto_auto] items-center gap-x-3 py-2 text-left';
   return (
     <section className="rounded-[20px] border border-sp-shade/10 bg-sp-surface p-5">
@@ -798,7 +850,7 @@ function VolumePanel({ tokens, onOpen }: { tokens: BoardToken[]; onOpen: (token:
           const cells = (
             <>
               <span className="flex min-w-0 items-center gap-2"><TokenGlyph token={token} /><span className="truncate text-[12px] font-extrabold text-sp-ink">{token.symbol}</span></span>
-              <span className="text-[12px] font-bold text-sp-ink">{formatEth(token.volume ?? 0)}</span>
+              <span className="text-[12px] font-bold text-sp-ink">{formatEth(volumeParts(token).eth)}</span>
               <span className="text-[12px] font-bold text-sp-shade/60">{token.trades ?? 0}</span>
             </>
           );
@@ -977,7 +1029,7 @@ function MyTokensPanel({
                   </div>
                 </div>
                 <div className="w-[92px] shrink-0">
-                  <span className="block text-[12px] font-bold text-sp-ink">{formatEth(token.volume ?? 0)}</span>
+                  <span className="block text-[12px] font-bold text-sp-ink">{formatEth(volumeParts(token).eth)}</span>
                   <span className="block text-[10px] text-sp-shade/40">volume</span>
                 </div>
                 <div className="w-[118px] shrink-0">
@@ -1018,7 +1070,8 @@ function LaunchTableRow({
   const status = curveStatusLabel(token);
   const sample = !token.live;
   const raisedNote = usdNote(token.raised, ethUsd);
-  const volNote = usdNote(token.volume ?? 0, ethUsd);
+  const vol = volumeParts(token);
+  const volNote = usdNote(vol.eth, ethUsd);
   const coinCell = (
     <>
       <TokenGlyph token={token} />
@@ -1037,8 +1090,8 @@ function LaunchTableRow({
         <button type="button" onClick={onOpen} className="flex min-w-0 items-center gap-3 text-left">{coinCell}</button>
       )}
       <div><span className="block text-[14px] font-extrabold text-sp-ink">{formatEth(token.raised)}{raisedNote && <span className="text-[11px] font-bold text-sp-shade/40"> · {raisedNote}</span>}</span><span className={`mt-1 block text-[11px] font-bold ${status.className}`}>{status.text}</span></div>
-      <div><span className="block text-[14px] font-bold text-sp-ink">{formatEth(token.volume ?? 0)}{volNote && <span className="text-[11px] font-bold text-sp-shade/40"> · {volNote}</span>}</span><span className="mt-1 block text-[11px] text-sp-shade/45">indexed volume</span></div>
-      <div className="flex items-center gap-2"><Sparkline prices={token.prices ?? []} /><span className="text-[11px] font-bold text-sp-shade/45">{token.holders} holders</span></div>
+      <div><span className="block text-[14px] font-bold text-sp-ink">{formatEth(vol.eth)}{volNote && <span className="text-[11px] font-bold text-sp-shade/40"> · {volNote}</span>}</span><span className="mt-1 block text-[11px] text-sp-shade/45">{vol.label === 'vol' ? 'indexed volume' : 'curve volume'}</span></div>
+      <div className="flex items-center gap-2"><Sparkline prices={token.prices ?? []} /><span className="text-[11px] font-bold text-sp-shade/45">{peopleNote(token)}</span></div>
       <div><span className="block text-[14px] font-bold text-sp-ink">{shortAddress(token.creator)}</span><span className="mt-1 block text-[11px] text-sp-shade/45">creator</span></div>
       {sample ? (
         <span />
@@ -1191,15 +1244,41 @@ function TradePanel({
 // blokach (male okno, wiele okien), Robinhood przyjmuje 200k na strzal (duze
 // okno, kilka okien - inaczej skan nie siegal bloku wdrozenia i tablica
 // pokazywala mocki). Patrz LAUNCHPAD_NETWORKS w config.ts.
-const LOG_WINDOW = ACTIVE_LAUNCHPAD_NETWORK.scanWindow;
+/**
+ * Okno skanu ZACZYNA sie na wartosci z konfiguracji, ale nie musi na niej
+ * zostac - patrz `logRangeLimitFrom` w `boardScan`. 10 wrzesnia 2026 kazde
+ * okno na Base wracalo z 413 "limited to a 2,000 range", bo konfiguracja
+ * niesie pomiar z 13 sierpnia, a Base zaciesnil limit po tej dacie. Zamiast
+ * przepisywac liczbe (i przegapic kolejna zmiane), czytamy limit z bledu i
+ * pamietamy go NA CZAS SESJI.
+ *
+ * `let`, a nie `const`: to jest zmierzona wlasnosc endpointu, do ktorego
+ * akurat mowimy, a nie stala programu.
+ */
+let logWindow = ACTIVE_LAUNCHPAD_NETWORK.scanWindow;
 const MAX_LOG_WINDOWS = ACTIVE_LAUNCHPAD_NETWORK.maxScanWindows;
+
+/**
+ * Zwez okno, jesli TEN blad mowi o limicie zakresu. Oddaje `true`, gdy okno
+ * sie zmienilo - wolajacy wie wtedy, ze warto policzyc zakresy od nowa.
+ *
+ * Nigdy nie POSZERZAMY: limit endpointu poznajemy wylacznie przez odmowe, a
+ * odmowy nie ma, dopoki pytamy w granicach. Powrot do szerszego okna nalezy do
+ * kolejnego wejscia na strone, gdzie `logWindow` startuje od konfiguracji.
+ */
+function narrowLogWindow(error: unknown): boolean {
+  const limit = logRangeLimitFrom(error);
+  if (limit === null || limit >= logWindow) return false;
+  logWindow = limit;
+  return true;
+}
 /**
  * Najwieksza zaleglosc, ktora wolno nadrobic doliczeniem delty. Powyzej niej
  * jedno zadanie i tak nie zeskanowaloby calego przedzialu, wiec zostalaby
  * dziura - a dziury w sumie addytywnej nie da sie pozniej odroznic od prawdy.
  * Praktycznie nieosiagalne: agregat starszy niz tydzien i tak wygasa.
  */
-const MAX_DELTA_SPAN = LOG_WINDOW * BigInt(MAX_LOG_WINDOWS);
+const maxDeltaSpan = () => logWindow * BigInt(MAX_LOG_WINDOWS);
 
 const LAUNCHED_EVENT = getAbiItem({ abi: launchpadAbi, name: 'Launched' });
 const BOUGHT_EVENT = getAbiItem({ abi: launchpadAbi, name: 'Bought' });
@@ -1212,12 +1291,105 @@ const HOOK_FEE_SETTLED_EVENT = getAbiItem({ abi: hookAbi, name: 'HookFeeSettled'
 const FEE_ACCRUED_EVENT = getAbiItem({ abi: launchpadAbi, name: 'FeeAccrued' });
 
 /**
+ * `Transfer` tokena i `Swap` puli - dwa zrodla, ktorych krzywa nie ma.
+ *
+ * `Transfer` bierzemy z ABI ERC-20, bo B20 emituje standardowe zdarzenie pod
+ * swoim wlasnym adresem (zmierzone: 6 063 logow dla $SPHERE miedzy blokiem
+ * startu a glowa). `Swap` jest ten sam, co na stronie tokena - importowany
+ * stamtad, zeby nie istnialy dwie definicje tego samego zdarzenia.
+ */
+const TRANSFER_EVENT = getAbiItem({ abi: erc20Abi, name: 'Transfer' });
+
+/**
+ * `totalSupply` osobno, bo `erc20Abi` z `config.ts` go nie ma, a config jest
+ * nietykalny. Kapitalizacja to cena razy podaz, wiec bez tego odczytu byla
+ * niepoliczalna - a zgadnieta podaz (np. "zawsze miliard") to dokladnie ten
+ * rodzaj liczby, ktorej ta zmiana ma sie pozbyc.
+ */
+const totalSupplyAbi = [
+  { type: 'function', name: 'totalSupply', stateMutability: 'view', inputs: [], outputs: [{ name: '', type: 'uint256' }] },
+] as const;
+
+/**
+ * ===========================================================================
+ * BUDZET ZAPYTAN NA DOLICZENIE POSIADACZY I WOLUMENU PULI
+ * ===========================================================================
+ * Jedno `eth_getLogs` przyjmuje TABLICE adresow, a filtr po temacie przyjmuje
+ * tablice wartosci. Dlatego okno kosztuje DWA zapytania niezaleznie od tego,
+ * ile tokenow jest na tablicy: jedno po `Transfer` wszystkich tokenow naraz i
+ * jedno po `Swap` wszystkich pul naraz. To jest cala roznica wobec naiwnego
+ * "po zapytaniu na token", ktore przy czterdziestu tokenach byloby osiemdziesiat
+ * zapytan na okno i zabiloby publiczny RPC.
+ *
+ * Sufit okien NA WEJSCIE jest osobny i niski. Pelna historia $SPHERE to 187
+ * okien po 2 000 blokow - za duzo na jedno wejscie, ale znacznik postepu lezy
+ * w `localStorage`, wiec kolejne wejscia dokladaja tylko nowe bloki i po
+ * kilku wizytach zakres sie domyka. Dopoki sie nie domknie, `complete` jest
+ * `false` i karta pokazuje liczby krzywej POD ICH WLASNA NAZWA - nigdy polowy
+ * prawdy pod nazwa calosci.
+ */
+const EXTRAS_MAX_WINDOWS_PER_VISIT = 150;
+const EXTRAS_CONCURRENCY = 2;
+const EXTRAS_KEY = (chainId: number, launchpad: string) =>
+  `startpad.extras.v1.${chainId}.${launchpad.toLowerCase()}`;
+
+function loadExtras(chainId: number, launchpad: string): TokenExtras | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(EXTRAS_KEY(chainId, launchpad));
+    return raw ? parseExtras(JSON.parse(raw)) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveExtras(chainId: number, launchpad: string, extras: TokenExtras): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(EXTRAS_KEY(chainId, launchpad), JSON.stringify(serializeExtras(extras)));
+  } catch {
+    // Brak miejsca albo tryb prywatny - wtedy po prostu liczymy od nowa przy
+    // kolejnym wejsciu. Nic sie nie psuje, jest tylko wolniej.
+  }
+}
+
+/**
  * Paleta i sposob liczenia przeniesione do `metadata.ts` - ten sam kolor musi
  * dostac karta udostepniania renderowana na serwerze, a ona nie moze wciagac
  * calej tablicy z wagmi. Wynik jest identyczny, wiec zaden token nie zmienia
  * barwy.
  */
 const accentFor = tokenAccent;
+
+/* ========================================================================== */
+/*  PODPISY, KTORE MOWIA TO, CO LICZBA NAPRAWDE ZNACZY                        */
+/* ========================================================================== */
+
+/**
+ * Liczba ludzi plus slowo, ktore ja nazywa.
+ *
+ * Dopoki `holderCount` jest `null`, jedyne, co wiemy, to ile kont handlowalo na
+ * krzywej - i dokladnie tak to piszemy. Zaden token nie dostaje slowa "holders"
+ * przy liczbie, ktora posiadaczy nie liczy.
+ */
+function peopleNote(token: BoardToken): string {
+  if (token.holderCount != null) return `${token.holderCount} holders`;
+  return `${token.traders ?? token.holders} traders`;
+}
+
+/**
+ * Wolumen plus slowo, ktore mowi, CO obejmuje.
+ *
+ * Po graduacji handel przenosi sie do puli, wiec sam wolumen krzywej opisuje
+ * juz tylko przeszlosc. Gdy mamy policzony wolumen puli, sumujemy oba i
+ * podpisujemy "vol"; gdy jeszcze nie mamy, a token JEST po graduacji, podpis
+ * brzmi "curve vol" - bo tyle wtedy naprawde wiemy.
+ */
+function volumeParts(token: BoardToken): { eth: number; label: string } {
+  const curve = token.volume ?? 0;
+  if (token.poolVolume != null) return { eth: curve + token.poolVolume, label: 'vol' };
+  return { eth: curve, label: token.state === 'Graduated' ? 'curve vol' : 'vol' };
+}
 
 function formatAge(startedAt: number) {
   const seconds = Math.max(0, Math.floor(Date.now() / 1000) - startedAt);
@@ -1360,11 +1532,28 @@ export default function LaunchpadBoard() {
       );
       const cachedAggregate = base?.aggregate ?? null;
 
+      /**
+       * ILE BLOKOW WOLNO NAM WZIAC - PYTAMY, ZANIM ZBUDUJEMY OKNA.
+       *
+       * Jedno zapytanie na adres ZEROWY: kontraktu tam nie ma, wiec odpowiedz
+       * jest pusta natychmiast i nic nie kosztuje po stronie indeksu - ale
+       * sprawdzenie ROZMIARU ZAKRESU dzieje sie po stronie RPC przed
+       * wyszukiwaniem, wiec limit poznajemy tak samo dobrze, jak prawdziwym
+       * zapytaniem. Odpowiedz idzie do `logWindow` i dopiero potem liczymy
+       * okna - inaczej zbudowalibysmy 90 okien po 9 500 blokow, z ktorych
+       * kazde odbiloby sie bledem, tak jak odbijalo sie 10 wrzesnia 2026.
+       */
+      try {
+        await readClient.getLogs({ address: zeroAddress, fromBlock: latest > logWindow ? latest - logWindow : 0n, toBlock: latest });
+      } catch (error) {
+        narrowLogWindow(error);
+      }
+
       const plan = planBoardScan({
         cachedLastBlock: base?.lastBlock ?? null,
         head: latest,
         deployBlock: LAUNCHPAD_DEPLOY_BLOCK,
-        maxSpan: MAX_DELTA_SPAN,
+        maxSpan: maxDeltaSpan(),
       });
       const resumable = plan.resume;
       const scanFloor = plan.floor;
@@ -1378,7 +1567,7 @@ export default function LaunchpadBoard() {
       {
         let cursor = latest;
         for (let window = 0; window < MAX_LOG_WINDOWS && cursor >= scanFloor; window += 1) {
-          const fromBlock = cursor > scanFloor + LOG_WINDOW ? cursor - LOG_WINDOW : scanFloor;
+          const fromBlock = cursor > scanFloor + logWindow ? cursor - logWindow : scanFloor;
           ranges.push({ fromBlock, toBlock: cursor });
           if (fromBlock === scanFloor) break;
           cursor = fromBlock - 1n;
@@ -1403,7 +1592,12 @@ export default function LaunchpadBoard() {
           });
         try {
           return await once();
-        } catch {
+        } catch (error) {
+          // Blad o ZAKRESIE zapamietujemy na przyszle wejscia (sonda wyzej
+          // mogla go przegapic, gdy RPC odpowiada rozne rzeczy pod obciazeniem).
+          // Tego okna to juz nie uratuje - jest zbudowane na starej szerokosci -
+          // wiec liczy sie jako padniete i skan nie bedzie wiarygodny.
+          narrowLogWindow(error);
           // Jedna proba ponowna: burst zapytan potrafi zebrac 429 z publicznego
           // RPC, ale po chwili przechodzi.
           try {
@@ -1605,8 +1799,14 @@ export default function LaunchpadBoard() {
           raised:
             LAUNCH_STATE[state] === 'Graduated' ? CURVE_TARGET_ETH : Number(formatEther(ethReserve)),
           target: CURVE_TARGET_ETH,
+          // `holders` to POLE WYSWIETLANE. Dopoki nie policzymy sald, siedzi w
+          // nim liczba handlujacych na krzywej - i karta nazywa ja "traders",
+          // bo `holderCount` jest wtedy `null`. Patrz `BoardToken`.
           holders: buyers.get(token)?.size ?? 0,
+          traders: buyers.get(token)?.size ?? 0,
+          holderCount: null,
           volume: activity.get(token)?.volume ?? 0,
+          poolVolume: null,
           trades: activity.get(token)?.trades ?? 0,
           lastPrice: history[history.length - 1] ?? 0,
           age: formatAge(Number(startedAt)),
@@ -1720,19 +1920,352 @@ export default function LaunchpadBoard() {
       // gubilby zaznaczenie po kazdym cichym odswiezeniu.
       setSelectedId((current) => current || live[0].id);
 
-      // Liczba POSIADACZY z Blockscouta - miekki dodatek scalany po fakcie.
-      // Z samego RPC nie da sie jej policzyc bez skanu wszystkich transferow;
-      // tu przychodzi z indeksu. Gdy Blockscout milczy, zostaje liczba z eventow.
       const liveAddresses = live.filter((t) => t.address).map((t) => t.address as string);
-      void fetchHolderCounts(ACTIVE_LAUNCHPAD_NETWORK.chain.id, liveAddresses).then((counts) => {
-        if (stale() || Object.keys(counts).length === 0) return;
+
+      /* ================================================================== */
+      /*  CENA I KAPITALIZACJA PO GRADUACJI                                  */
+      /* ================================================================== */
+      /**
+       * Karta tokena po graduacji pokazywala ostatnia cene KRZYWEJ - liczbe z
+       * chwili, w ktorej token przestal na niej handlowac. Ta sama martwa cena
+       * szla do `ShareToken`, wiec kazda karta udostepniania publikowala kurs
+       * sprzed graduacji.
+       *
+       * Zywa cena jest w `slot0` puli i czyta sie ja przez `StateView` - to ta
+       * sama sciezka, ktora ma juz strona tokena (`poolPrice.ts`), wiec obie
+       * pokazuja teraz jedna liczbe zamiast dwoch.
+       *
+       * KOSZT: `positionOf` po poolId i `getSlot0` po cene ida MULTICALLEM, po
+       * jednym na rundę niezaleznie od liczby tokenow po graduacji. Podaz
+       * (`totalSupply`) dolaczamy do tego samego multicalla. Trzy zapytania na
+       * odswiezenie tablicy, nie trzy na token.
+       */
+      const graduatedTokens = live
+        .filter((t) => t.state === 'Graduated' && t.address)
+        .map((t) => t.address as Address);
+      // token(lowercase) -> poolId(lowercase); zywe zrodlo dla skanu swapow.
+      const tokenOfPool = new Map<string, string>();
+      // token(lowercase) -> podaz z lancucha. Sluzy DWOM rzeczom: kapitalizacji
+      // i dowodowi kompletnosci sald (`supplyReconciles`) - ten sam odczyt.
+      const supplyByToken = new Map<string, bigint>();
+      if (graduatedTokens.length && STATE_VIEW_ADDRESS) {
+        try {
+          const positions = await readClient.multicall({
+            allowFailure: true,
+            contracts: graduatedTokens.map((token) => ({
+              address: LIQUIDITY_VAULT_ADDRESS as Address,
+              abi: liquidityVaultAbi,
+              functionName: 'positionOf' as const,
+              args: [token] as const,
+            })),
+          });
+          const poolIds = graduatedTokens.map((token, index) => {
+            const result = positions[index];
+            if (result?.status !== 'success') return null;
+            const poolId = (result.result as readonly [`0x${string}`, bigint, number, number])[0];
+            // Pusty poolId znaczy "pula jeszcze nie zalozona" - nie ma o co pytac.
+            if (!/^0x[0-9a-fA-F]{64}$/.test(poolId) || /^0x0+$/.test(poolId)) return null;
+            tokenOfPool.set(poolId.toLowerCase(), token.toLowerCase());
+            return poolId;
+          });
+
+          const withPool = graduatedTokens.map((token, index) => ({ token, poolId: poolIds[index] })).filter((e) => e.poolId);
+          if (withPool.length) {
+            const [slots, supplies] = await Promise.all([
+              readClient.multicall({
+                allowFailure: true,
+                contracts: withPool.map((entry) => ({
+                  address: STATE_VIEW_ADDRESS as Address,
+                  abi: stateViewAbi,
+                  functionName: 'getSlot0' as const,
+                  args: [entry.poolId as `0x${string}`] as const,
+                })),
+              }),
+              readClient.multicall({
+                allowFailure: true,
+                contracts: withPool.map((entry) => ({
+                  address: entry.token,
+                  abi: totalSupplyAbi,
+                  functionName: 'totalSupply' as const,
+                })),
+              }),
+            ]);
+            const priceByToken = new Map<string, { price: number; mcap?: number }>();
+            withPool.forEach((entry, index) => {
+              const slot = slots[index];
+              if (slot?.status !== 'success') return;
+              const sqrt = (slot.result as readonly [bigint, number, number, number])[0];
+              // Dziesietnosc B20 to 18 - ta sama, ktorej uzywa cala reszta
+              // tablicy przy `formatEther`.
+              const priceWei = poolPriceWeiFromSqrt(sqrt, 18);
+              if (priceWei <= 0n) return;
+              const price = Number(formatEther(priceWei));
+              const supply = supplies[index];
+              let mcap: number | undefined;
+              if (supply?.status === 'success') {
+                const total = supply.result as bigint;
+                supplyByToken.set(entry.token.toLowerCase(), total);
+                mcap = price * Number(formatEther(total));
+              }
+              priceByToken.set(entry.token.toLowerCase(), { price, mcap });
+            });
+            if (!stale() && priceByToken.size) {
+              setTokens((current) =>
+                current.map((t) => {
+                  const hit = t.address ? priceByToken.get(t.address.toLowerCase()) : undefined;
+                  if (!hit) return t;
+                  // `lastPrice` idzie takze do karty udostepniania, wiec to ono
+                  // musi byc cena zywa, a nie ostatni punkt krzywej.
+                  return { ...t, poolPrice: hit.price, lastPrice: hit.price, marketCapEth: hit.mcap };
+                })
+              );
+            }
+          }
+        } catch {
+          // Pula moze jeszcze nie istniec, a StateView potrafi zarewertowac.
+          // Jedno i drugie znaczy tyle samo: zostajemy przy tym, co juz jest.
+        }
+      }
+
+      /* ================================================================== */
+      /*  POSIADACZE I WOLUMEN PULI - doliczane oknami, w tle                */
+      /* ================================================================== */
+      /**
+       * Dwa skany po oknach, po JEDNYM zapytaniu na okno kazdy (patrz
+       * `EXTRAS_WINDOW`): `Transfer` po tablicy wszystkich adresow tokenow i
+       * `Swap` PoolManagera po tablicy wszystkich poolId. Wynik jest addytywny,
+       * wiec znacznik postepu w `localStorage` pozwala kolejnym wejsciom
+       * dokladac same nowe bloki.
+       *
+       * Leci PO ustawieniu wierszy i bez `await` na zewnatrz, bo to jest
+       * uzupelnienie, a nie warunek pokazania tablicy: gdy padnie, karta
+       * zostaje przy liczbach krzywej pod ich wlasna nazwa.
+       */
+      void (async () => {
+        /**
+         * TYLKO TOKENY PO GRADUACJI - i to jest wybor, nie oszczednosc na
+         * skroty.
+         *
+         * Zakres do przeskanowania liczy sie od NAJSTARSZEGO objetego tokena.
+         * Wziecie wszystkich tokenow cofneloby dno do bloku wdrozenia
+         * launchpada, czyli o 1,28 mln blokow (zmierzone 10 wrzesnia 2026) -
+         * 640 okien po 2 000, ktorych publiczny RPC nie odda ani dzis, ani za
+         * miesiac. Tokeny na krzywej i tak nie potrzebuja tej pracy: cala ich
+         * historia to `Bought`/`Sold`, ktore glowny skan juz ma.
+         *
+         * Problem jest wylacznie po graduacji, bo tam handel wychodzi poza
+         * krzywa - i dokladnie tam ten skan siega. Dla $SPHERE dno to blok
+         * jego startu, czyli 187 okien zamiast 640, i tylko przy pierwszym
+         * wejsciu.
+         *
+         * Reszta tokenow dostaje uczciwy podpis ("traders", "curve vol"), a nie
+         * zgadnieta liczbe.
+         */
+        if (!graduatedTokens.length) return;
+        const wanted = graduatedTokens.map((t) => t.toLowerCase());
+
+        /**
+         * DNO SKANU: NAJWCZESNIEJSZY START WSROD OBJETYCH TOKENOW.
+         *
+         * Dwa zrodla, bierzemy NIZSZE, bo za nisko kosztuje kilka okien, a za
+         * wysoko kosztuje poprawnosc:
+         *
+         *   1. `order` z agregatu (`blok * 10 000 + logIndex`) - dokladny, ale
+         *      jest tylko wtedy, gdy glowny skan zszedl do zdarzen tokena;
+         *   2. `startedAt` z kontraktu przeliczony tempem blokow sieci - zawsze
+         *      dostepny, ale to SZACUNEK, wiec z zapasem: polowa wiecej blokow,
+         *      niz wychodzi z rachunku, plus staly bufor. Zapas jest po to, zeby
+         *      dryf czasu blokow nie ucial nam pierwszych transferow.
+         *
+         * Szacunek nie musi byc trafiony, bo nie on rozstrzyga o zaufaniu -
+         * rozstrzyga `supplyReconciles`, ktory porownuje odtworzona emisje z
+         * `totalSupply` z lancucha. Za wysokie dno po prostu nie przejdzie tego
+         * testu i karta zostanie przy podpisach krzywej.
+         */
+        let floor = LAUNCHPAD_DEPLOY_BLOCK;
+        {
+          const nowSeconds = Math.floor(Date.now() / 1000);
+          const perBlock = ACTIVE_LAUNCHPAD_NETWORK.secondsPerBlock;
+          const candidates = graduatedTokens
+            .map((token) => {
+              const orders = [
+                ...(priceEntries.get(token) ?? []).map((p) => p.order),
+                ...rawFeed.filter((entry) => entry.token === token).map((entry) => entry.order),
+              ];
+              const fromOrder = orders.length ? BigInt(Math.floor(Math.min(...orders) / 10_000)) : null;
+
+              const startedAt = live.find((row) => row.address === token)?.startedAt ?? 0;
+              let fromClock: bigint | null = null;
+              if (startedAt > 0 && startedAt < nowSeconds && perBlock > 0) {
+                const blocksBack = BigInt(Math.ceil(((nowSeconds - startedAt) / perBlock) * 1.5)) + 10_000n;
+                fromClock = latest > blocksBack ? latest - blocksBack : 0n;
+              }
+
+              const both = [fromOrder, fromClock].filter((b): b is bigint => b !== null && b > 0n);
+              return both.length ? both.reduce((min, block) => (block < min ? block : min)) : null;
+            })
+            .filter((block): block is bigint => block !== null);
+          if (candidates.length) {
+            const earliest = candidates.reduce((min, block) => (block < min ? block : min));
+            if (earliest > floor) floor = earliest;
+          }
+          /**
+           * DNO ZAOKRAGLAMY W DOL DO SIATKI - inaczej wznowienie nie dziala.
+           *
+           * Skladnik zegarowy liczy sie od `Date.now()`, wiec przy KAZDYM
+           * wejsciu wychodzi o kilkadziesiat blokow nizej niz poprzednio.
+           * `planExtrasScan` widzi wtedy migawke zaczynajaca sie WYZEJ niz
+           * biezace dno i - slusznie - odrzuca ja jako niepelna. Efekt byl
+           * taki, ze skan zaczynal od zera przy kazdym odswiezeniu i nigdy nie
+           * dochodzil do glowy (zmierzone: dno 50 552 013, potem 50 551 982,
+           * potem 50 551 909 - trzy restarty pod rzad).
+           *
+           * Na siatce co 100 000 blokow dno stoi w miejscu przez kilka dni, a
+           * gdy w koncu zeskoczy o krok, kosztuje to jedno przeliczenie od nowa
+           * - nigdy poprawnosc, bo ta i tak jest sprawdzana `supplyReconciles`.
+           */
+          const GRID = 100_000n;
+          floor = (floor / GRID) * GRID;
+          if (floor < LAUNCHPAD_DEPLOY_BLOCK) floor = LAUNCHPAD_DEPLOY_BLOCK;
+        }
+
+        const cachedExtras = loadExtras(ACTIVE_LAUNCHPAD_NETWORK.chain.id, LAUNCHPAD_ADDRESS);
+        const { from, base: extras } = planExtrasScan({ cached: cachedExtras, head: latest, floor, tokens: wanted });
+
+        const poolIds = [...tokenOfPool.keys()] as `0x${string}`[];
+        const window = logWindow;
+
+        // Okna liczymy z gory i strzelamy partiami, tak jak glowny skan. Kazde
+        // okno to DWA zapytania niezaleznie od liczby tokenow: jedno po
+        // `Transfer` calej listy adresow, jedno po `Swap` calej listy pul.
+        const ranges: Array<{ from: bigint; to: bigint }> = [];
+        for (let cursor = from; cursor <= latest && ranges.length < EXTRAS_MAX_WINDOWS_PER_VISIT; ) {
+          const to = cursor + window - 1n < latest ? cursor + window - 1n : latest;
+          ranges.push({ from: cursor, to });
+          cursor = to + 1n;
+        }
+
+        let failed = false;
+        for (let i = 0; i < ranges.length && !failed; i += EXTRAS_CONCURRENCY) {
+          const batch = ranges.slice(i, i + EXTRAS_CONCURRENCY);
+          const results = await Promise.all(
+            batch.map(async (range) => {
+              /**
+               * PONAWIAMY Z ODCZEKANIEM, bo publiczny RPC odbija 429 przy
+               * serii, a nie dlatego, ze danych nie ma. Bez tego skan urywal sie
+               * po ~11 oknach z 285 i nie mial szans domknac zakresu - a
+               * niedomkniety zakres to brak liczby, nie zla liczba, wiec objawem
+               * bylo wieczne "traders" zamiast "holders".
+               *
+               * Ponawiamy TO SAMO okno: pominiecie go zrobiloby dziure w sumie
+               * addytywnej, ktorej pozniej nikt nie odrozni od prawdy.
+               */
+              for (let attempt = 0; attempt < 3; attempt += 1) {
+                try {
+                  return await Promise.all([
+                    readClient.getLogs({ address: graduatedTokens, event: TRANSFER_EVENT, fromBlock: range.from, toBlock: range.to }),
+                    poolIds.length
+                      ? readClient.getLogs({
+                          address: ACTIVE_LAUNCHPAD_NETWORK.poolManager as Address,
+                          event: POOL_SWAP_EVENT,
+                          args: { id: poolIds },
+                          fromBlock: range.from,
+                          toBlock: range.to,
+                        })
+                      : Promise.resolve([]),
+                  ]);
+                } catch (error) {
+                  // Blad o zakresie nie minie po odczekaniu - okno jest po
+                  // prostu za szerokie. Zapamietujemy limit i konczymy; wezsze
+                  // okna zbuduje kolejne wejscie.
+                  if (narrowLogWindow(error)) return null;
+                  await new Promise((resolve) => setTimeout(resolve, 400 * (attempt + 1)));
+                }
+              }
+              return null;
+            })
+          );
+
+          for (let j = 0; j < results.length; j += 1) {
+            const result = results[j];
+            if (!result) {
+              // Padniete okno to DZIURA w sumie addytywnej, ktorej nikt pozniej
+              // nie odrozni od prawdy. Urywamy na NIM, zapisujemy tylko ciagly
+              // poczatek, a reszte dolozy kolejne wejscie.
+              failed = true;
+              break;
+            }
+            const [transfers, swaps] = result;
+            applyTransferLogs(
+              extras,
+              transfers.map((log) => ({
+                address: log.address,
+                from: log.args.from as string | undefined,
+                to: log.args.to as string | undefined,
+                value: log.args.value as bigint | undefined,
+              }))
+            );
+            applySwapLogs(
+              extras,
+              (swaps as Array<{ args: Record<string, unknown> }>).map((log) => ({
+                poolId: log.args.id as string | undefined,
+                amount0: log.args.amount0 as bigint | undefined,
+              })),
+              tokenOfPool
+            );
+            extras.lastBlock = batch[j].to;
+          }
+        }
+
+        // `complete` znaczy: zakres jest ciagly od `fromBlock` AZ DO glowy.
+        // Dopiero wtedy salda sa saldami, a nie ich fragmentem.
+        extras.complete = !failed && extras.lastBlock >= latest;
+        saveExtras(ACTIVE_LAUNCHPAD_NETWORK.chain.id, LAUNCHPAD_ADDRESS, extras);
+        if (stale() || !extras.complete) return;
+
+        // PoolManager trzyma plynnosc puli, wiec ma saldo - ale rynek nie jest
+        // swoim wlasnym uczestnikiem. Wyrzucamy go z liczenia.
+        // Salda, ktore istnieja, ale nie naleza do zadnego czlowieka: plynnosc
+        // puli, skarbiec, hook i adres bez klucza (`0x...dead` - tam na $SPHERE
+        // lezy 59 mln tokenow, ktorych nikt juz nie ruszy).
+        const exclude = [ACTIVE_LAUNCHPAD_NETWORK.poolManager, LIQUIDITY_VAULT_ADDRESS, LAUNCH_HOOK_ADDRESS, BURN_SINK];
+        setTokens((current) =>
+          current.map((t) => {
+            if (!t.address) return t;
+            const count = holderCount(extras, t.address, { exclude, totalSupply: supplyByToken.get(t.address.toLowerCase()) });
+            // Wolumen puli bierze sie z TEGO SAMEGO zakresu blokow, co salda, a
+            // pula powstaje pozniej niz token. Dowod z podazy (zaszyty w
+            // `holderCount`) obejmuje wiec i ja: gdy on nie przechodzi, wolumen
+            // tez nie ma prawa isc na ekran.
+            const pool = count === null ? null : poolVolumeEth(extras, t.address);
+            return { ...t, holderCount: count, holders: count ?? t.holders, poolVolume: pool };
+          })
+        );
+      })();
+
+      /**
+       * INDEKS JAKO DRUGIE ZDANIE, NIE JAKO `Math.max`.
+       *
+       * Blockscout bywa szybszy niz nasz skan okien, wiec zostaje - ale tylko
+       * wtedy, gdy sam pokazuje, ze nadaza (`indexLooksCaughtUp`, patrz
+       * `blockscout.ts`). Dla $SPHERE tego dnia NIE nadazal: oddawal osiem
+       * posiadaczy i zero transferow przy 6 063 policzonych z logow. Stara
+       * regula `Math.max` ratowala przed pokazaniem tej osemki, ale kosztem
+       * pokazania czterdziestki - czyli liczby handlujacych na krzywej pod
+       * nazwa posiadaczy. Zadna z tych dwoch liczb nie byla liczba posiadaczy.
+       */
+      void fetchTokenCountersBatch(ACTIVE_LAUNCHPAD_NETWORK.chain.id, liveAddresses).then((counters) => {
+        if (stale() || Object.keys(counters).length === 0) return;
         setTokens((current) =>
           current.map((t) => {
             const key = t.address?.toLowerCase();
-            // MAX z liczba z eventow: Blockscout na Base Sepolii potrafi byc
-            // mocno spozniony (pokazuje 12 transferow przy 100+ realnych), wiec
-            // nie moze ZANIZAC swiezej liczby odtworzonej z lancucha.
-            return key && counts[key] != null ? { ...t, holders: Math.max(t.holders, counts[key]) } : t;
+            if (!key) return t;
+            // Skan lancucha jest zrodlem PEWNIEJSZYM - gdy juz policzyl, indeks
+            // nie ma go po co nadpisywac.
+            if (t.holderCount != null) return t;
+            if (!indexLooksCaughtUp(counters[key], t.trades ?? 0)) return t;
+            const holders = counters[key].holders as number;
+            return { ...t, holderCount: holders, holders };
           })
         );
       });
@@ -2029,14 +2562,14 @@ export default function LaunchpadBoard() {
       case 'new':
         return pinSphere([...matches].sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0)));
       case 'trending': {
-        const rows = [...matches].sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0));
+        const rows = [...matches].sort((a, b) => volumeParts(b).eth - volumeParts(a).eth);
         if (animationsOn) {
           // Swiezo handlowany token skacze na gore. Celowo ulotne: sortowanie
           // odswieza sie przy kazdym evencie, a po cichym kwadransie wraca
           // porzadek po wolumenie - bez zadnego timera.
           const now = Date.now();
           const heat = (row: BoardToken) => (row.lastTradeAt && now - row.lastTradeAt < HOT_TRADE_WINDOW_MS ? row.lastTradeAt : 0);
-          rows.sort((a, b) => heat(b) - heat(a) || (b.volume ?? 0) - (a.volume ?? 0));
+          rows.sort((a, b) => heat(b) - heat(a) || volumeParts(b).eth - volumeParts(a).eth);
         }
         return pinSphere(rows);
       }
@@ -2073,7 +2606,10 @@ export default function LaunchpadBoard() {
   const onSepolia = chainId === LAUNCHPAD_CHAIN.id;
   const liveCount = tokens.filter((token) => token.state === 'Curve').length;
   const totalRaised = tokens.reduce((sum, token) => sum + token.raised, 0);
-  const totalVolume = tokens.reduce((sum, token) => sum + (token.volume ?? 0), 0);
+  // Suma tego, co karty naprawde pokazuja: krzywa plus pula tam, gdzie pula
+  // jest juz policzona. Sumowanie samych krzywych dawaloby naglowek nizszy niz
+  // wiersze pod nim.
+  const totalVolume = tokens.reduce((sum, token) => sum + volumeParts(token).eth, 0);
   const totalTrades = tokens.reduce((sum, token) => sum + (token.trades ?? 0), 0);
   const showingPreview = !tokens.some((token) => token.live);
 
@@ -2834,7 +3370,7 @@ export default function LaunchpadBoard() {
             <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-soft-primary-deep">Curve trade</p><h2 className="mt-1 text-[21px] font-extrabold text-sp-ink">{selected.symbol} market</h2></div><button type="button" onClick={() => setTradeOpen(false)} className="rounded-full p-2 text-sp-shade/40 hover:bg-sp-shade/5 hover:text-sp-ink" aria-label="Close dialog"><X className="h-5 w-5" aria-hidden="true" /></button></div>
             <div className="mt-5 flex items-center gap-3"><TokenGlyph token={selected} large /><div><div className="flex items-center gap-2"><span className="text-[16px] font-extrabold text-sp-ink">{selected.symbol}</span><StatePill state={selected.state} /></div><p className="mt-1 text-[12px] text-sp-shade/45">{selected.name} · {curvePercent(selected)}% of curve</p></div></div>
             {selected.live ? <TradePanel token={selected} details={details} side={tradeSide} setSide={setTradeSide} buyAmount={buyAmount} setBuyAmount={setBuyAmount} sellAmount={sellAmount} setSellAmount={setSellAmount} sellQuote={sellQuote} gradReward={gradReward} busy={busy} ethUsd={ethUsd} onBuy={buy} onSell={sell} onGraduate={graduate} onSettle={settle} onHarvest={harvest} onClaim={claim} isConnected={isConnected} /> : <div className="mt-5 flex items-start gap-2 rounded-xl bg-sp-sunken p-3 text-[11.5px] leading-[1.45] text-sp-shade/55"><WalletCards className="mt-0.5 h-4 w-4 shrink-0 text-soft-primary" aria-hidden="true" /><span>This is a sample row. Launch a token to activate the live trade panel.</span></div>}
-            <div className="mt-5 flex items-center justify-between border-t border-sp-shade/10 pt-4 text-[11px] text-sp-shade/45"><span>{selected.holders} holders · {selected.trades ?? 0} trades</span><span className="flex items-center gap-2"><button type="button" onClick={() => void navigator.clipboard?.writeText(selected.address ?? selected.id)} className="inline-flex items-center gap-1.5 font-bold hover:text-soft-primary-deep"><Copy className="h-3.5 w-3.5" aria-hidden="true" /> Copy address</button>{selected.address && <button type="button" onClick={() => router.push(`/startpad/${selected.address}`)} className="inline-flex items-center gap-1.5 font-bold text-soft-primary-deep hover:text-soft-primary"><ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /> Details</button>}</span></div>
+            <div className="mt-5 flex items-center justify-between border-t border-sp-shade/10 pt-4 text-[11px] text-sp-shade/45"><span>{peopleNote(selected)} · {selected.trades ?? 0} curve trades</span><span className="flex items-center gap-2"><button type="button" onClick={() => void navigator.clipboard?.writeText(selected.address ?? selected.id)} className="inline-flex items-center gap-1.5 font-bold hover:text-soft-primary-deep"><Copy className="h-3.5 w-3.5" aria-hidden="true" /> Copy address</button>{selected.address && <button type="button" onClick={() => router.push(`/startpad/${selected.address}`)} className="inline-flex items-center gap-1.5 font-bold text-soft-primary-deep hover:text-soft-primary"><ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /> Details</button>}</span></div>
           </section>
         </div>
       )}

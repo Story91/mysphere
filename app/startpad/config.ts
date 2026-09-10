@@ -137,12 +137,19 @@ const baseMainnetEntry: LaunchpadNetwork = {
   // Wdrozenie sprzed parametryzacji skali - dawna stala kontraktu.
   rVirt: 0.75,
   explorerUrl: 'https://basescan.org',
-  // ZMIERZONE 2026-08-13 na `mainnet.base.org` ORAZ na CDP: limit `eth_getLogs`
-  // to 10 000 blokow, nie 2 000 - tak stalo w tym komentarzu przez pomylke z
-  // Sepolia, i to ta pomylka byla glowna przyczyna zacinania sie strony tokena.
-  // Historia tokena z 11 sierpnia (78 tys. blokow) schodzila przy oknie 1900 w
-  // 41 kolejkach; przy 10 000 to 8 okien i ~3,8 s. Zostawiamy 9 500 z zapasem
-  // pod krancowy blok, zeby nie ocierac sie o sufit.
+  // WARTOSC STARTOWA, NIE PRAWDA O SIECI.
+  //
+  // Do 10 wrzesnia 2026 stalo tu, ze `mainnet.base.org` przyjmuje 10 000 blokow
+  // (pomiar z 13 sierpnia) - i przez miesiac bylo to prawda. Base zaciesnil
+  // limit do 2 000 i skan tablicy PADAL W CALOSCI: kazde okno wracalo z
+  // `413 -32614 eth_getLogs is limited to a 2,000 range`. Nic nie wygladalo na
+  // zepsute, bo warstwa degradacji zadzialala wzorowo (padniete okno = skan
+  // niewiarygodny = agregat niezapisany, wiersze zostaja), ale przegladarka nie
+  // wnosila juz NIC - wszystko na ekranie szlo z agregatu serwerowego.
+  //
+  // Wniosek nie brzmi "wpisz 2 000", tylko "nie zgaduj": endpoint podaje swoj
+  // limit w tresci bledu, wiec skan czyta go stamtad i dobiera okno sam (patrz
+  // sonda w `boardScan.ts`). Ta liczba jest juz tylko punktem wyjscia.
   scanWindow: 9_500n,
   // 90 x 9500 to ~855 tys. blokow, czyli ponad trzy tygodnie lancucha Base -
   // grubo wiecej, niz ma najstarszy launch, a sufit i tak zwykle nie dziala:

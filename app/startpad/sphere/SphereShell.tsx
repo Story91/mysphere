@@ -453,7 +453,13 @@ export default function SphereShell({ children }: { children: React.ReactNode })
             <Flame className="sph-flame h-5 w-5 text-sp-brand" aria-hidden="true" /> $SPHERE
           </h1>
         </div>
-        <nav className="inline-flex items-stretch overflow-hidden rounded-full border border-sp-shade/10 bg-sp-surface">
+        {/* PASEK ZAKLADEK MUSI SIE PRZEWIJAC NA TELEFONIE.
+            Siedem zakladek nie miesci sie w 375 px (zmierzone: 454 px tresci w
+            348 px kontenera), a `overflow-hidden` po prostu je UCINAL - Vesting
+            i About byly na telefonie nieosiagalne, bez zadnego sladu, ze tam sa.
+            `overflow-x-auto` z `snap` zamienia to w przewijana szyne; na szerokim
+            ekranie nic sie nie zmienia, bo tresc i tak sie miesci. */}
+        <nav className="-mx-1 flex max-w-full items-stretch gap-0 overflow-x-auto scroll-smooth rounded-full border border-sp-shade/10 bg-sp-surface px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:overflow-visible sm:px-0">
           {TABS.map((tab) => {
             const active = pathname === tab.href;
             return (
@@ -461,7 +467,8 @@ export default function SphereShell({ children }: { children: React.ReactNode })
                 key={tab.href}
                 href={tab.href}
                 data-active={active}
-                className={`sph-tab isolate px-3.5 py-2 text-[12px] font-extrabold ${active ? 'text-sp-brand' : 'text-sp-shade/60 hover:text-sp-brand'}`}
+                aria-current={active ? 'page' : undefined}
+                className={`sph-tab isolate shrink-0 snap-start whitespace-nowrap px-3.5 py-2 text-[12px] font-extrabold ${active ? 'text-sp-brand' : 'text-sp-shade/60 hover:text-sp-brand'}`}
               >
                 {tab.label}
               </Link>

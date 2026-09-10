@@ -11,6 +11,17 @@
  * cyklu zycia, ile i CZYM spalono, co robi dystrybutor i kto stoi za piecioma
  * rolami. Kazda liczba idzie z lancucha (useSphereChainFacts), zadna nie jest
  * wpisana recznie.
+ *
+ * Przeglad wlasciciela 2026-09-10 ("za duzo napisow a za malo fajnych
+ * wizualnych spraw, tresc chowaj w dropdownach") - przebudowa PREZENTACJI,
+ * zadna liczba nie zmienila zrodla ani znaczenia:
+ *  - akapity o mechanice (kustodia LP, dwa wywolania buybacku, czym jest root
+ *    epoki, czemu jeden adres ma piec etykiet) siedza w `Disclosure`;
+ *  - udzialy, ktore byly zdaniami, sa teraz paskami (`MeterBar`): spalone do
+ *    podazy, odebrane do naleznego;
+ *  - "pot waiting" i "unsettled fees" awansowaly z wierszy tekstu na kafle.
+ * NA WIERZCHU zostaja zastrzezenia, ktore zmieniaja znaczenie liczby obok:
+ * ze burn nie odpala sie sam i ze palenie nie rusza totalSupply.
  */
 
 import Link from 'next/link';
@@ -31,9 +42,8 @@ import {
 } from 'lucide-react';
 import { launchpadAbi } from '../config';
 import { SPHERE_CHAIN, SPHERE_EXPLORER_URL, SPHERE_LAUNCHPAD_ADDRESS, SPHERE_NATIVE_SYMBOL, SPHERE_VAULT_ADDRESS } from './sphereChain';
-import NumberTicker from './NumberTicker';
 import { formatIn, formatUtc, useSphereChainFacts, type SphereChainFacts } from './SphereShell';
-import { AddressPill, BigStat, PageHero } from './SphereUI';
+import { AddressPill, BigStat, Disclosure, MeterBar, PageHero, StatShell, StatValue } from './SphereUI';
 import {
   SPHERE_ESCROW_ADDRESS,
   SPHERE_LIVE,
@@ -54,21 +64,34 @@ const FUTURE_TOKEN = '0xB200000000000000000000BA5eDb84c678432476';
  */
 function HeroStat({ icon, label, value, decimals, suffix }: { icon: React.ReactNode; label: string; value: number | null; decimals?: number; suffix?: string }) {
   return (
-    <div className="rounded-2xl bg-white/70 p-3.5 backdrop-blur-sm sm:p-4">
+    <StatShell className="sm:p-4">
       <p className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/50">
         {icon} {label}
       </p>
-      <p className="mt-1 font-soft-display text-[26px] font-extrabold leading-none text-sp-ink sm:text-[30px]">
+      <div className="mt-1 font-soft-display font-extrabold text-sp-ink">
         {value === null ? (
           <span className="sph-skeleton inline-block h-6 w-24 align-middle" />
         ) : (
-          <>
-            <NumberTicker value={value} decimals={decimals ?? 0} />
-            {suffix && <span className="ml-1 text-[13px] font-bold text-sp-shade/50">{suffix}</span>}
-          </>
+          <StatValue value={value} decimals={decimals ?? 0} suffix={suffix} max={30} />
         )}
-      </p>
-    </div>
+      </div>
+    </StatShell>
+  );
+}
+
+/**
+ * Pastylka "liczba + po co ona" w hero. Zastapila akapit, ktory tlumaczyl
+ * mechanike buybacku slowo w slowo tak samo jak sekcja "Burned forever".
+ * Wartosc jest juz sformatowana, wiec pastylka nie tyka - hero ma trzy
+ * tykajace liczniki obok i czwarty ruch tylko by je zaglaszal.
+ */
+function HeroChip({ icon, value, label }: { icon: React.ReactNode; value: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1.5 backdrop-blur-sm">
+      {icon}
+      <span className="text-[12px] font-extrabold text-sp-ink">{value}</span>
+      <span className="text-[10.5px] font-bold text-sp-shade/50">{label}</span>
+    </span>
   );
 }
 
@@ -194,13 +217,21 @@ function LifecycleSection({ facts }: { facts: SphereChainFacts }) {
               full range · ticks {pool.tickLower.toLocaleString('en-US')} → {pool.tickUpper.toLocaleString('en-US')}
             </FactRow>
             <FactRow label="LP liquidity">{pool.liquidity.toString()}</FactRow>
-            <FactRow label="LP custody">
-              locked in the LiquidityVault - it can seed and harvest fees, it has no function that
-              removes liquidity
-            </FactRow>
+            {/* Kustodia LP nie zmienia znaczenia zadnej liczby wyzej - to opis
+                mechanizmu, wiec schodzi pod rozwijak. */}
+            <FactRow label="LP custody">locked in the LiquidityVault</FactRow>
           </>
         )}
       </div>
+      {pool && (
+        <div className="mt-3">
+          <Disclosure summary="Why the pool liquidity cannot be pulled">
+            The position lives in the LiquidityVault, not in a wallet. The vault can seed the pool and
+            harvest fees; it has no function that removes liquidity, and there is no owner, pause or
+            upgrade path that could add one. The range is full-range, so the position covers every price.
+          </Disclosure>
+        </div>
+      )}
       {SPHERE_VAULT_ADDRESS && (
         <div className="mt-3 flex flex-wrap gap-2">
           <AddressPill address={SPHERE_VAULT_ADDRESS} label="LP vault" />
@@ -234,28 +265,75 @@ function BurnSection({ facts }: { facts: SphereChainFacts }) {
         <BigStat label="Revenue buyback" value={toNum(burn?.fromRevenueBuyback)} decimals={0} suffix="SPHERE" hint="SphereBuyback burn leg" />
         <BigStat label="Graduation seed" value={toNum(burn?.fromGraduationSeed)} decimals={0} suffix="SPHERE" hint="leftover, never bought" />
       </div>
-      <div className="mt-4 rounded-2xl bg-white/70 p-3.5 backdrop-blur-sm">
-        <FactRow label="How the burn fires">
-          not automatic - anyone calls hook.settle(SPHERE) to book the fees, then
-          hook.executeBuyback(...) to spend the pot; the bought tokens can only go to 0xdEaD
-        </FactRow>
-        {pending && (
-          <>
-            <FactRow label="Buyback pot waiting">
-              {Number(formatEther(pending.buybackEth)).toLocaleString('en-US', { maximumFractionDigits: 6 })}{' '}
-              {SPHERE_NATIVE_SYMBOL}
-            </FactRow>
-            <FactRow label="Unsettled fees">
-              {Number(formatEther(pending.eth)).toLocaleString('en-US', { maximumFractionDigits: 6 })}{' '}
-              {SPHERE_NATIVE_SYMBOL} ·{' '}
-              {Number(formatEther(pending.token)).toLocaleString('en-US', { maximumFractionDigits: 2 })} SPHERE
-            </FactRow>
-          </>
-        )}
-        <FactRow label="Total supply">
-          {burn ? Number(formatEther(burn.supply)).toLocaleString('en-US', { maximumFractionDigits: 0 }) : '-'} SPHERE ·
-          burns are transfers, supply never moves
-        </FactRow>
+
+      {/* Udzial spalonego w podazy jako DLUGOSC. Ta sama liczba stala wczesniej
+          w plakietce naglowka i ginela obok czterech innych plakietek. */}
+      {burn && (
+        <div className="mt-4 rounded-2xl bg-white/70 p-3.5 backdrop-blur-sm">
+          <MeterBar
+            pct={share}
+            tone="down"
+            left={`${Number(formatEther(burn.dead)).toLocaleString('en-US', { maximumFractionDigits: 0 })} burned`}
+            right={`of ${Number(formatEther(burn.supply)).toLocaleString('en-US', { maximumFractionDigits: 0 })} supply`}
+          />
+          {/* Zastrzezenie, ktore zmienia ZNACZENIE liczby wyzej - zostaje na
+              wierzchu: palenie to przelew na 0xdEaD, wiec totalSupply sie nie
+              rusza i "5.93% spalone" nie znaczy "podaz spadla". */}
+          <p className="mt-2.5 text-[11px] font-bold leading-relaxed text-sp-shade/55">
+            Burns are transfers to 0xdEaD, so total supply stays 1B - the dead balance is what shrinks
+            the circulating side.
+          </p>
+        </div>
+      )}
+
+      {/* Zastrzezenie nr 2 - i to jest cala roznica miedzy "pali sie samo"
+          a prawda. Nie schodzi pod rozwijak w zadnej wersji tej strony. */}
+      <p className="mt-3 flex items-start gap-2 rounded-2xl bg-sp-down/[0.07] px-3.5 py-2.5 text-[11.5px] font-bold leading-relaxed text-sp-shade/70">
+        <Flame className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sp-down" aria-hidden="true" />
+        <span>
+          The burn is not automatic. Someone has to call settle() and then executeBuyback() and pay the
+          gas - until then the pot just sits there.
+        </span>
+      </p>
+
+      {pending && (
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <BigStat
+            label="Pot waiting"
+            value={Number(formatEther(pending.buybackEth))}
+            decimals={4}
+            suffix={SPHERE_NATIVE_SYMBOL}
+            tone="brand"
+            hint="already booked, not spent"
+          />
+          {/* Dwie nogi tej samej pozycji - identyczna etykieta na obu czytalaby
+              sie jak powtorzona liczba, wiec nazwa niesie walute. */}
+          <BigStat
+            label={`Unsettled ${SPHERE_NATIVE_SYMBOL}`}
+            value={Number(formatEther(pending.eth))}
+            decimals={4}
+            suffix={SPHERE_NATIVE_SYMBOL}
+            hint="fees not booked yet"
+          />
+          <BigStat
+            label="Unsettled SPHERE"
+            value={Number(formatEther(pending.token))}
+            decimals={2}
+            suffix="SPHERE"
+            hint="token leg of the same fees"
+          />
+        </div>
+      )}
+
+      <div className="mt-3">
+        <Disclosure summary="The two calls that turn swap fees into a burn">
+          Swap fees accumulate inside the hook. <span className="font-mono">hook.settle(SPHERE)</span> books
+          them and moves the creator-side ETH share into the buyback pot;{' '}
+          <span className="font-mono">hook.executeBuyback(...)</span> spends that pot on SPHERE. The
+          destination of whatever it buys is frozen at launch to 0xdEaD - there is no function that
+          redirects it. Both calls are permissionless and pay the caller nothing, which is exactly why
+          the pot can sit unspent: no one is paid to fire it.
+        </Disclosure>
       </div>
     </PageHero>
   );
@@ -266,6 +344,8 @@ function DistributorSection({ facts }: { facts: SphereChainFacts }) {
   const d = facts.distributor;
   if (!d) return null;
   const outstanding = d.totalCumulative > d.totalClaimed ? d.totalCumulative - d.totalClaimed : 0n;
+  const claimedPct =
+    d.totalCumulative > 0n ? (Number(d.totalClaimed) / Number(d.totalCumulative)) * 100 : null;
   return (
     <PageHero
       title="Creator reward stream"
@@ -284,25 +364,40 @@ function DistributorSection({ facts }: { facts: SphereChainFacts }) {
         <BigStat label="Held by contract" value={toNum(d.held)} decimals={0} suffix="SPHERE" hint="funds future epochs" />
       </div>
       <div className="mt-4 rounded-2xl bg-white/70 p-3.5 backdrop-blur-sm">
-        <FactRow label="Active root since">{formatUtc(d.activatedAt)}</FactRow>
-        <FactRow label="Stream length">
-          {(d.streamDuration / 86_400).toFixed(0)} days of linear release per epoch increment
-        </FactRow>
-        <FactRow label="Veto window">{(d.minDelay / 3_600).toFixed(0)} h before any new root can activate</FactRow>
-        {d.pending ? (
-          <>
-            <FactRow label="Pending root">
-              epoch #{d.pending.epochId} ·{' '}
-              {Number(formatEther(d.pending.totalCumulative)).toLocaleString('en-US', { maximumFractionDigits: 2 })} SPHERE
-              cumulative
-            </FactRow>
-            <FactRow label="Activates">
-              {formatUtc(d.pending.validAt)} · {formatIn(d.pending.validAt)}
-            </FactRow>
-          </>
-        ) : (
-          <FactRow label="Pending root">nothing queued right now</FactRow>
-        )}
+        <MeterBar
+          pct={claimedPct}
+          tone="up"
+          left={`${Number(formatEther(d.totalClaimed)).toLocaleString('en-US', { maximumFractionDigits: 0 })} claimed`}
+          right={`of ${Number(formatEther(d.totalCumulative)).toLocaleString('en-US', { maximumFractionDigits: 0 })} owed`}
+        />
+        <div className="mt-3">
+          <FactRow label="Active root since">{formatUtc(d.activatedAt)}</FactRow>
+          <FactRow label="Stream length">{(d.streamDuration / 86_400).toFixed(0)} days per epoch increment</FactRow>
+          <FactRow label="Veto window">{(d.minDelay / 3_600).toFixed(0)} h</FactRow>
+          {d.pending ? (
+            <>
+              <FactRow label="Pending root">
+                epoch #{d.pending.epochId} ·{' '}
+                {Number(formatEther(d.pending.totalCumulative)).toLocaleString('en-US', { maximumFractionDigits: 2 })} SPHERE
+                cumulative
+              </FactRow>
+              <FactRow label="Activates">
+                {formatUtc(d.pending.validAt)} · {formatIn(d.pending.validAt)}
+              </FactRow>
+            </>
+          ) : (
+            <FactRow label="Pending root">nothing queued right now</FactRow>
+          )}
+        </div>
+      </div>
+      <div className="mt-3">
+        <Disclosure summary="What an epoch root is, and what the veto window is for">
+          Each epoch publishes a Merkle root of cumulative balances. A new root cannot activate sooner
+          than the veto window above, which is the time the guardian has to reject it, and the contract
+          refuses any root whose global total is lower than the current one or that the balance cannot
+          cover. Every epoch increment then releases linearly over the stream length rather than landing
+          in one lump.
+        </Disclosure>
       </div>
     </PageHero>
   );
@@ -337,10 +432,13 @@ function SafeSection({ facts }: { facts: SphereChainFacts }) {
         </h3>
         {r.shared && <AddressPill address={r.shared} label="safe" />}
       </div>
-      <p className="mt-1.5 text-[12px] leading-relaxed text-sp-shade/60">
+      {/* Jedno zdanie, ktore zmienia znaczenie listy nizej - to jest
+          zastrzezenie o centralizacji, wiec nie chowamy go pod rozwijak.
+          Uzasadnienie i nieodwracalnosc rol schodza do Disclosure. */}
+      <p className="mt-1.5 text-[12px] font-bold leading-relaxed text-sp-shade/60">
         {r.allSame
-          ? 'Every role below resolves to the same 1/1 Safe - one signer, one key. The labels differ because the contracts name them differently, not because there are five independent parties.'
-          : 'Read live from each contract. Roles are immutable, so what you see here is what the contracts will always answer.'}
+          ? 'All five resolve to the same 1/1 Safe - one signer, one key.'
+          : 'Read live from each contract, not from a config file.'}
       </p>
       <div className="mt-3">
         {rows.map(([label, addr]) => (
@@ -355,6 +453,14 @@ function SafeSection({ facts }: { facts: SphereChainFacts }) {
             </a>
           </FactRow>
         ))}
+      </div>
+      <div className="mt-3">
+        <Disclosure summary="Why one address carries five different labels">
+          Each contract names the address for its own job - fee recipient, buyback pot, ops target, key
+          holder, beneficiary - so five panels print five words for one party. The addresses above are
+          read back live from the contracts rather than from a config file, and those role slots are
+          immutable, so this cannot quietly change into five parties later, nor back.
+        </Disclosure>
       </div>
     </section>
   );
@@ -471,25 +577,24 @@ export default function SphereOverview() {
                 </span>
                 {facts && <StagePill stage={facts.stage} />}
               </p>
+              {/* Bylo: akapit powtarzajacy mechanike settle()/executeBuyback()
+                  slowo w slowo za sekcja "Burned forever" nizej. Zostaja same
+                  liczby - opis mechanizmu ma tam swoj rozwijak. */}
               {hookBurned !== null && (
-                <p className="mt-2 max-w-2xl text-[12px] font-bold leading-relaxed text-sp-shade/55">
-                  Swap fees pile up inside the hook until someone calls settle(), then
-                  executeBuyback() - which buys SPHERE and can only send it to 0xdEaD.{' '}
-                  <span className="text-sp-ink">
-                    {hookBurned.toLocaleString('en-US', { maximumFractionDigits: 0 })} SPHERE
-                  </span>{' '}
-                  has been bought and burned that way so far
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <HeroChip
+                    icon={<Flame className="h-3.5 w-3.5 text-sp-down" aria-hidden="true" />}
+                    value={`${hookBurned.toLocaleString('en-US', { maximumFractionDigits: 0 })} SPHERE`}
+                    label="bought & burned by the hook"
+                  />
                   {potWaiting !== null && (
-                    <>
-                      , with{' '}
-                      <span className="text-sp-ink">
-                        {potWaiting.toLocaleString('en-US', { maximumFractionDigits: 6 })} {SPHERE_NATIVE_SYMBOL}
-                      </span>{' '}
-                      waiting in the pot right now
-                    </>
+                    <HeroChip
+                      icon={<Coins className="h-3.5 w-3.5 text-sp-brand" aria-hidden="true" />}
+                      value={`${potWaiting.toLocaleString('en-US', { maximumFractionDigits: 6 })} ${SPHERE_NATIVE_SYMBOL}`}
+                      label="waiting in the buyback pot"
+                    />
                   )}
-                  .
-                </p>
+                </div>
               )}
             </div>
             <Flame className="sph-flame hidden h-16 w-16 text-sp-brand/70 sm:block" aria-hidden="true" />

@@ -52,6 +52,102 @@ export function PageHero({
   );
 }
 
+/* -------------------------------------------------------------------------- */
+/*  WIELKA LICZBA                                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Szerokosc napisu w "em" wlasnego stopnia pisma. Baloo 2 w wariancie
+ * tabularnym daje cyfrze ~0.60em, a przecinkowi/kropce ~0.32em - zmierzone
+ * na hubie: "59,332,928" przy 27px zajmowalo 147px, czyli 5.44em.
+ */
+function textEm(text: string): number {
+  let w = 0;
+  for (const ch of text) w += ch === ',' || ch === '.' || ch === ' ' ? 0.32 : 0.6;
+  return w;
+}
+
+/**
+ * Liczba z jednostka - wspolny silnik `BigStat` i hubowego `HeroStat`.
+ *
+ * ===========================================================================
+ * DLACZEGO TO NIE JEST ZWYKLY <span> Z ml-1 (10 wrzesnia 2026)
+ * ===========================================================================
+ * Poprzednia wersja sklejala tykajaca liczbe i sufiks w JEDEN ciag inline:
+ * `<NumberTicker/>{suffix && <span className="ml-1">…</span>}`. Miedzy tymi
+ * dwoma wyrazeniami JSX nie ma bialego znaku, a margines nie jest miejscem
+ * zlamania - dla przegladarki "59,332,928SPHERE" to jedno, NIEZLAMYWALNE
+ * slowo. Kafel w siatce byl wezszy, `.sph-hero` ma `overflow: hidden`, wiec
+ * jednostka wychodzila poza krawedz i byla scinana w polowie litery:
+ * wlasciciel zobaczyl "59,332,928 SPHERI". Zmierzone przed poprawka przy
+ * 1440px: scrollWidth 201px w clientWidth 175px.
+ *
+ * Poprawka jest strukturalna, nie kosmetyczna - trzy niezalezne zabezpieczenia:
+ *
+ *  1. Liczba i jednostka to DWA elementy flex, a nie jeden ciag tekstu. Miedzy
+ *     elementami flex zawsze wolno zlamac wiersz, wiec nie da sie ich na
+ *     siebie nasunac ani skleic w jedno slowo.
+ *  2. Stopien pisma liczy sie z SZEROKOSCI KAFLA (`cqi`) i z DLUGOSCI tej
+ *     konkretnej wartosci, a nie z punktu widokowego. Kafel deklaruje
+ *     `container-type: inline-size`, a `clamp()` dzieli jego szerokosc przez
+ *     zmierzona szerokosc napisu w em. Dluzsza liczba = mniejszy stopien,
+ *     automatycznie, bez zgadywania breakpointow. Jednostka skaluje sie razem
+ *     (0.45em), wiec proporcja z projektu zostaje.
+ *  3. Gdyby i to nie starczylo (skrajnie waski kafel, dolny prog stopnia),
+ *     jednostka spada do drugiego wiersza zamiast wyjsc poza kafel, a
+ *     `overflow-wrap: anywhere` pilnuje samych cyfr.
+ *
+ * Dolny prog istnieje po to, zeby "wielka liczba" nie zrobila sie petitem;
+ * gorny - zeby krotka wartosc ("1.00%") nie urosla na cala szerokosc.
+ */
+export function StatValue({
+  value,
+  decimals = 0,
+  suffix,
+  max,
+  min = 17,
+  className = '',
+}: {
+  value: number;
+  decimals?: number;
+  suffix?: string;
+  /** Gorny prog stopnia pisma w px - tyle, ile kafel mial w projekcie. */
+  max: number;
+  min?: number;
+  className?: string;
+}) {
+  const text = value.toLocaleString('en-US', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+  // Budzet szerokosci: cyfry + odstep + jednostka (jednostka ma 0.45em, wiec
+  // jej litera to ~0.32em stopnia glownego). 2px zapasu na zaokraglenia.
+  const em = textEm(text) + (suffix ? 0.22 + suffix.length * 0.32 : 0);
+  return (
+    <span
+      className={`flex flex-wrap items-baseline gap-x-[0.18em] leading-none ${className}`}
+      style={{ fontSize: `clamp(${min}px, calc((100cqi - 2px) / ${em.toFixed(2)}), ${max}px)` }}
+    >
+      <NumberTicker value={value} decimals={decimals} className="min-w-0 [overflow-wrap:anywhere]" />
+      {suffix && <span className="text-[0.45em] font-bold text-sp-shade/50">{suffix}</span>}
+    </span>
+  );
+}
+
+/**
+ * Kafel liczby. `container-type: inline-size` MUSI siedziec tutaj, nie na
+ * wierszu z liczba: `cqi` odpytuje najblizszego PRZODKA, element nie moze
+ * zapytac sam siebie. `min-w-0` odbiera kafelkowi domyslne `min-width: auto`
+ * z siatki, przez ktore szeroka tresc rozpychala tor zamiast sie zmiescic.
+ */
+export function StatShell({ children, className = '' }: { children: ReactNode; className?: string }) {
+  return (
+    <div className={`min-w-0 rounded-2xl bg-white/70 p-3.5 backdrop-blur-sm ${className}`} style={{ containerType: 'inline-size' }}>
+      {children}
+    </div>
+  );
+}
+
 /** Wielka liczba - glowny nosnik informacji na podstronach. */
 export function BigStat({
   label,
@@ -71,20 +167,85 @@ export function BigStat({
   const toneClass =
     tone === 'brand' ? 'text-sp-brand' : tone === 'up' ? 'text-sp-up' : tone === 'down' ? 'text-sp-down' : 'text-sp-ink';
   return (
-    <div className="rounded-2xl bg-white/70 p-3.5 backdrop-blur-sm">
+    <StatShell>
       <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/50">{label}</p>
-      <p className={`mt-1 font-soft-display text-[24px] font-extrabold leading-none sm:text-[27px] ${toneClass}`}>
+      <div className={`mt-1 font-soft-display font-extrabold ${toneClass}`}>
         {value === null ? (
           <span className="sph-skeleton inline-block h-6 w-20 align-middle" />
         ) : (
-          <>
-            <NumberTicker value={value} decimals={decimals} />
-            {suffix && <span className="ml-1 text-[12px] font-bold text-sp-shade/50">{suffix}</span>}
-          </>
+          <StatValue value={value} decimals={decimals} suffix={suffix} max={27} />
         )}
-      </p>
-      {hint && <p className="mt-0.5 text-[10px] font-bold text-sp-shade/40">{hint}</p>}
+      </div>
+      {hint && <p className="mt-1 text-[10px] font-bold leading-tight text-sp-shade/40">{hint}</p>}
+    </StatShell>
+  );
+}
+
+/**
+ * Pasek udzialu - jedna liczba pokazana jako DLUGOSC, nie jako zdanie.
+ * Powstal, bo wlasciciel czytal "5.93% of supply" jako plakietke obok
+ * czterech innych plakietek; pasek widac zanim sie go przeczyta.
+ */
+export function MeterBar({
+  pct,
+  tone = 'brand',
+  left,
+  right,
+}: {
+  pct: number | null;
+  tone?: 'brand' | 'up' | 'down';
+  left: string;
+  right: string;
+}) {
+  const fill = tone === 'down' ? 'bg-sp-down' : tone === 'up' ? 'bg-sp-up' : 'bg-sp-brand';
+  const width = pct === null ? 0 : Math.max(0.6, Math.min(100, pct));
+  return (
+    <div>
+      <div className="h-2 w-full overflow-hidden rounded-full bg-sp-shade/10">
+        <div className={`h-full rounded-full ${fill} transition-[width] duration-700 ease-out`} style={{ width: `${width}%` }} />
+      </div>
+      <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 text-[10px] font-extrabold uppercase tracking-[0.06em] text-sp-shade/45">
+        <span>{left}</span>
+        <span>{right}</span>
+      </div>
     </div>
+  );
+}
+
+/**
+ * Zwijana tresc - JEDEN wzorzec na cale centrum $SPHERE (te same <details>,
+ * co `LifecycleGuide` i `AdvancedSection` nizej, zeby nie zrobil sie trzeci).
+ *
+ * Powod: wlasciciel po przegladzie stron ("za duzo napisow, za malo fajnych
+ * wizualnych spraw - tresc chowaj w dropdownach"). Chowamy WYPROWADZENIA i
+ * opisy mechanizmu; zastrzezenie, ktore zmienia ZNACZENIE liczby, zostaje
+ * na wierzchu obok tej liczby. Podpis musi sam mowic, co jest w srodku -
+ * "Read more" nie jest podpisem.
+ */
+export function Disclosure({
+  summary,
+  children,
+  variant = 'inline',
+}: {
+  summary: string;
+  children: ReactNode;
+  variant?: 'card' | 'inline';
+}) {
+  const shell =
+    variant === 'card'
+      ? 'sph-card rounded-[20px] border border-sp-shade/10 bg-sp-surface'
+      : 'rounded-2xl border border-sp-shade/10 bg-sp-shade/[0.03]';
+  return (
+    <details className={`group ${shell}`}>
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3.5 py-2.5 text-[11.5px] font-extrabold text-sp-shade/60 transition-colors hover:text-sp-brand [&::-webkit-details-marker]:hidden">
+        <span>{summary}</span>
+        <span className="shrink-0 text-[10px] font-bold uppercase tracking-[0.08em] text-sp-shade/40">
+          <span className="group-open:hidden">read</span>
+          <span className="hidden group-open:inline">hide</span>
+        </span>
+      </summary>
+      <div className="border-t border-sp-shade/10 px-3.5 py-3 text-[11.5px] leading-relaxed text-sp-shade/60">{children}</div>
+    </details>
   );
 }
 
