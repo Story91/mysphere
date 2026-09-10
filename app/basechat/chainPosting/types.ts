@@ -24,7 +24,8 @@ export type PostNetworkId =
   | 'celo'
   | 'ethereum'
   | 'worldchain'
-  | 'robinhood';
+  | 'robinhood'
+  | 'arc';
 
 /** Warstwa czysto wygladowa - osobna dla przycisku postu i przycisku komentarza. */
 export interface ChainButtonSkin {

@@ -26,6 +26,7 @@ import {
   getNetworkByChainId,
   getTokensForNetwork,
   getDefaultTokenForNetwork,
+  getTokenOnNetwork,
   getQuickAmounts,
   getExplorerTxLink,
   ERC20_TRANSFER_ABI,
@@ -90,7 +91,9 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
   // Pobierz konfigurację aktualnej sieci
   const currentNetworkConfig = useMemo(() => getNetworkByChainId(chainId), [chainId]);
   const selectedNetworkConfig = useMemo(() => NETWORKS[selectedNetwork], [selectedNetwork]);
-  const selectedTokenConfig = useMemo(() => TOKENS[selectedToken], [selectedToken]);
+  // Z listy tokenow SIECI, nie z globalnego TOKENS - USDC na Arc jest natywne
+  // i ma 18 miejsc, a TOKENS.USDC to kontrakt na Base z szescioma.
+  const selectedTokenConfig = useMemo(() => getTokenOnNetwork(selectedNetwork, selectedToken), [selectedNetwork, selectedToken]);
   const availableTokens = useMemo(() => getTokensForNetwork(selectedNetwork), [selectedNetwork]);
   
   // Auto-detect sieci przy otwarciu modalu

@@ -99,6 +99,7 @@ const CreatePostCelo = dynamic(() => import('./Celo/components/CreatePostCelo'),
 const CreatePostEthereum = dynamic(() => import('./ETH/components/CreatePostEthereum'), { ssr: false });
 const CreatePostWorldChain = dynamic(() => import('./World/components/CreatePostWorldChain'), { ssr: false });
 const CreatePostRobinhood = dynamic(() => import('./Robinhood/components/CreatePostRobinhood'), { ssr: false });
+const CreatePostArc = dynamic(() => import('./Arc/components/CreatePostArc'), { ssr: false });
 import MockFeed from './prelogin/MockFeed';
 import { BASECAMP_CHAIN_ID } from '../contracts/BaseCampPostContract';
 import { LINEA_CHAIN_ID } from './Linea/config/LineaNetworkConfig';
@@ -408,7 +409,7 @@ function BaseChatContent() {
   } | null>(null);
   
   // Network filter state - renamed to activePostingNetwork to reflect its new purpose
-  const [activePostingNetwork, setActivePostingNetwork] = useState<'base' | 'basecamp' | 'optimism' | 'ethereum' | 'arbitrum' | 'monad' | 'linea' | 'celo' | 'worldchain' | 'robinhood'>('base');
+  const [activePostingNetwork, setActivePostingNetwork] = useState<'base' | 'basecamp' | 'optimism' | 'ethereum' | 'arbitrum' | 'monad' | 'linea' | 'celo' | 'worldchain' | 'robinhood' | 'arc'>('base');
   
   // Globalne deklaracje stanów modalu przeniesione na początek funkcji
   const [modalMessage, setModalMessage] = useState('');
@@ -3755,6 +3756,20 @@ function BaseChatContent() {
                       isActive: activePostingNetwork === 'robinhood',
                       color: '#00C805',
                       specialStyle: 'robinhood'
+                    },
+                    {
+                      icon: (
+                        <img
+                          src="/arc.jpg"
+                          alt="Arc"
+                          className="w-5 h-5 rounded-[4px]"
+                        />
+                      ),
+                      label: 'Arc',
+                      onClick: () => setActivePostingNetwork('arc'),
+                      isActive: activePostingNetwork === 'arc',
+                      color: '#1E1E1E',
+                      specialStyle: 'arc'
                     }
                   ]}
                 />
@@ -4630,6 +4645,12 @@ function BaseChatContent() {
                               pokazuje baner i wylacza przycisk wysylki. */}
                           {activePostingNetwork === 'robinhood' && (
                             <CreatePostRobinhood onPostCreated={refreshPosts} />
+                          )}
+
+                          {/* Arc - kontrakt postow czeka na deploy (ArcPostContract.ts);
+                              do tego czasu komponent pokazuje baner i wylacza wysylke. */}
+                          {activePostingNetwork === 'arc' && (
+                            <CreatePostArc onPostCreated={refreshPosts} />
                           )}
                         </div>
                       ) : (

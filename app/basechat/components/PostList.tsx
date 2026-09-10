@@ -22,11 +22,13 @@ import CommentTransactionButtonEthereum from '../ETH/components/CommentTransacti
 import CommentTransactionButtonWorldChain from '../World/components/CommentTransactionButtonWorldChain';
 import CommentTransactionButtonLinea from '../Linea/components/CommentTransactionButtonLinea';
 import CommentTransactionButtonRobinhood from '../Robinhood/components/CommentTransactionButtonRobinhood';
+import CommentTransactionButtonArc from '../Arc/components/CommentTransactionButtonArc';
 import { BASECAMP_CHAIN_ID } from '../../contracts/BaseCampPostContract';
 import { CELO_CHAIN_ID } from '../Celo/config/CeloNetworkConfig';
 import { ETHEREUM_CHAIN_ID } from '../ETH/config/EthereumNetworkConfig';
 import { WORLD_CHAIN_ID } from '../World/config/WorldChainNetworkConfig';
 import { ROBINHOOD_CHAIN_ID } from '../Robinhood/config/RobinhoodNetworkConfig';
+import { ARC_CHAIN_ID } from '../Arc/contracts/ArcPostContract';
 import { LINEA_CHAIN_ID } from '../Linea/config/LineaNetworkConfig';
 import { base, baseSepolia } from 'wagmi/chains';
 import TipButton from './TipButton';
@@ -135,7 +137,7 @@ const forgetCollectionComment = (postId: string, mainCommentId: string) => {
 
 export interface ExtendedPost extends Post {
   pollId?: string;
-  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood';
+  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood' | 'arc';
   // 🚀 Paid Pin fields
   isPaidPin?: boolean;
   pinExpiresAt?: number;
@@ -333,6 +335,18 @@ const NETWORK_BADGES: Record<string, NetworkBadgeDef> = {
     },
     label: { text: 'RH', className: 'text-soft-ink-muted' },
   },
+  arc: {
+    alt: 'Arc',
+    chipClass: 'bg-soft-sunken',
+    // Znak Arc, jak Robinhood, ma wlasne tlo - to samo zaokraglenie.
+    src: '/arc.jpg',
+    iconClass: {
+      post: 'w-4 h-4 rounded-[4px]',
+      comment: 'w-3 h-3 rounded-[3px]',
+      reply: 'w-2.5 h-2.5 rounded-[3px]',
+    },
+    label: { text: 'Arc', className: 'text-soft-ink-muted' },
+  },
 };
 
 const NetworkBadge = ({ network, size }: { network?: string | null; size: NetworkBadgeSize }) => {
@@ -412,7 +426,7 @@ const ACTION_ITEM_PAID = 'min-h-[40px] [&_svg]:w-4 [&_svg]:h-4';
 // ===== SIEC POSTA / KOMENTARZA =====
 // Ten sam lancuch if-ow byl wczesniej przepisany osobno w handleAddComment
 // i w handleAddReply - rozjechanie sie ich znaczylo cicho zla odznake.
-type PostNetwork = 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood';
+type PostNetwork = 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood' | 'arc';
 
 const resolvePostNetwork = (chainId: number): PostNetwork | undefined => {
   if (chainId === base.id || chainId === baseSepolia.id) return 'base';
@@ -422,6 +436,7 @@ const resolvePostNetwork = (chainId: number): PostNetwork | undefined => {
   if (chainId === ETHEREUM_CHAIN_ID) return 'ethereum';
   if (chainId === WORLD_CHAIN_ID) return 'worldchain';
   if (chainId === ROBINHOOD_CHAIN_ID) return 'robinhood';
+  if (chainId === ARC_CHAIN_ID) return 'arc';
   return undefined;
 };
 
@@ -434,6 +449,7 @@ const COMMENT_BUTTON_BY_CHAIN: Record<number, typeof CommentTransactionButton> =
   [WORLD_CHAIN_ID]: CommentTransactionButtonWorldChain,
   [LINEA_CHAIN_ID]: CommentTransactionButtonLinea,
   [ROBINHOOD_CHAIN_ID]: CommentTransactionButtonRobinhood,
+  [ARC_CHAIN_ID]: CommentTransactionButtonArc,
 };
 
 // ===== EKSPLORATORY =====
@@ -468,6 +484,7 @@ const EXPLORERS: Record<string, { name: string; txUrl: string; tokenUrl?: string
   },
   linea: { name: 'Lineascan', txUrl: 'https://lineascan.build/tx/' },
   robinhood: { name: 'Robinhood Explorer', txUrl: 'https://robinhoodchain.blockscout.com/tx/' },
+  arc: { name: 'Arcscan', txUrl: 'https://testnet.arcscan.app/tx/', tokenUrl: 'https://testnet.arcscan.app/token/' },
 };
 
 const getTxExplorer = (network?: string) => (network && EXPLORERS[network]) || BASESCAN;

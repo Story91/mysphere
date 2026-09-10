@@ -38,6 +38,7 @@ export const SOFT_NETWORKS: SoftNetwork[] = [
   { id: 'ethereum', label: 'ETH', iconSrc: '/ethlogo.png' },
   { id: 'worldchain', label: 'World', iconSrc: '/logotypy/world-symbol-dark.svg' },
   { id: 'robinhood', label: 'RH', iconSrc: '/robin.webp' },
+  { id: 'arc', label: 'Arc', iconSrc: '/arc.jpg' },
 ];
 
 export default function SoftStoryRail({

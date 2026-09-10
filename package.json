@@ -19,6 +19,7 @@
     "contracts:deploy:post2:sepolia": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run app/basemorning/scripts/deployPostContract2.ts --network base-sepolia",
     "contracts:deploy:robinhood": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run app/basechat/Robinhood/scripts/deploy-robinhood.ts --network robinhood",
     "contracts:deploy:robinhood:testnet": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run app/basechat/Robinhood/scripts/deploy-robinhood.ts --network robinhoodTestnet",
+    "contracts:deploy:arc": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run app/basechat/Arc/scripts/deploy-arc.ts --network arcTestnet",
     "contracts:test": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat test",
     "launchpad:mine": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run scripts/mineHookAddress.ts",
     "launchpad:deploy": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run scripts/launchpad/deploy.ts",

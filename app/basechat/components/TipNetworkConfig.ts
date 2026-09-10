@@ -8,10 +8,11 @@ import { LINEA_CHAIN_ID } from '../Linea/config/LineaNetworkConfig';
 import { BASECAMP_CHAIN_ID } from '../../contracts/BaseCampPostContract';
 import { ETHEREUM_CHAIN_ID } from '../ETH/config/EthereumNetworkConfig';
 import { ROBINHOOD_CHAIN_ID } from '../Robinhood/config/RobinhoodNetworkConfig';
+import { arcTestnet } from '../../startpad/arcChain';
 
 // ===== TOKEN TYPES =====
-export type TipToken = 'ETH' | 'USDC' | 'CELO' | 'WLD' | 'LINEA' | 'CAMP';
-export type TipNetwork = 'base' | 'ethereum' | 'celo' | 'world' | 'linea' | 'camp' | 'robinhood';
+export type TipToken = 'ETH' | 'USDC' | 'CELO' | 'WLD' | 'LINEA' | 'CAMP' | 'USDG';
+export type TipNetwork = 'base' | 'ethereum' | 'celo' | 'world' | 'linea' | 'camp' | 'robinhood' | 'arc';
 
 // ===== TOKEN CONFIG =====
 export interface TokenConfig {
@@ -48,6 +49,10 @@ export const TOKEN_ADDRESSES = {
   WLD_WORLD: '0x2cFc85d8E48F8EAB294be644d9E25C3030863003' as `0x${string}`,
   // Linea
   LINEA_LINEA: '0x1789e0043623282d5dcc7f213d703c6d8bafbb04' as `0x${string}`,
+  // Robinhood Chain - Global Dollar (Paxos). Ten sam kontrakt, ktorym /api/asks
+  // rozlicza x402 (app/api/asks/pricing.ts) - jedyny stablecoin na tej sieci
+  // z EIP-3009. ZMIERZONE 2026-09-11: symbol() = "USDG", decimals() = 6.
+  USDG_ROBINHOOD: '0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168' as `0x${string}`,
 } as const;
 
 // ===== DEFINICJE TOKENÓW =====
@@ -109,6 +114,38 @@ export const TOKENS: Record<TipToken, TokenConfig> = {
     iconUrl: '/Camp.png',
     color: '#FF6B35',
   },
+  USDG: {
+    symbol: 'USDG',
+    name: 'Global Dollar',
+    decimals: 6,
+    isNative: false,
+    contractAddress: TOKEN_ADDRESSES.USDG_ROBINHOOD,
+    icon: '💵',
+    iconUrl: '/icons/usdg.svg',
+    color: '#1E5EFF',
+  },
+};
+
+/**
+ * USDC na Arc - jednostka NATYWNA sieci, nie ERC-20.
+ *
+ * Nie da sie tu wziac TOKENS.USDC: tamten wpis to kontrakt na Base z szescioma
+ * miejscami. Na Arc gaz i `msg.value` chodza w USDC z OSIEMNASTOMA miejscami
+ * (pomiar w app/startpad/arcChain.ts), wiec napiwek to zwykly przelew natywny,
+ * a kwota "1" to parseUnits('1', 18). Symbol zostaje 'USDC', bo w bazie i w
+ * statystykach to nadal dolar - rozroznia je pole `network`.
+ *
+ * Dlatego TipButton szuka konfiguracji tokena NAJPIERW na liscie tokenow
+ * wybranej sieci, a dopiero potem w globalnym TOKENS.
+ */
+export const ARC_NATIVE_USDC: TokenConfig = {
+  symbol: 'USDC',
+  name: 'USD Coin',
+  decimals: 18,
+  isNative: true,
+  icon: '💵',
+  iconUrl: '/icons/usdc.svg',
+  color: '#2775CA',
 };
 
 // ===== DEFINICJE SIECI =====
@@ -208,7 +245,25 @@ export const NETWORKS: Record<TipNetwork, NetworkConfig> = {
     tokens: [
       // ETH jest juz zdefiniowany w TOKENS - reuzywamy zamiast duplikowac
       TOKENS.ETH,
+      // Global Dollar - stablecoin, ktorym ta siec realnie zyje (x402 w /api/asks
+      // rozlicza sie wlasnie w nim). Zwykly transfer ERC-20.
+      TOKENS.USDG,
     ],
+  },
+  // Arc (Circle) - testnet, mainnet zapowiedziany na 16 wrzesnia 2026.
+  // Napiwek to przelew natywny w USDC; patrz ARC_NATIVE_USDC.
+  arc: {
+    id: 'arc',
+    chainId: arcTestnet.id,
+    name: 'Arc Testnet',
+    shortName: 'Arc',
+    icon: '◎',
+    iconUrl: '/arc.jpg',
+    color: '#1E1E1E',
+    explorerUrl: 'https://testnet.arcscan.app',
+    explorerTxPath: '/tx/',
+    nativeToken: 'USDC',
+    tokens: [ARC_NATIVE_USDC],
   },
   camp: {
     id: 'camp',
@@ -270,8 +325,18 @@ export const getTokensForNetwork = (networkId: TipNetwork): TokenConfig[] => {
  */
 export const getDefaultTokenForNetwork = (networkId: TipNetwork): TokenConfig => {
   const network = NETWORKS[networkId];
-  return TOKENS[network.nativeToken];
+  // Z listy sieci, nie z globalnego TOKENS - Arc ma wlasny wpis USDC (natywny,
+  // 18 miejsc), ktory w TOKENS nie istnieje.
+  return network.tokens.find((t) => t.symbol === network.nativeToken) ?? TOKENS[network.nativeToken];
 };
+
+/**
+ * Konfiguracja tokena W KONTEKSCIE SIECI. Ten sam symbol moze znaczyc inny
+ * kontrakt (a nawet inna liczbe miejsc) na roznych lancuchach - USDC na Base
+ * to ERC-20 z 6 miejscami, na Arc to jednostka natywna z 18.
+ */
+export const getTokenOnNetwork = (networkId: TipNetwork, token: TipToken): TokenConfig =>
+  NETWORKS[networkId].tokens.find((t) => t.symbol === token) ?? TOKENS[token];
 
 /**
  * Generuje link do explorera dla transakcji
@@ -315,6 +380,10 @@ const EXPLORER_SEARCH_PATH: Partial<Record<TipNetwork, string>> = {
   celo: '/search?f=0&q=',
   ethereum: '/search?f=0&q=',
   world: '/search?f=0&q=',
+  // Blockscout: jedna sciezka dla transakcji, adresow i userOpow.
+  robinhood: '/search-results?q=',
+  arc: '/search-results?q=',
+  camp: '/search-results?q=',
 };
 
 /**
@@ -336,6 +405,7 @@ const NETWORK_ALIASES: Record<string, TipNetwork> = {
   celo: 'celo',
   linea: 'linea',
   robinhood: 'robinhood',
+  arc: 'arc',
   world: 'world',
   worldchain: 'world',
   camp: 'camp',
@@ -370,6 +440,7 @@ export const QUICK_AMOUNTS: Record<TipToken, string[]> = {
   WLD: ['1', '5', '10'],
   LINEA: ['10', '50', '100'],
   CAMP: ['0.01', '0.1', '1'],
+  USDG: ['1', '5', '10'],
 };
 
 /**

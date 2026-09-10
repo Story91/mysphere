@@ -636,7 +636,7 @@ export const createPost = async (post: {
   visibility?: 'public' | 'followers' | 'private';
   txHash?: string; // Keep this as it now represents the Zora creation tx hash
   zoraCoinAddress?: string; // <-- ADDED
-  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood'; // Add network parameter to identify the source network
+  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood' | 'arc'; // Add network parameter to identify the source network
   musicTrack?: { // 🎵 Dodaj obsługę załączników muzycznych
     id: string;
     name: string;
@@ -991,7 +991,7 @@ export const addComment = async (postId: string, comment: {
   likedBy: string[];
   mentions: string[];
   txHash?: string | null;
-  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood';
+  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood' | 'arc';
   /**
    * ZWRACA ID UTWORZONEGO KOMENTARZA.
    *
@@ -1538,7 +1538,7 @@ export const addCommentReply = async (postId: string, commentId: string, replyDa
   author: string, 
   content: string,
   txHash?: string | null,
-  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood'
+  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood' | 'arc'
 }) => {
   try {
     const postRef = doc(db, 'posts', postId);
@@ -3264,9 +3264,9 @@ export const fetchPinnedPosts = async (): Promise<ExtendedPost[]> => {
 // ===== TIP TRACKING SYSTEM =====
 
 // Typy tokenów obsługiwanych przez system tipowania
-export type TipTokenType = 'ETH' | 'USDC' | 'CELO' | 'WLD' | 'LINEA' | 'CAMP';
+export type TipTokenType = 'ETH' | 'USDC' | 'CELO' | 'WLD' | 'LINEA' | 'CAMP' | 'USDG';
 // 'basecamp' zachowane dla kompatybilności wstecznej ze starymi danymi w Firebase
-export type TipNetworkType = 'base' | 'ethereum' | 'celo' | 'world' | 'linea' | 'camp' | 'robinhood' | 'basecamp';
+export type TipNetworkType = 'base' | 'ethereum' | 'celo' | 'world' | 'linea' | 'camp' | 'robinhood' | 'arc' | 'basecamp';
 
 export interface Tip {
   id?: string;
@@ -3291,12 +3291,14 @@ export interface TipStats {
   wldReceived: number;
   lineaReceived: number;
   campReceived: number;
+  usdgReceived: number;
   ethSent: number;
   usdcSent: number;
   celoSent: number;
   wldSent: number;
   lineaSent: number;
   campSent: number;
+  usdgSent: number;
 }
 
 export interface PostTipStats {
@@ -3307,6 +3309,7 @@ export interface PostTipStats {
   wldTips: number;
   lineaTips: number;
   campTips: number;
+  usdgTips: number;
   tipCount: number;
   uniqueTippers: number;
   // Per-network tips (ETH grouped by network)
@@ -3409,7 +3412,8 @@ const TIP_TOKEN_FIELD: Record<TipTokenType, string> = {
   CELO: 'celo',
   WLD: 'wld',
   LINEA: 'linea',
-  CAMP: 'camp'
+  CAMP: 'camp',
+  USDG: 'usdg'
 };
 
 /** Dopisuje kwote do pola `<token><suffix>`; nieznane tokeny sa pomijane. */
@@ -3435,12 +3439,14 @@ const emptyTipStats = (): TipStats => ({
   wldReceived: 0,
   lineaReceived: 0,
   campReceived: 0,
+  usdgReceived: 0,
   ethSent: 0,
   usdcSent: 0,
   celoSent: 0,
   wldSent: 0,
   lineaSent: 0,
-  campSent: 0
+  campSent: 0,
+  usdgSent: 0
 });
 
 /** Pusty komplet statystyk tipow posta - byl wpisany z reki w trzech miejscach. */
@@ -3452,6 +3458,7 @@ const emptyPostTipStats = (): PostTipStats => ({
   wldTips: 0,
   lineaTips: 0,
   campTips: 0,
+  usdgTips: 0,
   tipCount: 0,
   uniqueTippers: 0,
   networkTips: []

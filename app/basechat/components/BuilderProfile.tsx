@@ -1433,6 +1433,14 @@ export default function BuilderProfile({
                               </span>
                             </div>
                           )}
+                          {(tipStats.usdgReceived ?? 0) > 0 && (
+                            <div className="flex items-center space-x-1.5">
+                              <img src="/icons/usdg.svg" alt="USDG" className="w-4 h-4" />
+                              <span className="text-sm font-semibold text-soft-accent-deep font-soft-display tabular-nums">
+                                {tipStats.usdgReceived.toFixed(2)}
+                              </span>
+                            </div>
+                          )}
                           {/* CAMP token support - ODBLOKOWANY */}
                           <div className="flex items-center space-x-1.5">
                             <img src="/Camp.png" alt="CAMP" className="w-4 h-4" />

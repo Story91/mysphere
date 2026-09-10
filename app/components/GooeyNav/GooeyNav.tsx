@@ -10,7 +10,7 @@ export type GooeyNavItem = {
   onClick: () => void;
   isActive?: boolean;
   color?: string;
-  specialStyle?: 'base' | 'world' | 'celo' | 'camp' | 'linea' | 'ethereum' | 'robinhood';
+  specialStyle?: 'base' | 'world' | 'celo' | 'camp' | 'linea' | 'ethereum' | 'robinhood' | 'arc';
 };
 
 export type GooeyNavProps = {
@@ -132,7 +132,7 @@ export default function GooeyNav({ items, className = '' }: GooeyNavProps) {
                       ? 'bg-white border'
                       : item.specialStyle === 'camp' || item.specialStyle === 'celo'
                       ? 'border'
-                      : item.specialStyle === 'linea' || item.specialStyle === 'ethereum' || item.specialStyle === 'robinhood'
+                      : item.specialStyle === 'linea' || item.specialStyle === 'ethereum' || item.specialStyle === 'robinhood' || item.specialStyle === 'arc'
                       ? 'border'
                       : ''
                   }`}
@@ -152,7 +152,7 @@ export default function GooeyNav({ items, className = '' }: GooeyNavProps) {
                       : item.specialStyle === 'robinhood'
                       ? '#00C805' // firmowa zielen Robinhooda
                       : 'transparent',
-                    borderWidth: item.specialStyle === 'base' ? '2px' : item.specialStyle === 'world' || item.specialStyle === 'celo' || item.specialStyle === 'camp' || item.specialStyle === 'linea' || item.specialStyle === 'ethereum' || item.specialStyle === 'robinhood' ? '1px' : '0px',
+                    borderWidth: item.specialStyle === 'base' ? '2px' : item.specialStyle === 'world' || item.specialStyle === 'celo' || item.specialStyle === 'camp' || item.specialStyle === 'linea' || item.specialStyle === 'ethereum' || item.specialStyle === 'robinhood' || item.specialStyle === 'arc' ? '1px' : '0px',
                     zIndex: 0
                   }}
                 />

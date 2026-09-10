@@ -231,8 +231,17 @@ export const ROBINHOOD_POST_CONTRACT_ABI = [
 // NEXT_PUBLIC_ROBINHOOD_POST_CONTRACT, adres jest pusty, getRobinhoodContractAddress
 // zwraca undefined, a komponenty postowania wylaczaja przycisk zamiast wysylac
 // transakcje na pusty/nieprawidlowy adres.
+/**
+ * Kontrakt wdrozony 2026-08-05 (deployment-info.json obok), ZMIERZONE
+ * 2026-09-11: eth_getCode pod tym adresem oddaje 1458 bajtow. Wczesniej adres
+ * szedl WYLACZNIE z env i gdy zmiennej brakowalo (lokalnie jej nie ma),
+ * caly kompozytor Robinhooda pokazywal "not live yet" - miesiac po deployu.
+ * Env zostaje jako nadpisanie na wypadek redeployu.
+ */
+export const ROBINHOOD_DEPLOYED_CONTRACT_ADDRESS = '0xd02A166A186bcc5C537FeCD5103E9c1A94Bb49D6';
+
 export const ROBINHOOD_CONTRACT_ADDRESS =
-  process.env.NEXT_PUBLIC_ROBINHOOD_POST_CONTRACT || '';
+  process.env.NEXT_PUBLIC_ROBINHOOD_POST_CONTRACT || ROBINHOOD_DEPLOYED_CONTRACT_ADDRESS;
 
 // Funkcja do pobierania adresu kontraktu w zaleznosci od sieci.
 // Zwraca undefined gdy adres nie jest skonfigurowany (kontrakt niewdrozony).

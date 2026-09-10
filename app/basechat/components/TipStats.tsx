@@ -376,6 +376,7 @@ export default function TipStats({ userAddress, postId, className = '', presetPo
       { token: 'WLD' as TipToken, amount: userStats.wldReceived },
       { token: 'LINEA' as TipToken, amount: userStats.lineaReceived },
       { token: 'CAMP' as TipToken, amount: userStats.campReceived },
+      { token: 'USDG' as TipToken, amount: userStats.usdgReceived ?? 0 },
     ].filter(t => t.amount > 0);
 
     return (
@@ -435,6 +436,30 @@ export default function TipStats({ userAddress, postId, className = '', presetPo
         name: 'Celo',
         tokens: [
           { token: 'CELO' as TipTokenType, label: 'CELO' },
+        ]
+      },
+      // Trzy sieci brakowaly w tej tabeli, choc TipButton pozwalal na nich
+      // tipowac - napiwek dochodzil, a pod postem sie nie pokazywal.
+      {
+        network: 'ethereum' as TipNetworkType,
+        name: 'Ethereum',
+        tokens: [
+          { token: 'ETH' as TipTokenType, label: 'ETH' },
+        ]
+      },
+      {
+        network: 'robinhood' as TipNetworkType,
+        name: 'Robinhood',
+        tokens: [
+          { token: 'ETH' as TipTokenType, label: 'ETH' },
+          { token: 'USDG' as TipTokenType, label: 'USDG' },
+        ]
+      },
+      {
+        network: 'arc' as TipNetworkType,
+        name: 'Arc',
+        tokens: [
+          { token: 'USDC' as TipTokenType, label: 'USDC' },
         ]
       },
     ];
