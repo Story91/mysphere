@@ -32,7 +32,7 @@ export const ARC_POSTING: ChainWithComposer = {
   explorerTxUrl: `${arcTestnet.blockExplorers.default.url}/tx/`,
   explorerButtonLabel: 'View on Arcscan',
 
-  // Kontrakt czeka na deploy - patrz ArcPostContract.ts.
+  // Kontrakt wdrozony 2026-09-11; isLive zostaje na wypadek pustego adresu po redeployu.
   isLive: isArcPostContractDeployed,
   notLiveMessage: ARC_POSTING_DISABLED_MESSAGE,
 
@@ -68,7 +68,7 @@ export const ARC_POSTING: ChainWithComposer = {
       >
         <span className="font-medium">{ARC_POSTING_DISABLED_MESSAGE}.</span>{' '}
         <span className="opacity-80">
-          Tipping in USDC on Arc already works - only onchain posting waits for the contract deployment.
+          Tipping in USDC on Arc already works - only onchain posting waits for the contract address.
         </span>
       </div>
     ),

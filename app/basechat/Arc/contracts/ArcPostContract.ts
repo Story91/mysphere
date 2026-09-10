@@ -5,21 +5,20 @@ import { ROBINHOOD_POST_CONTRACT_ABI } from '../../Robinhood/contracts/Robinhood
  * Kontrakt postow na Arc (Circle) - ten sam bajt w bajt co na Robinhoodzie i
  * Linei (zrodlo: contracts/ArcPostContract.sol), wiec ABI jest wspolne.
  *
- * ADRES IDZIE Z ENV, bo kontrakt NIE JEST JESZCZE WDROZONY. Deployer z
- * .env.local (0xF1fa...) ma na Arc zero USDC (ZMIERZONE 2026-09-11), a gaz
- * placi sie tam w USDC. Po zasileniu:
- *
- *     npx hardhat run scripts/deployArc.js --network arcTestnet
- *
- * i wpisanie adresu do NEXT_PUBLIC_ARC_POST_CONTRACT. Do tego czasu
- * kompozytor Arc pokazuje baner "not live yet" - tak jak Robinhood przed
- * swoim deployem.
+ * Wdrozony 2026-09-11 przez wlasciciela (deployment-info.json obok),
+ * ZMIERZONE: eth_getCode = 2148 B. Adres siedzi w kodzie jako domyslny -
+ * tak jak na Robinhoodzie, gdzie brak zmiennej env wylaczal postowanie na
+ * miesiac. NEXT_PUBLIC_ARC_POST_CONTRACT zostaje jako nadpisanie po
+ * ewentualnym redeployu (`npm run contracts:deploy:arc`).
  */
 export const ARC_CHAIN_ID = arcTestnet.id;
 
 export const ARC_POST_CONTRACT_ABI = ROBINHOOD_POST_CONTRACT_ABI;
 
-export const ARC_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_ARC_POST_CONTRACT || '';
+export const ARC_DEPLOYED_CONTRACT_ADDRESS = '0xD012Afb6E08B0DA44f9041bA3d277EA727F9389b';
+
+export const ARC_CONTRACT_ADDRESS =
+  process.env.NEXT_PUBLIC_ARC_POST_CONTRACT || ARC_DEPLOYED_CONTRACT_ADDRESS;
 
 export const getArcContractAddress = (chainId: number): string | undefined => {
   if (chainId !== ARC_CHAIN_ID) return undefined;

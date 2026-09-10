@@ -10,8 +10,7 @@ import { ethers } from 'hardhat';
 //  - PRIVATE_KEY w .env.local
 //  - USDC NATYWNE na koncie deployera - na Arc gaz placi sie w USDC, nie w ETH.
 //    Kran: https://faucet.circle.com (wybrac Arc Testnet).
-//    Stan 2026-09-11: deployer z .env.local (0xF1fa...) ma tam ZERO, dlatego
-//    ten skrypt jeszcze nie byl uruchomiony.
+//    Pierwszy deploy: 2026-09-11 z 0xD488... -> 0xD012Afb6... (deployment-info.json).
 //
 // Zrodlo kontraktu: contracts/ArcPostContract.sol (ten sam kod co Robinhood/Linea).
 

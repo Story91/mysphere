@@ -4647,8 +4647,7 @@ function BaseChatContent() {
                             <CreatePostRobinhood onPostCreated={refreshPosts} />
                           )}
 
-                          {/* Arc - kontrakt postow czeka na deploy (ArcPostContract.ts);
-                              do tego czasu komponent pokazuje baner i wylacza wysylke. */}
+                          {/* Arc - kontrakt postow: ArcPostContract.ts */}
                           {activePostingNetwork === 'arc' && (
                             <CreatePostArc onPostCreated={refreshPosts} />
                           )}
