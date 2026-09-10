@@ -86,18 +86,13 @@ export type TokenCounters = {
 };
 
 /**
- * Oba liczniki tokena jednym zapytaniem `/counters`. To ten sam URL, ktory
- * wola `fetchHolderCount`, wiec przy wlaczonym cache liczba posiadaczy i liczba
- * transferow dziela JEDNO zapytanie - dodanie statystyki transferow nie kosztuje
- * ani jednego kredytu wiecej.
+ * Oba liczniki tokena jednym zapytaniem `/counters`. Liczba posiadaczy i liczba
+ * transferow dziela wiec JEDNO zapytanie - sprawdzenie, czy indeks nadaza
+ * (`indexLooksCaughtUp`), nie kosztuje ani jednego kredytu wiecej.
  */
 export async function fetchTokenCounters(chainId: number, token: string): Promise<TokenCounters> {
   const data = await cachedGet<CountersResponse>(`${proxyBase(chainId)}/tokens/${token}/counters`);
   return { holders: toCount(data?.token_holders_count), transfers: toCount(data?.transfers_count) };
-}
-
-export async function fetchHolderCount(chainId: number, token: string): Promise<number | null> {
-  return (await fetchTokenCounters(chainId, token)).holders;
 }
 
 export type IndexedHolder = {
@@ -137,29 +132,77 @@ export async function fetchTokenHolders(
 }
 
 /**
- * Liczby posiadaczy dla wielu tokenow naraz, z ograniczona rownolegloscia -
- * plan Builder ma limit 15 req/s, wiec nie wypuszczamy 40 zapytan w jednym
- * mgnieniu. Zwraca mape adres(lowercase) -> liczba; tokeny bez odpowiedzi
+ * Oba liczniki dla wielu tokenow naraz, z ograniczona rownolegloscia - plan
+ * Builder ma limit 15 req/s, wiec nie wypuszczamy 40 zapytan w jednym
+ * mgnieniu. Zwraca mape adres(lowercase) -> liczniki; tokeny bez odpowiedzi
  * po prostu nie maja klucza w mapie.
+ *
+ * Oddajemy CALE liczniki, a nie sama liczbe posiadaczy, bo dopiero obie liczby
+ * naraz pozwalaja stwierdzic, czy indeks w ogole nadaza - patrz
+ * `indexLooksCaughtUp` nizej.
  */
-export async function fetchHolderCounts(
+export async function fetchTokenCountersBatch(
   chainId: number,
   tokens: string[],
   concurrency = 5
-): Promise<Record<string, number>> {
+): Promise<Record<string, TokenCounters>> {
   const unique = Array.from(new Set(tokens.map((t) => t.toLowerCase())));
-  const out: Record<string, number> = {};
+  const out: Record<string, TokenCounters> = {};
   let cursor = 0;
 
   async function worker() {
     while (cursor < unique.length) {
       const index = cursor++;
       const address = unique[index];
-      const count = await fetchHolderCount(chainId, address);
-      if (count !== null) out[address] = count;
+      const counters = await fetchTokenCounters(chainId, address);
+      if (counters.holders !== null || counters.transfers !== null) out[address] = counters;
     }
   }
 
   await Promise.all(Array.from({ length: Math.min(concurrency, unique.length) }, worker));
   return out;
+}
+
+/**
+ * CZY INDEKSOWI WOLNO ODPOWIADAC ZA LICZBE POSIADACZY.
+ *
+ * ===========================================================================
+ * OBJAW, KTORY TO WYWOLAL
+ * ===========================================================================
+ * 10 wrzesnia 2026 karta $SPHERE na tablicy pokazywala "40 holders". Token byl
+ * po graduacji i mial ich naprawde 147. Czterdziestka nie byla pomylka indeksu
+ * - to byla liczba KONT, ktore kupily na krzywej, wystawiona pod cudza nazwa.
+ *
+ * Blockscout mial poprawic te liczbe i nie poprawil. Zmierzone tego dnia,
+ * wprost z `base.blockscout.com` (endpoint odpowiada 200, wiec zaden fallback
+ * na blad sie nie wlaczal):
+ *
+ *     {"transfers_count":"0","token_holders_count":"8"}
+ *
+ * Zero transferow przy 6 063 policzonych z logow znaczy tyle, ze indeks tego
+ * tokena po prostu NIE MA. Osemka nie jest wiec mniejsza liczba posiadaczy -
+ * ona nie jest liczba posiadaczy w ogole.
+ *
+ * ===========================================================================
+ * DLACZEGO NIE `Math.max`
+ * ===========================================================================
+ * Tablica brala dotad `Math.max(liczba z eventow, liczba z indeksu)`. To
+ * ratowalo przed ZANIZENIEM, ale kosztem gorszej rzeczy: wynik nie byl juz
+ * zadna z tych dwoch wielkosci. Maksimum z "kupujacych na krzywej" i
+ * "posiadaczy wg indeksu" nie ma nazwy - a stalo pod nazwa "holders".
+ *
+ * Dlatego zamiast mieszac dwie liczby w jedna, sprawdzamy, czy indeks nadaza,
+ * i albo bierzemy JEGO liczbe w calosci, albo nie bierzemy jej wcale.
+ *
+ * Test kosztuje zero zapytan: `transfers_count` przychodzi tym samym
+ * `/counters`, co `token_holders_count`. Kazda transakcja na krzywej to co
+ * najmniej jeden Transfer (mint przy kupnie, burn przy sprzedazy), wiec indeks
+ * raportujacy mniej transferow niz sami naliczylismy transakcji jest z
+ * definicji w tyle - i jego liczba posiadaczy tez.
+ */
+export function indexLooksCaughtUp(counters: TokenCounters | undefined, knownTrades: number): boolean {
+  if (!counters || counters.holders === null) return false;
+  // Brak `transfers_count` - nie ma czym zmierzyc zaleglosci, wiec nie ufamy.
+  if (counters.transfers === null) return false;
+  return counters.transfers >= knownTrades;
 }

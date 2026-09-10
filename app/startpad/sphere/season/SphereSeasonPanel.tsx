@@ -56,9 +56,15 @@ import { ChevronDown, ChevronUp, Info, Loader2, Trophy } from 'lucide-react';
 // etykieta nie moze podazac za wybrana siecia tablicy.
 import { SPHERE_CHAIN, SPHERE_NATIVE_SYMBOL } from '../sphereChain';
 import { SPHERE_DISTRIBUTOR_ADDRESS, SPHERE_SAFE_ADDRESS, sphereDistributorReadsAbi } from '../sphereConfig';
-import { AddressPill, BigStat, LearnMore, PageHero } from '../SphereUI';
+import { AddressPill, BigStat, Disclosure, LearnMore, PageHero } from '../SphereUI';
 import { EPOCH_BLOCKS, SEASON_GENESIS_BLOCK } from './epochMath';
-import SphereRewardsClaim, { useSphereDistributor, type DistributorState } from './SphereRewardsClaim';
+import SphereRewardsClaim, {
+  TokenGlyph,
+  useSphereDistributor,
+  useTokenLogos,
+  useTokenSymbols,
+  type DistributorState,
+} from './SphereRewardsClaim';
 
 type SeasonToken = {
   token: string;
@@ -92,6 +98,16 @@ type SeasonData = {
   creators: SeasonCreator[];
 };
 
+/** Wiersz tablicy tworcow z manifestu - przepisany, nie przeliczony. */
+type ManifestCreator = {
+  creator: string;
+  shareBps: number;
+  netProtocolEth: string;
+  rewardCapEth: string;
+  /** Adresy tokenow tego tworcy (do ikonek) - bez wykluczonych z sezonu. */
+  tokens: string[];
+};
+
 /** Ksztalt /api/sphere/epochs - podsumowania manifestow publishEpoch.ts. */
 type EpochManifestSummary = {
   closedAtPublish: boolean;
@@ -103,6 +119,7 @@ type EpochManifestSummary = {
   root: string | null;
   manifestHash: string;
   cumulative: Record<string, string>;
+  board: ManifestCreator[];
   url: string;
 };
 
@@ -162,7 +179,7 @@ function useEpochCountdown(endsAtUnix: string | null) {
   return `Ends in ${d}d ${h}h · shares settle when the epoch closes`;
 }
 
-function CreatorRow({ rank, c }: { rank: number; c: SeasonCreator }) {
+function CreatorRow({ rank, c, logos }: { rank: number; c: SeasonCreator; logos: Record<string, string> }) {
   const [open, setOpen] = useState(false);
   const share = c.shareBps / 100;
   const podium = rank <= 3;
@@ -194,6 +211,13 @@ function CreatorRow({ rank, c }: { rank: number; c: SeasonCreator }) {
             className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[12px] font-extrabold ${rankTone}`}
           >
             {podium ? MEDALS[rank - 1] : rank}
+          </span>
+          {/* Ikonki tokenow przed adresem: token jest tym, co czytelnik
+              rozpoznaje, adres tworcy nie. Fallback na inicjal symbolu. */}
+          <span className="flex shrink-0 -space-x-1.5">
+            {c.tokens.slice(0, 4).map((t) => (
+              <TokenGlyph key={t.token} url={logos[t.token.toLowerCase()]} symbol={t.symbol} />
+            ))}
           </span>
           <span className="min-w-0 flex-1">
             <span className="block truncate font-mono text-[12.5px] font-extrabold text-sp-ink">{short(c.creator)}</span>
@@ -480,27 +504,10 @@ function PastEpochRow({ e, line }: { e: PastEpoch; line: AccountEpochLine | null
  * stan odbioru i przycisk Claim mieszkaja w karcie "Your SPHERE rewards"
  * wyzej (SphereRewardsClaim) - tu tylko historia per epoka.
  */
-function PastEpochsSection() {
-  const [data, setData] = useState<EpochsData | null>(null);
-  const [failed, setFailed] = useState(false);
+function PastEpochsSection({ data, failed }: { data: EpochsData | null; failed: boolean }) {
   const readClient = usePublicClient({ chainId: SPHERE_CHAIN.id });
   const { address: account } = useAccount();
   const [claimedAmt, setClaimedAmt] = useState<bigint | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    fetch('/api/sphere/epochs')
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
-      .then((d: EpochsData) => {
-        if (alive) setData(d);
-      })
-      .catch(() => {
-        if (alive) setFailed(true);
-      });
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   // Najnowszy opublikowany root (API zwraca epoki malejaco) - z map
   // cumulative liczy sie przyrost konta per epoka.
@@ -559,13 +566,11 @@ function PastEpochsSection() {
           Cumulative · no claim deadline
         </span>
       </div>
-      <p className="mt-0.5 text-[10.5px] leading-relaxed text-sp-shade/50">
-        Every closed epoch gets a canonical manifest anyone can recompute, and every epoch window is{' '}
-        {EPOCH_BLOCKS.toLocaleString('en-US')} blocks long, counted from launchpad deploy block{' '}
-        {blockNo(SEASON_GENESIS_BLOCK)}. Rewards are cumulative: one claim collects everything accrued under the active
-        root, and nothing forces you to claim every epoch. What the contract enforces is that a new root may not carry a
-        smaller total than the one before it (<span className="font-mono">ShrinkingTotal</span>); carrying your own
-        balance forward is the proposer&apos;s job, not the contract&apos;s.
+      {/* Fakt z liczbami zostaje na wierzchu, wyprowadzenie schodzi do rozwijki
+          - ten sam akapit o ShrinkingTotal stal juz w karcie Claim wyzej. */}
+      <p className="mt-0.5 text-[10.5px] text-sp-shade/50">
+        {EPOCH_BLOCKS.toLocaleString('en-US')}-block windows from deploy block {blockNo(SEASON_GENESIS_BLOCK)}, one
+        canonical manifest each.
       </p>
 
       <div className="mt-3 grid gap-1.5">
@@ -584,6 +589,207 @@ function PastEpochsSection() {
         )}
       </div>
 
+      <div className="mt-3">
+        <Disclosure summary="Why every epoch is a block window, and what &quot;cumulative&quot; buys you">
+          <p>
+            An epoch is a fixed window of {EPOCH_BLOCKS.toLocaleString('en-US')} blocks counted from launchpad deploy
+            block {blockNo(SEASON_GENESIS_BLOCK)} - not a calendar week - so anyone can recompute it from Base logs with
+            the public formula.
+          </p>
+          <p className="mt-2">
+            Rewards are cumulative: one claim collects everything accrued under the active root, and nothing forces you
+            to claim every epoch. What the contract enforces is that a new root may not carry a smaller total than the
+            one before it (<span className="font-mono">ShrinkingTotal</span>); carrying your own balance forward is the
+            proposer&apos;s job, not the contract&apos;s.
+          </p>
+        </Disclosure>
+      </div>
+    </section>
+  );
+}
+
+
+/** Wiersz tablicy ZAMKNIETEJ epoki - wszystkie liczby wprost z manifestu. */
+function PastCreatorRow({
+  rank,
+  c,
+  logos,
+  symbols,
+}: {
+  rank: number;
+  c: ManifestCreator;
+  logos: Record<string, string>;
+  symbols: Record<string, string>;
+}) {
+  const share = c.shareBps / 100;
+  const podium = rank <= 3;
+  const rankTone =
+    rank === 1
+      ? 'bg-amber-400/20 text-amber-600'
+      : rank === 2
+        ? 'bg-sp-shade/10 text-sp-shade/60'
+        : rank === 3
+          ? 'bg-orange-400/20 text-orange-600'
+          : 'bg-sp-shade/5 text-sp-shade/45';
+  return (
+    <div className="relative overflow-hidden rounded-2xl bg-sp-shade/[0.03]">
+      <div
+        className="absolute inset-y-0 left-0 bg-gradient-to-r from-sp-brand/25 to-sp-brand/[0.06]"
+        style={{ width: `${Math.min(share, 100)}%` }}
+        aria-hidden="true"
+      />
+      <div className="relative flex items-center gap-3 px-3 py-2.5">
+        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[12px] font-extrabold ${rankTone}`}>
+          {podium ? MEDALS[rank - 1] : rank}
+        </span>
+        <span className="flex shrink-0 -space-x-1.5">
+          {c.tokens.slice(0, 4).map((t) => (
+            <TokenGlyph key={t} url={logos[t]} symbol={symbols[t] ?? '?'} />
+          ))}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-mono text-[12.5px] font-extrabold text-sp-ink">{short(c.creator)}</span>
+          <span className="block truncate text-[10.5px] text-sp-shade/45">
+            {c.tokens.map((t) => symbols[t] ?? `${t.slice(0, 6)}…`).join(' · ') || 'carried over'}
+          </span>
+        </span>
+        <span className="shrink-0 text-right">
+          <span className="font-soft-display text-[17px] font-extrabold leading-none text-sp-ink">{share.toFixed(2)}%</span>
+          <span className="mt-0.5 block text-[9.5px] font-bold uppercase tracking-[0.06em] text-sp-shade/40">pool share</span>
+        </span>
+        <span className="hidden shrink-0 text-right sm:block">
+          <span className="font-mono text-[12px] font-bold text-sp-ink">{eth(c.rewardCapEth)}</span>
+          <span className="mt-0.5 block text-[9.5px] font-bold uppercase tracking-[0.06em] text-sp-shade/40">
+            reward cap ({SPHERE_NATIVE_SYMBOL})
+          </span>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * TABLICA TWORCOW - Z ZAPASEM NA CICHY TYDZIEN.
+ *
+ * Wlasciciel zglosil "leaderboard zniknal". Nie zniknal: w epoce 4 nie
+ * zapunktowal ANI JEDEN tworca (jedyny token z obrotem to SPHERE, wykluczony
+ * z wlasnego sezonu), wiec tablica renderowala uczciwy pusty stan. Uczciwy
+ * i bezuzyteczny - strona, ktorej glowna tabela stoi pusta przez caly cichy
+ * tydzien, czyta sie jak zepsuta.
+ *
+ * Dlatego przy pustej epoce biezacej pokazujemy OSTATNIA epoke, ktora
+ * cokolwiek punktowala - z manifestu (/api/sphere/epochs), z jawna etykieta,
+ * ktorej epoki dotyczy, i z przelacznikiem z powrotem na biezaca. Zaden
+ * wiersz nie udaje biezacego: naglowek nad tablica nazywa epoke, a liczby
+ * pochodza z opublikowanego manifestu, nie z przeliczenia w przegladarce.
+ */
+function LeaderboardSection({
+  data,
+  scoredTokens,
+  epochs,
+  logos,
+}: {
+  data: SeasonData | null;
+  scoredTokens: number;
+  epochs: EpochsData | null;
+  logos: Record<string, string>;
+}) {
+  const [manual, setManual] = useState<'current' | 'past' | null>(null);
+
+  // Najnowsza zamknieta epoka, ktora ma manifest Z TWORCAMI. API oddaje epoki
+  // malejaco, wiec pierwsze trafienie jest najnowszym.
+  const fallback = useMemo(
+    () => (epochs?.epochs ?? []).find((e) => (e.manifest?.board?.length ?? 0) > 0) ?? null,
+    [epochs]
+  );
+
+  const liveRows = data?.creators ?? [];
+  const hasLive = liveRows.length > 0;
+  const view = manual ?? (hasLive || !fallback ? 'current' : 'past');
+  // useMemo, a nie `?? []`: swiezy pusty literal w kazdym renderze przeganialby
+  // useMemo nizej, a ten karmi hooka od symboli (czyli odczyty z lancucha).
+  const pastBoard = useMemo(() => fallback?.manifest?.board ?? [], [fallback]);
+
+  const symbolTokens = useMemo(() => pastBoard.flatMap((c) => c.tokens), [pastBoard]);
+  const symbols = useTokenSymbols(symbolTokens);
+
+  const showingPast = view === 'past' && fallback !== null;
+
+  return (
+    <section className="sph-card rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-[13.5px] font-extrabold text-sp-ink">Creator leaderboard</h3>
+        <a
+          href={showingPast ? (fallback!.manifest!.url as string) : '/api/sphere/season'}
+          target="_blank"
+          rel="noreferrer"
+          className="text-[10.5px] font-extrabold text-sp-shade/45 transition-colors hover:text-sp-brand"
+        >
+          Verify the math (raw data) ↗
+        </a>
+      </div>
+
+      {/* Przelacznik pokazuje sie DOPIERO, gdy jest miedzy czym wybierac -
+          przy zwyklym tygodniu nie ma go wcale. */}
+      {data && fallback && (
+        <div className="mt-2 inline-flex rounded-full bg-sp-shade/[0.06] p-0.5">
+          {[
+            { k: 'current' as const, label: `Epoch ${data.epoch.index}${hasLive ? '' : ' · empty'}` },
+            { k: 'past' as const, label: `Epoch ${fallback.index} · last with scoring creators` },
+          ].map((t) => (
+            <button
+              key={t.k}
+              type="button"
+              onClick={() => setManual(t.k)}
+              className={`rounded-full px-3 py-1 text-[10.5px] font-extrabold transition-colors ${
+                view === t.k ? 'bg-sp-surface text-sp-ink shadow-sm' : 'text-sp-shade/45 hover:text-sp-brand'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <p className="mt-1.5 text-[10.5px] text-sp-shade/50">
+        {showingPast ? (
+          <>
+            Closed epoch {fallback!.index}, straight from its published manifest - blocks {blockNo(fallback!.fromBlock)} –{' '}
+            {blockNo(fallback!.toBlock)}.
+          </>
+        ) : (
+          'Tap a row for every step behind its share.'
+        )}
+      </p>
+
+      <div className="mt-3 grid gap-1.5">
+        {!data ? (
+          <p className="flex items-center justify-center gap-2 py-8 text-center text-[12px] text-sp-shade/45">
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Indexing this epoch&apos;s volume from Base…
+          </p>
+        ) : showingPast ? (
+          pastBoard.map((c, i) => (
+            <PastCreatorRow key={c.creator} rank={i + 1} c={c} logos={logos} symbols={symbols} />
+          ))
+        ) : hasLive ? (
+          liveRows.map((c, i) => <CreatorRow key={c.creator} rank={i + 1} c={c} logos={logos} />)
+        ) : (
+          <p className="py-8 text-center text-[12px] text-sp-shade/45">
+            No creator scored in epoch {data.epoch.index}:{' '}
+            {data.totals.tokens === 0
+              ? 'no token traded on the curve'
+              : `the only ${data.totals.tokens - scoredTokens === 1 ? 'token' : 'tokens'} with volume ${data.totals.tokens - scoredTokens === 1 ? 'is' : 'are'} excluded from scoring`}
+            . The board fills as soon as an eligible token trades.
+          </p>
+        )}
+      </div>
+
+      {showingPast && (
+        <p className="mt-2 text-[10.5px] font-bold text-sp-shade/45">
+          Epoch {data?.epoch.index} is still running and nothing has scored in it yet - switch back above to watch it
+          fill.
+        </p>
+      )}
     </section>
   );
 }
@@ -593,6 +799,30 @@ export default function SphereSeasonPanel() {
   const [error, setError] = useState<string | null>(null);
   // Stan dystrybutora: plakietka shadow/live w naglowku + karta Claim + ksiega.
   const dist = useSphereDistributor();
+  // Logo tokenow - jedna mapa na cala strone (tablica, historia, Claim).
+  const logos = useTokenLogos();
+
+  /**
+   * Historia epok wisi TERAZ NA PANELU, nie w "Previous epochs": tych samych
+   * manifestow potrzebuje tablica tworcow, zeby miec co pokazac w cichym
+   * tygodniu. Jeden fetch zamiast dwoch takich samych.
+   */
+  const [epochs, setEpochs] = useState<EpochsData | null>(null);
+  const [epochsFailed, setEpochsFailed] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    fetch('/api/sphere/epochs')
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((d: EpochsData) => {
+        if (alive) setEpochs(d);
+      })
+      .catch(() => {
+        if (alive) setEpochsFailed(true);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -745,16 +975,17 @@ export default function SphereSeasonPanel() {
           </span>
         </div>
 
-        {/* KOTWICA EPOKI: dokladne okno blokow + skad sie bierze. Bez tego
-            "Epoch 4" jest slowem, ktorego czytelnik nie moze sprawdzic. */}
+        {/* KOTWICA EPOKI: dokladne okno blokow. Bez tego "Epoch 4" jest slowem,
+            ktorego czytelnik nie moze sprawdzic. Zdanie o tym, ze to okno
+            BLOKOW, a nie tydzien kalendarzowy, zeszlo do rozwijki w "Previous
+            epochs" - tu zostaja same liczby, ktore da sie odbic na Basescanie. */}
         {data && (
           <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] text-sp-shade/45">
             <span className="font-mono">
               blocks {blockNo(data.epoch.fromBlock)} – {blockNo(data.epoch.toBlock)}
             </span>
             <span>
-              · epochs are fixed {EPOCH_BLOCKS.toLocaleString('en-US')}-block windows counted from launchpad deploy block{' '}
-              {blockNo(SEASON_GENESIS_BLOCK)}, not calendar weeks
+              · {EPOCH_BLOCKS.toLocaleString('en-US')}-block window from deploy block {blockNo(SEASON_GENESIS_BLOCK)}
             </span>
             <AddressPill address={SPHERE_SAFE_ADDRESS} label="revenue safe" />
           </p>
@@ -877,38 +1108,11 @@ export default function SphereSeasonPanel() {
       {/* CLAIM - nagrody w SPHERE tego konta (dystrybutor) ------------------- */}
       <SphereRewardsClaim dist={dist} />
 
-      {/* LEADERBOARD --------------------------------------------------------- */}
-      <section className="sph-card rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="text-[13.5px] font-extrabold text-sp-ink">Creator leaderboard</h3>
-          <a
-            href="/api/sphere/season"
-            target="_blank"
-            rel="noreferrer"
-            className="text-[10.5px] font-extrabold text-sp-shade/45 transition-colors hover:text-sp-brand"
-          >
-            Verify the math (raw data) ↗
-          </a>
-        </div>
-        <p className="mt-0.5 text-[10.5px] text-sp-shade/50">Tap a row for every step behind its share.</p>
-        <div className="mt-3 grid gap-1.5">
-          {!data ? (
-            <p className="flex items-center justify-center gap-2 py-8 text-center text-[12px] text-sp-shade/45">
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Indexing this epoch&apos;s volume from Base…
-            </p>
-          ) : data.creators.length === 0 ? (
-            <p className="py-8 text-center text-[12px] text-sp-shade/45">
-              No creator scored in epoch {data.epoch.index}: {data.totals.tokens === 0 ? 'no token traded on the curve' : `the only ${data.totals.tokens - scoredTokens === 1 ? 'token' : 'tokens'} with volume ${data.totals.tokens - scoredTokens === 1 ? 'is' : 'are'} excluded from scoring`}
-              . The board fills as soon as an eligible token trades.
-            </p>
-          ) : (
-            data.creators.map((c, i) => <CreatorRow key={c.creator} rank={i + 1} c={c} />)
-          )}
-        </div>
-      </section>
+      {/* LEADERBOARD - z zapasem na cichy tydzien (patrz LeaderboardSection) -- */}
+      <LeaderboardSection data={data} scoredTokens={scoredTokens} epochs={epochs} logos={logos} />
 
       {/* POPRZEDNIE EPOKI: manifesty + gwarancja kumulatywnosci ------------- */}
-      <PastEpochsSection />
+      <PastEpochsSection data={epochs} failed={epochsFailed} />
 
       <LearnMore>How scoring works - volume, trader multiplier and the 30% fee cap</LearnMore>
     </div>

@@ -39,8 +39,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { formatEther, parseAbi, type Address } from 'viem';
 import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
 import { Clock, Gift, Loader2 } from 'lucide-react';
+import { fetchLogos, recallLogos } from '../../logos';
 import { SPHERE_CHAIN, SPHERE_EXPLORER_URL } from '../sphereChain';
 import { SPHERE_DISTRIBUTOR_ADDRESS, SPHERE_TOKEN_ADDRESS } from '../sphereConfig';
+import { Disclosure } from '../SphereUI';
+import { EXCLUDED_TOKENS } from './epochMath';
 import StreamLane from './StreamLane';
 
 const distributorAbi = parseAbi([
@@ -75,12 +78,15 @@ type Manifest = {
   result?: { creators?: { creator: string; shareBps: string }[] };
 };
 /**
- * ZA CO ta nagroda: tokeny tworcy z manifestu (symbole czytane z lancucha),
- * udzial w puli i numer epoki. Bez tego wiersz pokazywal goly adres, a
- * leaderboard nizej dotyczy INNEJ epoki (w toku) - wygladalo, jakby nagroda
- * szla do kogos spoza listy tworcow.
+ * ZA CO ta nagroda: tokeny tworcy z manifestu (symbole czytane z lancucha,
+ * logo z tej samej mapy, co tablica startpada), udzial w puli i numer epoki.
+ * Bez tego wiersz pokazywal goly adres, a leaderboard nizej dotyczy INNEJ
+ * epoki (w toku) - wygladalo, jakby nagroda szla do kogos spoza listy tworcow.
+ *
+ * `tokens` i `symbols` sa rownolegle (i-ty symbol nalezy do i-tego adresu):
+ * adres jest kluczem do logo, symbol - podpisem i zapasem, gdy logo nie wstanie.
  */
-type Earned = { symbols: string[]; shareBps: number; epoch: number; manifestUrl: string };
+type Earned = { tokens: string[]; symbols: string[]; shareBps: number; epoch: number; manifestUrl: string };
 
 /** Rozwiazany manifest: numer epoki sezonu, liscie i opisy "za co". */
 type Resolved = { epoch: number; leaves: Leaf[]; earned: Record<string, Earned>; manifestHash: string };
@@ -183,6 +189,141 @@ export function useSphereDistributor(): DistributorState | null {
   return state;
 }
 
+/**
+ * LOGO TOKENOW - ta sama mapa, co tablica startpada (/api/startpad/logos przez
+ * Blob), z natychmiastowym odczytem z trwalej pamieci. Odczyt localStorage
+ * siedzi w efekcie, a nie w inicjalizatorze stanu: serwer go nie widzi, wiec
+ * w inicjalizatorze rozjechalaby sie hydracja.
+ */
+export function useTokenLogos(): Record<string, string> {
+  const [logos, setLogos] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let alive = true;
+    const remembered = recallLogos(SPHERE_CHAIN.id);
+    if (Object.keys(remembered).length > 0) setLogos(remembered);
+    void fetchLogos(SPHERE_CHAIN.id).then((m) => {
+      if (alive) setLogos((prev) => ({ ...prev, ...m }));
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return logos;
+}
+
+/**
+ * SYMBOLE TOKENOW - JEDEN multicall na komplet, nie N osobnych eth_call.
+ *
+ * Manifest trzyma same adresy (symbol nie wchodzi w algorithmHash), a ikonka
+ * bez podpisu nic nie mowi. Wczesniej karta czytala `symbol()` w petli po
+ * tokenach: publiczny RPC Base odbijal czesc burstu bledem 429 i wiersze
+ * pokazywaly skrocony ADRES zamiast symbolu (zmierzone 10.09.2026 lokalnie -
+ * "0xb200…5c70" zamiast "SAUSAGES"). Multicall3 sklada to w jedno zapytanie,
+ * a wynik siedzi w mapie modulu: symbol ERC-20 jest niezmienny, wiec drugi raz
+ * nie pytamy o niego nigdy.
+ */
+const symbolMemo = new Map<string, string>();
+
+export async function resolveSymbols(
+  client: ReturnType<typeof usePublicClient>,
+  tokens: string[]
+): Promise<Record<string, string>> {
+  const list = [...new Set(tokens.map((t) => t.toLowerCase()))];
+  const out: Record<string, string> = {};
+  const missing: string[] = [];
+  for (const t of list) {
+    const s = symbolMemo.get(t);
+    if (s) out[t] = s;
+    else missing.push(t);
+  }
+  if (missing.length === 0 || !client) {
+    // Bez klienta zapasem jest skrocony adres - dziura w wierszu wygladalaby
+    // na blad interfejsu, a nie na brak metadanych.
+    for (const t of missing) out[t] = `${t.slice(0, 6)}…${t.slice(-4)}`;
+    return out;
+  }
+  try {
+    const res = await client.multicall({
+      contracts: missing.map((t) => ({ address: t as Address, abi: erc20SymbolAbi, functionName: 'symbol' as const })),
+      allowFailure: true,
+    });
+    res.forEach((r, i) => {
+      const sym = r.status === 'success' ? String(r.result) : `${missing[i].slice(0, 6)}…${missing[i].slice(-4)}`;
+      if (r.status === 'success') symbolMemo.set(missing[i], sym);
+      out[missing[i]] = sym;
+    });
+  } catch {
+    for (const t of missing) out[t] = `${t.slice(0, 6)}…${t.slice(-4)}`;
+  }
+  return out;
+}
+
+/** Wersja hookowa dla widokow, ktore dostaja adresy dopiero z propsow. */
+export function useTokenSymbols(tokens: string[]): Record<string, string> {
+  const client = usePublicClient({ chainId: SPHERE_CHAIN.id });
+  const [map, setMap] = useState<Record<string, string>>({});
+  // Klucz stringowy zamiast tablicy - inaczej efekt bieglby w kazdym renderze.
+  const key = useMemo(() => [...new Set(tokens.map((t) => t.toLowerCase()))].sort().join(','), [tokens]);
+  useEffect(() => {
+    if (!key) return;
+    let alive = true;
+    void resolveSymbols(client, key.split(',')).then((m) => {
+      if (alive) setMap((prev) => ({ ...prev, ...m }));
+    });
+    return () => {
+      alive = false;
+    };
+  }, [client, key]);
+  return map;
+}
+
+/**
+ * Ikonka tokena przy nagrodzie. Zapas to inicjal symbolu, bo obrazek nalezy do
+ * obcego tworcy i moze nie wstac - pusta dziura przy kazdym wierszu wyglada na
+ * blad interfejsu, kolorowy inicjal nie. Ten sam wzorzec, co `SymbolGlyph`
+ * w tabelach startpada (app/startpad/[address]/DetailTabs.tsx).
+ */
+export function TokenGlyph({ url, symbol }: { url?: string; symbol: string }) {
+  return (
+    <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full bg-soft-primary text-[8px] font-extrabold leading-none text-sp-on-brand">
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={url} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" loading="lazy" />
+      ) : (
+        (symbol || '?').slice(0, 1)
+      )}
+    </span>
+  );
+}
+
+/** Ikonka + symbol dla kazdego tokena, ktory zarobil te nagrode. */
+export function TokenChips({
+  tokens,
+  symbols,
+  logos,
+  className = '',
+}: {
+  tokens: string[];
+  symbols: string[];
+  logos: Record<string, string>;
+  className?: string;
+}) {
+  if (tokens.length === 0) return null;
+  return (
+    <span className={`inline-flex flex-wrap items-center gap-1.5 ${className}`}>
+      {tokens.map((t, i) => (
+        <span
+          key={t}
+          className="inline-flex items-center gap-1 rounded-full bg-sp-shade/[0.06] py-0.5 pl-0.5 pr-2 text-[10px] font-extrabold text-sp-shade/60"
+        >
+          <TokenGlyph url={logos[t.toLowerCase()]} symbol={symbols[i] ?? '?'} />
+          {symbols[i] ?? `${t.slice(0, 6)}…`}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 function fmt(wei: bigint, digits = 0) {
   return Number(formatEther(wei)).toLocaleString('en-US', { maximumFractionDigits: digits });
 }
@@ -207,7 +348,7 @@ const utcStamp = (ts: number) => new Date(ts * 1000).toISOString().slice(5, 16).
  * przycisku nie bylo wcale. Doktryna KeeperSection (deliver/release sa
  * celowo publiczne, protokol ma przezyc milczenie zespolu) w wersji nagrod.
  */
-function DeliverRow({ leaf, earned }: { leaf: Leaf; earned?: Earned }) {
+function DeliverRow({ leaf, earned, logos }: { leaf: Leaf; earned?: Earned; logos: Record<string, string> }) {
   const client = usePublicClient({ chainId: SPHERE_CHAIN.id });
   const { data: walletClient } = useWalletClient();
   const { address: caller } = useAccount();
@@ -270,15 +411,24 @@ function DeliverRow({ leaf, earned }: { leaf: Leaf; earned?: Earned }) {
     <div className="rounded-2xl bg-sp-sunken px-3 py-2">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
         <span className="min-w-0">
-          <span className="block font-mono text-[11.5px] font-bold text-sp-ink">
-            {leaf.account.slice(0, 6)}…{leaf.account.slice(-4)}
+          <span className="flex items-center gap-2">
+            {/* IKONKI TOKENOW, KTORE ZAROBILY TE NAGRODE. Adres tworcy nie mowi
+                nic; logo tokena mowi wszystko w jednej klatce. Adresy biora sie
+                z `inputs` manifestu, wiec ikonka jest twierdzeniem z manifestu,
+                nie ozdoba. */}
+            {earned && earned.tokens.length > 0 && (
+              <TokenChips tokens={earned.tokens} symbols={earned.symbols} logos={logos} />
+            )}
+            <span className="font-mono text-[11.5px] font-bold text-sp-ink">
+              {leaf.account.slice(0, 6)}…{leaf.account.slice(-4)}
+            </span>
           </span>
           <span className="block text-[9.5px] font-bold uppercase tracking-[0.06em] text-sp-shade/40">
             {!earned
               ? 'creator wallet'
-              : earned.symbols.length === 0
+              : earned.tokens.length === 0
                 ? `creator wallet · carried over from earlier epochs`
-                : `creator of ${earned.symbols.join(' · ')} · epoch ${earned.epoch} · ${(earned.shareBps / 100).toFixed(2)}% share`}
+                : `epoch ${earned.epoch} · ${(earned.shareBps / 100).toFixed(2)}% share`}
             {earned && (
               <>
                 {' · '}
@@ -334,7 +484,15 @@ function DeliverRow({ leaf, earned }: { leaf: Leaf; earned?: Earned }) {
  * liscie staja sie aktywnym manifestem i trafiaja do listy wyzej, juz z
  * dzialajacym przyciskiem.
  */
-function PendingCreatorList({ dist, next }: { dist: DistributorState; next: Resolved | null }) {
+function PendingCreatorList({
+  dist,
+  next,
+  logos,
+}: {
+  dist: DistributorState;
+  next: Resolved | null;
+  logos: Record<string, string>;
+}) {
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
   useEffect(() => {
     const t = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 30_000);
@@ -360,12 +518,16 @@ function PendingCreatorList({ dist, next }: { dist: DistributorState; next: Reso
           : `Published in the manifest and verifiable now; claimable from ${utcStamp(dist.pendingValidAt)} UTC, ${untilText(dist.pendingValidAt - now)}. Nobody can claim before that - the contract does not know this tree yet.`}
       </p>
       <div className="mt-1.5 grid gap-1.5">
-        {rows.map((r, i) => (
+        {rows.map((r, i) => {
+          const e = next.earned[r.leaf.account.toLowerCase()];
+          return (
           <div
             key={r.leaf.account}
             className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-sp-shade/10 bg-sp-surface px-3 py-2"
           >
             <span className="w-5 text-[11px] font-extrabold text-sp-shade/35">{i + 1}</span>
+            {/* Ta sama zasada, co przy wierszach Claim: token, ktory zarobil. */}
+            {e && e.tokens.length > 0 && <TokenChips tokens={e.tokens} symbols={e.symbols} logos={logos} />}
             <span className="font-mono text-[11px] text-sp-shade/60">
               {r.leaf.account.slice(0, 6)}…{r.leaf.account.slice(-4)}
             </span>
@@ -387,7 +549,8 @@ function PendingCreatorList({ dist, next }: { dist: DistributorState; next: Reso
               {live ? 'awaiting activation' : 'locked until activation'}
             </span>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -450,19 +613,42 @@ function NextEpochStrip({ dist, next, account }: { dist: DistributorState; next:
 }
 
 /**
- * JEDNA LINIJKA O GWARANCJACH - dokladnie tyle, ile daje kontrakt, ani slowa
- * wiecej. Wczesniej strona pisala "nagrody nigdy nie przepadaja", co jest
- * mocniejsze niz SphereStreamingMerkleDistributor.sol: ShrinkingTotal broni
- * tylko GLOBALNEJ sumy, a claim() sprawdza proof przeciw AKTYWNEMU rootowi.
+ * GWARANCJE KONTRAKTU - dokladnie tyle, ile daje kontrakt, ani slowa wiecej.
+ * Wczesniej strona pisala "nagrody nigdy nie przepadaja", co jest mocniejsze
+ * niz SphereStreamingMerkleDistributor.sol: ShrinkingTotal broni tylko
+ * GLOBALNEJ sumy, a claim() sprawdza proof przeciw AKTYWNEMU rootowi.
+ *
+ * 2026-09-10: ten sam akapit stal w KAZDEJ galezi karty, a niemal ten sam -
+ * w "Previous epochs" nizej. To wyprowadzenie mechanizmu, a nie zastrzezenie
+ * przy liczbie, wiec schodzi do `Disclosure` (wzorzec huba). Podpis mowi
+ * wprost, co jest w srodku - nikt nie musi go otwierac, zeby wiedziec.
  */
-function GuaranteeNote() {
+function GuaranteeNote({ vetoHours }: { vetoHours?: number }) {
   return (
-    <p className="mt-2 text-[10.5px] text-sp-shade/45">
-      What the contract actually guarantees: each new root must carry a total no smaller than the previous one (it reverts
-      with <span className="font-mono">ShrinkingTotal</span>), and there is no deadline on claiming what is already
-      unlocked under the active root. Carrying an unclaimed balance forward is not enforced on chain - claims verify
-      against the active root only, so it depends on the proposer including your past balance in every new root.
-    </p>
+    <div className="mt-3">
+      <Disclosure summary="What the contract actually guarantees (and what it does not)">
+        <p>
+          Each new root must carry a total no smaller than the previous one (it reverts with{' '}
+          <span className="font-mono">ShrinkingTotal</span>), and there is no deadline on claiming what is already
+          unlocked under the active root. Carrying an unclaimed balance forward is not enforced on chain - claims verify
+          against the active root only, so it depends on the proposer including your past balance in every new root.
+        </p>
+        {vetoHours !== undefined && (
+          <p className="mt-2">
+            The {vetoHours}h veto window is enforced by the contract (<span className="font-mono">MIN_DELAY</span> is
+            immutable): a wrong list can be stopped before any token moves. Root and manifest hash are readable on the{' '}
+            <a
+              href={`${SPHERE_EXPLORER_URL}/address/${SPHERE_DISTRIBUTOR_ADDRESS}`}
+              target="_blank"
+              rel="noreferrer"
+              className="font-bold text-sp-brand hover:underline"
+            >
+              distributor {SPHERE_DISTRIBUTOR_ADDRESS?.slice(0, 8)}…
+            </a>
+          </p>
+        )}
+      </Disclosure>
+    </div>
   );
 }
 
@@ -476,6 +662,8 @@ export default function SphereRewardsClaim({ dist }: { dist: DistributorState | 
   const { address: account } = useAccount();
   const client = usePublicClient({ chainId: SPHERE_CHAIN.id });
   const { data: walletClient } = useWalletClient();
+  /** Mapa token->logo dla ikonek przy wierszach tworcow (ASK: "ikonki tokenow"). */
+  const logos = useTokenLogos();
   const [claimedWei, setClaimedWei] = useState<bigint>(0n);
   const [vestedWei, setVestedWei] = useState<bigint>(0n);
   /** claimed(account) czytane ZAWSZE - takze dla konta bez liscia, zeby
@@ -538,22 +726,30 @@ export default function SphereRewardsClaim({ dist }: { dist: DistributorState | 
         const describe = async (m: Manifest, epoch: number): Promise<Resolved> => {
           const all = m.leaves ?? [];
           const shares = new Map((m.result?.creators ?? []).map((c) => [c.creator.toLowerCase(), Number(c.shareBps)]));
-          const inputs = m.inputs ?? [];
+          // Tokeny wykluczone z sezonu (SPHERE) nie zarobily niczego, wiec nie
+          // moga stac przy nagrodzie jako jej powod - lista wykluczen jest
+          // czescia publicznego algorytmu (epochMath, algorithmHash manifestu).
+          const inputs = (m.inputs ?? []).filter((i) => !EXCLUDED_TOKENS.has(i.token.toLowerCase()));
+          // Jeden multicall na WSZYSTKIE tokeny manifestu, zanim polecimy po
+          // lisciach - petla po `symbol()` lapala 429 i podpisywala ikonki
+          // adresami zamiast symbolami.
+          const symbolMap = await resolveSymbols(
+            client,
+            inputs.map((i) => i.token)
+          );
           const earned: Record<string, Earned> = {};
           for (const lf of all) {
             const key = lf.account.toLowerCase();
-            const tokens = inputs.filter((i) => i.creator.toLowerCase() === key).map((i) => i.token);
-            const symbols = await Promise.all(
-              tokens.map(async (t) => {
-                try {
-                  if (!client) throw new Error('no client');
-                  return (await client.readContract({ address: t as Address, abi: erc20SymbolAbi, functionName: 'symbol' })) as string;
-                } catch {
-                  return `${t.slice(0, 6)}…${t.slice(-4)}`;
-                }
-              })
-            );
-            earned[key] = { symbols, shareBps: shares.get(key) ?? 0, epoch, manifestUrl: `/sphere-epochs/epoch-${epoch}.json` };
+            const tokens = inputs
+              .filter((i) => i.creator.toLowerCase() === key)
+              .map((i) => i.token.toLowerCase());
+            earned[key] = {
+              tokens,
+              symbols: tokens.map((t) => symbolMap[t] ?? `${t.slice(0, 6)}…${t.slice(-4)}`),
+              shareBps: shares.get(key) ?? 0,
+              epoch,
+              manifestUrl: `/sphere-epochs/epoch-${epoch}.json`,
+            };
           }
           return { epoch, leaves: all, earned, manifestHash: String(m.manifestHash ?? '') };
         };
@@ -718,13 +914,9 @@ export default function SphereRewardsClaim({ dist }: { dist: DistributorState | 
                 ? 'Reading the epoch manifest...'
                 : noLeafNote(`the proposed epoch #${dist.pendingEpochId}`)}
         </p>
-        <p className="mt-1 text-[10.5px] text-sp-shade/40">
-          The {vetoHours}h window is enforced by the contract (MIN_DELAY is immutable): a wrong list can be stopped before any token moves. Root and manifest hash: distributor{' '}
-          <a href={`${SPHERE_EXPLORER_URL}/address/${SPHERE_DISTRIBUTOR_ADDRESS}`} target="_blank" rel="noreferrer" className="font-bold text-sp-brand hover:underline">
-            {SPHERE_DISTRIBUTOR_ADDRESS?.slice(0, 8)}…
-          </a>
-        </p>
-        <GuaranteeNote />
+        {/* Akapit o oknie weta zszedl do tej samej rozwijki, co gwarancje -
+            stal tu i w GuaranteeNote naraz, dwa razy na jednym ekranie. */}
+        <GuaranteeNote vetoHours={vetoHours} />
       </section>
     );
   }
@@ -768,7 +960,7 @@ export default function SphereRewardsClaim({ dist }: { dist: DistributorState | 
         <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> Reading the epoch manifest...
       </p>
       <NextEpochStrip dist={dist} next={next} account={account} />
-      <PendingCreatorList dist={dist} next={next} />
+      <PendingCreatorList dist={dist} next={next} logos={logos} />
     </section>
   );
   const epochView = (note: string) => (
@@ -803,7 +995,7 @@ export default function SphereRewardsClaim({ dist }: { dist: DistributorState | 
         </p>
       </div>
       <NextEpochStrip dist={dist} next={next} account={account} />
-      <PendingCreatorList dist={dist} next={next} />
+      <PendingCreatorList dist={dist} next={next} logos={logos} />
       {rows.length > 0 && (
         <div className="mt-3">
           <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/45">
@@ -815,7 +1007,7 @@ export default function SphereRewardsClaim({ dist }: { dist: DistributorState | 
           </p>
           <div className="mt-1.5 grid gap-1.5">
             {rows.map((l) => (
-              <DeliverRow key={l.account} leaf={l} earned={shown?.earned[l.account.toLowerCase()]} />
+              <DeliverRow key={l.account} leaf={l} earned={shown?.earned[l.account.toLowerCase()]} logos={logos} />
             ))}
           </div>
           {/* Wyplaty ida z OPOZNIENIEM O EPOKE - ten strumien rozlicza zamknieta
@@ -913,7 +1105,7 @@ export default function SphereRewardsClaim({ dist }: { dist: DistributorState | 
         ))}
       </div>
       <NextEpochStrip dist={dist} next={next} account={account} />
-      <PendingCreatorList dist={dist} next={next} />
+      <PendingCreatorList dist={dist} next={next} logos={logos} />
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <button
           type="button"

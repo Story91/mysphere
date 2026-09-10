@@ -11,11 +11,20 @@
  * i placa), i obiecywala wiecej, niz wymuszaja kontrakty (auto-burn,
  * nieprzedawnialne nagrody). Kazde takie zdanie stoi teraz obok liczby
  * odczytanej z lancucha, zeby nie dalo sie go znowu przeoczyc.
+ *
+ * Przeglad wlasciciela 2026-09-10 ("tresc chowaj w dropdownach"): akapity
+ * zamienily sie w kafle mechanizmow. Kolejnosc na kafelku to LICZBA ->
+ * ZASTRZEZENIE -> (rozwijak) JAK TO DZIALA. Pod rozwijak schodza wyprowadzenia
+ * i opisy mechaniki; na wierzchu zostaja zdania, bez ktorych sasiednia liczba
+ * znaczy cos innego - ze buyback nie odpala sie sam, ze zasilanie SphereBuyback
+ * z przychodu protokolu jest uznaniowe i ze kontrakt nie gwarantuje przeniesienia
+ * TWOJEJ pozycji do kolejnej epoki.
  */
 
 import { ExternalLink, Flame, FlaskConical } from 'lucide-react';
 import { formatEther, type Address } from 'viem';
 import { SPHERE_EXPLORER_URL } from '../sphereChain';
+import { Disclosure } from '../SphereUI';
 import { EnforcedBadge, KeeperTriggeredBadge, TeamRunBadge, formatUtc, useSphereChainFacts } from '../SphereShell';
 import {
   SPHERE_BUYBACK_ADDRESS,
@@ -65,6 +74,58 @@ function Live({ value, decimals = 0, suffix }: { value: bigint | null | undefine
   );
 }
 
+/** Liczba z podpisem - to, co ma zostac widoczne, gdy akapit schodzi pod rozwijak. */
+function Figure({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <span className="inline-flex min-w-0 flex-col gap-0.5">
+      <span className="text-[9.5px] font-extrabold uppercase tracking-[0.07em] text-sp-shade/40">{label}</span>
+      <span className="font-soft-display text-[16px] font-extrabold leading-none text-sp-ink [overflow-wrap:anywhere]">
+        {children}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * Jeden mechanizm = jeden kafel: nazwa, plakietki, LICZBY, zastrzezenie i
+ * dopiero pod rozwijakiem opis dzialania.
+ *
+ * Wczesniej kazdy z czterech mechanizmow byl akapitem na 5-8 linijek z
+ * liczbami wplecionymi w srodek zdania - przez co strona czytala sie jak
+ * dokumentacja, a nie jak panel. Kolejnosc jest teraz odwrotna niz w tekscie:
+ * najpierw ile, potem czym to jest zastrzezone, na koncu (opcjonalnie) jak to
+ * dziala. `caveat` NIE schodzi pod rozwijak - to zdanie, bez ktorego liczba
+ * obok znaczy cos innego.
+ */
+function Mechanism({
+  title,
+  badges,
+  figures,
+  caveat,
+  more,
+  children,
+}: {
+  title: string;
+  badges?: React.ReactNode;
+  figures?: React.ReactNode;
+  caveat?: React.ReactNode;
+  more: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border border-sp-shade/10 bg-sp-shade/[0.02] p-3.5">
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] font-extrabold text-sp-ink">
+        {title} {badges}
+      </p>
+      {figures && <div className="mt-2.5 flex flex-wrap gap-x-5 gap-y-2.5">{figures}</div>}
+      {caveat && <p className="mt-2.5 text-[11.5px] font-bold leading-relaxed text-sp-shade/60">{caveat}</p>}
+      <div className="mt-2.5">
+        <Disclosure summary={more}>{children}</Disclosure>
+      </div>
+    </div>
+  );
+}
+
 function SplitBar({ parts }: { parts: { label: string; bps: number; className: string }[] }) {
   return (
     <div>
@@ -95,57 +156,96 @@ export default function SphereAbout() {
     <div className="sph-stagger grid gap-4">
       <Card>
         <h2 className="text-[15px] font-extrabold text-sp-ink">How $SPHERE accrues value</h2>
-        <div className="mt-3 grid gap-2.5 text-[12.5px] leading-relaxed text-sp-shade/70">
-          <p>
-            {/* Bylo: "Auto-burn ... Frozen at launch, no one can turn it off."
-                Druga polowa jest prawda, pierwsza nie: nic nie odpala sie samo.
-                Rozbijamy wiec na dwie plakietki - co wymusza kontrakt, i co
-                wymaga czyjegos wywolania. */}
-            <EnforcedBadge /> <KeeperTriggeredBadge />{' '}
-            <span className="ml-1">
-              Buy-and-burn: 50% of the creator-side ETH from every post-graduation SPHERE swap fee is
-              set aside inside the hook as a buyback pot. What that pot buys can go to exactly one
-              place - 0xdEaD - and that is frozen at launch, nobody can redirect it. It does not fire
-              by itself: someone has to call hook.settle(SPHERE) to book the fees and
-              hook.executeBuyback(...) to spend the pot. Both are permissionless and pay the caller
-              nothing, so until somebody spends the gas the ETH simply waits. Bought and burned this
-              way so far: <Live value={burn?.fromHookBuyback} suffix="SPHERE" />, out of{' '}
-              <Live value={burn?.dead} suffix="SPHERE" /> sitting at 0xdEaD in total.
+        <div className="mt-3 grid gap-2.5">
+          {/* Plakietki rozdzielaja to, co wymusza kontrakt, od tego, co wymaga
+              czyjegos wywolania - "auto-burn" nie istnieje, nic nie pali sie samo. */}
+          <Mechanism
+            title="Buy-and-burn"
+            badges={
+              <>
+                <EnforcedBadge /> <KeeperTriggeredBadge />
+              </>
+            }
+            figures={
+              <>
+                <Figure label="Bought & burned by the hook">
+                  <Live value={burn?.fromHookBuyback} suffix="SPHERE" />
+                </Figure>
+                <Figure label="Total at 0xdEaD">
+                  <Live value={burn?.dead} suffix="SPHERE" />
+                </Figure>
+              </>
+            }
+            caveat="It does not fire by itself. Someone has to call settle() and then executeBuyback() and pay the gas - both are permissionless and pay the caller nothing, so until somebody spends it, the ETH just waits."
+            more="Where the buyback pot comes from, and why 0xdEaD is its only exit"
+          >
+            50% of the creator-side ETH from every post-graduation SPHERE swap fee is set aside inside
+            the hook as a buyback pot. <span className="font-mono">hook.settle(SPHERE)</span> books the
+            fees into that pot and <span className="font-mono">hook.executeBuyback(...)</span> spends it.
+            What the pot buys can go to exactly one place - 0xdEaD - and that destination is frozen at
+            launch: there is no function, owner or upgrade path that could redirect it.
+          </Mechanism>
+
+          <Mechanism
+            title="Frozen fee split"
+            badges={<EnforcedBadge />}
+            caveat="The creator's 70% share of every curve fee routes 60% to the rewards vault and 40% to the creator escrow. The receiving addresses are baked into the launch forever."
+            more="The same split expressed against the whole fee"
+          >
+            60% and 40% of the creator&apos;s 70% work out to 42% and 28% of the entire curve fee - the
+            two shares drawn in the bar below.
+          </Mechanism>
+
+          <Mechanism
+            title="Revenue buybacks"
+            badges={<TeamRunBadge />}
+            caveat="Discretionary: the treasury Safe may buy SPHERE with protocol revenue, but that is a policy, not a contract guarantee. Nothing forces it to happen, or to keep happening."
+            more="How we keep this one honest"
+          >
+            Every purchase is visible on-chain, and we label it as team-run rather than counting it
+            among the things the contracts enforce. Treat it as something that has happened, not as
+            something that must.
+          </Mechanism>
+
+          {/* Bylo: "Written, not deployed yet ... treat this as a plan, not a
+              guarantee". SphereBuyback stoi na Base od 2.09.2026 i ma juz
+              wykonane transze, wiec plakietka klamala w druga strone niz
+              zwykle - ZANIZALA to, co protokol faktycznie robi. */}
+          <Mechanism
+            title="Buyback contract (SphereBuyback)"
+            badges={<EnforcedBadge />}
+            figures={
+              <>
+                <Figure label="ETH spent">
+                  <Live value={bb?.totalEthSpent} decimals={6} suffix="ETH" />
+                </Figure>
+                <Figure label="Burned">
+                  <Live value={bb?.totalBurned} decimals={2} suffix="SPHERE" />
+                </Figure>
+                <Figure label="To the reward pool">
+                  <Live value={bb?.totalToDistributor} decimals={2} suffix="SPHERE" />
+                </Figure>
+                <Figure label="Immutable split">
+                  {bb
+                    ? `${(bb.burnBps / 100).toFixed(0)}% / ${((10_000 - bb.burnBps) / 100).toFixed(0)}%`
+                    : '20% / 80%'}
+                </Figure>
+              </>
+            }
+            caveat="Deployed on Base and already executing. But when and whether the Safe funds it at all is policy - the contract cannot make revenue appear."
+            more="What the contract enforces once it is funded, and where it lives"
+          >
+            Everything it buys splits{' '}
+            {bb ? `${(bb.burnBps / 100).toFixed(0)}% burned forever and ${((10_000 - bb.burnBps) / 100).toFixed(0)}%` : '20% burned forever and 80%'}{' '}
+            into the weekly creator reward pool, and that ratio is immutable. The tranche size, the
+            window budget and the price-deviation guard are enforced by the contract too. Address:{' '}
+            <span className="font-mono">
+              {SPHERE_BUYBACK_ADDRESS
+                ? `${SPHERE_BUYBACK_ADDRESS.slice(0, 8)}…${SPHERE_BUYBACK_ADDRESS.slice(-6)}`
+                : 'no address in this build'}
             </span>
-          </p>
-          <p>
-            <EnforcedBadge />{' '}
-            <span className="ml-1">
-              Frozen fee split: the creator&apos;s 70% share of every curve fee routes 60% to the rewards vault and 40%
-              to the creator escrow (42% / 28% of the whole fee) - receivers are baked into the launch forever.
-            </span>
-          </p>
-          <p>
-            <TeamRunBadge />{' '}
-            <span className="ml-1">
-              Revenue buybacks: the treasury Safe may buy SPHERE with protocol revenue. Every purchase is visible
-              on-chain, but it is a policy, not a contract guarantee - we label it honestly.
-            </span>
-          </p>
-          <p>
-            {/* Bylo: "Written, not deployed yet ... treat this as a plan, not a
-                guarantee". SphereBuyback stoi na Base od 2.09.2026 i ma juz
-                wykonane transze, wiec plakietka klamala w druga strone niz
-                zwykle - ZANIZALA to, co protokol faktycznie robi. */}
-            <EnforcedBadge />{' '}
-            <span className="ml-1">
-              Buyback contract (SphereBuyback,{' '}
-              {SPHERE_BUYBACK_ADDRESS ? `${SPHERE_BUYBACK_ADDRESS.slice(0, 8)}…${SPHERE_BUYBACK_ADDRESS.slice(-6)}` : 'no address in this build'}
-              ): deployed on Base and already executing. Everything it buys splits{' '}
-              {bb ? `${(bb.burnBps / 100).toFixed(0)}% burned forever, ${((10_000 - bb.burnBps) / 100).toFixed(0)}%` : '20% burned forever, 80%'}{' '}
-              into the weekly creator reward pool - the ratio is immutable. Spent so far:{' '}
-              <Live value={bb?.totalEthSpent} decimals={6} suffix="ETH" />, which burned{' '}
-              <Live value={bb?.totalBurned} decimals={2} suffix="SPHERE" /> and sent{' '}
-              <Live value={bb?.totalToDistributor} decimals={2} suffix="SPHERE" /> to the distributor.
-              The tranche size, the window budget and the price-deviation guard are enforced by the
-              contract; when and whether the Safe funds it at all is policy.
-            </span>
-          </p>
+            .
+          </Mechanism>
         </div>
       </Card>
 
@@ -176,80 +276,112 @@ export default function SphereAbout() {
               ]}
             />
           </div>
-          <p className="text-[10.5px] text-sp-shade/45">
-            Exact effective numbers from the tokenomics spec: buybackBps={SPHERE_PLAN.buybackBps} cuts the creator ETH
-            leg only; token-denominated legs go 70/30 escrow/Safe with no burn cut.
-          </p>
           {/* SPHERE jest po graduacji, wiec kupujacy placi OBIE nogi naraz -
-              i nigdzie indziej nie widzial ich zsumowanych. */}
+              i nigdzie indziej nie widzial ich zsumowanych. To jedyna liczba w
+              tej karcie, ktora dotyczy go osobiscie, wiec dostaje kafel. */}
           {facts?.pool && (
-            <p className="text-[11px] font-bold text-sp-shade/55">
-              What a swap actually costs you today: {(facts.pool.poolFeePpm / 10_000).toFixed(2)}% pool fee +{' '}
-              {(facts.pool.hookFeeBps / 100).toFixed(2)}% hook fee ={' '}
-              <span className="font-extrabold text-sp-ink">
-                {(facts.pool.poolFeePpm / 10_000 + facts.pool.hookFeeBps / 100).toFixed(2)}%
-              </span>{' '}
-              per trade, in the v4 pool the curve graduated into.
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-2xl bg-sp-brand/[0.07] px-4 py-3">
+              <span className="text-[11px] font-extrabold uppercase tracking-[0.07em] text-sp-shade/50">
+                What a swap costs you today
+              </span>
+              <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <span className="font-soft-display text-[24px] font-extrabold leading-none text-sp-brand">
+                  {(facts.pool.poolFeePpm / 10_000 + facts.pool.hookFeeBps / 100).toFixed(2)}%
+                </span>
+                <span className="text-[11px] font-bold text-sp-shade/50">
+                  {(facts.pool.poolFeePpm / 10_000).toFixed(2)}% pool + {(facts.pool.hookFeeBps / 100).toFixed(2)}% hook
+                </span>
+              </span>
+            </div>
           )}
+          {/* Wyprowadzenie z arkusza tokenomiki - nie zmienia znaczenia zadnej
+              liczby wyzej, tylko tlumaczy, skad sie wzialy. Pod rozwijak. */}
+          <Disclosure summary="How these bars are derived from the tokenomics spec">
+            buybackBps={SPHERE_PLAN.buybackBps} cuts the creator ETH leg only; token-denominated legs go
+            70/30 escrow/Safe with no burn cut.
+          </Disclosure>
         </div>
       </Card>
 
       <Card>
         <h2 className="text-[15px] font-extrabold text-sp-ink">Weekly creator rewards - the rules</h2>
-        <div className="mt-3 grid gap-2 text-[12.5px] leading-relaxed text-sp-shade/70">
-          <p>Every week the indexer scores every launchpad creator from raw chain logs. The formula is public and deterministic - anyone can recompute it.</p>
-          <p>
-            <span className="font-extrabold text-sp-ink">Anti-wash by design:</span> your own trades count for zero, and
-            your weekly reward is hard-capped at 30% of the fees your tokens actually brought the protocol from real
-            traders. Washing burns your ETH on fees and cannot raise that cap.
-          </p>
-          <p>
-            {/* Bylo: "inside a distributor contract that ships once shadow
-                season proves the numbers" - dystrybutor stoi na Base od
-                2.09.2026, ma aktywny root i wyplacone tokeny. */}
-            <span className="font-extrabold text-sp-ink">Streaming payouts:</span> the distributor is live on Base
-            {dist ? (
-              <>
-                {' '}
-                and paying. Epoch #{dist.epochId} has been the active root since {formatUtc(dist.activatedAt)}; it owes{' '}
-                <Live value={dist.totalCumulative} decimals={2} suffix="SPHERE" /> cumulatively, of which{' '}
-                <Live value={dist.totalClaimed} decimals={2} suffix="SPHERE" /> has already been claimed. Each epoch&apos;s
-                increment unlocks linearly over {(dist.streamDuration / 86_400).toFixed(0)} days from the moment its root
-                activates, and no root can activate less than {(dist.minDelay / 3_600).toFixed(0)} h after it was
-                proposed - that window exists so the guardian can veto.
-                {dist.pending && (
-                  <>
-                    {' '}
-                    Queued right now: epoch #{dist.pending.epochId} with{' '}
-                    <Live value={dist.pending.totalCumulative} decimals={2} suffix="SPHERE" /> cumulative, activating{' '}
-                    {formatUtc(dist.pending.validAt)}.
-                  </>
-                )}
-              </>
-            ) : (
-              '.'
-            )}
-          </p>
-          <p>
+        <div className="mt-3 grid gap-3">
+          {/* Bylo: "inside a distributor contract that ships once shadow
+              season proves the numbers" - dystrybutor stoi na Base od
+              2.09.2026, ma aktywny root i wyplacone tokeny. */}
+          {dist && (
+            <div className="flex flex-wrap gap-x-5 gap-y-2.5 rounded-2xl bg-sp-shade/[0.03] p-3.5">
+              <Figure label="Active epoch">#{dist.epochId}</Figure>
+              <Figure label="Owed cumulatively">
+                <Live value={dist.totalCumulative} decimals={2} suffix="SPHERE" />
+              </Figure>
+              <Figure label="Claimed">
+                <Live value={dist.totalClaimed} decimals={2} suffix="SPHERE" />
+              </Figure>
+              <Figure label="Stream length">{(dist.streamDuration / 86_400).toFixed(0)} days</Figure>
+              <Figure label="Veto window">{(dist.minDelay / 3_600).toFixed(0)} h</Figure>
+              <Figure label="Anti-wash cap">30%</Figure>
+            </div>
+          )}
+
+          <div className="grid gap-2 text-[12.5px] leading-relaxed text-sp-shade/70">
+            <p>
+              <span className="font-extrabold text-sp-ink">Anti-wash by design:</span> your own trades count for
+              zero, and your weekly reward is hard-capped at 30% of the fees your tokens actually brought the
+              protocol from real traders.
+            </p>
             {/* Bylo: "Unclaimed rewards never expire - the ledger is cumulative,
                 so one claim pays everything you have earned." Kontrakt tego NIE
                 gwarantuje na poziomie konta: ShrinkingTotal pilnuje wylacznie
                 sumy globalnej, a przeniesienie TWOJEJ pozycji zalezy od tego,
-                czy proposer wpisze ja do nowego roota. */}
-            <span className="font-extrabold text-sp-ink">What the ledger really guarantees:</span> the contract
-            rejects any new root whose global totalCumulative is lower than the current one (error
-            <span className="font-mono"> ShrinkingTotal</span>), and it will not activate a root the balance cannot
-            cover. Your own claim is a high-water mark, so nobody can claw back what you already took, and one claim
-            still collects every epoch that is already in the active root. What the contract cannot promise is your
-            personal line surviving into the next epoch: that depends on the proposer carrying your past balance into
-            each new root. The manifest hash published with every root exists precisely so that anyone can recompute
-            the leaves and catch a root that drops someone.
-          </p>
-          <p className="text-[11px] text-sp-shade/50">
-            The formula still calibrates on live volume - the scoreboard is published every epoch and the payouts
-            follow it.
-          </p>
+                czy proposer wpisze ja do nowego roota. To zastrzezenie zmienia
+                znaczenie liczby "owed cumulatively" wyzej, wiec zostaje na
+                wierzchu; caly wywod o ShrinkingTotal schodzi pod rozwijak. */}
+            <p>
+              <span className="font-extrabold text-sp-ink">What is not promised:</span> the contract cannot
+              guarantee that your personal line survives into the next epoch - that depends on the proposer
+              carrying your past balance into each new root. Unclaimed does not mean untouchable.
+            </p>
+            <p className="text-[11px] text-sp-shade/50">
+              The formula still calibrates on live volume - the scoreboard is published every epoch and the
+              payouts follow it.
+            </p>
+          </div>
+
+          <Disclosure summary="How the score is computed, and what the ledger does guarantee">
+            <span className="grid gap-2">
+              <span className="block">
+                Every week the indexer scores every launchpad creator from raw chain logs. The formula is public
+                and deterministic - anyone can recompute it. Washing burns your ETH on fees and cannot raise the
+                30% cap.
+              </span>
+              <span className="block">
+                The contract rejects any new root whose global totalCumulative is lower than the current one
+                (error <span className="font-mono">ShrinkingTotal</span>) and will not activate a root the balance
+                cannot cover. Your own claim is a high-water mark, so nobody can claw back what you already took,
+                and one claim still collects every epoch already inside the active root. Each epoch increment
+                unlocks linearly over the stream length above, and no root activates sooner than the veto window
+                after it was proposed - that window exists so the guardian can reject it. The manifest hash
+                published with every root exists precisely so anyone can recompute the leaves and catch a root
+                that drops someone.
+              </span>
+              {dist && (
+                <span className="block">
+                  Active root since {formatUtc(dist.activatedAt)}.
+                  {dist.pending ? (
+                    <>
+                      {' '}
+                      Queued right now: epoch #{dist.pending.epochId} with{' '}
+                      <Live value={dist.pending.totalCumulative} decimals={2} suffix="SPHERE" /> cumulative,
+                      activating {formatUtc(dist.pending.validAt)}.
+                    </>
+                  ) : (
+                    ' Nothing is queued right now.'
+                  )}
+                </span>
+              )}
+            </span>
+          </Disclosure>
         </div>
       </Card>
 
@@ -274,20 +406,31 @@ export default function SphereAbout() {
             czyta sie jak pieciu niezaleznych uczestnikow. Porownanie robimy
             na ODCZYTANYCH adresach, nie na stalej z configu. */}
         {facts?.roles.allSame && facts.roles.shared && (
-          <p className="mt-2 rounded-xl bg-sp-shade/5 px-3 py-2 text-[11px] leading-relaxed text-sp-shade/60">
-            <span className="font-extrabold text-sp-ink">One key, five labels.</span> Protocol fee recipient, escrow
-            buyback pot, escrow ops target, rewards key holder and vesting beneficiary all read back the same address -{' '}
-            <a
-              href={`${SPHERE_EXPLORER_URL}/address/${facts.roles.shared}`}
-              target="_blank"
-              rel="noreferrer"
-              className="font-mono font-bold text-sp-brand hover:underline"
-            >
-              {facts.roles.shared.slice(0, 8)}…{facts.roles.shared.slice(-6)}
-            </a>
-            , a 1/1 Safe. Different panels label it differently because the contracts name it differently, not because
-            there are five independent parties. Those role addresses are immutable, so this cannot quietly change.
-          </p>
+          <>
+            {/* Zdanie o centralizacji zostaje na wierzchu razem z adresem -
+                to nie jest ozdobnik, tylko wymog przejrzystosci. Lista pieciu
+                rol i uzasadnienie schodza pod rozwijak. */}
+            <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl bg-sp-shade/5 px-3 py-2 text-[11.5px] font-bold leading-relaxed text-sp-shade/60">
+              <span className="font-extrabold text-sp-ink">One key, five labels.</span>
+              <span>Five role slots, one 1/1 Safe -</span>
+              <a
+                href={`${SPHERE_EXPLORER_URL}/address/${facts.roles.shared}`}
+                target="_blank"
+                rel="noreferrer"
+                className="font-mono font-bold text-sp-brand hover:underline"
+              >
+                {facts.roles.shared.slice(0, 8)}…{facts.roles.shared.slice(-6)}
+              </a>
+            </p>
+            <div className="mt-2">
+              <Disclosure summary="Which five roles, and why they cannot quietly become five parties">
+                Protocol fee recipient, escrow buyback pot, escrow ops target, rewards key holder and vesting
+                beneficiary all read back that one address. Different panels label it differently because the
+                contracts name it differently, not because there are five independent parties. Those role slots
+                are immutable, so this cannot quietly change.
+              </Disclosure>
+            </div>
+          </>
         )}
       </Card>
 
@@ -295,23 +438,32 @@ export default function SphereAbout() {
         <h2 className="flex items-center gap-1.5 text-[15px] font-extrabold text-sp-ink">
           <FlaskConical className="h-4 w-4 text-sp-brand" aria-hidden="true" /> Rehearsal proven on Sepolia
         </h2>
-        <p className="mt-2 text-[12px] leading-relaxed text-sp-shade/60">
-          Before mainnet, the exact SPHERE lifecycle ran end-to-end on Base Sepolia with the same contracts: launch, a
-          full graduation of the bonding curve and the first buy-and-burn of{' '}
-          <span className="inline-flex items-center gap-1 font-extrabold text-sp-ink">
-            <Flame className="h-3.5 w-3.5 text-sp-down" aria-hidden="true" /> 12,131 SPHERE
-          </span>{' '}
-          - executed by the real mechanism, not a simulation.
+        <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2.5 rounded-2xl bg-sp-shade/[0.03] p-3.5">
+          <Figure label="First buy-and-burn, testnet">
+            <span className="inline-flex items-center gap-1.5">
+              <Flame className="h-4 w-4 text-sp-down" aria-hidden="true" /> 12,131 SPHERE
+            </span>
+          </Figure>
+          <Figure label="Network">Base Sepolia</Figure>
+        </div>
+        <p className="mt-2.5 text-[11.5px] font-bold text-sp-shade/55">
+          Testnet tokens are worthless and this is not the token you buy.
         </p>
-        <a
-          href="https://sepolia.basescan.org/address/0xb200000000000000000000Ba5ED02Ebf7B04aDBc"
-          target="_blank"
-          rel="noreferrer"
-          className="mt-2 inline-flex items-center gap-1 text-[11.5px] font-bold text-sp-brand hover:underline"
-        >
-          Rehearsal token 0xb20000…04aDBc on Sepolia BaseScan (testnet, worthless, not the token you buy){' '}
-          <ExternalLink className="h-3 w-3" aria-hidden="true" />
-        </a>
+        <div className="mt-2">
+          <Disclosure summary="What exactly was rehearsed before mainnet">
+            The exact SPHERE lifecycle ran end-to-end on Base Sepolia with the same contracts: launch, a full
+            graduation of the bonding curve and that first buy-and-burn - executed by the real mechanism, not a
+            simulation.{' '}
+            <a
+              href="https://sepolia.basescan.org/address/0xb200000000000000000000Ba5ED02Ebf7B04aDBc"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 font-bold text-sp-brand hover:underline"
+            >
+              Rehearsal token 0xb20000…04aDBc on Sepolia BaseScan <ExternalLink className="h-3 w-3" aria-hidden="true" />
+            </a>
+          </Disclosure>
+        </div>
       </Card>
     </div>
   );

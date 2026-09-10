@@ -35,7 +35,19 @@ const LAUNCHPAD = '0xCF541A7EcE881945833ff1680dFc067C5Dd4cE2D' as Address;
 const HOOK = '0x71028Ea6999e2c415b46cc022ED0A9fDca2e2044' as Address;
 const SAFE = '0x83E2DE974FC6B866FDb78AEFa5596d58fDc4142F' as Address;
 const CHAIN_ID = 8453;
-const CHUNK = 9_500n; // publiczne RPC Base tna getLogs ~10k blokow
+/**
+ * OKNO `getLogs`. Stalo tu 9 500 z komentarzem "publiczne RPC Base tna ~10k" -
+ * i to bylo prawda do wrzesnia 2026. Base zaciesnil limit do 2 000 i kazde
+ * okno zaczelo wracac bledem `-32614 eth_getLogs is limited to a 2,000 range`.
+ * Przy szesciu probach na okno trasa i tak dowozila wynik, ale placila za to
+ * szescioma odbitymi zapytaniami na kazdy krok - a w czasie builda, gdzie
+ * ponowienia nie ratuja, wywracala CALY build (patrz `dynamic` nizej).
+ *
+ * 2 000 to wartosc, ktora endpoint deklaruje wprost. `CHUNK_FALLBACK` zostaje
+ * na wypadek endpointu z wiekszym limitem: pierwsze padniete okno schodzi na
+ * mniejsze i tam zostaje.
+ */
+const CHUNK = 2_000n;
 const REFRESH_MS = 5 * 60 * 1000;
 
 const EV = {
@@ -110,6 +122,20 @@ async function scanRange<T>(
   }
   return out;
 }
+
+/**
+ * TRASA CZYTA LANCUCH, WIEC NIE WOLNO JEJ PRERENDEROWAC.
+ *
+ * Bez tej linii Next probuje wygenerowac ja statycznie przy buildzie: odpala
+ * skan `getLogs` na maszynie budujacej i - gdy publiczny RPC akurat odmowi -
+ * wywraca CALY build komunikatem "Error occurred prerendering page
+ * /api/sphere/season". Zlapane 10 wrzesnia 2026: build padl na zakresie
+ * 51062130-51071629, chociaz ta sama trasa na produkcji odpowiadala poprawnie.
+ *
+ * Build nie ma prawa zalezec od tego, czy cudzy endpoint akurat odpowiada.
+ * `/api/sphere/epochs` ma te deklaracje od poczatku - ta jej nie miala.
+ */
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   const cached = g.__sphereSeasonV2;

@@ -447,3 +447,438 @@ export function parseAggregate(raw: unknown): BoardAggregate | null {
     return null;
   }
 }
+
+/* ========================================================================== */
+/*  LICZBA POSIADACZY I WOLUMEN PULI - to, czego krzywa z definicji nie wie    */
+/* ========================================================================== */
+
+/**
+ * DWIE LICZBY, KTORE PO GRADUACJI PRZESTAWALY BYC PRAWDZIWE.
+ *
+ * ===========================================================================
+ * OBJAW
+ * ===========================================================================
+ * 10 wrzesnia 2026 karta $SPHERE na /startpad glosila:
+ *
+ *     5.54 ETH ($13,677) vol · 40 holders · 8 d
+ *
+ * Token byl wtedy po graduacji od osmiu dni i handlowal wylacznie w puli
+ * Uniswap v4. Zmierzone tego samego dnia, wprost z logow Base mainnet:
+ *
+ *     wolumen puli    135.56 ETH   (2 528 swapow)   - karta pokazywala 5.54
+ *     posiadacze      147 adresow  (6 063 Transfer) - karta pokazywala 40
+ *
+ * ===========================================================================
+ * SKAD SIE BRALA KAZDA Z TYCH POMYLEK
+ * ===========================================================================
+ * WOLUMEN liczyl sie z `Bought`/`Sold` krzywej. Krzywa po graduacji nie
+ * handluje, wiec ta liczba nie byla zla - ona po prostu ZAMARLA w chwili
+ * awansu i od tego dnia opisywala przeszlosc pod nazwa terazniejszosci.
+ *
+ * "HOLDERS" nigdy nie byli posiadaczami. To bylo `buyers.get(token)?.size`,
+ * czyli liczba KONT, KTORE HANDLOWALY NA KRZYWEJ. Kto kupil i sprzedal
+ * wszystko, liczyl sie dalej; kto kupil w puli, nie liczyl sie wcale.
+ *
+ * ===========================================================================
+ * DLACZEGO TO WOLNO DOLICZAC OKNAMI, TAK JAK RESZTE AGREGATU
+ * ===========================================================================
+ * Obie wielkosci sa ADDYTYWNE po rozlacznych zakresach blokow - dokladnie jak
+ * wolumen krzywej i naliczenia oplat wyzej:
+ *   - saldo konta to suma delt z `Transfer` (+do, -od). Suma delt z zakresu A
+ *     i z zakresu B daje to samo, co suma z A u B, o ile A i B sa rozlaczne;
+ *   - wolumen puli to suma `|amount0|` po swapach, czyli zwykla suma.
+ * Obowiazuje wiec ta sama regula, co przy `planBoardScan`: albo cala delta,
+ * albo zadna, i zakresy nie moga na siebie zachodzic.
+ *
+ * ===========================================================================
+ * DLACZEGO TO ZYJE OBOK `BoardAggregate`, A NIE W NIM
+ * ===========================================================================
+ * `BoardAggregate` przychodzi takze Z SERWERA (`/api/launchpad/board/stats`) i
+ * `pickAggregateBase` potrafi wybrac wlasnie tamten, bo siega wyzej. Serwer
+ * tych dwoch rzeczy nie liczy. Gdyby siedzialy w tym samym obiekcie, wybor
+ * serwerowej podstawy dawalby PUSTE salda z `lastBlock` gdzies wysoko - a
+ * kolejna delta doliczylaby do nich same swieze transfery i tablica pokazalaby
+ * garstke kont jako "wszystkich posiadaczy". Polowa zakresu pod nazwa calosci
+ * to ten sam blad, ktory tu naprawiamy, tylko z drugiej strony.
+ *
+ * Osobny obiekt ma wiec WLASNY znacznik pokrycia i wlasny klucz w
+ * `localStorage`, a `complete === false` znaczy "jeszcze nie wiem" - i wtedy
+ * karta ma pokazac liczbe z krzywej POD JEJ WLASNA NAZWA, a nie te sama
+ * liczbe pod nazwa "holders".
+ */
+
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+
+/**
+ * `0x...dead` NIE JEST SPALENIEM - to zwykly przelew na adres bez klucza.
+ *
+ * Zmierzone 10 wrzesnia 2026 na $SPHERE: 59 332 928 tokenow lezy na `0x...dead`,
+ * a `totalSupply` stoi caly czas na okraglym miliardzie. Podaz zmniejsza tylko
+ * przelew na adres ZEROWY, bo tylko on jest w ERC-20 spaleniem.
+ *
+ * Ma to konkretny skutek dla `supplyReconciles`: liczac `0x...dead` jako
+ * spalenie, rownanie rozjezdzalo sie dokladnie o te 59 mln i dowod nie
+ * przechodzil NIGDY - czyli liczba posiadaczy nie pokazalaby sie nigdy, mimo
+ * ze salda byly policzone poprawnie.
+ *
+ * Saldo `0x...dead` prowadzimy wiec normalnie (ono istnieje), a z LICZENIA
+ * ludzi wypada dopiero na koncu, przez `exclude` - razem z pula i skarbcem.
+ * Tam jego miejsce: to saldo, ktore nie nalezy do nikogo, a nie saldo, ktorego
+ * nie ma.
+ */
+export const BURN_SINK = '0x000000000000000000000000000000000000dead';
+
+export type TokenExtras = {
+  /** token (lowercase) -> konto (lowercase) -> saldo w jednostkach bazowych. */
+  balances: Map<string, Map<string, bigint>>;
+  /** token (lowercase) -> suma `|amount0|` swapow puli, w wei. */
+  poolVolumeWei: Map<string, bigint>;
+  /**
+   * Adresy tokenow (lowercase), ktore ten skan naprawde OBEJMOWAL.
+   *
+   * Bez tego pola migawka klamalaby przy kazdym nowym tokenie: skan lecial po
+   * konkretnej liscie adresow, wiec token dopisany do tablicy pozniej ma w
+   * `balances` co najwyzej swoje NAJSWIEZSZE transfery, a wygladalby jak token
+   * policzony od poczatku. Zero transferow w zakresie i "nie bylo cie w tym
+   * zakresie" to z zewnatrz ta sama pusta mapa - i tylko ten zbior je rozroznia.
+   */
+  tokens: Set<string>;
+  /**
+   * token -> ile wyemitowano (Transfer OD adresu zerowego) i ile spalono
+   * (Transfer DO adresu zerowego albo `0x...dead`) w objetym zakresie.
+   *
+   * To jest DOWOD, a nie statystyka. Patrz `supplyReconciles`.
+   */
+  minted: Map<string, bigint>;
+  burned: Map<string, bigint>;
+  /** Blok, OD ktorego to jest policzone. Ponizej niego danych nie ma. */
+  fromBlock: bigint;
+  /** Blok, DO ktorego to jest policzone. */
+  lastBlock: bigint;
+  /**
+   * Czy zakres `[fromBlock, lastBlock]` domyka sie do glowy lancucha, czyli
+   * czy te liczby wolno pokazac pod ich wlasna nazwa. Dopoki `false`, karta
+   * nie ma prawa mowic "holders" ani doliczac wolumenu puli.
+   */
+  complete: boolean;
+};
+
+export function emptyExtras(fromBlock: bigint, tokens: Iterable<string> = []): TokenExtras {
+  return {
+    balances: new Map(),
+    poolVolumeWei: new Map(),
+    tokens: new Set([...tokens].map((t) => t.toLowerCase())),
+    minted: new Map(),
+    burned: new Map(),
+    fromBlock,
+    lastBlock: fromBlock - 1n,
+    complete: false,
+  };
+}
+
+/**
+ * CZY TE SALDA NA PEWNO OBEJMUJA CALA HISTORIE TOKENA.
+ *
+ * ===========================================================================
+ * PROBLEM: DNO SKANU JEST OSZACOWANE, A WYNIK MA BYC PEWNY
+ * ===========================================================================
+ * Blok, w ktorym token wystartowal, znamy tylko wtedy, gdy glowny skan zszedl
+ * az do jego zdarzenia `Launched`. Kiedy nie zszedl (a na Base przy limicie
+ * 2 000 blokow na zapytanie zwykle nie schodzi), dno wyliczamy z czasu startu
+ * i tempa blokow - czyli SZACUJEMY. Szacunek za niski kosztuje kilka okien
+ * wiecej i nic wiecej. Szacunek za wysoki jest grozny: gubimy pierwsze
+ * transfery, a niepelne salda wygladaja dokladnie tak samo jak pelne.
+ *
+ * ===========================================================================
+ * DOWOD ZAMIAST ZALOZENIA
+ * ===========================================================================
+ * Kazdy token ma jedna wielkosc, ktora lancuch podaje wprost i ktora MUSI sie
+ * zgodzic, jesli widzielismy wszystkie transfery:
+ *
+ *     wyemitowane - spalone == totalSupply
+ *
+ * Emisja to Transfer OD adresu zerowego, spalenie - DO adresu zerowego (i tylko
+ * tam, patrz `BURN_SINK`). Jesli nasze dno bylo za wysokie, ucieklismy czesci
+ * emisji i lewa strona wychodzi mniejsza. Rownosc jest wiec dowodem na to, ze
+ * zakres obejmuje cala historie tokena - niezaleznie od tego, czy dno bylo
+ * trafione, czy tylko dostatecznie nisko.
+ *
+ * Zmierzone na $SPHERE 10 wrzesnia 2026, dnem 50 552 093 (o ~197 tys. blokow
+ * ponizej startu): 6 068 transferow, emisja 1e27, spalenie 0, `totalSupply`
+ * 1e27 - rownanie sie domyka.
+ *
+ * `false` znaczy "nie wiem", nie "zle" - i wtedy karta zostaje przy liczbach
+ * krzywej pod ich wlasna nazwa.
+ */
+export function supplyReconciles(extras: TokenExtras, token: string, totalSupply: bigint | undefined): boolean {
+  if (totalSupply === undefined) return false;
+  const key = token.toLowerCase();
+  if (!extras.tokens.has(key)) return false;
+  return (extras.minted.get(key) ?? 0n) - (extras.burned.get(key) ?? 0n) === totalSupply;
+}
+
+/**
+ * Delty sald z logow `Transfer`. Skan leci JEDNYM zapytaniem po tablicy adresow
+ * tokenow naraz (patrz wolajacy), wiec kazdy log niesie swoj `address` i to on
+ * rozdziela wynik na tokeny.
+ */
+export function applyTransferLogs(extras: TokenExtras, logs: ExtrasLog[]): void {
+  for (const log of logs) {
+    const token = log.address?.toLowerCase();
+    const from = log.from?.toLowerCase();
+    const to = log.to?.toLowerCase();
+    const value = log.value;
+    if (!token || !from || !to || value === undefined) continue;
+
+    const perToken = extras.balances.get(token) ?? new Map<string, bigint>();
+    // Zerowy adres to mennica i spalarnia, nie konto - jego "saldo" byloby
+    // ujemna suma calego obrotu. Nie prowadzimy go w ogole, ale ZLICZAMY, ile
+    // przez niego przeszlo: to jest material dowodowy dla `supplyReconciles`.
+    if (from === ZERO_ADDRESS) extras.minted.set(token, (extras.minted.get(token) ?? 0n) + value);
+    else perToken.set(from, (perToken.get(from) ?? 0n) - value);
+
+    if (to === ZERO_ADDRESS) extras.burned.set(token, (extras.burned.get(token) ?? 0n) + value);
+    else perToken.set(to, (perToken.get(to) ?? 0n) + value);
+
+    extras.balances.set(token, perToken);
+  }
+}
+
+/**
+ * Wolumen puli z logow `Swap` PoolManagera. `amount0` jest ze strony
+ * swapujacego (ujemne = zaplacil ETH, czyli kupil), wiec bierzemy wartosc
+ * bezwzgledna: interesuje nas obrot, nie kierunek.
+ *
+ * Token jest zawsze `currency1`, a natywny ETH `currency0` - `LiquidityVault`
+ * seeduje pule z `address(0)` jako zerowa waluta i sprawdza to przy zakladaniu,
+ * wiec `amount0` to ZAWSZE noga ETH.
+ */
+export function applySwapLogs(extras: TokenExtras, logs: SwapLog[], tokenOfPool: Map<string, string>): void {
+  for (const log of logs) {
+    const poolId = log.poolId?.toLowerCase();
+    if (!poolId || log.amount0 === undefined) continue;
+    const token = tokenOfPool.get(poolId);
+    if (!token) continue;
+    const abs = log.amount0 < 0n ? -log.amount0 : log.amount0;
+    extras.poolVolumeWei.set(token, (extras.poolVolumeWei.get(token) ?? 0n) + abs);
+  }
+}
+
+/** Log `Transfer` w postaci, w ktorej ten modul go potrzebuje. */
+export type ExtrasLog = { address?: string; from?: string; to?: string; value?: bigint };
+/** Log `Swap` PoolManagera - tyle, ile naprawde czytamy. */
+export type SwapLog = { poolId?: string; amount0?: bigint };
+
+/**
+ * Ilu ludzi NAPRAWDE trzyma ten token. Liczymy konta z saldem dodatnim, a
+ * `exclude` wypisuje adresy, ktore saldo maja, ale posiadaczami nie sa -
+ * przede wszystkim sam PoolManager, bo salda AMM nikt nie nazywa posiadaczem:
+ * to jest rynek, a nie jego uczestnik.
+ *
+ * `null` znaczy "zakres jeszcze nie domkniety", a nie "zero" - i tak ma byc
+ * czytane wyzej.
+ */
+export function holderCount(
+  extras: TokenExtras,
+  token: string,
+  options: { exclude?: Iterable<string>; totalSupply?: bigint } = {}
+): number | null {
+  const key = token.toLowerCase();
+  if (!extras.complete || !extras.tokens.has(key)) return null;
+  // Bez zgodnosci z podazia nie wiemy, czy dno skanu bylo dosc nisko - a
+  // niepelne salda wygladaja jak pelne. Wtedy uczciwa odpowiedzia jest "nie wiem".
+  if (!supplyReconciles(extras, key, options.totalSupply)) return null;
+  // Token objety skanem, ktory nie ma ani jednego transferu, ma zero posiadaczy
+  // - i to jest odpowiedz, a nie brak odpowiedzi.
+  const perToken = extras.balances.get(key) ?? new Map<string, bigint>();
+  const skip = new Set([...(options.exclude ?? [])].map((a) => a.toLowerCase()));
+  let count = 0;
+  for (const [account, balance] of perToken) {
+    if (balance > 0n && !skip.has(account)) count += 1;
+  }
+  return count;
+}
+
+/** Wolumen puli w ETH. `null` = zakres niedomkniety, czyli "nie wiem". */
+export function poolVolumeEth(extras: TokenExtras, token: string): number | null {
+  const key = token.toLowerCase();
+  if (!extras.complete || !extras.tokens.has(key)) return null;
+  return Number(extras.poolVolumeWei.get(key) ?? 0n) / 1e18;
+}
+
+export type SerializedExtras = {
+  balances: Array<[string, Array<[string, string]>]>;
+  poolVolumeWei: Array<[string, string]>;
+  tokens: string[];
+  minted: Array<[string, string]>;
+  burned: Array<[string, string]>;
+  fromBlock: string;
+  lastBlock: string;
+  complete: boolean;
+};
+
+const weiPairs = (map: Map<string, bigint>): Array<[string, string]> =>
+  [...map.entries()].map(([key, wei]) => [key, wei.toString()] as [string, string]);
+
+export function serializeExtras(extras: TokenExtras): SerializedExtras {
+  return {
+    // Konta z saldem zero to slad po kims, kto wyszedl - do liczenia sa
+    // niepotrzebne, a w `localStorage` zajmuja tyle samo, co posiadacz.
+    balances: [...extras.balances.entries()].map(
+      ([token, perToken]) =>
+        [
+          token,
+          [...perToken.entries()].filter(([, wei]) => wei !== 0n).map(([account, wei]) => [account, wei.toString()] as [string, string]),
+        ] as [string, Array<[string, string]>]
+    ),
+    poolVolumeWei: weiPairs(extras.poolVolumeWei),
+    tokens: [...extras.tokens],
+    minted: weiPairs(extras.minted),
+    burned: weiPairs(extras.burned),
+    fromBlock: extras.fromBlock.toString(),
+    lastBlock: extras.lastBlock.toString(),
+    complete: extras.complete,
+  };
+}
+
+/**
+ * Odczyt tak samo NIEUFNY, jak przy `parseAggregate`: cokolwiek nie pasuje do
+ * ksztaltu, oddajemy `null`. Polowiczne salda sa tu grozniejsze niz polowiczny
+ * wolumen - z nich liczy sie liczba ludzi, a ta ma stac na karcie pod slowem
+ * "holders".
+ */
+export function parseExtras(raw: unknown): TokenExtras | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const input = raw as Partial<SerializedExtras>;
+  if (typeof input.fromBlock !== 'string' || typeof input.lastBlock !== 'string') return null;
+  if (!/^\d+$/.test(input.fromBlock) || !/^\d+$/.test(input.lastBlock)) return null;
+
+  try {
+    if (!Array.isArray(input.tokens) || input.tokens.some((t) => typeof t !== 'string')) return null;
+    const extras = emptyExtras(BigInt(input.fromBlock), input.tokens);
+    extras.lastBlock = BigInt(input.lastBlock);
+    extras.complete = input.complete === true;
+    if (extras.lastBlock < extras.fromBlock - 1n) return null;
+
+    for (const [token, perTokenRaw] of Array.isArray(input.balances) ? input.balances : []) {
+      if (typeof token !== 'string' || !Array.isArray(perTokenRaw)) return null;
+      const perToken = new Map<string, bigint>();
+      for (const [account, wei] of perTokenRaw) {
+        if (typeof account !== 'string' || typeof wei !== 'string') return null;
+        perToken.set(account, BigInt(wei));
+      }
+      extras.balances.set(token, perToken);
+    }
+    // Wolumen, emisja i spalenie to sumy wartosci bezwzglednych - ujemna
+    // wartosc znaczy uszkodzony zapis, a nie maly rynek.
+    for (const [field, target] of [
+      [input.poolVolumeWei, extras.poolVolumeWei],
+      [input.minted, extras.minted],
+      [input.burned, extras.burned],
+    ] as Array<[unknown, Map<string, bigint>]>) {
+      for (const [token, wei] of Array.isArray(field) ? (field as Array<[string, string]>) : []) {
+        if (typeof token !== 'string' || typeof wei !== 'string') return null;
+        const value = BigInt(wei);
+        if (value < 0n) return null;
+        target.set(token, value);
+      }
+    }
+    return extras;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Od ktorego bloku dociagac salda przy tym wejsciu - i czy wolno dosumowac.
+ *
+ * Ta sama regula, co w `planBoardScan`, plus jeden warunek wiecej: zapamietane
+ * salda wolno kontynuowac TYLKO wtedy, gdy zaczynaja sie nie wyzej niz tam,
+ * gdzie zaczac chcemy. Migawka policzona od bloku graduacji nie stanie sie
+ * migawka od bloku startu tokena przez dosumowanie swiezych blokow - brakowaloby
+ * jej srodka, a z zewnatrz wygladalaby identycznie jak pelna.
+ */
+export function planExtrasScan(input: {
+  cached: TokenExtras | null;
+  head: bigint;
+  floor: bigint;
+  /** Tokeny, ktore ten skan ma objac - migawka bez ktoregos z nich nie nadaje sie do kontynuacji. */
+  tokens: string[];
+}): { from: bigint; base: TokenExtras } {
+  const { cached, head, floor, tokens } = input;
+  const wanted = tokens.map((t) => t.toLowerCase());
+  const fresh = () => ({ from: floor, base: emptyExtras(floor, wanted) });
+
+  if (!cached || cached.fromBlock > floor) return fresh();
+  // Glowa ponizej naszego znacznika znaczy inna siec albo reorganizacje - takiej
+  // migawki nie wolno dosumowac, bo jej zakres nie jest juz tym, co mowi.
+  if (head < cached.lastBlock) return fresh();
+  // Token spoza pokrycia migawki mialby policzone tylko swieze bloki, a
+  // wygladalby na policzonego od poczatku. Wtedy liczymy caly zbior od nowa.
+  if (wanted.some((token) => !cached.tokens.has(token))) return fresh();
+  return { from: cached.lastBlock + 1n, base: cached };
+}
+
+/* ========================================================================== */
+/*  ILE BLOKOW NA JEDNO `eth_getLogs` - PYTAMY RPC, ZAMIAST ZGADYWAC          */
+/* ========================================================================== */
+
+/**
+ * OKNO SKANU JEST WLASNOSCIA ENDPOINTU, A NIE SIECI - I POTRAFI SIE ZMIENIC.
+ *
+ * ===========================================================================
+ * OBJAW
+ * ===========================================================================
+ * 10 wrzesnia 2026 KAZDE okno skanu tablicy na Base konczylo sie bledem.
+ * Zmierzone wprost na `mainnet.base.org`, oknem z konfiguracji (9 500 blokow):
+ *
+ *     HTTP 413  {"code":-32614,"message":"eth_getLogs is limited to a 2,000 range"}
+ *
+ * Nie bylo tego widac, bo degradacja dziala jak powinna: padniete okno
+ * podbija `failedWindows`, skan przestaje byc wiarygodny, agregat nie jest
+ * zapisywany, a wiersze zostaja na ekranie. Tablica wygladala wiec zdrowo,
+ * tylko skan z przegladarki nie wnosil do niej NIC - wszystko, co bylo widac,
+ * pochodzilo z agregatu serwera. Stad "stare staty": nie bylo zadnej sciezki,
+ * ktora doniosla by swiezsze liczby.
+ *
+ * ===========================================================================
+ * DLACZEGO NIE WPISUJEMY PO PROSTU 2 000
+ * ===========================================================================
+ * W `config.ts` stoi 9 500 z komentarzem "ZMIERZONE 2026-08-13: limit to
+ * 10 000, nie 2 000". Ten pomiar byl prawdziwy w dniu, w ktorym go zrobiono -
+ * Base zaciesnil limit pozniej. Wpisanie teraz 2 000 na sztywno to ta sama
+ * pomylka o miesiac pozniej: nasze wlasne endpointy (CDP) nadal daja 10 000,
+ * wiec staly zjazd do 2 000 spowolnilby skan pieciokrotnie tam, gdzie nie ma
+ * takiej potrzeby.
+ *
+ * Dlatego okna nie zgadujemy ani nie pamietamy - PYTAMY o nie endpoint. RPC
+ * podaje swoj limit wprost w tresci bledu, wiec bierzemy go stamtad, a gdy nie
+ * poda, schodzimy do najostrozniejszej wartosci, jaka spotykamy w praktyce.
+ */
+
+/** Okno, do ktorego schodzimy, gdy RPC odmawia i nie mowi, ile wolno. */
+export const SAFE_LOG_WINDOW = 2_000n;
+
+/**
+ * Limit zakresu wyluskany z tresci bledu RPC, albo `null`, gdy to nie jest
+ * blad o zakresie. Rozpoznajemy zapis z separatorem tysiecy ("2,000") i bez.
+ *
+ * `null` znaczy "ten blad nie mowi nic o oknie" - wtedy wolajacy ma go
+ * potraktowac jak zwykla awarie okna (ponowienie, `failedWindows`), a NIE jak
+ * powod do zmiany rozmiaru. Blad sieci nie jest informacja o limicie.
+ */
+export function logRangeLimitFrom(error: unknown): bigint | null {
+  const text =
+    error instanceof Error ? `${error.message} ${(error as { details?: string }).details ?? ''}` : String(error ?? '');
+  if (!/\b(range|block range|limited to)\b/i.test(text)) return null;
+  const match = text.match(/limited to (?:a )?([\d,_ ]+)\s*(?:block\s*)?range/i) ?? text.match(/range of ([\d,_ ]+)/i);
+  if (match) {
+    const digits = match[1].replace(/[,_ ]/g, '');
+    if (/^\d+$/.test(digits)) {
+      const limit = BigInt(digits);
+      if (limit > 0n) return limit;
+    }
+  }
+  // Blad JEST o zakresie, ale bez liczby - schodzimy do bezpiecznej wartosci.
+  return SAFE_LOG_WINDOW;
+}
