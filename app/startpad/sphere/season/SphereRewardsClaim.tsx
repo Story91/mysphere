@@ -319,6 +319,81 @@ function DeliverRow({ leaf, earned }: { leaf: Leaf; earned?: Earned }) {
 }
 
 /**
+ * LISTA TWORCOW Z EPOKI OCZEKUJACEJ - kto ile dostanie i od kiedy.
+ *
+ * Pasek `NextEpochStrip` podaje sume i liczbe tworcow, ale nie mowi KOMU. Do 10
+ * wrzesnia 2026 strona pokazywala liscie epoki oczekujacej jako gotowe do
+ * odbioru i przycisk "Claim for creator" przy kazdym z nich - to byl blad, bo
+ * dowod z drzewa, ktorego kontrakt jeszcze nie zna, konczyl sie rewertem
+ * (portfel raportowal to jako problem z gazem). Poprawka dopasowala manifest do
+ * aktywnego roota i piatka tworcow zniknela z ekranu razem z bledem.
+ *
+ * Zniknac nie miala. Kwoty z propozycji sa publiczne i sprawdzalne od chwili
+ * `propose()`, wiec pokazujemy je tutaj w calosci - z jawnym powodem, dlaczego
+ * przycisku jeszcze nie ma i od ktorej godziny bedzie. Po aktywacji te same
+ * liscie staja sie aktywnym manifestem i trafiaja do listy wyzej, juz z
+ * dzialajacym przyciskiem.
+ */
+function PendingCreatorList({ dist, next }: { dist: DistributorState; next: Resolved | null }) {
+  const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
+  useEffect(() => {
+    const t = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 30_000);
+    return () => clearInterval(t);
+  }, []);
+  if (dist.pendingValidAt === 0 || !next) return null;
+  const rows = next.leaves
+    .map((l) => ({ leaf: l, delta: BigInt(l.cumulative) - BigInt(l.prevCumulative) }))
+    .filter((r) => r.delta > 0n)
+    .sort((a, b) => (b.delta > a.delta ? 1 : b.delta < a.delta ? -1 : 0));
+  if (rows.length === 0) return null;
+  const total = rows.reduce((a, r) => a + r.delta, 0n);
+  const live = dist.pendingValidAt <= now;
+
+  return (
+    <div className="mt-3">
+      <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/45">
+        Proposed for epoch #{dist.pendingEpochId} - {rows.length} {rows.length === 1 ? 'creator' : 'creators'}, {fmt(total, 2)} SPHERE
+      </p>
+      <p className="mt-0.5 text-[10px] text-sp-shade/40">
+        {live
+          ? 'The veto window has passed - anyone can activate this root, and then every row below becomes claimable.'
+          : `Published in the manifest and verifiable now; claimable from ${utcStamp(dist.pendingValidAt)} UTC, ${untilText(dist.pendingValidAt - now)}. Nobody can claim before that - the contract does not know this tree yet.`}
+      </p>
+      <div className="mt-1.5 grid gap-1.5">
+        {rows.map((r, i) => (
+          <div
+            key={r.leaf.account}
+            className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-sp-shade/10 bg-sp-surface px-3 py-2"
+          >
+            <span className="w-5 text-[11px] font-extrabold text-sp-shade/35">{i + 1}</span>
+            <span className="font-mono text-[11px] text-sp-shade/60">
+              {r.leaf.account.slice(0, 6)}…{r.leaf.account.slice(-4)}
+            </span>
+            <span className="ml-auto text-right">
+              <span className="block font-mono text-[11.5px] font-bold text-sp-ink">{fmt(r.delta, 2)}</span>
+              <span className="block text-[9.5px] font-bold uppercase tracking-[0.06em] text-sp-shade/40">
+                adds (SPHERE)
+              </span>
+            </span>
+            <span className="text-right">
+              <span className="block font-mono text-[11.5px] font-bold text-sp-shade/60">
+                {total > 0n ? ((Number(r.delta) / Number(total)) * 100).toFixed(2) : '0.00'}%
+              </span>
+              <span className="block text-[9.5px] font-bold uppercase tracking-[0.06em] text-sp-shade/40">
+                share of epoch
+              </span>
+            </span>
+            <span className="rounded-full bg-sp-shade/8 px-2.5 py-1 text-[9.5px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/45">
+              {live ? 'awaiting activation' : 'locked until activation'}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
  * Pasek nastepnej epoki - czytany z pending() i pokazywany TAKZE wtedy, gdy
  * biezaca epoka juz plynie. To jest odpowiedz na "ile i kiedy": kwota
  * przyrostu (pendingTotalCumulative - totalCumulative), odliczanie do validAt
@@ -693,6 +768,7 @@ export default function SphereRewardsClaim({ dist }: { dist: DistributorState | 
         <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> Reading the epoch manifest...
       </p>
       <NextEpochStrip dist={dist} next={next} account={account} />
+      <PendingCreatorList dist={dist} next={next} />
     </section>
   );
   const epochView = (note: string) => (
@@ -727,6 +803,7 @@ export default function SphereRewardsClaim({ dist }: { dist: DistributorState | 
         </p>
       </div>
       <NextEpochStrip dist={dist} next={next} account={account} />
+      <PendingCreatorList dist={dist} next={next} />
       {rows.length > 0 && (
         <div className="mt-3">
           <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/45">
@@ -836,6 +913,7 @@ export default function SphereRewardsClaim({ dist }: { dist: DistributorState | 
         ))}
       </div>
       <NextEpochStrip dist={dist} next={next} account={account} />
+      <PendingCreatorList dist={dist} next={next} />
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <button
           type="button"

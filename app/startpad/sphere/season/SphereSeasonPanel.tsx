@@ -617,15 +617,28 @@ export default function SphereSeasonPanel() {
     };
   }, []);
 
+  /**
+   * DZIEN, KTORY SIE NIE WYDARZYL, TO NIE JEST DZIEN Z ZEREM.
+   *
+   * Obie serie mialy zawsze siedem slupkow, a epoka trwa tydzien - wiec w
+   * drugiej dobie dni 3-7 stały puste i czytalo sie to jako "brak danych" albo
+   * wrecz "wykres sie zepsul" (zgloszone: "nie ma dnia 3 i 4"). Dni przyszle sa
+   * teraz oznaczone i podpisane, a os mowi, ktory dzien trwa TERAZ.
+   */
+  const elapsedDays = data ? Math.min(7, Math.floor((data.epoch.progressBps / 10_000) * 7) + 1) : 7;
   const chartData = useMemo(
     () =>
       (data?.dailyVolumeEth ?? []).map((v, i) => ({
         day: `Day ${i + 1}`,
+        dayLabel: data && i + 1 === elapsedDays ? `Day ${i + 1} · now` : `Day ${i + 1}`,
+        future: data ? i + 1 > elapsedDays : false,
         volume: Number(formatEther(BigInt(v))),
         sphere: Number(formatEther(BigInt(data?.dailyExcludedVolumeEth?.[i] ?? '0'))),
       })),
-    [data]
+    [data, elapsedDays]
   );
+  /** Ile dni epoki juz minelo - do podpisow pod obydwoma wykresami. */
+  const futureDays = Math.max(0, 7 - elapsedDays);
   const hasExcluded = chartData.some((d) => d.sphere > 0);
   /** Suma wolumenu wykluczonego - do zdania w ZeroEpochNotice. */
   const excludedVolumeWei = useMemo(
@@ -765,7 +778,7 @@ export default function SphereSeasonPanel() {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 18, right: 8, left: 0, bottom: 0 }} barCategoryGap="28%">
                 <CartesianGrid vertical={false} stroke="rgba(0,0,0,0.06)" />
-                <XAxis dataKey="day" tickLine={false} axisLine={false} tick={{ fontSize: 10.5, fill: 'rgba(0,0,0,0.45)' }} />
+                <XAxis dataKey="dayLabel" tickLine={false} axisLine={false} tick={{ fontSize: 10.5, fill: 'rgba(0,0,0,0.45)' }} />
                 <YAxis width={44} tickLine={false} axisLine={false} tick={{ fontSize: 10.5, fill: 'rgba(0,0,0,0.45)' }} />
                 <Tooltip
                   cursor={{ fill: 'rgba(124,107,218,0.08)' }}
@@ -794,7 +807,9 @@ export default function SphereSeasonPanel() {
             sie jak brak danych, zwlaszcza tuz nad niepusta seria SPHERE. */}
         {data && chartData.every((d) => d.volume === 0) && (
           <p className="mt-1 text-[10.5px] font-bold text-sp-shade/45">
-            Flat at zero for all seven days: no season-eligible token traded in this epoch.
+            {futureDays > 0
+              ? `Flat at zero for the ${elapsedDays} ${elapsedDays === 1 ? 'day' : 'days'} of this epoch so far: no season-eligible token has traded yet. The remaining ${futureDays} ${futureDays === 1 ? 'day has' : 'days have'} not happened, which is why those bars are empty.`
+              : 'Flat at zero for all seven days: no season-eligible token traded in this epoch.'}
           </p>
         )}
 
@@ -810,12 +825,19 @@ export default function SphereSeasonPanel() {
             <p className="mt-0.5 text-[10px] text-sp-shade/45">
               SPHERE cannot farm its own creator rewards, so its trading scores zero above - the history is still real
               and shown here.
+              {futureDays > 0 && (
+                <>
+                  {' '}
+                  This epoch is on day {elapsedDays} of 7, so the last {futureDays}{' '}
+                  {futureDays === 1 ? 'bar covers a day that' : 'bars cover days that'} have not happened yet.
+                </>
+              )}
             </p>
             <div className="mt-2 h-28 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} margin={{ top: 16, right: 8, left: 0, bottom: 0 }} barCategoryGap="28%">
                   <CartesianGrid vertical={false} stroke="rgba(0,0,0,0.05)" />
-                  <XAxis dataKey="day" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: 'rgba(0,0,0,0.4)' }} />
+                  <XAxis dataKey="dayLabel" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: 'rgba(0,0,0,0.4)' }} />
                   <YAxis width={44} tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: 'rgba(0,0,0,0.4)' }} />
                   <Tooltip
                     cursor={{ fill: 'rgba(0,0,0,0.05)' }}
