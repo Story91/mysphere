@@ -56,7 +56,7 @@ describe('derivatives math', () => {
       { time: 3000, price: 2n },
       { time: 3500, price: 3n },
     ];
-    expect(filterRange(pts, '1h', 4000).map((p) => p.price)).to.deep.equal([2n, 3n]);
+    expect(filterRange(pts, '1h', 4000).map((p: { price: bigint }) => p.price)).to.deep.equal([2n, 3n]);
     expect(filterRange(pts, 'all', 4000).length).to.equal(3);
   });
 
