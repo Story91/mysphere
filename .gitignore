@@ -229,3 +229,6 @@ impl.txt
 
 # znacznik alarmu gazu keepera (runtime)
 scripts/output/GAZ-NISKI.txt
+
+# indeks tokenow launchpada dla keepera (odbudowuje sie sam)
+scripts/output/launchpad-tokens.json

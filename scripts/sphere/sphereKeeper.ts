@@ -1,4 +1,6 @@
 import { ethers } from "hardhat";
+import * as fs from "fs";
+import * as path from "path";
 
 /**
  * SPHERE KEEPER - cron peryferii (spec sekcja 8, "SphereKeeper").
@@ -8,6 +10,8 @@ import { ethers } from "hardhat";
  * keeper moze byc dowolnym, niezaufanym adresem z gazem.
  *
  * Kroki (kazdy pomijany, gdy nie ma nic do zrobienia):
+ *  0. graduate() kazdej krzywej w stanie Locked - kontrakt placi za to
+ *     wywolanie 1.5% rezerwy i nie patrzy, kto wola,
  *  1. per token z TOKENS: hook.settle + vault.harvest (odswieza salda przed
  *     snapshotem epoki) + hook.executeBuyback (auto-burn tokena),
  *  2. dostawy claimFor/claimEthFor/claimTokenFor na adresy z env
@@ -30,8 +34,62 @@ import { ethers } from "hardhat";
 const PAD_ABI = [
   "function claimable(address) view returns (uint256)",
   "function claimFor(address) external",
+  "function claim() external",
   "function launchOf(address) view returns (address,uint8,uint256,uint256,uint40,bytes32)",
+  "function graduate(address) external",
+  "function gradFeeOf(address) view returns (uint256 fee, uint256 callerReward)",
+  "event Launched(address indexed token, address indexed creator, bytes32 indexed launchId, string name, string symbol, uint256 totalSupply, uint256 curveSupply, uint256 tMin, uint256 rVirt, uint16 feeBps, uint16 creatorFeeBps, uint40 startedAt)",
 ];
+
+/** Stan krzywej w kontrakcie: 0 None, 1 Curve, 2 Locked, 3 Graduated. */
+const STATE_LOCKED = 2;
+
+/**
+ * Lista tokenow launchpada, budowana PRZYROSTOWO. Pelny skan historii co
+ * godzine kosztowalby kilkadziesiat zapytan eth_getLogs za nic - plik trzyma
+ * ostatni przeskanowany blok, wiec kolejny przebieg oglada tylko nowe.
+ */
+const TOKENS_CACHE = path.join(__dirname, "..", "output", "launchpad-tokens.json");
+
+async function discoverTokens(pad: any, padAddress: string, firstBlock: number): Promise<string[]> {
+  let state: { lastBlock: number; tokens: string[] } = { lastBlock: firstBlock - 1, tokens: [] };
+  try {
+    const disk = JSON.parse(fs.readFileSync(TOKENS_CACHE, "utf8"));
+    if (Array.isArray(disk?.tokens) && Number.isFinite(disk?.lastBlock)) state = disk;
+  } catch {
+    /* pierwszy przebieg albo plik zepsuty - skanujemy od firstBlock */
+  }
+  const head = await ethers.provider.getBlockNumber();
+  const topic = pad.interface.getEvent("Launched").topicHash;
+  const seen = new Set(state.tokens.map((t) => t.toLowerCase()));
+  // Okno zwezane przy odmowie - limity eth_getLogs roznia sie miedzy wezlami.
+  let step = 50_000;
+  for (let from = state.lastBlock + 1; from <= head; ) {
+    const to = Math.min(head, from + step - 1);
+    try {
+      const logs = await ethers.provider.getLogs({ address: padAddress, topics: [topic], fromBlock: from, toBlock: to });
+      for (const l of logs) {
+        const d = pad.interface.parseLog(l);
+        const t: string = d?.args?.token;
+        if (t && !seen.has(t.toLowerCase())) {
+          seen.add(t.toLowerCase());
+          state.tokens.push(t);
+        }
+      }
+      from = to + 1;
+    } catch (e) {
+      if (step > 2_000) {
+        step = Math.floor(step / 4);
+        continue;
+      }
+      throw e;
+    }
+  }
+  state.lastBlock = head;
+  fs.mkdirSync(path.dirname(TOKENS_CACHE), { recursive: true });
+  fs.writeFileSync(TOKENS_CACHE, JSON.stringify(state, null, 2));
+  return state.tokens;
+}
 const HOOK_ABI = [
   "function pendingEth(address) view returns (uint256)",
   "function pendingToken(address) view returns (uint256)",
@@ -102,6 +160,60 @@ async function main() {
 
   const now = BigInt((await ethers.provider.getBlock("latest"))!.timestamp);
   const deadline = now + 600n;
+
+  // ---- 0. graduacje: nagroda za wywolanie -----------------------------------
+  // Krzywa, ktora zebrala cel, przechodzi w stan Locked i czeka, az KTOKOLWIEK
+  // zawola graduate(). Kontrakt placi za to polowe GRAD_FEE_BPS, czyli 1.5%
+  // rezerwy, i nie sprawdza, kto wola. 1.09.2026 SPHERE zgraduowal obcy portfel
+  // 16 sekund po zapelnieniu krzywej i zarobil na tym 0.045 ETH. Nagroda lezy
+  // dla kazdego, kto patrzy - od teraz patrzy takze keeper.
+  //
+  // Nagroda laduje w mapie naleznosci TEGO klucza, wiec odbieramy ja od razu:
+  // ten portfel placi gaz za wszystkie kroki i w ten sposob sam sie finansuje.
+  // GRADUATE=nie wylacza caly krok.
+  if (process.env.GRADUATE !== "nie") {
+    const padAddress = await pad.getAddress();
+    // Blok wdrozenia launchpada na Base (scripts/output/launchpad-base.json).
+    // Pierwszy przebieg skanuje stad, kolejne tylko przyrost.
+    const firstBlock = Number(process.env.GRAD_FROM_BLOCK ?? 49_843_030);
+    let known: string[] = [];
+    try {
+      known = await discoverTokens(pad, padAddress, firstBlock);
+    } catch (e) {
+      log(`graduate: skan tokenow nieudany (${(e as Error).message.split("\n")[0]}) - pomijam krok`);
+    }
+    const ready: string[] = [];
+    for (const t of known) {
+      try {
+        const l = await pad.launchOf(t);
+        if (Number(l[1]) === STATE_LOCKED) ready.push(t);
+      } catch {
+        /* token spoza tego wdrozenia albo lag wezla - nastepny przebieg */
+      }
+    }
+    if (known.length > 0 && ready.length === 0) log(`graduate: nic nie czeka (${known.length} tokenow na liscie)`);
+    for (const t of ready) {
+      const [fee, reward] = await pad.gradFeeOf(t);
+      log(`graduate(${t}): oplata ${ethers.formatEther(fee)} ETH, z tego nagroda dla wywolujacego ${ethers.formatEther(reward)} ETH`);
+      if (execute) {
+        try {
+          const rc = await (await pad.graduate(t)).wait();
+          log(`  zgraduowany | tx ${rc.hash}`);
+          await pace();
+        } catch (e) {
+          log(`  graduate odrzucone: ${(e as Error).message.split("\n")[0]}`);
+        }
+      }
+    }
+    const mine: bigint = await pad.claimable(signer.address);
+    if (mine > 0n) {
+      log(`claim(): odbieram nagrode keepera ${ethers.formatEther(mine)} ETH`);
+      if (execute) {
+        await (await pad.claim()).wait();
+        await pace();
+      }
+    }
+  }
 
   // ---- 1. per token: settle / harvest / auto-burn --------------------------
   const tokens = (process.env.TOKENS ?? "").split(",").map((t) => t.trim()).filter(Boolean);

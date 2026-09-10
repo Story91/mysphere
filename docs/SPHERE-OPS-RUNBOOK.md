@@ -61,6 +61,15 @@ bezuprawnieniowy poza `checkpoint()` (CHECKPOINTER = ten klucz).
 7. `SphereBuyback`: `checkpoint()` gdy nieswiezy, `execute(0.05 ETH)` gdy
    kontrakt ma ETH i checkpoint jest swiezy.
 8. `distributor.activate()` - gdy jest zaproponowany root po 24h weta.
+9. `graduate(token)` dla KAZDEJ krzywej w stanie Locked (2) - kontrakt placi
+   za to wywolanie polowe GRAD_FEE_BPS, czyli 1.5% rezerwy, i nie sprawdza,
+   kto wola. 1.09.2026 SPHERE zgraduowal obcy portfel 16 sekund po zapelnieniu
+   krzywej i zarobil 0.045 ETH; nagroda przepadla nam, bo nikt nie patrzyl.
+   Keeper prowadzi przyrostowy indeks tokenow w `scripts/output/launchpad-tokens.json`
+   (od bloku wdrozenia 49 843 030), wiec kazdy przebieg oglada tylko nowe bloki.
+   Po graduacji wola `claim()` - nagroda laduje na portfelu keepera, ktory placi
+   gaz za wszystkie kroki, wiec sam sie w ten sposob dofinansowuje.
+   Wylacznik: `GRADUATE=nie`. Poczatek skanu: `GRAD_FROM_BLOCK`.
 
 Instalacja harmonogramu (raz, w PowerShellu, z katalogu repo):
 
