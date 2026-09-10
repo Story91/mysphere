@@ -1,16 +1,15 @@
 {
   "chainId": 5042002,
   "network": "arcTestnet",
-  "deployer": null,
-  "governance": null,
-  "treasury": null,
+  "deployer": "0xD4885A5aa53446843CABcDE1F35DE9b4E906030e",
+  "governance": "0xD4885A5aa53446843CABcDE1F35DE9b4E906030e",
+  "treasury": "0xD4885A5aa53446843CABcDE1F35DE9b4E906030e",
   "usdc": "0x3600000000000000000000000000000000000000",
-  "oracle": null,
-  "factory": null,
-  "insuranceFund": null,
-  "feeDistributor": null,
-  "deployBlock": 0,
-  "insuranceSeedUsdc": "0",
-  "deployedAt": null,
-  "note": "SZKIELET - jeszcze NIE WDROZONE. Pola z null uzupelnia scripts/deploy-derivative-market.ts, ktory nadpisuje ten plik w calosci po udanym wdrozeniu (CONFIRM=tak ... --network arcTestnet). Adres USDC to kanoniczny ERC-20 Arc z SZESCIOMA miejscami - jednostka natywna tego lancucha to takze USDC, ale z osiemnastoma i modul jej nie dotyka. Fundusz ubezpieczeniowy MUSI zostac zasilony (SEED_USDC), inaczej po pierwszej pozycji modul zatrzyma nowe pozycje na wszystkich rynkach."
+  "oracle": "0xe7D362F50638aA64C98aEbcbb6e2c48fEF799eEf",
+  "factory": "0x295CCB8b7Bb9E4987ceE77846a29C5B882cF680b",
+  "insuranceFund": "0x3092712878F766A554C2Cab03EcbCD6AA2c93F42",
+  "feeDistributor": "0x15c2854798043995e85AC5d2c9cB12aF3e78A550",
+  "deployBlock": 61373327,
+  "insuranceSeedUsdc": "5000000",
+  "deployedAt": "2026-09-10T09:00:19.555Z"
 }
