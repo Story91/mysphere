@@ -1,0 +1,16 @@
+{
+  "chainId": 5042002,
+  "network": "arcTestnet",
+  "deployer": null,
+  "governance": null,
+  "treasury": null,
+  "usdc": "0x3600000000000000000000000000000000000000",
+  "oracle": null,
+  "factory": null,
+  "insuranceFund": null,
+  "feeDistributor": null,
+  "deployBlock": 0,
+  "insuranceSeedUsdc": "0",
+  "deployedAt": null,
+  "note": "SZKIELET - jeszcze NIE WDROZONE. Pola z null uzupelnia scripts/deploy-derivative-market.ts, ktory nadpisuje ten plik w calosci po udanym wdrozeniu (CONFIRM=tak ... --network arcTestnet). Adres USDC to kanoniczny ERC-20 Arc z SZESCIOMA miejscami - jednostka natywna tego lancucha to takze USDC, ale z osiemnastoma i modul jej nie dotyka. Fundusz ubezpieczeniowy MUSI zostac zasilony (SEED_USDC), inaczej po pierwszej pozycji modul zatrzyma nowe pozycje na wszystkich rynkach."
+}
