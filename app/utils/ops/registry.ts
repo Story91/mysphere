@@ -61,7 +61,7 @@ export const OPS_CHAINS: Record<number, ChainMeta> = {
   484: {
     id: 484,
     name: 'Camp Network',
-    rpcs: [process.env.CAMP_RPC_URL, 'https://rpc.camp.raas.gelato.cloud', 'https://rpc-campnetwork.xyz', 'https://camp.cloud.blockscout.com/api/eth-rpc'].filter(Boolean) as string[],
+    rpcs: [process.env.CAMP_RPC_URL, 'https://rpc-mainnet.campnetwork.xyz', 'https://camp.cloud.blockscout.com/api/eth-rpc'].filter(Boolean) as string[],
     explorer: 'https://camp.cloud.blockscout.com',
     nativeSymbol: 'CAMP',
   },

@@ -22,7 +22,7 @@ export const CELO_POSTING: ChainWithComposer = {
   shortName: 'Celo',
 
   txHashStorageKey: 'lastCeloTxHash',
-  explorerTxUrl: 'https://explorer.celo.org/tx/',
+  explorerTxUrl: 'https://celo.blockscout.com/tx/',
   explorerButtonLabel: 'View on Celo Explorer',
 
   post: {

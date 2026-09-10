@@ -27,8 +27,8 @@ export const celoChain = defineChain({
   blockExplorers: {
     default: { 
       name: 'Celo Explorer', 
-      url: 'https://explorer.celo.org',
-      apiUrl: 'https://explorer.celo.org/api'
+      url: 'https://celo.blockscout.com',
+      apiUrl: 'https://celo.blockscout.com/api'
     },
   },
   testnet: false,
@@ -42,7 +42,7 @@ export const CELO_CONFIG = {
   symbol: 'CELO',
   decimals: 18,
   rpcUrl: CELO_RPC_URLS[0],
-  explorerUrl: 'https://explorer.celo.org',
-  explorerApiUrl: 'https://explorer.celo.org/api',
+  explorerUrl: 'https://celo.blockscout.com',
+  explorerApiUrl: 'https://celo.blockscout.com/api',
 } as const;
 

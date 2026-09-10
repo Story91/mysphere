@@ -11,8 +11,8 @@ export const campMainnetChain = defineChain({
     symbol: 'CAMP',
   },
   rpcUrls: {
-    default: { http: [CAMP_MAINNET.RPC_HTTP] },
-    public: { http: [CAMP_MAINNET.RPC_HTTP] },
+    default: { http: [CAMP_MAINNET.RPC_HTTP, CAMP_MAINNET.RPC_HTTP_FALLBACK] },
+    public: { http: [CAMP_MAINNET.RPC_HTTP, CAMP_MAINNET.RPC_HTTP_FALLBACK] },
   },
   blockExplorers: {
     default: { name: 'Blockscout', url: CAMP_MAINNET.EXPLORER },

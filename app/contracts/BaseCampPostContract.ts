@@ -1,4 +1,5 @@
 import { defineChain } from 'viem';
+import { CAMP_MAINNET } from '@/config/camp';
 
 // Define BaseCamp chain - Updated to Mainnet
 export const BASECAMP_CHAIN_ID = 484;
@@ -12,9 +13,11 @@ export const baseCampChain = defineChain({
     name: 'Camp Token',
     symbol: 'CAMP',
   },
+  // Ten obiekt trafia do portfela przez wallet_addEthereumChain - martwy
+  // host gelato zostawal tam na stale. Jedno zrodlo prawdy: config/camp.ts.
   rpcUrls: {
-    default: { http: ['https://rpc.camp.raas.gelato.cloud'] },
-    public: { http: ['https://rpc.camp.raas.gelato.cloud'] },
+    default: { http: [CAMP_MAINNET.RPC_HTTP, CAMP_MAINNET.RPC_HTTP_FALLBACK] },
+    public: { http: [CAMP_MAINNET.RPC_HTTP, CAMP_MAINNET.RPC_HTTP_FALLBACK] },
   },
   blockExplorers: {
     default: { name: 'Blockscout', url: 'https://camp.cloud.blockscout.com/' },

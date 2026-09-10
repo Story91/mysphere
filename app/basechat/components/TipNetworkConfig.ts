@@ -273,7 +273,9 @@ export const NETWORKS: Record<TipNetwork, NetworkConfig> = {
     icon: '🏕️',
     iconUrl: '/Camp.png',
     color: '#FF6B35',
-    explorerUrl: 'https://basecamp.cloud',
+    // basecamp.cloud przekierowuje dzis (307) na trailmap.ai - kazdy link
+    // "verify" na Camp ladowal na obcej stronie. ZMIERZONE curl 2026-09-11.
+    explorerUrl: 'https://camp.cloud.blockscout.com',
     explorerTxPath: '/tx/',
     nativeToken: 'CAMP',
     tokens: [

@@ -86,7 +86,9 @@ const TRANSPORTS_BASE = {
     http('https://mainnet.base.org'),
   ]),
   [baseSepolia.id]: http(process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org'),
-  [baseCampChain.id]: http('https://rpc.basecamp.t.raas.gelato.cloud'),
+  // Camp (484): gelato zniknal z DNS - patrz config/camp.ts. Wczesniej stal tu
+  // w dodatku adres TESTNETU (basecamp.t.raas) pod chainId mainnetu.
+  [baseCampChain.id]: fallback([http(CAMP_MAINNET.RPC_HTTP), http(CAMP_MAINNET.RPC_HTTP_FALLBACK)]),
   [lineaChain.id]: http('https://linea-rpc.publicnode.com'),
   [celoChain.id]: http('https://forno.celo.org'),
   // Ethereum: eth.llamarpc.com PRZESTAL wysylac naglowki CORS - w konsoli
@@ -125,7 +127,7 @@ const CHAINS_WITH_CAMP_MAINNET = [
 ] as const;
 const TRANSPORTS_WITH_CAMP_MAINNET = {
   ...TRANSPORTS_BASE,
-  [campMainnetChain.id]: http(CAMP_MAINNET.RPC_HTTP),
+  [campMainnetChain.id]: fallback([http(CAMP_MAINNET.RPC_HTTP), http(CAMP_MAINNET.RPC_HTTP_FALLBACK)]),
 } as const;
 
 // Wallet metadata must match the origin actually serving the app — a hardcoded

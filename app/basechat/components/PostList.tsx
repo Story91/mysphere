@@ -469,8 +469,8 @@ const EXPLORERS: Record<string, { name: string; txUrl: string; tokenUrl?: string
   },
   celo: {
     name: 'Celo Explorer',
-    txUrl: 'https://explorer.celo.org/tx/',
-    tokenUrl: 'https://explorer.celo.org/token/',
+    txUrl: 'https://celo.blockscout.com/tx/',
+    tokenUrl: 'https://celo.blockscout.com/token/',
   },
   ethereum: {
     name: 'Etherscan',
