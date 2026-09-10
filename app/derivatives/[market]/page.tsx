@@ -4,8 +4,8 @@ import { notFound } from 'next/navigation';
 import MarketDetail from './MarketDetail';
 
 export const metadata: Metadata = {
-  title: 'Rynek - Arc Derivatives',
-  description: 'Otworz long albo short na vAMM.',
+  title: 'Market - Arc Derivatives',
+  description: 'Open a long or short position on a vAMM market.',
 };
 
 export default function MarketPage({ params }: { params: { market: string } }) {

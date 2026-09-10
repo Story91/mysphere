@@ -3,7 +3,7 @@ import DerivativesBoard from './DerivativesBoard';
 
 export const metadata: Metadata = {
   title: 'Arc Derivatives',
-  description: 'Perpetualy na vAMM: wystaw feed z kaucja albo handluj z dzwignia.',
+  description: 'vAMM perpetuals: list a price feed with a bond, or trade one with leverage.',
 };
 
 export default function DerivativesPage() {
