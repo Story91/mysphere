@@ -2500,6 +2500,134 @@ export default function LaunchpadBoard() {
   }, [readClient]);
 
   /**
+   * NA ZYWO PO GRADUACJI.
+   *
+   * Watcher wyzej sluchał WYLACZNIE launchpada, a launchpad milknie w chwili
+   * graduacji - dalszy handel dzieje sie w PoolManagerze. Skutek: token,
+   * ktoremu sie udalo, znikal z tasmy zdarzen na zawsze. $SPHERE mial 10.09.2026
+   * ponad 2 500 swapow w puli i ani jednego wiersza na zywym pasku, wiec
+   * wygladal na martwy dokladnie wtedy, gdy byl najbardziej zywy.
+   *
+   * Tu nadrabiamy ten kawalek: dla zgraduowanych wierszy czytamy poolId ze
+   * skarbca (`positionOf`), a potem jeden watcher obejmuje wszystkie te pule
+   * naraz - viem robi z tablicy tematow filtr "albo-albo", wiec to jedna
+   * subskrypcja, nie jedna na token.
+   */
+  const graduatedKey = useMemo(
+    () =>
+      tokens
+        .filter((row) => row.state === 'Graduated' && row.address)
+        .map((row) => (row.address as string).toLowerCase())
+        .sort()
+        .join(','),
+    [tokens]
+  );
+
+  const [gradPools, setGradPools] = useState<Array<{ token: Address; poolId: `0x${string}` }>>([]);
+
+  useEffect(() => {
+    if (!readClient || !graduatedKey || !LIQUIDITY_VAULT_ADDRESS) {
+      setGradPools([]);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const out: Array<{ token: Address; poolId: `0x${string}` }> = [];
+      for (const address of graduatedKey.split(',') as Address[]) {
+        try {
+          const position = (await readClient.readContract({
+            address: LIQUIDITY_VAULT_ADDRESS as Address,
+            abi: liquidityVaultAbi,
+            functionName: 'positionOf',
+            args: [address],
+          })) as readonly [`0x${string}`, bigint, number, number];
+          const poolId = position[0];
+          if (/^0x[0-9a-fA-F]{64}$/.test(poolId) && !/^0x0+$/.test(poolId)) out.push({ token: address, poolId });
+        } catch {
+          // Token spoza tego wdrozenia albo lag wezla - nastepne odswiezenie
+          // tablicy sprobuje jeszcze raz.
+        }
+      }
+      if (!cancelled) setGradPools(out);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [readClient, graduatedKey]);
+
+  useEffect(() => {
+    if (!readClient || gradPools.length === 0) return;
+    const byPool = new Map(gradPools.map((entry) => [entry.poolId.toLowerCase(), entry.token]));
+
+    const unwatch = readClient.watchEvent({
+      address: ACTIVE_LAUNCHPAD_NETWORK.poolManager,
+      event: POOL_SWAP_EVENT,
+      args: { id: gradPools.map((entry) => entry.poolId) },
+      poll: LIVE_WATCH.poll,
+      pollingInterval: LIVE_WATCH.pollingInterval,
+      onError: () => {},
+      onLogs: (logs) => {
+        const fresh: ActivityItem[] = [];
+        for (const log of logs) {
+          const args = (log as unknown as { args?: Record<string, unknown> }).args ?? {};
+          const token = byPool.get(String(args.id ?? '').toLowerCase());
+          const amount0 = args.amount0 as bigint | undefined;
+          const sqrtPriceX96 = args.sqrtPriceX96 as bigint | undefined;
+          if (!token || amount0 === undefined) continue;
+
+          // Znaki delt sa z perspektywy swapujacego (zweryfikowane na zywym
+          // auto-burnie): amount0 < 0 = zaplacil ETH, czyli KUPIL token.
+          const isBuy = amount0 < 0n;
+          const eth = Number(formatEther(amount0 < 0n ? -amount0 : amount0));
+          const price =
+            sqrtPriceX96 === undefined ? null : Number(formatEther(poolPriceWeiFromSqrt(sqrtPriceX96, 18)));
+
+          fresh.push({
+            id: `${(log as unknown as { transactionHash?: string }).transactionHash ?? ''}-swap-${String((log as unknown as { logIndex?: number }).logIndex ?? 0)}`,
+            address: token,
+            symbol: shortAddress(token),
+            accent: accentFor(token),
+            // Etykieta mowi, ze to juz pula, a nie krzywa - inaczej dwa rozne
+            // rynki wygladalyby na tasmie identycznie.
+            label: isBuy ? 'Pool buy' : 'Pool sell',
+            eth,
+            tone: isBuy ? 'buy' : 'sell',
+          });
+
+          flashSeq.current += 1;
+          const seq = flashSeq.current;
+          setTokens((current) =>
+            current.map((row) => {
+              if (row.address?.toLowerCase() !== token.toLowerCase()) return row;
+              return {
+                ...row,
+                trades: (row.trades ?? 0) + 1,
+                volume: (row.volume ?? 0) + eth,
+                prices: price === null ? row.prices : [...(row.prices ?? []), price].slice(-12),
+                lastPrice: price ?? row.lastPrice,
+                lastTradeAt: Date.now(),
+                flash: { tone: isBuy ? 'buy' : 'sell', seq },
+              };
+            })
+          );
+        }
+
+        if (fresh.length === 0) return;
+        setActivityFeed((current) => {
+          const seen = new Set(current.map((item) => item.id));
+          const unique = fresh.filter((item) => !seen.has(item.id));
+          if (unique.length === 0) return current;
+          return [...unique.reverse(), ...current].slice(0, 24);
+        });
+      },
+    });
+
+    return () => {
+      unwatch();
+    };
+  }, [readClient, gradPools]);
+
+  /**
    * Logo tokenow z VERCEL BLOB (przez /api/startpad/logos), NIE z Firestore.
    * Firestore trzymal logo jako data-URL i egress zabijal darmowy limit; teraz
    * obrazki zyja na CDN Bloba, a to jest tylko mapa token->URL. Brak logo nie
