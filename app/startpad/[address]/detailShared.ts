@@ -243,10 +243,17 @@ export type PricePoint = { ts: number; price: number };
 export function toPricePoints(
   trades: TradeEntry[],
   startedAt: number,
-  mode: 'price' | 'mcap',
+  /**
+   * Mnoznik ceny jednego tokena. 1 = wykres ceny. Cala podaz = kapitalizacja
+   * w ETH. Cala podaz razy kurs ETH/USD = kapitalizacja w dolarach.
+   *
+   * Stalo tu wczesniej `mode: 'price' | 'mcap'`, a mnoznik powstawal w srodku.
+   * Kapitalizacji nie dalo sie przez to pokazac w dolarach, mimo ze kurs byl
+   * o dwie linijki wyzej - a kapitalizacja w ETH nie mowi nikomu nic.
+   */
+  scale: number,
   nowTs: number
 ): PricePoint[] {
-  const scale = mode === 'mcap' ? Number(SUPPLY_TOKENS) : 1;
   const points: PricePoint[] = [{ ts: startedAt, price: priceToNumber(START_PRICE_WEI) * scale }];
   let last = startedAt;
   for (const trade of trades) {

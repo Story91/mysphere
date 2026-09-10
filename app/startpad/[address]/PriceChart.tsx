@@ -135,9 +135,23 @@ export default function PriceChart({
   const nowMinute = Math.floor(Date.now() / 60_000) * 60;
   const hasPoolPoints = useMemo(() => trades.some((trade) => trade.ethReserveAfter === 0n), [trades]);
   const endTs = state === 'Graduated' && graduatedTs !== null && !hasPoolPoints ? graduatedTs : nowMinute;
+
+  /**
+   * KAPITALIZACJA IDZIE W DOLARACH.
+   *
+   * "26.27 ETH kapitalizacji" nie mowi nikomu nic - kazdy, kto siega po ten
+   * przelacznik, chce wiedziec, ile ten token jest wart w pieniadzu, ktory zna.
+   * Cena zostaje w ETH, bo tam liczy sie ruch wzgledem pary, a nie kwota.
+   *
+   * Gdy kurs ETH/USD jeszcze nie doszedl, kapitalizacja zostaje w ETH i tak
+   * jest podpisana - zaden ekran nie pokazuje liczby z niewiadoma jednostka.
+   */
+  const mcapInUsd = mode === 'mcap' && ethUsd !== null;
+  const scale = mode === 'mcap' ? Number(SUPPLY_TOKENS) * (ethUsd ?? 1) : 1;
+
   const points = useMemo(
-    () => toPricePoints(trades, startedAt, mode, endTs),
-    [trades, startedAt, mode, endTs]
+    () => toPricePoints(trades, startedAt, scale, endTs),
+    [trades, startedAt, scale, endTs]
   );
   const candles = useMemo(() => buildCandles(points, effInterval), [points, effInterval]);
   const linePoints = useMemo(() => buildLine(points), [points]);
@@ -153,7 +167,6 @@ export default function PriceChart({
         : lastPriceWei > 0n
           ? lastPriceWei
           : START_PRICE_WEI;
-  const scale = mode === 'mcap' ? Number(SUPPLY_TOKENS) : 1;
   const currentValue = priceToNumber(headWei) * scale;
   const multiple = Number(headWei) / Number(START_PRICE_WEI);
   const poolLive = state === 'Graduated' && (hasPoolPoints || lastPriceWei > 0n);
@@ -212,8 +225,10 @@ export default function PriceChart({
     // Ceny krzywej siegaja 7.5e-10 ETH; wbudowane formaty ucinalyby je do zera.
     const priceFormat = {
       type: 'custom' as const,
-      formatter: (value: number) => fmtPrice(value),
-      minMove: mode === 'mcap' ? 0.000001 : 1e-12,
+      // Os musi byc w tej samej jednostce, co naglowek - inaczej ktos czyta
+      // "28.00" jako dolary przy kapitalizacji podanej w ETH albo odwrotnie.
+      formatter: (value: number) => (mcapInUsd ? formatUsd(value) : fmtPrice(value)),
+      minMove: mcapInUsd ? 0.01 : mode === 'mcap' ? 0.000001 : 1e-12,
     };
     let series: ISeriesApi<'Candlestick'> | ISeriesApi<'Line'>;
     if (effStyle === 'candles') {
@@ -293,7 +308,10 @@ export default function PriceChart({
     const raf = requestAnimationFrame(applyRange);
     prevBars.current = bars;
     return () => cancelAnimationFrame(raf);
-  }, [ready, effStyle, mode, effInterval, candles, linePoints, graduatedTs]);
+    // `mcapInUsd` w zaleznosciach nie jest formalnoscia: kurs ETH/USD dochodzi
+    // asynchronicznie, wiec bez tego os zostawalaby w ETH u kazdego, kto
+    // otworzyl kapitalizacje przed odpowiedzia z kursem.
+  }, [ready, effStyle, mode, mcapInUsd, effInterval, candles, linePoints, graduatedTs]);
 
   return (
     <section className="rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
@@ -303,9 +321,24 @@ export default function PriceChart({
             {mode === 'mcap' ? 'Market cap' : state === 'Graduated' ? (poolLive ? 'Pool price' : 'Last curve price') : 'Price'}
           </p>
           <p className="mt-1 font-soft-display text-[26px] font-extrabold leading-none text-sp-ink">
-            {fmtPrice(currentValue)} <span className="text-[14px] text-sp-shade/40">{NATIVE_SYMBOL}</span>
-            {/* Sam wykres zostaje w jednostce natywnej - USD jest tylko dopiskiem. */}
-            {ethUsd !== null && <span className="ml-1.5 text-[13px] font-bold text-sp-shade/35">· {formatUsd(currentValue * ethUsd)}</span>}
+            {mcapInUsd ? (
+              <>
+                {formatUsd(currentValue)}
+                {/* Kapitalizacja prowadzi w dolarach, a ETH zostaje dopiskiem -
+                    odwrotnie niz przy cenie, gdzie liczy sie ruch wzgledem pary. */}
+                <span className="ml-1.5 text-[13px] font-bold text-sp-shade/35">
+                  · {fmtPrice(currentValue / (ethUsd as number))} {NATIVE_SYMBOL}
+                </span>
+              </>
+            ) : (
+              <>
+                {fmtPrice(currentValue)} <span className="text-[14px] text-sp-shade/40">{NATIVE_SYMBOL}</span>
+                {/* Wykres ceny zostaje w jednostce natywnej - USD jest dopiskiem. */}
+                {ethUsd !== null && (
+                  <span className="ml-1.5 text-[13px] font-bold text-sp-shade/35">· {formatUsd(currentValue * ethUsd)}</span>
+                )}
+              </>
+            )}
           </p>
           <p className="mt-1 text-[11px] font-bold text-sp-shade/45">
             {multiple >= 1 ? (
