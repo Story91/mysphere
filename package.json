@@ -36,6 +36,7 @@
     "launchpad:watch:sepolia": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run scripts/launchpad/watchFlow.ts --network base-sepolia",
     "launchpad:record:sepolia": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run scripts/launchpad/recordDeployment.ts --network base-sepolia",
     "launchpad:env": "ts-node scripts/launchpad/printEnv.ts",
+    "test:perps-math": "node scripts/test-perps-math.cjs",
     "launchpad:keeper:sepolia": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run scripts/launchpad/keeper.ts --network base-sepolia",
     "db:setup": "ts-node app/basemorning/scripts/setup-mongodb-indexes.ts",
     "db:indexes": "ts-node app/basemorning/scripts/setup-mongodb-indexes.ts",
