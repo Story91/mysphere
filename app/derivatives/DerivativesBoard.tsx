@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, LineChart, Plus, RefreshCw, ShieldCheck, Sprout } from 'lucide-react';
+import { AlertTriangle, LineChart, Plus, RefreshCw, ShieldCheck, Sprout, Timer } from 'lucide-react';
 import type { Address } from 'viem';
 import { usePublicClient } from 'wagmi';
 import { Badge } from '@/components/ui/badge';
@@ -19,13 +19,70 @@ import {
   insuranceAbi,
   marketAbi,
   oracleAbi,
-  type MarketRow,
 } from './config';
 import { fmtAge, fmtPrice, fmtSignedWad, fmtUsdc, fmtWadCompact, oiPercent, shortAddress } from './format';
 import CreateMarketModal from './CreateMarketModal';
+import PerpsGuide, { premiumBps } from './PerpsGuide';
+
+/**
+ * TABLICA RYNKOW - lista perpow, a nie lista adresow.
+ *
+ * ===========================================================================
+ * CO SIE ZMIENILO 10 WRZESNIA 2026
+ * ===========================================================================
+ * Wiersz pokazywal mark, index, OI i kaucje. Trader patrzacy na taka liste nie
+ * wiedzial trzech rzeczy, ktore na kazdej innej gieldzie perpow sa na wierzchu:
+ * ile wynosi PREMIA miedzy markiem a indeksem (czyli w ktora strone poleci
+ * funding), KIEDY ten funding sie rozliczy i kto komu zaplaci, oraz JAK ZDROWY
+ * jest feed, od ktorego zalezy caly index. Wszystkie te liczby kontrakt
+ * wystawia od poczatku - brakowalo tylko drogi do ekranu.
+ *
+ * ===========================================================================
+ * MULTICALL, NIE PETLA
+ * ===========================================================================
+ * Poprzednia wersja robila ~7 osobnych `readContract` na rynek, sekwencyjnie.
+ * Teraz wiersz potrzebuje 12 odczytow, wiec przy kilkunastu rynkach to bylyby
+ * setki zapytan, a Arc limituje. Multicall3 jest w definicji lancucha, wiec
+ * caly ekran mieszci sie w TRZECH zapytaniach niezaleznie od liczby rynkow.
+ *
+ * ===========================================================================
+ * `null` ZNACZY "NIE WIEM", ZERO ZNACZY ZERO
+ * ===========================================================================
+ * Dlatego wiersz NIE uzywa `MarketRow` z `config.ts`, tylko wlasnego typu z
+ * polami dopuszczajacymi `null`. W tym module zero to prawdziwa wartosc -
+ * "rynek sciety" ma cap OI dokladnie zero - wiec podstawienie zera za nieudany
+ * odczyt bylo by klamstwem nie do odroznienia od prawdy. Nieudany odczyt
+ * rysuje sie jako kreska z tytulem, nigdy jako liczba.
+ */
+type Row = {
+  id: number;
+  address: Address;
+  symbol: string;
+  creator: Address;
+  /* vAMM */
+  markPrice: bigint | null;
+  indexPrice: bigint | null;
+  openInterest: bigint | null;
+  maxOpenInterest: bigint | null;
+  netSize: bigint | null;
+  mature: boolean | null;
+  /* funding */
+  lastFundingAt: number | null;
+  fundingInterval: number | null;
+  maxPremiumBps: number | null;
+  /* feed */
+  bond: bigint | null;
+  createdAt: number | null;
+  updateCount: number | null;
+  challengesOpened: number | null;
+  frozen: boolean;
+  slashed: boolean;
+  priceUpdatedAt: number | null;
+  feedActive: boolean | null;
+};
 
 /** Zdrowie funduszu - to samo pole, co decyduje o globalnej pauzie. */
-type Health = { balance: bigint; required: bigint; paused: boolean } | null;
+type Health = { balance: bigint | null; required: bigint | null; paused: boolean | null } | null;
 
 /** Jeden wpis aktywnosci ZE WSZYSTKICH rynkow naraz - realne logi, nie zmyslone. */
 type ActivityItem =
@@ -33,14 +90,66 @@ type ActivityItem =
   | { kind: 'closed'; symbol: string; market: Address; trader: Address; exitNotional: bigint; pnl: bigint; block: bigint; txHash: string; at: number }
   | { kind: 'liquidated'; symbol: string; market: Address; trader: Address; keeper: Address; payoutUsdc: bigint; block: bigint; txHash: string; at: number };
 
+const ZERO = '0x0000000000000000000000000000000000000000';
+
+/** Wynik jednego wywolania z multicalla: sukces albo NIC. Nigdy zero. */
+const ok = (r: unknown): unknown => {
+  const x = r as { status?: string; result?: unknown } | undefined;
+  return x && x.status === 'success' ? x.result : null;
+};
+const big = (r: unknown): bigint | null => (r == null ? null : (r as bigint));
+const num = (r: unknown): number | null => (r == null ? null : Number(r as bigint | number));
+
+/** Odliczanie do rozliczenia fundingu. Ujemne = zalega i kazdy moze je odpalic. */
+function fmtCountdown(seconds: number): string {
+  if (seconds <= 0) return 'due';
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  if (m >= 60) return `${Math.floor(m / 60)}h ${m % 60}m`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+/** Nieudany odczyt ma wygladac jak brak odczytu, a nie jak liczba. */
+function Missing() {
+  return (
+    <span className="text-sp-ink-soft" title="This value could not be read from the contract">
+      &mdash;
+    </span>
+  );
+}
+
+function Stat({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-[16px] border border-sp-shade/10 bg-sp-surface px-4 py-3">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-sp-ink-soft">{label}</p>
+      <div className="mt-0.5 text-lg font-bold tabular-nums text-sp-ink">{children}</div>
+    </div>
+  );
+}
+
+/** Podpis komorki, widoczny tylko na waskim ekranie - na szerokim jest naglowek. */
+function CellLabel({ children }: { children: string }) {
+  return <p className="text-[10px] font-semibold uppercase tracking-wide text-sp-ink-soft lg:hidden">{children}</p>;
+}
+
 export default function DerivativesBoard() {
   const client = usePublicClient({ chainId: DERIV_CHAIN.id });
-  const [rows, setRows] = useState<MarketRow[]>([]);
+  const [rows, setRows] = useState<Row[]>([]);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [health, setHealth] = useState<Health>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
+  const guideRef = useRef<HTMLDivElement | null>(null);
+
+  // Zegar odliczania do fundingu. Sekunda wystarczy - rynek i tak rozlicza sie
+  // co godzine, a szybszy interwal to tylko przerysowania.
+  useEffect(() => {
+    const t = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1_000);
+    return () => clearInterval(t);
+  }, []);
 
   const load = useCallback(async () => {
     if (!client || !DEPLOYED) {
@@ -50,66 +159,100 @@ export default function DerivativesBoard() {
     setLoading(true);
     setError(null);
     try {
-      const insurance = (await client.readContract({
-        address: FACTORY_ADDRESS,
-        abi: factoryAbi,
-        functionName: 'INSURANCE',
-      })) as Address;
+      // Zapytanie 1: adres funduszu i liczba feedow w rejestrze.
+      const head1 = await client.multicall({
+        contracts: [
+          { address: FACTORY_ADDRESS, abi: factoryAbi, functionName: 'INSURANCE' },
+          { address: ORACLE_ADDRESS, abi: oracleAbi, functionName: 'marketCount' },
+        ] as never,
+        allowFailure: true,
+      });
+      const insurance = ok(head1[0]) as Address | null;
+      const count = Number((ok(head1[1]) as bigint | null) ?? 0n);
+      if (insurance == null) throw new Error('The factory did not return an insurance fund address.');
 
-      const [balance, required, paused] = (await Promise.all([
-        client.readContract({ address: insurance, abi: insuranceAbi, functionName: 'balance' }),
-        client.readContract({ address: insurance, abi: insuranceAbi, functionName: 'requiredBalance' }),
-        client.readContract({ address: insurance, abi: insuranceAbi, functionName: 'newPositionsPaused' }),
-      ])) as [bigint, bigint, boolean];
-      setHealth({ balance, required, paused });
+      // Zapytanie 2: ktory feed ma juz vAMM. Rejestr numeruje od jedynki, a
+      // rynek istnieje tylko dla czesci feedow - stad odsiew adresow zerowych.
+      const ids = Array.from({ length: count }, (_, i) => BigInt(i + 1));
+      const addrRes = ids.length
+        ? await client.multicall({
+            contracts: ids.map((id) => ({
+              address: FACTORY_ADDRESS,
+              abi: factoryAbi,
+              functionName: 'marketOf',
+              args: [id],
+            })) as never,
+            allowFailure: true,
+          })
+        : [];
+      const live = ids
+        .map((id, i) => ({ id: Number(id), address: ok(addrRes[i]) as Address | null }))
+        .filter((m): m is { id: number; address: Address } => m.address != null && m.address !== ZERO);
 
-      // Rynki numerowane sa w REJESTRZE (od 1), a vAMM istnieje tylko dla
-      // niektorych feedow - stad przejscie przez `marketOf` i odsianie zer.
-      const count = Number(
-        (await client.readContract({ address: ORACLE_ADDRESS, abi: oracleAbi, functionName: 'marketCount' })) as bigint,
-      );
+      // Zapytanie 3: WSZYSTKO pozostale naraz - fundusz plus 12 odczytow na
+      // rynek. Kolejnosc jest tu kontraktem miedzy budowaniem a odczytem, wiec
+      // liczba `PER_MARKET` i lista ponizej musza sie zgadzac co do jednego.
+      const PER_MARKET = 12;
+      const marketCalls = live.flatMap(({ id, address }) => [
+        { address, abi: marketAbi, functionName: 'markPrice' },
+        { address, abi: marketAbi, functionName: 'indexPrice' },
+        { address, abi: marketAbi, functionName: 'openInterestNotional' },
+        { address, abi: marketAbi, functionName: 'maxOpenInterest' },
+        { address, abi: marketAbi, functionName: 'isMature' },
+        { address, abi: marketAbi, functionName: 'netSize' },
+        { address, abi: marketAbi, functionName: 'lastFundingAt' },
+        { address, abi: marketAbi, functionName: 'FUNDING_INTERVAL' },
+        { address, abi: marketAbi, functionName: 'MAX_PREMIUM_BPS' },
+        { address: ORACLE_ADDRESS, abi: oracleAbi, functionName: 'getMarket', args: [BigInt(id)] },
+        { address: ORACLE_ADDRESS, abi: oracleAbi, functionName: 'marketStats', args: [BigInt(id)] },
+        { address: ORACLE_ADDRESS, abi: oracleAbi, functionName: 'isActive', args: [BigInt(id)] },
+      ]);
+      const res = await client.multicall({
+        contracts: [
+          { address: insurance, abi: insuranceAbi, functionName: 'balance' },
+          { address: insurance, abi: insuranceAbi, functionName: 'requiredBalance' },
+          { address: insurance, abi: insuranceAbi, functionName: 'newPositionsPaused' },
+          ...marketCalls,
+        ] as never,
+        allowFailure: true,
+      });
 
-      const collected: MarketRow[] = [];
-      for (let id = 1; id <= count; id++) {
-        const address = (await client.readContract({
-          address: FACTORY_ADDRESS,
-          abi: factoryAbi,
-          functionName: 'marketOf',
-          args: [BigInt(id)],
-        })) as Address;
-        if (address === '0x0000000000000000000000000000000000000000') continue;
+      setHealth({
+        balance: big(ok(res[0])),
+        required: big(ok(res[1])),
+        paused: ok(res[2]) == null ? null : Boolean(ok(res[2])),
+      });
 
-        const [meta, stats] = (await Promise.all([
-          client.readContract({ address: ORACLE_ADDRESS, abi: oracleAbi, functionName: 'getMarket', args: [BigInt(id)] }),
-          client.readContract({ address: ORACLE_ADDRESS, abi: oracleAbi, functionName: 'marketStats', args: [BigInt(id)] }),
-        ])) as [readonly any[], readonly any[]];
-
-        const [mark, index, oi, cap, mature] = (await Promise.all([
-          client.readContract({ address, abi: marketAbi, functionName: 'markPrice' }),
-          client.readContract({ address, abi: marketAbi, functionName: 'indexPrice' }),
-          client.readContract({ address, abi: marketAbi, functionName: 'openInterestNotional' }),
-          client.readContract({ address, abi: marketAbi, functionName: 'maxOpenInterest' }),
-          client.readContract({ address, abi: marketAbi, functionName: 'isMature' }),
-        ])) as [bigint, bigint, bigint, bigint, boolean];
-
-        collected.push({
+      const collected: Row[] = live.map(({ id, address }, i) => {
+        const at = (offset: number) => ok(res[3 + i * PER_MARKET + offset]);
+        const meta = at(9) as readonly unknown[] | null;
+        const stats = at(10) as readonly unknown[] | null;
+        return {
           id,
           address,
-          symbol: meta[2] as string,
-          creator: meta[0] as Address,
-          markPrice: mark,
-          indexPrice: index,
-          openInterest: oi,
-          maxOpenInterest: cap,
-          bond: stats[0] as bigint,
-          createdAt: Number(stats[1]),
-          updateCount: Number(stats[2]),
-          challengesOpened: Number(stats[3]),
-          frozen: stats[4] as boolean,
-          slashed: stats[5] as boolean,
-          mature,
-        });
-      }
+          symbol: (meta?.[2] as string) ?? shortAddress(address),
+          creator: (meta?.[0] as Address) ?? ZERO,
+          markPrice: big(at(0)),
+          indexPrice: big(at(1)),
+          openInterest: big(at(2)),
+          maxOpenInterest: big(at(3)),
+          mature: at(4) == null ? null : Boolean(at(4)),
+          netSize: big(at(5)),
+          lastFundingAt: num(at(6)),
+          fundingInterval: num(at(7)),
+          maxPremiumBps: num(at(8)),
+          // Kaucja i kartoteka feedu; `frozen`/`slashed` domyslnie falsz, bo
+          // ostrzezenie, ktorego nie potwierdzil odczyt, tez jest klamstwem.
+          bond: stats ? (stats[0] as bigint) : null,
+          createdAt: stats ? Number(stats[1]) : null,
+          updateCount: stats ? Number(stats[2]) : null,
+          challengesOpened: stats ? Number(stats[3]) : null,
+          frozen: stats ? Boolean(stats[4]) : false,
+          slashed: stats ? Boolean(stats[5]) : false,
+          priceUpdatedAt: meta ? Number(meta[4]) : null,
+          feedActive: at(11) == null ? null : Boolean(at(11)),
+        };
+      });
       setRows(collected);
 
       // Aktywnosc ze WSZYSTKICH rynkow naraz - realne logi PositionOpened/
@@ -186,6 +329,15 @@ export default function DerivativesBoard() {
     void load();
   }, [load]);
 
+  // Rynek, z ktorego wyjasnienie czyta stale kontraktu. Wystarczy pierwszy -
+  // stale sa te same we wszystkich instancjach, a odczyt z zywego rynku jest
+  // uczciwszy od wpisania ich w kod.
+  const guideMarket = rows[0];
+
+  // Suma OI liczy sie tylko z rynkow, ktore FAKTYCZNIE oddaly liczbe.
+  const oiRead = rows.filter((r) => r.openInterest != null);
+  const totalOi = oiRead.reduce((sum, r) => sum + (r.openInterest as bigint), 0n);
+
   return (
     <div className="sphere-shell sph-stagger mx-auto w-full max-w-6xl px-4 py-8">
       <header className="mb-7 flex flex-wrap items-end justify-between gap-4">
@@ -238,15 +390,16 @@ export default function DerivativesBoard() {
 
       {/* Pauza globalna dotyczy WSZYSTKICH rynkow naraz - musi byc widoczna
           na tablicy, a nie dopiero przy nieudanej transakcji. */}
-      {health?.paused && (
+      {health?.paused === true && (
         <Card className="mb-6 rounded-[18px] border-destructive/40 bg-destructive/5">
           <CardContent className="flex items-start gap-3 py-4 text-sm">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
             <div>
               <p className="font-semibold text-destructive">New positions are paused across the module</p>
               <p className="mt-1 text-sp-ink-soft">
-                The insurance fund holds {fmtUsdc(health.balance)} against {fmtUsdc(health.required)} required for the
-                current open interest. Closing positions and liquidations still work normally.
+                The insurance fund holds {health.balance != null ? fmtUsdc(health.balance) : 'an amount it would not report'}{' '}
+                against {health.required != null ? fmtUsdc(health.required) : 'an unreadable requirement'} required for
+                the current open interest. Closing positions and liquidations still work normally.
               </p>
             </div>
           </CardContent>
@@ -255,22 +408,32 @@ export default function DerivativesBoard() {
 
       {DEPLOYED && (
         <div className="mb-5 flex flex-wrap items-center gap-2">
-          {health && !health.paused && (
+          {health && health.paused === false && (
             <div className="inline-flex items-center gap-2 rounded-full border border-sp-shade/10 bg-sp-surface py-1.5 pl-1.5 pr-3.5 text-xs shadow-chip">
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-sp-brand-soft text-sp-brand-deep">
                 <ShieldCheck className="h-3.5 w-3.5" />
               </span>
               <span className="text-sp-ink-soft">Insurance fund</span>
-              <span className="font-bold tabular-nums text-sp-ink">{fmtUsdc(health.balance)}</span>
-              <span className="text-sp-ink-soft">/ {fmtUsdc(health.required)} required</span>
+              <span className="font-bold tabular-nums text-sp-ink">
+                {health.balance != null ? fmtUsdc(health.balance) : <Missing />}
+              </span>
+              <span className="text-sp-ink-soft">
+                / {health.required != null ? fmtUsdc(health.required) : '?'} required
+              </span>
             </div>
           )}
-          <Link
-            href="/how#arc-derivatives"
+          {/* Bylo tu `/how#arc-derivatives` - strona o LAUNCHPADZIE. Wyjasnienie
+              perpow mieszka teraz w tym module i otwiera sie na miejscu. */}
+          <button
+            type="button"
+            onClick={() => {
+              setGuideOpen(true);
+              guideRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}
             className="inline-flex items-center rounded-full border border-sp-shade/10 bg-sp-surface px-3.5 py-1.5 text-xs font-semibold text-sp-ink-soft hover:text-sp-brand-deep"
           >
-            How it works
-          </Link>
+            How perps work
+          </button>
           <a
             href={`${DERIV_CHAIN.blockExplorers?.default.url}/address/${FACTORY_ADDRESS}`}
             target="_blank"
@@ -315,96 +478,228 @@ export default function DerivativesBoard() {
       )}
 
       {rows.length > 0 && (
-        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <div className="rounded-[16px] border border-sp-shade/10 bg-sp-surface px-4 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-sp-ink-soft">Markets</p>
-            <p className="mt-0.5 text-lg font-bold tabular-nums text-sp-ink">{rows.length}</p>
-          </div>
-          <div className="rounded-[16px] border border-sp-shade/10 bg-sp-surface px-4 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-sp-ink-soft">Total open interest</p>
-            <p className="mt-0.5 text-lg font-bold tabular-nums text-sp-ink">
-              {fmtWadCompact(rows.reduce((sum, r) => sum + r.openInterest, 0n))}
-            </p>
-          </div>
-          <div className="rounded-[16px] border border-sp-shade/10 bg-sp-surface px-4 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-sp-ink-soft">Mature markets</p>
-            <p className="mt-0.5 text-lg font-bold tabular-nums text-sp-ink">{rows.filter((r) => r.mature).length}</p>
-          </div>
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Stat label="Markets">{rows.length}</Stat>
+          <Stat label="Total open interest">
+            {oiRead.length === rows.length ? (
+              fmtWadCompact(totalOi)
+            ) : oiRead.length === 0 ? (
+              <Missing />
+            ) : (
+              <span title={`${rows.length - oiRead.length} market(s) did not report open interest`}>
+                {fmtWadCompact(totalOi)}
+                <span className="text-sp-ink-soft">*</span>
+              </span>
+            )}
+          </Stat>
+          <Stat label="Mature markets">{rows.filter((r) => r.mature === true).length}</Stat>
+          <Stat label="Fund coverage">
+            {health?.balance != null && health.required != null ? (
+              health.required === 0n ? (
+                <span className="text-emerald-600">no cover needed</span>
+              ) : (
+                <span className={health.balance < health.required ? 'text-destructive' : 'text-emerald-600'}>
+                  {(Number((health.balance * 1000n) / health.required) / 10).toFixed(1)}%
+                </span>
+              )
+            ) : (
+              <Missing />
+            )}
+          </Stat>
         </div>
       )}
 
       {rows.length > 0 && (
         <div className="overflow-hidden rounded-[18px] border border-sp-shade/10 bg-sp-surface">
-          {/* Naglowek kolumn - tylko od md w gore, na telefonie kazdy wiersz
-              sam podpisuje swoje wartosci. */}
-          <div className="hidden grid-cols-[2fr_1fr_1fr_1.3fr_1fr] gap-4 border-b border-sp-shade/10 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-sp-ink-soft md:grid">
+          {/* Naglowek kolumn - tylko od lg w gore, nizej kazda komorka podpisuje
+              sie sama. Siedem kolumn nie miesci sie uczciwie na telefonie. */}
+          <div className="hidden grid-cols-[1.7fr_1fr_1fr_0.8fr_0.9fr_1.4fr_1.2fr] gap-4 border-b border-sp-shade/10 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-sp-ink-soft lg:grid">
             <span>Market</span>
-            <span className="text-right">Mark price</span>
-            <span className="text-right">Index price</span>
-            <span>Open interest</span>
-            <span className="text-right">Bond</span>
+            <span className="text-right">Mark</span>
+            <span className="text-right">Index</span>
+            <span className="text-right">Premium</span>
+            <span className="text-right">Funding</span>
+            <span>Open interest &amp; skew</span>
+            <span>Feed</span>
           </div>
           <div>
             {rows.map((row) => {
-              const pct = oiPercent(row.openInterest, row.maxOpenInterest);
+              const pct =
+                row.openInterest != null && row.maxOpenInterest != null
+                  ? oiPercent(row.openInterest, row.maxOpenInterest)
+                  : null;
+              const prem = premiumBps(row.markPrice, row.indexPrice);
+              const capped = prem != null && row.maxPremiumBps != null && Math.abs(prem) > row.maxPremiumBps;
+              const dueIn =
+                row.lastFundingAt != null && row.fundingInterval != null
+                  ? row.lastFundingAt + row.fundingInterval - now
+                  : null;
+              // Przechyl w DOLARACH: |netSize| razy mark. Sam netSize jest w
+              // jednostkach bazowych i nikomu nic nie mowi.
+              const netNotional =
+                row.netSize != null && row.markPrice != null
+                  ? ((row.netSize < 0n ? -row.netSize : row.netSize) * row.markPrice) / 10n ** 18n
+                  : null;
+              const skewPct =
+                netNotional != null && row.openInterest != null && row.openInterest > 0n
+                  ? Math.min(100, Number((netNotional * 100n) / row.openInterest))
+                  : null;
+              const isLongSkew = row.netSize != null && row.netSize > 0n;
+              const feedStale = row.feedActive === false;
+
               return (
                 <Link
                   key={row.address}
                   href={`/derivatives/${row.address}`}
-                  className="grid grid-cols-2 gap-4 border-b border-sp-shade/10 px-4 py-3.5 transition-colors last:border-b-0 hover:bg-sp-hover md:grid-cols-[2fr_1fr_1fr_1.3fr_1fr] md:items-center"
+                  className="grid grid-cols-2 gap-x-4 gap-y-3 border-b border-sp-shade/10 px-4 py-3.5 transition-colors last:border-b-0 hover:bg-sp-hover lg:grid-cols-[1.7fr_1fr_1fr_0.8fr_0.9fr_1.4fr_1.2fr] lg:items-center lg:gap-y-0"
                 >
-                  <div className="col-span-2 md:col-span-1">
-                    <div className="flex items-center gap-2">
+                  <div className="col-span-2 lg:col-span-1">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="font-bold text-sp-ink">{row.symbol}</span>
                       {row.slashed ? (
                         <Badge variant="destructive" className="rounded-full">slashed</Badge>
                       ) : row.frozen ? (
                         <Badge variant="destructive" className="rounded-full">frozen</Badge>
-                      ) : row.mature ? (
+                      ) : row.mature === true ? (
                         <Badge className="gap-1 rounded-full border-transparent bg-sp-brand-soft text-sp-brand-deep hover:bg-sp-brand-soft">
                           <ShieldCheck className="h-3 w-3" />
                           mature
                         </Badge>
-                      ) : (
+                      ) : row.mature === false ? (
                         <Badge variant="outline" className="gap-1 rounded-full border-sp-shade/15 text-sp-ink-soft">
                           <Sprout className="h-3 w-3" />
                           probation
                         </Badge>
+                      ) : null}
+                      {feedStale && !row.slashed && !row.frozen && (
+                        <Badge variant="outline" className="rounded-full border-amber-500/40 text-amber-600">
+                          stale feed
+                        </Badge>
                       )}
                     </div>
                     <p className="mt-1 text-xs text-sp-ink-soft">
-                      {fmtAge(row.createdAt)} old &middot; {row.updateCount} prices &middot; creator{' '}
-                      {shortAddress(row.creator)}
+                      {row.createdAt != null ? `${fmtAge(row.createdAt)} old` : 'age unknown'} &middot;{' '}
+                      {row.updateCount != null ? `${row.updateCount} prices` : 'price count unknown'} &middot; creator{' '}
+                      {row.creator === ZERO ? <Missing /> : shortAddress(row.creator)}
                     </p>
                   </div>
 
-                  <div className="md:text-right">
-                    <p className="text-[11px] text-sp-ink-soft md:hidden">Mark price</p>
-                    <p className="font-semibold tabular-nums text-sp-ink">{fmtPrice(row.markPrice)}</p>
+                  <div className="lg:text-right">
+                    <CellLabel>Mark</CellLabel>
+                    <p className="font-semibold tabular-nums text-sp-ink">
+                      {row.markPrice != null ? fmtPrice(row.markPrice) : <Missing />}
+                    </p>
                   </div>
-                  <div className="md:text-right">
-                    <p className="text-[11px] text-sp-ink-soft md:hidden">Index price</p>
-                    <p className="font-semibold tabular-nums text-sp-ink">{fmtPrice(row.indexPrice)}</p>
+                  <div className="lg:text-right">
+                    <CellLabel>Index</CellLabel>
+                    <p className="font-semibold tabular-nums text-sp-ink">
+                      {row.indexPrice != null ? fmtPrice(row.indexPrice) : <Missing />}
+                    </p>
                   </div>
-                  <div className="col-span-2 md:col-span-1">
+
+                  {/* Premia to jedyna liczba, ktora mowi, w ktora strone poleci
+                      funding - dlatego stoi obok cen, a nie w szczegolach. */}
+                  <div className="lg:text-right">
+                    <CellLabel>Premium</CellLabel>
+                    {prem == null ? (
+                      <Missing />
+                    ) : (
+                      <p
+                        className={`font-semibold tabular-nums ${prem > 0 ? 'text-emerald-600' : prem < 0 ? 'text-red-600' : 'text-sp-ink'}`}
+                        title={capped ? 'Beyond the funding premium cap, so funding uses the capped rate' : undefined}
+                      >
+                        {prem >= 0 ? '+' : '-'}
+                        {(Math.abs(prem) / 100).toFixed(2)}%{capped ? '*' : ''}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="lg:text-right">
+                    <CellLabel>Funding</CellLabel>
+                    {dueIn == null ? (
+                      <Missing />
+                    ) : (
+                      <>
+                        <p className="inline-flex items-center gap-1 font-semibold tabular-nums text-sp-ink lg:justify-end">
+                          <Timer className="h-3 w-3 text-sp-ink-soft" />
+                          {fmtCountdown(dueIn)}
+                        </p>
+                        <p className="text-[11px] text-sp-ink-soft">
+                          {prem == null ? '' : prem > 0 ? 'longs pay' : prem < 0 ? 'shorts pay' : 'flat'}
+                        </p>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="col-span-2 lg:col-span-1">
+                    <CellLabel>Open interest</CellLabel>
                     <p className="text-[11px] text-sp-ink-soft">
-                      {fmtWadCompact(row.openInterest)} / {fmtWadCompact(row.maxOpenInterest)}
+                      {row.openInterest != null ? fmtWadCompact(row.openInterest) : <Missing />} /{' '}
+                      {row.maxOpenInterest != null ? fmtWadCompact(row.maxOpenInterest) : <Missing />}
+                      {pct != null && <span className="ml-1 tabular-nums">({pct.toFixed(0)}%)</span>}
                     </p>
                     <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-sp-shade/[0.07]">
-                      <div
-                        className={`h-full rounded-full ${pct > 85 ? 'bg-destructive' : 'bg-sp-brand'}`}
-                        style={{ width: `${pct}%` }}
-                      />
+                      {pct != null && (
+                        <div
+                          className={`h-full rounded-full ${pct > 85 ? 'bg-destructive' : 'bg-sp-brand'}`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      )}
                     </div>
+                    <p className="mt-1 text-[11px] text-sp-ink-soft">
+                      {row.netSize == null ? (
+                        <>net skew <Missing /></>
+                      ) : row.netSize === 0n ? (
+                        <>net skew balanced</>
+                      ) : (
+                        <>
+                          net{' '}
+                          <span className={isLongSkew ? 'font-semibold text-emerald-600' : 'font-semibold text-red-600'}>
+                            {isLongSkew ? 'LONG' : 'SHORT'}
+                          </span>{' '}
+                          {netNotional != null ? fmtWadCompact(netNotional) : ''}
+                          {skewPct != null ? ` (${skewPct}% of OI)` : ''}
+                        </>
+                      )}
+                    </p>
                   </div>
-                  <div className="md:text-right">
-                    <p className="text-[11px] text-sp-ink-soft md:hidden">Bond</p>
-                    <p className="font-semibold tabular-nums text-sp-ink">{fmtUsdc(row.bond)}</p>
+
+                  {/* Zdrowie feedu na liscie, a nie dopiero na stronie rynku:
+                      przy tym modelu oracle to jest ryzyko numer jeden. */}
+                  <div className="col-span-2 lg:col-span-1">
+                    <CellLabel>Feed</CellLabel>
+                    <p className="font-semibold tabular-nums text-sp-ink">
+                      {row.bond != null ? `${fmtUsdc(row.bond)} bond` : <Missing />}
+                    </p>
+                    <p className="text-[11px] text-sp-ink-soft">
+                      {row.priceUpdatedAt != null ? (
+                        <span className={feedStale ? 'text-amber-600' : undefined}>
+                          priced {fmtAge(row.priceUpdatedAt)} ago
+                        </span>
+                      ) : (
+                        <>priced <Missing /></>
+                      )}
+                      {row.challengesOpened != null && row.challengesOpened > 0 && (
+                        <span className="text-amber-600"> &middot; {row.challengesOpened} challenged</span>
+                      )}
+                    </p>
                   </div>
                 </Link>
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* Wyjasnienie perpow - w module, nie na stronie produktowej. */}
+      {DEPLOYED && (
+        <div ref={guideRef} className="mt-4 scroll-mt-4">
+          <PerpsGuide
+            market={guideMarket?.address}
+            symbol={guideMarket?.symbol}
+            open={guideOpen}
+            onOpenChange={setGuideOpen}
+          />
         </div>
       )}
 
@@ -468,7 +763,7 @@ export default function DerivativesBoard() {
       )}
 
       {DEPLOYED && (
-        <details className="mt-8 rounded-[16px] border border-sp-shade/10 bg-sp-surface px-4 py-3 text-xs">
+        <details className="mt-4 rounded-[16px] border border-sp-shade/10 bg-sp-surface px-4 py-3 text-xs">
           <summary className="cursor-pointer font-semibold text-sp-ink-soft">Deployed contracts (Arc testnet)</summary>
           <dl className="mt-3 grid gap-2">
             {[
@@ -478,12 +773,12 @@ export default function DerivativesBoard() {
             ].map((c) => (
               <div key={c.address} className="flex flex-wrap items-center justify-between gap-2">
                 <dt className="text-sp-ink-soft">{c.name}</dt>
-                <dd>
+                <dd className="min-w-0">
                   <a
                     href={`${DERIV_CHAIN.blockExplorers?.default.url}/address/${c.address}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="font-mono tabular-nums text-sp-brand-deep hover:underline"
+                    className="block break-all font-mono tabular-nums text-sp-brand-deep hover:underline"
                   >
                     {c.address}
                   </a>
@@ -497,6 +792,7 @@ export default function DerivativesBoard() {
       <CreateMarketModal
         open={createOpen}
         onOpenChange={setCreateOpen}
+        referenceMarket={guideMarket?.address}
         onCreated={() => {
           setCreateOpen(false);
           void load();
