@@ -689,6 +689,14 @@ type ActivityItem = {
   pending?: boolean;
   /** Hasz wlasnej transakcji - po nim rozpoznajemy jej zdarzenie. */
   txHash?: string;
+  /**
+   * Skad wziety. `pool` = swap w puli v4, czyli wiersz, ktorego skan tablicy
+   * NIE UMIE odtworzyc (skanuje launchpad, a ten milczy po graduacji).
+   * `loadBoard` podmienia cala tasme na wynik skanu, wiec bez tego znacznika
+   * kazde odswiezenie kasowalo swiezo zlapane transakcje z puli - pojawialy
+   * sie na chwile i znikaly.
+   */
+  source?: 'pool';
 };
 
 /**
@@ -1412,7 +1420,39 @@ export default function LaunchpadBoard() {
   // render pokazywal probki na sekunde, zanim skan dogonil prawde - wygladalo
   // to jak stare dane. Probki wchodza dopiero, gdy UKONCZONY skan nic nie da.
   const [tokens, setTokens] = useState<BoardToken[]>([]);
+
+  /**
+   * Aktualna lista tokenow w refie. Subskrypcje (`onLogs`) zyja w domknieciu
+   * z chwili zalozenia, wiec czytanie z nich `tokens` dawaloby stan sprzed
+   * zaladowania tablicy - stad wiersze z puli pokazywaly `0xb200...2476`
+   * zamiast `SPHERE`.
+   */
+  const tokensRef = useRef<BoardToken[]>([]);
+  useEffect(() => {
+    tokensRef.current = tokens;
+  }, [tokens]);
+
+  const symbolOf = useCallback(
+    (address: string) =>
+      tokensRef.current.find((row) => row.address?.toLowerCase() === address.toLowerCase())?.symbol ??
+      shortAddress(address),
+    []
+  );
   const [activityFeed, setActivityFeed] = useState<ActivityItem[]>([]);
+
+  /**
+   * Podmiana tasmy z zachowaniem wierszy, ktorych skan nie zna. Wiersze z puli
+   * ida na przod: trafiaja tu wylacznie z subskrypcji na zywo, wiec w chwili
+   * podmiany sa najswiezszym, co mamy.
+   */
+  const replaceFeed = useCallback((next: ActivityItem[]) => {
+    setActivityFeed((current) => {
+      const fromPool = current.filter((item) => item.source === 'pool');
+      if (fromPool.length === 0) return next.slice(0, 24);
+      const seen = new Set(fromPool.map((item) => item.id));
+      return [...fromPool, ...next.filter((item) => !seen.has(item.id))].slice(0, 24);
+    });
+  }, []);
   const [topEarners, setTopEarners] = useState<CreatorEarnings[]>([]);
   // Kurs ETH/USD do dopiskow. Null przy braku danych - wtedy dopiski znikaja,
   // a ETH zostaje jedyna (i zawsze prawdziwa) wartoscia na ekranie.
@@ -1716,7 +1756,7 @@ export default function LaunchpadBoard() {
       setScanTruncated(!trustworthy);
 
       if (launched.size === 0) {
-        setActivityFeed([]);
+        replaceFeed([]);
         // Nie ZRZUCAJ dobrego stanu na mocki przy pustym skanie (chwilowa awaria
         // RPC). Podglad tylko gdy naprawde nic nie mamy.
         setTokens((current) => (current.some((token) => token.live) ? current : previewTokens));
@@ -1724,7 +1764,7 @@ export default function LaunchpadBoard() {
         return;
       }
 
-      setActivityFeed(
+      replaceFeed(
         // Kopia przed sortowaniem: `feed` nalezy do agregatu, ktory przy
         // nieudanej delcie jest tym samym obiektem, co stan zapamietany.
         [...rawFeed]
@@ -1819,7 +1859,7 @@ export default function LaunchpadBoard() {
       });
 
       if (live.length === 0) {
-        setActivityFeed([]);
+        replaceFeed([]);
         setTokens((current) => (current.some((token) => token.live) ? current : previewTokens));
         setTopEarners([]);
         return;
@@ -2276,7 +2316,9 @@ export default function LaunchpadBoard() {
     } finally {
       setLoadingBoard(false);
     }
-  }, [readClient]);
+    // `replaceFeed` jest stabilne (useCallback z pusta lista), wiec nie
+    // przeladowuje tablicy - stoi tu, bo lint ma racje, ze jest uzywane.
+  }, [readClient, replaceFeed]);
 
   // MIGAWKA: przy wejsciu pokazujemy od razu ostatni znany stan (z logami)
   // z localStorage, a skan lancucha lecí w tle i aktualizuje. Koniec z pustym
@@ -2555,6 +2597,66 @@ export default function LaunchpadBoard() {
     };
   }, [readClient, graduatedKey]);
 
+  /**
+   * ZASIEW TASMY Z PULI. Subskrypcja nizej lapie tylko to, co wydarzy sie przy
+   * otwartej stronie - po odswiezeniu tasma znowu nie mialaby ani jednego
+   * wiersza zgraduowanego tokena i ten wygladalby na martwy, mimo ze pula
+   * chodzi. Dociagamy wiec ostatnie swapy z tej samej trasy, z ktorej korzysta
+   * strona tokena; odpowiedz jest w cache'u brzegowym, wiec to jedno zapytanie
+   * na wielu ogladajacych.
+   */
+  useEffect(() => {
+    if (gradPools.length === 0) return;
+    let cancelled = false;
+    void (async () => {
+      for (const entry of gradPools) {
+        try {
+          const query = new URLSearchParams({
+            chainId: String(ACTIVE_LAUNCHPAD_NETWORK.chain.id),
+            poolId: entry.poolId,
+            decimals: '18',
+            fromBlock: '0',
+          });
+          const response = await fetch(`/api/launchpad/pool-swaps?${query.toString()}`, {
+            signal: AbortSignal.timeout(15_000),
+          });
+          if (!response.ok || cancelled) continue;
+          const data = (await response.json()) as { swaps?: string[] };
+          const rows = Array.isArray(data.swaps) ? data.swaps.slice(-12) : [];
+          if (cancelled || rows.length === 0) continue;
+          const fresh: ActivityItem[] = [];
+          for (const row of rows.reverse()) {
+            // Kodowanie wspolne z historia krzywej: kind|account|eth|...|logIndex|ts|txHash
+            const parts = row.split('|');
+            if (parts.length < 10) continue;
+            const isBuy = parts[0] === 'b';
+            fresh.push({
+              id: `${parts[9]}-swap-${parts[7]}`,
+              address: entry.token,
+              symbol: symbolOf(entry.token),
+              accent: accentFor(entry.token),
+              label: isBuy ? 'Pool buy' : 'Pool sell',
+              eth: Number(formatEther(BigInt(parts[2]))),
+              tone: isBuy ? 'buy' : 'sell',
+              source: 'pool',
+            });
+          }
+          if (fresh.length === 0) continue;
+          setActivityFeed((current) => {
+            const seen = new Set(current.map((item) => item.id));
+            const unique = fresh.filter((item) => !seen.has(item.id));
+            return unique.length === 0 ? current : [...unique, ...current].slice(0, 24);
+          });
+        } catch {
+          // Zasiew jest wygoda, nie warunkiem - subskrypcja nizej dziala tak czy tak.
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [gradPools, symbolOf]);
+
   useEffect(() => {
     if (!readClient || gradPools.length === 0) return;
     const byPool = new Map(gradPools.map((entry) => [entry.poolId.toLowerCase(), entry.token]));
@@ -2585,13 +2687,14 @@ export default function LaunchpadBoard() {
           fresh.push({
             id: `${(log as unknown as { transactionHash?: string }).transactionHash ?? ''}-swap-${String((log as unknown as { logIndex?: number }).logIndex ?? 0)}`,
             address: token,
-            symbol: shortAddress(token),
+            symbol: symbolOf(token),
             accent: accentFor(token),
             // Etykieta mowi, ze to juz pula, a nie krzywa - inaczej dwa rozne
             // rynki wygladalyby na tasmie identycznie.
             label: isBuy ? 'Pool buy' : 'Pool sell',
             eth,
             tone: isBuy ? 'buy' : 'sell',
+            source: 'pool',
           });
 
           flashSeq.current += 1;
@@ -2625,7 +2728,7 @@ export default function LaunchpadBoard() {
     return () => {
       unwatch();
     };
-  }, [readClient, gradPools]);
+  }, [readClient, gradPools, symbolOf]);
 
   /**
    * Logo tokenow z VERCEL BLOB (przez /api/startpad/logos), NIE z Firestore.

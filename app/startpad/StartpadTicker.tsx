@@ -15,6 +15,7 @@ import {
   NATIVE_SYMBOL,
 } from './config';
 import { POOL_SWAP_EVENT } from './[address]/poolSwaps';
+import { fetchLogos, recallLogos } from './logos';
 import { loadFeedSnapshot, loadSnapshot } from './snapshot';
 import { SPHERE_TOKEN_ADDRESS } from './sphere/sphereConfig';
 
@@ -49,6 +50,14 @@ type TickerItem = {
 
 const MAX_ITEMS = 20;
 
+/**
+ * Ile trwa jedno okrazenie tasmy. Wspolna klasa `.soft-marquee` ma 32 s, co
+ * przy kursach bylo w porzadku, ale tutaj wiersze niosa kwote i symbol - trzeba
+ * zdazyc je przeczytac, zanim znikna. 90 s czyta sie spokojnie i nie odciaga
+ * uwagi od tresci strony.
+ */
+const LAP_SECONDS = 90;
+
 function shortAddress(value: string) {
   return `${value.slice(0, 5)}…${value.slice(-3)}`;
 }
@@ -66,6 +75,24 @@ export default function StartpadTicker() {
   const [items, setItems] = useState<TickerItem[]>([]);
   const [poolId, setPoolId] = useState<`0x${string}` | null>(null);
   const seeded = useRef(false);
+  // Logo tokenow z tego samego zrodla, co tablica (Vercel Blob przez
+  // /api/startpad/logos). Najpierw pamiec podreczna, zeby awatary byly od
+  // pierwszej klatki, potem swieza mapa.
+  const [logos, setLogos] = useState<Record<string, string>>(() => recallLogos(ACTIVE_LAUNCHPAD_NETWORK.chain.id));
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchLogos(chainId)
+      .then((map) => {
+        if (!cancelled && Object.keys(map).length) setLogos((current) => ({ ...current, ...map }));
+      })
+      .catch(() => {
+        // Brak logo nie jest bledem - zostaje kolorowa kropka z inicjalem.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [chainId]);
 
   /** Adres -> symbol z migawki tablicy; bez niej zostaje skrocony adres. */
   const symbols = useMemo(() => {
@@ -265,13 +292,32 @@ export default function StartpadTicker() {
           Watching Startpad for live trades...
         </p>
       ) : (
-        <div className="soft-marquee flex w-max items-center gap-5 whitespace-nowrap px-3">
+        <div
+          className="soft-marquee flex w-max items-center gap-5 whitespace-nowrap px-3"
+          style={{ animationDuration: `${LAP_SECONDS}s` }}
+        >
           {lane.map((item, index) => (
             <Link
               key={`${item.id}-${index}`}
               href={item.address ? `/startpad/${item.address}` : '/startpad'}
               className="flex items-center gap-1.5 text-[11.5px] font-bold text-sp-ink/70 hover:text-sp-ink"
             >
+              {(() => {
+                const url = item.address ? logos[item.address.toLowerCase()] : undefined;
+                return url ? (
+                  // Zwykly <img>, nie next/image: to 16 px z Bloba, wiec optymalizator
+                  // nie ma czego zoptymalizowac, a wymagalby wpisania hosta w konfig.
+                  // Tak samo robi tablica.
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={url} alt="" width={16} height={16} className="h-4 w-4 shrink-0 rounded-full object-cover" loading="lazy" />
+                ) : (
+                  // Zastepnik zamiast pustego miejsca - pasek nie ma podskakiwac,
+                  // gdy token nie ma jeszcze wgranego logo.
+                  <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-sp-shade/15 text-[8px] font-extrabold text-sp-shade/60">
+                    {item.symbol.slice(0, 1).toUpperCase()}
+                  </span>
+                );
+              })()}
               <span className="font-extrabold">{item.symbol}</span>
               <span className={TONE_CLASS[item.tone]}>{item.label}</span>
               {item.eth !== undefined && (
