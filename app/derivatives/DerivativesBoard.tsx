@@ -21,15 +21,22 @@ import {
   oracleAbi,
   type MarketRow,
 } from './config';
-import { fmtAge, fmtPrice, fmtUsdc, fmtWadCompact, oiPercent, shortAddress } from './format';
+import { fmtAge, fmtPrice, fmtSignedWad, fmtUsdc, fmtWadCompact, oiPercent, shortAddress } from './format';
 import CreateMarketModal from './CreateMarketModal';
 
 /** Zdrowie funduszu - to samo pole, co decyduje o globalnej pauzie. */
 type Health = { balance: bigint; required: bigint; paused: boolean } | null;
 
+/** Jeden wpis aktywnosci ZE WSZYSTKICH rynkow naraz - realne logi, nie zmyslone. */
+type ActivityItem =
+  | { kind: 'opened'; symbol: string; market: Address; trader: Address; isLong: boolean; notional: bigint; entryPrice: bigint; block: bigint; txHash: string; at: number }
+  | { kind: 'closed'; symbol: string; market: Address; trader: Address; exitNotional: bigint; pnl: bigint; block: bigint; txHash: string; at: number }
+  | { kind: 'liquidated'; symbol: string; market: Address; trader: Address; keeper: Address; payoutUsdc: bigint; block: bigint; txHash: string; at: number };
+
 export default function DerivativesBoard() {
   const client = usePublicClient({ chainId: DERIV_CHAIN.id });
   const [rows, setRows] = useState<MarketRow[]>([]);
+  const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [health, setHealth] = useState<Health>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -104,6 +111,70 @@ export default function DerivativesBoard() {
         });
       }
       setRows(collected);
+
+      // Aktywnosc ze WSZYSTKICH rynkow naraz - realne logi PositionOpened/
+      // Closed/Liquidated, to samo okno co sparkline cen na stronie rynku.
+      // Zero syntetycznych wpisow: bez ruchu na rynkach lista jest pusta.
+      try {
+        const head = await client.getBlockNumber();
+        const from = head > 40_000n ? head - 40_000n : 0n;
+        const perMarket = await Promise.all(
+          collected.map(async (row) => {
+            const [opened, closed, liquidated] = await Promise.all([
+              client.getContractEvents({ address: row.address, abi: marketAbi, eventName: 'PositionOpened', fromBlock: from, toBlock: head }),
+              client.getContractEvents({ address: row.address, abi: marketAbi, eventName: 'PositionClosed', fromBlock: from, toBlock: head }),
+              client.getContractEvents({ address: row.address, abi: marketAbi, eventName: 'Liquidated', fromBlock: from, toBlock: head }),
+            ]);
+            return { row, opened, closed, liquidated };
+          }),
+        );
+
+        const allLogs = perMarket.flatMap((m) => [...m.opened, ...m.closed, ...m.liquidated]);
+        const blockNumbers = Array.from(new Set(allLogs.map((l: any) => l.blockNumber as bigint)));
+        const blocks = await Promise.all(blockNumbers.map((bn) => client.getBlock({ blockNumber: bn })));
+        const atByBlock = new Map(blockNumbers.map((bn, i) => [bn, Number(blocks[i].timestamp)]));
+
+        const items: ActivityItem[] = perMarket.flatMap(({ row, opened, closed, liquidated }) => [
+          ...opened.map((l: any): ActivityItem => ({
+            kind: 'opened',
+            symbol: row.symbol,
+            market: row.address,
+            trader: l.args.trader as Address,
+            isLong: l.args.isLong as boolean,
+            notional: l.args.notional as bigint,
+            entryPrice: l.args.entryPrice as bigint,
+            block: l.blockNumber as bigint,
+            txHash: l.transactionHash as string,
+            at: atByBlock.get(l.blockNumber as bigint) ?? 0,
+          })),
+          ...closed.map((l: any): ActivityItem => ({
+            kind: 'closed',
+            symbol: row.symbol,
+            market: row.address,
+            trader: l.args.trader as Address,
+            exitNotional: l.args.exitNotional as bigint,
+            pnl: l.args.pnl as bigint,
+            block: l.blockNumber as bigint,
+            txHash: l.transactionHash as string,
+            at: atByBlock.get(l.blockNumber as bigint) ?? 0,
+          })),
+          ...liquidated.map((l: any): ActivityItem => ({
+            kind: 'liquidated',
+            symbol: row.symbol,
+            market: row.address,
+            trader: l.args.trader as Address,
+            keeper: l.args.keeper as Address,
+            payoutUsdc: l.args.payoutUsdc as bigint,
+            block: l.blockNumber as bigint,
+            txHash: l.transactionHash as string,
+            at: atByBlock.get(l.blockNumber as bigint) ?? 0,
+          })),
+        ]);
+        items.sort((a, b) => (b.block === a.block ? 0 : b.block > a.block ? 1 : -1));
+        setActivity(items.slice(0, 15));
+      } catch {
+        setActivity([]);
+      }
     } catch (e: any) {
       setError(e?.shortMessage || e?.message || "Couldn't load markets.");
     } finally {
@@ -333,6 +404,65 @@ export default function DerivativesBoard() {
                 </Link>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {activity.length > 0 && (
+        <div className="mt-4 overflow-hidden rounded-[18px] border border-sp-shade/10 bg-sp-surface">
+          <p className="border-b border-sp-shade/10 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-sp-ink-soft">
+            Recent activity
+          </p>
+          <div>
+            {activity.map((item) => (
+              <a
+                key={`${item.txHash}-${item.kind}`}
+                href={`${DERIV_CHAIN.blockExplorers?.default.url}/tx/${item.txHash}`}
+                target="_blank"
+                rel="noreferrer"
+                className="flex flex-wrap items-center justify-between gap-2 border-b border-sp-shade/10 px-4 py-2.5 text-sm transition-colors last:border-b-0 hover:bg-sp-hover"
+              >
+                <div className="flex items-center gap-2">
+                  {item.kind === 'opened' && (
+                    <Badge
+                      className={`rounded-full border-transparent hover:bg-transparent ${
+                        item.isLong ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                      }`}
+                    >
+                      {item.isLong ? 'Opened long' : 'Opened short'}
+                    </Badge>
+                  )}
+                  {item.kind === 'closed' && (
+                    <Badge variant="outline" className="rounded-full border-sp-shade/15 text-sp-ink-soft">
+                      Closed
+                    </Badge>
+                  )}
+                  {item.kind === 'liquidated' && (
+                    <Badge variant="destructive" className="rounded-full">
+                      Liquidated
+                    </Badge>
+                  )}
+                  <span className="font-semibold text-sp-ink">{item.symbol}</span>
+                  <span className="text-xs text-sp-ink-soft">{shortAddress(item.trader)}</span>
+                </div>
+                <div className="flex items-center gap-3 text-xs">
+                  {item.kind === 'opened' && (
+                    <span className="tabular-nums text-sp-ink">
+                      {fmtWadCompact(item.notional)} @ {fmtPrice(item.entryPrice)}
+                    </span>
+                  )}
+                  {item.kind === 'closed' && (
+                    <span className={`font-semibold tabular-nums ${item.pnl >= 0n ? 'text-emerald-600' : 'text-red-600'}`}>
+                      {fmtSignedWad(item.pnl)}
+                    </span>
+                  )}
+                  {item.kind === 'liquidated' && (
+                    <span className="tabular-nums text-sp-ink">{fmtUsdc(item.payoutUsdc)} returned</span>
+                  )}
+                  <span className="text-sp-ink-soft">{fmtAge(item.at)} ago</span>
+                </div>
+              </a>
+            ))}
           </div>
         </div>
       )}
