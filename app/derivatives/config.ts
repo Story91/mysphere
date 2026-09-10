@@ -79,6 +79,48 @@ export const oracleAbi = [
       { name: 'slashed', type: 'bool' },
     ],
   },
+  /* --------------------------------------------------------------------- */
+  /*  BARIERKI REJESTRU - to sa liczby, ktore odpowiadaja na pytanie          */
+  /*  "co powstrzymuje wydawce ceny przed wpisaniem czegokolwiek".            */
+  /*  Bez nich przewodnik musial opisywac te zabezpieczenia JAKOSCIOWO        */
+  /*  ("odrzuca zbyt duzy skok"), a jakosciowy opis zabezpieczenia jest       */
+  /*  wart tyle, co jego brak.                                               */
+  /* --------------------------------------------------------------------- */
+  /** Najwiekszy dopuszczalny skok ceny miedzy zgloszeniami, w bps. */
+  { type: 'function', name: 'MAX_DEVIATION_BPS', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint16' }] },
+  /** Najkrotszy odstep miedzy zgloszeniami - zapora przed zalewaniem cenami. */
+  { type: 'function', name: 'MIN_UPDATE_INTERVAL', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint32' }] },
+  /** Po tylu sekundach cena jest przeterminowana i rynek przestaje byc aktywny. */
+  { type: 'function', name: 'MAX_PRICE_AGE', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint32' }] },
+  /** Ile czasu ma spor od otwarcia do rozstrzygniecia. */
+  { type: 'function', name: 'CHALLENGE_WINDOW', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint32' }] },
+  /** Z ilu obserwacji liczy sie TWAP. */
+  { type: 'function', name: 'TWAP_CARDINALITY', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint8' }] },
+  /** Otwarty spor: kto, za ile, od kiedy i o ktora cene. */
+  {
+    type: 'function',
+    name: 'getChallenge',
+    stateMutability: 'view',
+    inputs: [{ type: 'uint256' }],
+    outputs: [
+      { name: 'challenger', type: 'address' },
+      { name: 'bond', type: 'uint256' },
+      { name: 'openedAt', type: 'uint64' },
+      { name: 'disputedPrice', type: 'uint256' },
+      { name: 'open', type: 'bool' },
+    ],
+  },
+  /** Cena RAZEM ze znacznikiem czasu - swiezosc feedu jest tu informacja o ryzyku. */
+  {
+    type: 'function',
+    name: 'getPrice',
+    stateMutability: 'view',
+    inputs: [{ type: 'uint256' }],
+    outputs: [
+      { name: 'price', type: 'uint256' },
+      { name: 'updatedAt', type: 'uint64' },
+    ],
+  },
   { type: 'function', name: 'getTwap', stateMutability: 'view', inputs: [{ type: 'uint256' }], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'isActive', stateMutability: 'view', inputs: [{ type: 'uint256' }], outputs: [{ type: 'bool' }] },
   {
@@ -115,6 +157,15 @@ export const factoryAbi = [
   { type: 'function', name: 'INSURANCE', stateMutability: 'view', inputs: [], outputs: [{ type: 'address' }] },
   { type: 'function', name: 'FEES', stateMutability: 'view', inputs: [], outputs: [{ type: 'address' }] },
   { type: 'function', name: 'MIN_VIRTUAL_LIQUIDITY', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
+  /**
+   * `isMarket` STOI TUTAJ, A NIE W ABI FUNDUSZU.
+   *
+   * `InsuranceFund` deklaruje ten podpis tylko po to, zeby ZAWOLAC go na
+   * fabryce (`MARKETS.isMarket`) - sam go nie wystawia, wiec odczyt pod adresem
+   * funduszu rewertuje. Trzymanie go po stronie funduszu bylo pulapka gotowa
+   * wystrzelic przy pierwszym uzyciu.
+   */
+  { type: 'function', name: 'isMarket', stateMutability: 'view', inputs: [{ type: 'address' }], outputs: [{ type: 'bool' }] },
   {
     type: 'function',
     name: 'createMarket',
@@ -127,9 +178,67 @@ export const factoryAbi = [
 export const marketAbi = [
   { type: 'function', name: 'ORACLE_MARKET_ID', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'CREATOR', stateMutability: 'view', inputs: [], outputs: [{ type: 'address' }] },
+  /** Adres feedu Chainlink, gdy rynek go ma; adres zerowy znaczy "tylko rejestr". */
+  { type: 'function', name: 'CHAINLINK_FEED', stateMutability: 'view', inputs: [], outputs: [{ type: 'address' }] },
   { type: 'function', name: 'markPrice', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'indexPrice', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'openInterestNotional', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
+  /* ---------------------------------------------------------------------- */
+  /*  RESZTA POWIERZCHNI RYNKU - dolozona 10 wrzesnia 2026.                   */
+  /*                                                                          */
+  /*  Front czytal 23 rzeczy, a kontrakt wystawia komplet, ktorego trader     */
+  /*  potrzebuje, zeby w ogole wiedziec, na co sie pisze: stawke oplaty,      */
+  /*  zegar fundingu, glebokosc vAMM (czyli realny poslizg przed klikiem),    */
+  /*  przechyl long/short i to, dlaczego cap OI jest taki, a nie inny.        */
+  /*  Kazda z tych liczb jest w kontrakcie od poczatku - brakowalo tylko      */
+  /*  drogi do ekranu.                                                        */
+  /* ---------------------------------------------------------------------- */
+  /** Oplata wejscia i wyjscia, w bps. 30 = 0,30% od notional. */
+  { type: 'function', name: 'TRADE_FEE_BPS', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint16' }] },
+  /** Kara likwidacyjna w bps - to ona zjada depozyt przy likwidacji. */
+  { type: 'function', name: 'LIQUIDATION_FEE_BPS', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint16' }] },
+  /** Co ile sekund rozlicza sie funding. Bez tego nie da sie pokazac zegara. */
+  { type: 'function', name: 'FUNDING_INTERVAL', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint32' }] },
+  /** Sufit premii mark/index w bps - ogranicza stawke fundingu. */
+  { type: 'function', name: 'MAX_PREMIUM_BPS', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint16' }] },
+  /** Kiedy ostatnio rozliczono funding. Zegar liczy sie z tego plus interwal. */
+  { type: 'function', name: 'lastFundingAt', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint64' }] },
+  /**
+   * REZERWY vAMM. Z nich - i tylko z nich - liczy sie POSLIZG przed
+   * podpisaniem transakcji. Bez nich interfejs moze pokazac cene mark i udawac,
+   * ze wejscie odbedzie sie po niej, co przy plytkim rynku jest nieprawda.
+   */
+  { type: 'function', name: 'quoteReserve', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
+  { type: 'function', name: 'baseReserve', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
+  /** Ile funding wisi na koncie TERAZ, ze znakiem. Do karty pozycji. */
+  { type: 'function', name: 'pendingFunding', stateMutability: 'view', inputs: [{ type: 'address' }], outputs: [{ type: 'int256' }] },
+  /** Pokryty zly dlug - uczciwosc wymaga, zeby to bylo widoczne. */
+  { type: 'function', name: 'coveredBadDebtUsdc', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
+  /** Mnozniki i progi dojrzewania rynku: skad bierze sie cap OI. */
+  { type: 'function', name: 'OI_MULTIPLIER_PROBATION', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint8' }] },
+  { type: 'function', name: 'OI_MULTIPLIER_MATURE', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint8' }] },
+  { type: 'function', name: 'PROBATION_AGE', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint32' }] },
+  { type: 'function', name: 'PROBATION_UPDATES', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint32' }] },
+  { type: 'function', name: 'CREATOR_OI_CAP_BPS', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint16' }] },
+  /** Zdarzenie rozliczenia fundingu - z niego rysuje sie historia stawki. */
+  {
+    type: 'event',
+    name: 'FundingSettled',
+    inputs: [
+      { name: 'premium', type: 'int256', indexed: false },
+      { name: 'fundingPerUnit', type: 'int256', indexed: false },
+      { name: 'cumFunding', type: 'int256', indexed: false },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'BadDebt',
+    inputs: [
+      { name: 'trader', type: 'address', indexed: true },
+      { name: 'shortfallWad', type: 'uint256', indexed: false },
+      { name: 'coveredUsdc', type: 'uint256', indexed: false },
+    ],
+  },
   { type: 'function', name: 'maxOpenInterest', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'creatorOiCap', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'isMature', stateMutability: 'view', inputs: [], outputs: [{ type: 'bool' }] },
@@ -205,10 +314,44 @@ export const insuranceAbi = [
   { type: 'function', name: 'requiredBalance', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'newPositionsPaused', stateMutability: 'view', inputs: [], outputs: [{ type: 'bool' }] },
   { type: 'function', name: 'minRatioBps', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint16' }] },
+  /**
+   * OTWARTY INTERES TEGO KONKRETNEGO RYNKU. Fundusz trzyma i sume, i rozbicie
+   * na rynki - bez tego strona rynku umiala pokazac tylko `totalOi` calego
+   * modulu, czyli liczbe, ktora o ogladanym rynku nie mowi nic.
+   */
+  { type: 'function', name: 'oiByMarket', stateMutability: 'view', inputs: [{ type: 'address' }], outputs: [{ type: 'uint256' }] },
+  {
+    type: 'event',
+    name: 'ShortfallCovered',
+    inputs: [
+      { name: 'market', type: 'address', indexed: true },
+      { name: 'amount', type: 'uint256', indexed: false },
+      { name: 'balance', type: 'uint256', indexed: false },
+    ],
+  },
   { type: 'function', name: 'notifyDeposit', stateMutability: 'nonpayable', inputs: [{ type: 'uint256' }], outputs: [] },
 ] as const;
 
 export const feesAbi = [
+  /**
+   * PODZIAL OPLATY. Bez tych trzech stalych interfejs umial powiedziec tylko,
+   * ze udzial tworcy "splywa z opoznieniem", nie podajac ANI JEDNEGO procentu -
+   * czyli akurat w miejscu, gdzie mowa o cudzych pieniadzach, byl najbardziej
+   * mglisty. 6500/1500 i reszta do skarbca, odblokowanie po LOCK_DAYS.
+   */
+  { type: 'function', name: 'CREATOR_SHARE_BPS', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint16' }] },
+  { type: 'function', name: 'INSURANCE_SHARE_BPS', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint32' }] },
+  { type: 'function', name: 'LOCK_DAYS', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint32' }] },
+  { type: 'function', name: 'TREASURY', stateMutability: 'view', inputs: [], outputs: [{ type: 'address' }] },
+  { type: 'function', name: 'INSURANCE', stateMutability: 'view', inputs: [], outputs: [{ type: 'address' }] },
+  {
+    type: 'event',
+    name: 'Claimed',
+    inputs: [
+      { name: 'account', type: 'address', indexed: true },
+      { name: 'amount', type: 'uint256', indexed: false },
+    ],
+  },
   { type: 'function', name: 'claimableNow', stateMutability: 'view', inputs: [{ type: 'address' }], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'lockedTotal', stateMutability: 'view', inputs: [{ type: 'address' }], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'claim', stateMutability: 'nonpayable', inputs: [], outputs: [{ type: 'uint256' }] },
