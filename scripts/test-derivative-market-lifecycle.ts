@@ -48,6 +48,9 @@ async function main() {
   const market = await ethers.getContractAt("DerivativeMarket", marketAddress);
   const usdcAddress = getAddress(await market.USDC());
   const usdc = await ethers.getContractAt("IERC20", usdcAddress);
+  const oracleAddress = getAddress(await market.ORACLE());
+  const oracle = await ethers.getContractAt("PriceOracleRegistry", oracleAddress);
+  const oracleMarketId: bigint = await market.ORACLE_MARKET_ID();
 
   console.log("siec       ", `${network.name} (chainId ${chainId})`);
   console.log("trader     ", trader);
@@ -56,6 +59,21 @@ async function main() {
   console.log("margin     ", ethers.formatUnits(marginUsdc, 6), "USDC");
   console.log("dzwignia   ", `${leverage}x`);
   console.log("");
+
+  // `openPosition` wymaga swiezej ceny (ORACLE.isActive) - MAX_PRICE_AGE to
+  // 1h, wiec feed bez zadnego submitPrice od rejestracji po godzinie
+  // przestaje byc "aktywny". Odswiezamy TA SAMA cena (0% odchylenia,
+  // zawsze przechodzi limit 10%), zeby transakcja ponizej nie wywalila sie
+  // na OracleInactive().
+  const isActive: boolean = await oracle.isActive(oracleMarketId);
+  if (!isActive) {
+    const meta = await oracle.getMarket(oracleMarketId);
+    const lastPrice: bigint = meta[3];
+    console.log(`feed nieaktywny (starszy niz 1h) - odswiezam cena ${ethers.formatEther(lastPrice)} USD...`);
+    await (
+      await oracle.submitPrice(oracleMarketId, lastPrice, BigInt(Math.floor(Date.now() / 1000)))
+    ).wait();
+  }
 
   const allowance: bigint = await usdc.allowance(trader, marketAddress);
   if (allowance < marginUsdc) {
