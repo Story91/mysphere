@@ -164,6 +164,39 @@ export const marketAbi = [
   { type: 'function', name: 'closePosition', stateMutability: 'nonpayable', inputs: [], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'liquidate', stateMutability: 'nonpayable', inputs: [{ type: 'address' }], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'settleFunding', stateMutability: 'nonpayable', inputs: [], outputs: [] },
+  {
+    type: 'event',
+    name: 'PositionOpened',
+    inputs: [
+      { name: 'trader', type: 'address', indexed: true },
+      { name: 'isLong', type: 'bool', indexed: false },
+      { name: 'marginUsdc', type: 'uint256', indexed: false },
+      { name: 'notional', type: 'uint256', indexed: false },
+      { name: 'size', type: 'uint256', indexed: false },
+      { name: 'entryPrice', type: 'uint256', indexed: false },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'PositionClosed',
+    inputs: [
+      { name: 'trader', type: 'address', indexed: true },
+      { name: 'exitNotional', type: 'uint256', indexed: false },
+      { name: 'pnl', type: 'int256', indexed: false },
+      { name: 'funding', type: 'int256', indexed: false },
+      { name: 'payoutUsdc', type: 'uint256', indexed: false },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'Liquidated',
+    inputs: [
+      { name: 'trader', type: 'address', indexed: true },
+      { name: 'keeper', type: 'address', indexed: true },
+      { name: 'keeperRewardUsdc', type: 'uint256', indexed: false },
+      { name: 'payoutUsdc', type: 'uint256', indexed: false },
+    ],
+  },
 ] as const;
 
 export const insuranceAbi = [

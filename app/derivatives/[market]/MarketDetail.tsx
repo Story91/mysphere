@@ -23,6 +23,7 @@ import {
   oracleAbi,
 } from '../config';
 import {
+  fmtAge,
   fmtPrice,
   fmtSignedWad,
   fmtUsdc,
@@ -65,6 +66,12 @@ type Position = {
   liqPrice: bigint;
 } | null;
 
+/** Jeden wpis w historii aktywnosci - z realnych logow kontraktu, zero zmyslania. */
+type ActivityItem =
+  | { kind: 'opened'; trader: Address; isLong: boolean; notional: bigint; entryPrice: bigint; block: bigint; txHash: string; at: number }
+  | { kind: 'closed'; trader: Address; exitNotional: bigint; pnl: bigint; block: bigint; txHash: string; at: number }
+  | { kind: 'liquidated'; trader: Address; keeper: Address; payoutUsdc: bigint; block: bigint; txHash: string; at: number };
+
 export default function MarketDetail({ market }: { market: Address }) {
   const { address, chainId } = useAccount();
   const client = usePublicClient({ chainId: DERIV_CHAIN.id });
@@ -73,6 +80,7 @@ export default function MarketDetail({ market }: { market: Address }) {
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [position, setPosition] = useState<Position>(null);
   const [history, setHistory] = useState<bigint[]>([]);
+  const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -187,8 +195,62 @@ export default function MarketDetail({ market }: { market: Address }) {
         // Brak okna getLogs na RPC nie ma prawa zabrac calej strony.
         setHistory([]);
       }
+
+      // Historia aktywnosci - PROSTO z logow tego rynku, to samo okno co
+      // sparkline. Zero liczb zmyslonych na potrzeby "wygladania jak
+      // prawdziwa gielda": jak nie ma zdarzen, lista jest po prostu pusta.
+      try {
+        const head = await client.getBlockNumber();
+        const from = head > 40_000n ? head - 40_000n : 0n;
+        const [opened, closed, liquidated] = await Promise.all([
+          client.getContractEvents({ address: market, abi: marketAbi, eventName: 'PositionOpened', fromBlock: from, toBlock: head }),
+          client.getContractEvents({ address: market, abi: marketAbi, eventName: 'PositionClosed', fromBlock: from, toBlock: head }),
+          client.getContractEvents({ address: market, abi: marketAbi, eventName: 'Liquidated', fromBlock: from, toBlock: head }),
+        ]);
+
+        const blockNumbers = Array.from(
+          new Set([...opened, ...closed, ...liquidated].map((l: any) => l.blockNumber as bigint)),
+        );
+        const blocks = await Promise.all(blockNumbers.map((bn) => client.getBlock({ blockNumber: bn })));
+        const atByBlock = new Map(blockNumbers.map((bn, i) => [bn, Number(blocks[i].timestamp)]));
+
+        const items: ActivityItem[] = [
+          ...opened.map((l: any): ActivityItem => ({
+            kind: 'opened',
+            trader: l.args.trader as Address,
+            isLong: l.args.isLong as boolean,
+            notional: l.args.notional as bigint,
+            entryPrice: l.args.entryPrice as bigint,
+            block: l.blockNumber as bigint,
+            txHash: l.transactionHash as string,
+            at: atByBlock.get(l.blockNumber as bigint) ?? 0,
+          })),
+          ...closed.map((l: any): ActivityItem => ({
+            kind: 'closed',
+            trader: l.args.trader as Address,
+            exitNotional: l.args.exitNotional as bigint,
+            pnl: l.args.pnl as bigint,
+            block: l.blockNumber as bigint,
+            txHash: l.transactionHash as string,
+            at: atByBlock.get(l.blockNumber as bigint) ?? 0,
+          })),
+          ...liquidated.map((l: any): ActivityItem => ({
+            kind: 'liquidated',
+            trader: l.args.trader as Address,
+            keeper: l.args.keeper as Address,
+            payoutUsdc: l.args.payoutUsdc as bigint,
+            block: l.blockNumber as bigint,
+            txHash: l.transactionHash as string,
+            at: atByBlock.get(l.blockNumber as bigint) ?? 0,
+          })),
+        ];
+        items.sort((a, b) => (b.block === a.block ? 0 : b.block > a.block ? 1 : -1));
+        setActivity(items.slice(0, 20));
+      } catch {
+        setActivity([]);
+      }
     } catch (e: any) {
-      setError(e?.shortMessage || e?.message || 'Nie udalo sie odczytac rynku.');
+      setError(e?.shortMessage || e?.message || "Couldn't load the market.");
     } finally {
       setLoading(false);
     }
@@ -546,6 +608,64 @@ export default function MarketDetail({ market }: { market: Address }) {
           </CardContent>
         </Card>
       </div>
+
+      {activity.length > 0 && (
+        <Card className="sph-card mt-4 rounded-[20px] border-sp-shade/10 bg-sp-surface shadow-none">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-bold uppercase tracking-wide text-sp-ink-soft">Recent activity</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-1">
+            {activity.map((item) => (
+              <a
+                key={`${item.txHash}-${item.kind}`}
+                href={`${DERIV_CHAIN.blockExplorers?.default.url}/tx/${item.txHash}`}
+                target="_blank"
+                rel="noreferrer"
+                className="flex flex-wrap items-center justify-between gap-2 rounded-[12px] px-2 py-1.5 text-sm transition-colors hover:bg-sp-hover"
+              >
+                <div className="flex items-center gap-2">
+                  {item.kind === 'opened' && (
+                    <Badge
+                      className={`rounded-full border-transparent hover:bg-transparent ${
+                        item.isLong ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                      }`}
+                    >
+                      {item.isLong ? 'Opened long' : 'Opened short'}
+                    </Badge>
+                  )}
+                  {item.kind === 'closed' && (
+                    <Badge variant="outline" className="rounded-full border-sp-shade/15 text-sp-ink-soft">
+                      Closed
+                    </Badge>
+                  )}
+                  {item.kind === 'liquidated' && (
+                    <Badge variant="destructive" className="rounded-full">
+                      Liquidated
+                    </Badge>
+                  )}
+                  <span className="text-xs text-sp-ink-soft">{shortAddress(item.trader)}</span>
+                </div>
+                <div className="flex items-center gap-3 text-xs">
+                  {item.kind === 'opened' && (
+                    <span className="tabular-nums text-sp-ink">
+                      {fmtWadCompact(item.notional)} @ {fmtPrice(item.entryPrice)}
+                    </span>
+                  )}
+                  {item.kind === 'closed' && (
+                    <span className={`font-semibold tabular-nums ${item.pnl >= 0n ? 'text-emerald-600' : 'text-red-600'}`}>
+                      {fmtSignedWad(item.pnl)}
+                    </span>
+                  )}
+                  {item.kind === 'liquidated' && (
+                    <span className="tabular-nums text-sp-ink">{fmtUsdc(item.payoutUsdc)} returned</span>
+                  )}
+                  <span className="text-sp-ink-soft">{fmtAge(item.at)} ago</span>
+                </div>
+              </a>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Panel wystawcy ceny. Widoczny tylko dla tworcy feedu - i to jest cala
           jego wladza nad tym rynkiem: nie ma tu ani pauzy, ani likwidacji. */}
