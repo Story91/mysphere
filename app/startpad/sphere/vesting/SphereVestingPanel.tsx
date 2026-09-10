@@ -26,6 +26,19 @@ function toAmount(value: bigint | null | undefined) {
   return value == null ? 0 : Number(formatEther(value));
 }
 
+/**
+ * Kwota DOKLADNA, z separatorem tysiecy. Wielkie liczniki u gory zaokraglaja
+ * do dwoch miejsc i to jest w porzadku dla oka, ale ponizej stoi wiersz, ktory
+ * ma sie zgadzac z tym, co odda kontrakt - stad druga funkcja zamiast jednej.
+ */
+function fmtExact(value: bigint | null | undefined, decimals = 2) {
+  if (value == null) return '—';
+  return Number(formatEther(value)).toLocaleString('en-US', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+}
+
 /** Etykieta pod paskiem: co to za punkt + kiedy wypada. */
 function TimelineMark({ label, date, align }: { label: string; date: string; align: 'left' | 'center' | 'right' }) {
   const alignClass = align === 'left' ? 'text-left' : align === 'right' ? 'text-right' : 'text-center';
@@ -54,12 +67,19 @@ export default function SphereVestingPanel() {
         .readContract({ address: SPHERE_ESCROW_ADDRESS, abi: sphereCreatorEscrowAbi, functionName: 'sphereToken' })
         .catch(() => zeroAddress)) as Address;
     }
+    // `vestedAmount` na BIEZACY moment dochodzi do trojki odczytow, bo bez
+    // niego strona nie umie powiedziec, ile juz sie odblokowalo - a to jest
+    // jedyna liczba na tej stronie, ktora rosnie sama.
+    const nowSec = BigInt(Math.floor(Date.now() / 1000));
     const perToken =
       token !== zeroAddress
         ? await Promise.all([
             client.readContract({ address: vesting, abi: sphereTokenVestingAbi, functionName: 'totalReceived', args: [token] }),
             client.readContract({ address: vesting, abi: sphereTokenVestingAbi, functionName: 'releasable', args: [token] }),
             client.readContract({ address: vesting, abi: sphereTokenVestingAbi, functionName: 'released', args: [token] }),
+            client
+              .readContract({ address: vesting, abi: sphereTokenVestingAbi, functionName: 'vestedAmount', args: [token, nowSec] })
+              .catch(() => 0n),
           ])
         : null;
     return {
@@ -71,6 +91,7 @@ export default function SphereVestingPanel() {
       totalReceived: perToken ? (perToken[0] as bigint) : null,
       releasable: perToken ? (perToken[1] as bigint) : null,
       released: perToken ? (perToken[2] as bigint) : null,
+      vested: perToken ? (perToken[3] as bigint) : null,
     };
   });
 
@@ -102,15 +123,40 @@ export default function SphereVestingPanel() {
   }
 
   const now = BigInt(Math.floor(Date.now() / 1000));
-  const progress =
-    state && state.duration > 0n
-      ? Math.min(100, Math.max(0, Number(((now - state.start) * 100n) / state.duration)))
-      : 0;
+  /**
+   * PROCENT LICZONY NA ULAMKACH, NIE NA BIGINTACH.
+   *
+   * Stalo tu dzielenie bigintow, ktore ucina do pelnej jednostki - przez
+   * pierwsze 3,6 dnia rocznego harmonogramu strona pisala wiec "0% elapsed",
+   * chociaz zegar szedl. Przy 366 dniach jeden procent to prawie cztery dni
+   * milczenia licznika, ktory ma byc jedyna rzecza w ruchu na tej stronie.
+   */
+  const elapsedSec = state ? Number(now - state.start) : 0;
+  const durationSec = state ? Number(state.duration) : 0;
+  const progress = durationSec > 0 ? Math.min(100, Math.max(0, (elapsedSec / durationSec) * 100)) : 0;
   // Klif jako procent calego okna - marker na tej samej osi co postep.
-  const cliffPct =
-    state && state.duration > 0n ? Math.min(100, Math.max(0, Number((state.cliff * 100n) / state.duration))) : 0;
-  // Pigulka "you are here" trzymana z dala od krawedzi paska.
-  const markerPct = Math.min(92, Math.max(8, progress));
+  const cliffSec = state ? Number(state.cliff) : 0;
+  const cliffPct = durationSec > 0 ? Math.min(100, Math.max(0, (cliffSec / durationSec) * 100)) : 0;
+  /**
+   * PIGULKA "YOU ARE HERE" STOI DOKLADNIE NA POSTEPIE.
+   *
+   * Poprzednia wersja dociskala ja do przedzialu 8-92%, zeby nie wystawala
+   * poza pasek. Skutek byl gorszy niz problem, ktory rozwiazywala: klif rocznego
+   * harmonogramu wypada na 8,2%, wiec przez pierwszy miesiac pigulka siedziala
+   * DOKLADNIE na znaczniku klifu i mowila "jestes tu" temu, kto do klifu ma
+   * jeszcze cztery tygodnie. Teraz pozycja jest prawdziwa, a przed wyjechaniem
+   * poza krawedz chroni przesuniecie w poziomie, nie klamstwo o pozycji.
+   */
+  const markerShift = progress < 6 ? '0' : progress > 94 ? '-100%' : '-50%';
+  const cliffEnd = state ? state.start + state.cliff : 0n;
+  const beforeCliff = state ? now < cliffEnd : false;
+  const secsToCliff = state ? Number(cliffEnd - now) : 0;
+  // Tempo liniowe: cala podstawa rozlozona na dlugosc harmonogramu. Liczone na
+  // bigintach, bo `totalReceived` to kilkadziesiat milionow tokenow w wei.
+  const perDayWei =
+    state && state.totalReceived != null && state.duration > 0n
+      ? (state.totalReceived * 86_400n) / state.duration
+      : null;
 
   const tokenLive = state != null && state.token !== zeroAddress;
   const lockedNow =
@@ -129,12 +175,21 @@ export default function SphereVestingPanel() {
         icon={<Timer className="h-6 w-6 text-sp-brand" aria-hidden="true" />}
       >
         <div className="grid gap-3 sm:grid-cols-3">
+          {/* Podpisy niosa KONKRET, nie ozdobe: ile z czego, i do kiedy nic
+              sie nie odblokuje. Bez nich trzy wielkie liczby stoja bez skali,
+              a "0" przy odbiorze wyglada na usterke, a nie na trwajacy klif. */}
           <BigStat
             label="Locked now"
             value={state ? (tokenLive ? toAmount(lockedNow) : 0) : null}
             decimals={2}
             suffix="SPHERE"
-            hint={state && !tokenLive ? 'Token not launched yet' : undefined}
+            hint={
+              state && !tokenLive
+                ? 'Token not launched yet'
+                : state && tokenLive
+                  ? `of ${fmtExact(state.totalReceived, 0)} received by the lock`
+                  : undefined
+            }
           />
           <BigStat
             label="Releasable now"
@@ -142,14 +197,28 @@ export default function SphereVestingPanel() {
             decimals={2}
             suffix="SPHERE"
             tone="up"
-            hint={state && !tokenLive ? 'Token not launched yet' : undefined}
+            hint={
+              state && !tokenLive
+                ? 'Token not launched yet'
+                : state && tokenLive && beforeCliff
+                  ? `nothing until the cliff ends ${fmtDate(cliffEnd)}`
+                  : state && tokenLive
+                    ? 'unlocks linearly, claim any time'
+                    : undefined
+            }
           />
           <BigStat
             label="Released so far"
             value={state ? (tokenLive ? toAmount(state.released) : 0) : null}
             decimals={2}
             suffix="SPHERE"
-            hint={state && !tokenLive ? 'Token not launched yet' : undefined}
+            hint={
+              state && !tokenLive
+                ? 'Token not launched yet'
+                : state && tokenLive
+                  ? `of ${fmtExact(state.vested, 0)} vested to date`
+                  : undefined
+            }
           />
         </div>
       </PageHero>
@@ -159,7 +228,7 @@ export default function SphereVestingPanel() {
         <div className="flex items-baseline justify-between gap-3">
           <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/50">Unlock schedule</p>
           <p className="font-soft-display text-[13px] font-extrabold text-sp-brand">
-            {state ? `${progress}% elapsed` : '—'}
+            {state ? `${progress.toFixed(progress < 10 ? 2 : 1)}% elapsed` : '—'}
           </p>
         </div>
 
@@ -167,8 +236,8 @@ export default function SphereVestingPanel() {
           <>
             <div className="relative mt-6 pb-1">
               <span
-                className="absolute -top-5 -translate-x-1/2 whitespace-nowrap rounded-full bg-sp-brand px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.06em] text-white"
-                style={{ left: `${markerPct}%` }}
+                className="absolute -top-5 whitespace-nowrap rounded-full bg-sp-brand px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.06em] text-white"
+                style={{ left: `${progress}%`, transform: `translateX(${markerShift})` }}
               >
                 You are here
               </span>
@@ -195,6 +264,39 @@ export default function SphereVestingPanel() {
               <TimelineMark label="Cliff end" date={fmtDate(state.start + state.cliff)} align="center" />
               <TimelineMark label="Fully vested" date={fmtDate(state.start + state.duration)} align="right" />
             </div>
+
+            {/* DOKLADNE LICZBY, nie zaokraglone haslo. Do 10 wrzesnia 2026 ta
+                strona nie mowila ani ile juz sie odblokowalo, ani ile zostalo
+                do klifu - a to sa jedyne dwie rzeczy, o ktore ktokolwiek tu
+                pyta. Tempo podajemy dopiero po klifie, bo przed nim jest zerowe
+                i liczba na godzine byla by myląca. */}
+            {tokenLive && (
+              <dl className="mt-4 grid gap-2 border-t border-sp-shade/10 pt-3 text-[11.5px] sm:grid-cols-3">
+                <div>
+                  <dt className="text-sp-shade/45">Received by the lock</dt>
+                  <dd className="font-extrabold text-sp-ink">{fmtExact(state.totalReceived)} SPHERE</dd>
+                </div>
+                <div>
+                  <dt className="text-sp-shade/45">Vested so far</dt>
+                  <dd className="font-extrabold text-sp-ink">
+                    {fmtExact(state.vested)} SPHERE
+                    {state.totalReceived && state.totalReceived > 0n && state.vested != null && (
+                      <span className="ml-1 font-bold text-sp-shade/40">
+                        · {((Number(state.vested) / Number(state.totalReceived)) * 100).toFixed(2)}%
+                      </span>
+                    )}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sp-shade/45">{beforeCliff ? 'Cliff ends in' : 'Unlocking per day'}</dt>
+                  <dd className="font-extrabold text-sp-ink">
+                    {beforeCliff
+                      ? `${Math.floor(secsToCliff / 86400)}d ${Math.floor((secsToCliff % 86400) / 3600)}h`
+                      : `${fmtExact(perDayWei)} SPHERE`}
+                  </dd>
+                </div>
+              </dl>
+            )}
           </>
         ) : (
           <div className="mt-6">
@@ -222,6 +324,16 @@ export default function SphereVestingPanel() {
             args={[state.token]}
             disabled={!state.releasable || state.releasable === 0n}
           />
+          {/* Wyszarzony przycisk BEZ POWODU wyglada jak awaria. Powod jest
+              zawsze ten sam i zawsze sprawdzalny: przed klifem kontrakt nie
+              odblokowuje ani jednego tokena, wiec `releasable` to zero. */}
+          {(!state.releasable || state.releasable === 0n) && (
+            <p className="mt-2 text-[11px] leading-[1.45] text-sp-shade/45">
+              {beforeCliff
+                ? `Nothing is releasable yet: the ${Math.round(Number(state.cliff) / 86_400)}-day cliff ends ${fmtDate(cliffEnd)}, in ${Math.floor(secsToCliff / 86_400)} days. Until then the schedule vests nothing at all.`
+                : 'Everything vested so far has already been released. The next tokens unlock as the schedule advances.'}
+            </p>
+          )}
         </ActionCard>
       ) : (
         <ActionCard

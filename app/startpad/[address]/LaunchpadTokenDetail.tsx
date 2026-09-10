@@ -13,7 +13,7 @@ import {
   SearchX,
   Send,
 } from 'lucide-react';
-import { ContractFunctionExecutionError, formatEther, getAbiItem, type Address } from 'viem';
+import { BaseError, ContractFunctionRevertedError, formatEther, getAbiItem, type Address } from 'viem';
 import { useAccount, usePublicClient } from 'wagmi';
 import {
   NATIVE_SYMBOL,
@@ -229,9 +229,23 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
         },
       });
     } catch (cause) {
-      // Rewert launchOf/erc20 = ten adres nie jest tokenem launchpada.
-      // Kazdy inny blad (siec, limit RPC) to awaria odczytu, nie brak tokena.
-      if (cause instanceof ContractFunctionExecutionError) setNotFound(true);
+      /**
+       * REWERT KONTRAKTU to jedyny dowod na "to nie jest token launchpada".
+       *
+       * Stalo tu `cause instanceof ContractFunctionExecutionError` i to bylo za
+       * szerokie: viem opakowuje w ten sam typ TAKZE awarie transportu, wiec
+       * odbicie sie od limitu publicznego RPC (429) kazalo stronie napisac
+       * "Token not found - this address is not a token launched on the MySphere
+       * launchpad". Zlapane 10 wrzesnia 2026 na $SPHERE, ktory stoi na lancuchu
+       * od 1 wrzesnia. Komunikat o nieistnieniu tokena, ktory istnieje, jest
+       * gorszy niz jakikolwiek komunikat o bledzie sieci.
+       *
+       * `walk` schodzi po lancuchu przyczyn i szuka PRAWDZIWEGO rewertu; awaria
+       * sieci idzie sciezka bledu odczytu, ktora strona umie ponowic.
+       */
+      const reverted =
+        cause instanceof BaseError && cause.walk((err) => err instanceof ContractFunctionRevertedError) !== null;
+      if (reverted) setNotFound(true);
       else setCoreError(cause instanceof Error ? cause.message.split('\n')[0] : String(cause));
     } finally {
       setCoreLoading(false);

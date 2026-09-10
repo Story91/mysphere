@@ -994,7 +994,7 @@ export default function ReDefinitionPage() {
                 },
                 {
                   t: 'Being built',
-                  d: 'A read ceiling above the product itself, so one hungry page cannot take the paid paths down. And the $SPHERE token: its contracts stand on Base mainnet, the token itself is not launched.',
+                  d: 'A read ceiling above the product itself, so one hungry page cannot take the paid paths down. And the season machinery around $SPHERE: the token launched on 1 September 2026 and has since graduated, but rewards are still running in shadow mode while the epochs prove their numbers.',
                 },
                 {
                   t: 'Direction',
