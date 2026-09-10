@@ -202,6 +202,12 @@ export default function Navigation() {
     // strona, do ktorej nie prowadzi zaden link, z punktu widzenia
     // uzytkownika nie istnieje (ta sama zasada, co przy /startpad wyzej).
     { href: '/startpad/sphere', label: '$SPHERE' },
+    // Perps zaraz za $SPHERE, bo to ten sam ruch co Startpad, tylko o stopien
+    // dalej: tam tworca wystawia token na krzywej, tu wystawia FEED i rynek
+    // lewarowany na Arc. Bez tego wpisu /derivatives bylo dokladnie tym, przed
+    // czym ostrzega komentarz przy /startpad - trasa dostepna wylacznie
+    // z palca, czyli dla uzytkownika nieistniejaca.
+    { href: '/derivatives', label: 'Perps' },
     // "B20" jest CHWILOWO UKRYTE w belce (na zyczenie). Trasa /b20 DZIALA dalej
     // pod adresem - NIE dodajemy jej do DISABLED_ROUTES, wiec nie jest
     // przekierowana, tylko niepokazana w nawigacji. Powrot do belki =
