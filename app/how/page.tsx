@@ -309,11 +309,11 @@ function Cost({ lead, children }: { lead: string; children: React.ReactNode }) {
 function StepIndex() {
   return (
     <nav
-      aria-label="The eleven steps"
+      aria-label="The twelve steps"
       className="mt-10 rounded-card border border-soft-line bg-soft-surface p-4 shadow-card sm:p-5"
     >
       <p className="mb-2 font-soft text-[11px] font-bold uppercase tracking-[0.16em] text-soft-ink-faint">
-        Eleven steps, and what each one costs
+        Twelve steps, and what each one costs
       </p>
       <ol>
         {STEPS.map((step) => (
