@@ -21,13 +21,18 @@ import { arcTestnet } from '../startpad/arcChain';
 
 export const DERIV_CHAIN = arcTestnet;
 
-const env = (name: string) => (process.env[name] || '').trim();
-
-export const ORACLE_ADDRESS = (env('NEXT_PUBLIC_DERIV_ORACLE') ||
+/**
+ * STATYCZNE odwolania do process.env.NEXT_PUBLIC_* - to jedyna forma, ktora
+ * webpack/Next.js potrafi podmienic na etapie builda. Wersja przez
+ * `process.env[name]` z dynamiczna nazwa NIGDY nie dziala w przegladarce
+ * (tam `process.env` po prostu nie istnieje), wiec zawsze spadala na adres
+ * zerowy bez wzgledu na to, co ustawiono w Vercelu czy `.env.local`.
+ */
+export const ORACLE_ADDRESS = ((process.env.NEXT_PUBLIC_DERIV_ORACLE || '').trim() ||
   '0x0000000000000000000000000000000000000000') as Address;
-export const FACTORY_ADDRESS = (env('NEXT_PUBLIC_DERIV_FACTORY') ||
+export const FACTORY_ADDRESS = ((process.env.NEXT_PUBLIC_DERIV_FACTORY || '').trim() ||
   '0x0000000000000000000000000000000000000000') as Address;
-export const USDC_ADDRESS = (env('NEXT_PUBLIC_DERIV_USDC') ||
+export const USDC_ADDRESS = ((process.env.NEXT_PUBLIC_DERIV_USDC || '').trim() ||
   '0x3600000000000000000000000000000000000000') as Address;
 
 export const DEPLOYED = FACTORY_ADDRESS !== '0x0000000000000000000000000000000000000000';
