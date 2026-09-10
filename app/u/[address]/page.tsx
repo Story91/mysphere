@@ -250,13 +250,13 @@ export default async function ProfilePage({ params }: Props) {
           {/* Paid zyje jako zakladka na /money - link celuje wprost w nia,
               zeby nie placic przekierowania ze starego /leaderboard. */}
           <Link
-            href="/money?tab=paid"
+            href="/asks?tab=paid"
             className="rounded-pill bg-soft-surface px-5 py-3 font-soft text-[14px] font-semibold text-soft-ink-muted shadow-card transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97]"
           >
             Who got paid this week
           </Link>
           <Link
-            href="/re-definition"
+            href="/how?tab=re-definition"
             className="rounded-pill bg-soft-surface px-5 py-3 font-soft text-[14px] font-semibold text-soft-ink-muted shadow-card transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97]"
           >
             What MySphere is becoming

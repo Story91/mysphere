@@ -33,7 +33,6 @@ type NavLink = {
  */
 const LINK_THEME: Record<string, { suffix: string }> = {
   MySphere: { suffix: 'text-fuchsia-700' },
-  'Re-Definition': { suffix: 'text-soft-info' },
   // Firmowy niebieski Base zostaje niezmieniony - to znak sieci, nie ozdobnik.
   MyBase: { suffix: 'text-[#0052FF]' },
   MyCamp: { suffix: 'text-soft-accent-deep' },
@@ -167,30 +166,22 @@ export default function Navigation() {
     // Miejsce w kolejnosci nie jest przypadkowe: Ask ma byc jednostka tego
     // produktu, wiec nie moze stac za czterema modulami, z ktorych wiekszosc
     // jest dzis wylaczona.
+    //
+    // "Money" i "Paid" NIE MAJA juz wlasnych wpisow - wlasna ksiega pieniedzy
+    // i publiczna tasma rozliczonych platnosci mieszkaja jako zakladki tutaj
+    // (?tab=money, ?tab=paid), obok Kuratorow. Powod ten sam co przy Paid
+    // i Kuratorach wczesniej: skarga "za duzo pozycji w nawigacji", a wszystkie
+    // te strony mowia o tej samej rzeczy - Ask jest miejscem, w ktorym
+    // pieniadze sie zaczynaja, Money jedynym, w ktorym widac, gdzie skonczyly.
+    // /money i /leaderboard przekierowuja tu serwerowo, karty OG zostaly pod
+    // starymi adresami.
     { href: '/asks', label: 'Asks' },
-    // Money stoi TUZ ZA Askami, bo to ich druga polowa: Ask jest miejscem, w
-    // ktorym pieniadze sie zaczynaja, a /money jedynym, w ktorym widac, gdzie
-    // skonczyly. Do niedawna saldo do odebrania z kontraktu escrow pokazywalo
-    // sie WYLACZNIE na /asks - czyli czlowiek, ktoremu przyznano wyplate,
-    // dowiadywal sie o niej tylko wtedy, gdy sam wrocil na tamta liste.
-    //
-    // NAZWA: "Money", nie "Wallet" i nie "Portfolio". Portfel jest w prawym
-    // rogu tej samej belki i pokazuje salda tokenow; ta strona nie zna zadnych
-    // sald ani kursow i nie ma udawac, ze zna. "Portfolio" obiecywaloby wycene.
-    //
-    // "Paid" nie ma juz wlasnego wpisu: publiczna tasma i ranking rozliczonych
-    // platnosci mieszkaja jako zakladka na /money (?tab=paid). Powod scalenia:
-    // skarga "za duzo pozycji w nawigacji", a obie strony mowia o pieniadzach -
-    // roznia sie tylko tym, CZYJE pokazuja. /leaderboard przekierowuje tam
-    // serwerowo, karta OG zostala pod starym adresem.
-    { href: '/money', label: 'Money' },
     { href: '/base', label: 'MyBase' },
     { href: '/mycamp', label: 'MyCamp' },
     { href: '/MyAgents', label: 'MyAgents' },
     { href: '/MyClaw', label: 'MyClaw' },
-    // "Curators" nie ma juz wlasnego wpisu w belce - publiczny rejestr zmian
-    // kuratorow skarbcow Morpho mieszka teraz jako zakladka na /asks
-    // (?tab=curators), tak jak "Paid" na /money. Scalone, zeby odchudzic belke;
+    // "Curators" tez nie ma wlasnego wpisu - publiczny rejestr zmian kuratorow
+    // skarbcow Morpho mieszka jako czwarta zakladka /asks (?tab=curators).
     // /curators przekierowuje na /asks?tab=curators.
     //
     // Startpad (krzywa launchpada) trafil do belki z tego samego powodu, co
@@ -213,18 +204,19 @@ export default function Navigation() {
     // przekierowana, tylko niepokazana w nawigacji. Powrot do belki =
     // odkomentowanie ponizszej linii.
     // { href: '/b20', label: 'B20' },
-    // "How" TUZ PRZED manifestem, bo odpowiadaja na dwa rozne pytania i to
-    // pierwsze jest pilniejsze. /re-definition mowi, DLACZEGO ten produkt
-    // istnieje - i ma prawo opisywac rzeczy, ktorych jeszcze nie ma. /how mowi,
-    // CO DA SIE ZROBIC TERAZ, i nie ma tam ani jednego zdania w czasie
-    // przyszlym.
+    // "How" i manifest odpowiadaja na dwa rozne pytania o ten sam produkt, wiec
+    // stoja pod jednym wpisem jako dwie zakladki (?tab=re-definition).
+    // /re-definition mowi, DLACZEGO ten produkt istnieje - i ma prawo opisywac
+    // rzeczy, ktorych jeszcze nie ma. /how mowi, CO DA SIE ZROBIC TERAZ, i nie
+    // ma tam ani jednego zdania w czasie przyszlym. Pierwsze pytanie jest
+    // pilniejsze, wiec instrukcja jest zakladka domyslna, a manifest - druga.
+    // /re-definition przekierowuje na /how?tab=re-definition.
     //
-    // Zgloszenie, ktore to wywolalo, brzmialo wprost: "zrob tutorial dla
-    // uzytkownikow co mozna robic w tej aplikacji". Wczesniej jedyna droga do
-    // dowiedzenia sie, ze da sie sprzedac czesc posta albo zalozyc Aska
+    // Zgloszenie, ktore postawilo tu instrukcje, brzmialo wprost: "zrob tutorial
+    // dla uzytkownikow co mozna robic w tej aplikacji". Wczesniej jedyna droga
+    // do dowiedzenia sie, ze da sie sprzedac czesc posta albo zalozyc Aska
     // z budzetem, bylo natkniecie sie na przycisk.
     { href: '/how', label: 'How' },
-    { href: '/re-definition', label: 'Re-Definition' },
   ];
 
   const navLinks: NavLink[] = allNavLinks.filter(

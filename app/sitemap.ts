@@ -25,19 +25,22 @@ const BASE_URL = 'https://mysphere.fun';
 
 const STATIC_ROUTES: { path: string; priority: number; changeFrequency: 'daily' | 'weekly' | 'monthly' }[] = [
   { path: '/basechat', priority: 1, changeFrequency: 'daily' },
-  { path: '/re-definition', priority: 0.9, changeFrequency: 'weekly' },
-  // Paid mieszka jako zakladka na /money - stary /leaderboard tylko
-  // przekierowuje, a sitemapa nie ma prawa zapraszac crawlera na
-  // przekierowanie (ten sam powod, dla ktorego filtrujemy isRouteDisabled).
-  // Query w URL-u jest legalne w sitemapie; /money bez query zostaje poza nia,
-  // bo bez portfela nie pokazuje niczego i ma noindex.
-  { path: '/money?tab=paid', priority: 0.8, changeFrequency: 'daily' },
-  // /how i /curators sa jedynymi stronami, ktore ktos moze SZUKAC z zewnatrz:
-  // pierwsza odpowiada "co da sie tu zrobic", druga jest publicznym zapisem
-  // zmian prowizji i kuratorow w skarbcach Morpho na Base - czyli pytaniem,
-  // ktore ludzie zadaja wyszukiwarce, a nie nam.
+  // WSZYSTKIE ADRESY TU SA DOCELOWE, NIGDY PRZEKIEROWANIA. Sitemapa nie ma
+  // prawa zapraszac crawlera na przekierowanie (ten sam powod, dla ktorego
+  // filtrujemy isRouteDisabled) - a po dwoch scaleniach polowa dawnych tras
+  // to juz tylko redirecty: /re-definition -> /how?tab=re-definition,
+  // /money?tab=paid i /leaderboard -> /asks?tab=paid, /curators ->
+  // /asks?tab=curators. Query w URL-u jest w sitemapie legalne.
+  { path: '/how?tab=re-definition', priority: 0.9, changeFrequency: 'weekly' },
+  // /asks bez query (otwarte Aski) zostaje poza sitemapa razem z ?tab=money:
+  // ta druga bez portfela nie pokazuje niczego i ma noindex.
+  { path: '/asks?tab=paid', priority: 0.8, changeFrequency: 'daily' },
+  // /how i rejestr kuratorow sa jedynymi stronami, ktore ktos moze SZUKAC
+  // z zewnatrz: pierwsza odpowiada "co da sie tu zrobic", druga jest publicznym
+  // zapisem zmian prowizji i kuratorow w skarbcach Morpho na Base - czyli
+  // pytaniem, ktore ludzie zadaja wyszukiwarce, a nie nam.
   { path: '/how', priority: 0.8, changeFrequency: 'monthly' },
-  { path: '/curators', priority: 0.7, changeFrequency: 'daily' },
+  { path: '/asks?tab=curators', priority: 0.7, changeFrequency: 'daily' },
   // /b20 z tego samego powodu: "co to jest B20" i "jak zrobic ladny adres
   // tokena" to pytania zadawane wyszukiwarce. Standard jest swiezy (mainnet
   // 25.06.2026), a najpelniejszy zbior materialow o Base nie ma o nim ani

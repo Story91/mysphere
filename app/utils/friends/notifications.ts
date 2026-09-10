@@ -603,7 +603,7 @@ export const notifyAskPayout = async (params: {
     data: { askId, answerId, tipAmount: amount, token, delivery, txHash },
     // /money to jedyne miejsce z PRZYCISKIEM ODBIORU (AskClaimPanel) i z lista
     // tego, co juz wplynelo. Trasa istnieje - app/money/page.tsx.
-    actionUrl: '/money'
+    actionUrl: '/asks?tab=money'
   });
 
   if (!created) {

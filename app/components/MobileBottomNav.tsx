@@ -15,8 +15,20 @@ import { usePathname } from 'next/navigation';
  *
  * === POZYCJE ===
  * Odbicie gornej belki w zasiegu kciuka: Feed, Asks, StartPad, Money, How.
- * (Re-Definition zostaje w hamburgerze gornej belki - piec pozycji to komplet,
- * ktory miesci sie przy 320px, a StartPad w srodku jest wypukly i najwazniejszy.)
+ * Piec pozycji to komplet, ktory miesci sie przy 320px, a StartPad w srodku
+ * jest wypukly i najwazniejszy.
+ *
+ * MONEY ZOSTAJE TU MIMO SCALENIA. W gornej belce "Money" zniknelo jako wpis -
+ * wlasna ksiega pieniedzy jest dzis zakladka /asks (?tab=money). Tutaj zostaje
+ * osobnym przyciskiem, bo ten pasek nie odchudza sie z pozycji, tylko wybiera
+ * piec najczestszych celow, a saldo do odebrania jest jednym z nich. Skrot
+ * prowadzi wprost do zakladki.
+ *
+ * CENA TEGO SKROTU: `isActive` zna tylko sciezke, nie query (`usePathname`),
+ * wiec na zakladce Money podswietla sie "Asks", a nie "Money". Swiadomie -
+ * `useSearchParams` w komponencie renderowanym na KAZDEJ stronie wymusza
+ * granice <Suspense> na wszystkich, ktore sa dzis statyczne. Zla pigulka jest
+ * tansza niz wypchniecie calej apki z prerenderu.
  *
  * === STARTPAD W SRODKU ===
  * StartPad to nowosc, wiec dostaje wyrozniony, PODNIESIONY przycisk w samym
@@ -62,7 +74,7 @@ const POZYCJE: Poz[] = [
     ),
   },
   {
-    href: '/money',
+    href: '/asks?tab=money',
     label: 'Money',
     icon: (
       <>

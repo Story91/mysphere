@@ -1,6 +1,6 @@
 # Money & Paid
 
-Two tabs, both about money that actually moved through MySphere, not a token-price portfolio. Money (`/money`) is your own ledger, built from your wallet address. Paid (`/money?tab=paid`) is a public tape of tips that settled onchain.
+Two tabs, both about money that actually moved through MySphere, not a token-price portfolio. Money (`/asks?tab=money`) is your own ledger, built from your wallet address. Paid (`/asks?tab=paid`) is a public tape of tips that settled onchain.
 
 ## What it does
 
@@ -19,24 +19,24 @@ The Paid tab is public and shared. It shows a receipt-style tape of tips that se
 
 ## How to use it
 
-1. Open `/money` and connect a wallet. The whole page is built from your address, and nothing is stored elsewhere.
+1. Open `/asks?tab=money` and connect a wallet. The whole page is built from your address, and nothing is stored elsewhere.
 2. Check Waiting for you at the top; if a balance is there, collect it (a signed transaction on Base).
 3. Scan Locked, Paid to you, and What you spent. Click any line's hash to open the transaction in a block explorer.
 4. If an escrowed Ask of yours expired unresolved, the Locked section shows a button that sends the budget back once the 48-hour window has passed. The refund lands as a contract balance, so collecting it is the Waiting for you step at the top.
-5. Switch to Paid (`/money?tab=paid`) to see the public tape and the ranking.
+5. Switch to Paid (`/asks?tab=paid`) to see the public tape and the ranking.
 
 ## How it flows
 
 ```mermaid
 flowchart TD
-    A["Connect wallet on /money"] --> B["Read your address"]
+    A["Connect wallet on /asks?tab=money"] --> B["Read your address"]
     B --> C["Chain: claimable + escrowFor"]
     B --> D["Records: tips, unlocks, answers, asks"]
     C --> E["Waiting + Locked"]
     D --> F["Paid to you + What you spent"]
     E --> G["Every settled line links its tx"]
     F --> G
-    H["/money?tab=paid"] --> I["Public tape of settled tips + ranking"]
+    H["/asks?tab=paid"] --> I["Public tape of settled tips + ranking"]
 ```
 
 ## The math

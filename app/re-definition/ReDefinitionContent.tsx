@@ -3,7 +3,16 @@ import Link from 'next/link';
 // @ts-ignore - config CommonJS wspoldzielony z next.config.js
 import { DISABLED_ROUTES } from '@/config/routeStatus';
 
-export const metadata: Metadata = {
+/**
+ * Metadane zakladki Re-Definition.
+ *
+ * Nie sa juz `export const metadata`, bo /re-definition przestalo byc strona:
+ * manifest mieszka jako zakladka na /how (?tab=re-definition), a metadane
+ * eksportuje tamtejsze generateMetadata. Zostaja TUTAJ, przy tresci, ktora
+ * opisuja - inaczej opis rozjechalby sie z manifestem przy pierwszej zmianie
+ * (ta sama zasada, co przy metadanych Money w app/asks/page.tsx).
+ */
+export const RE_DEFINITION_METADATA: Metadata = {
   // Marke doklada template z layoutu - patrz komentarz przy `title` w app/layout.tsx.
   // (Wczesniej odsylacz szedl do app/leaderboard/page.tsx, ale /leaderboard jest
   // scalany z /money i ten plik znika.)
@@ -39,10 +48,11 @@ export const metadata: Metadata = {
 };
 
 /**
- * Strona Re-Definition.
+ * Tresc zakladki Re-Definition (dawna strona /re-definition).
  *
- * Komponent SERWEROWY - zero interaktywnosci, wiec prerenderuje sie do
- * statycznego HTML-a i nie ciagnie ani kilobajta JS-a.
+ * Komponent SERWEROWY - zero interaktywnosci, wiec nie ciagnie ani kilobajta
+ * JS-a. Renderuje go strona /how na zadanie (zakladka siedzi w query, wiec
+ * prerenderu przy buildzie juz nie ma - powod w komentarzu tam).
  *
  * To NIE jest changelog ani rejestr wylaczonych modulow (poprzednia wersja nim
  * byla i slusznie zostala zjechana). To jest manifest kierunku: jednostka
@@ -869,7 +879,7 @@ function CapabilityRow({ cap }: { cap: (typeof CAPABILITIES)[number] }) {
 
 /* ------------------------------------------------------------------ */
 
-export default function ReDefinitionPage() {
+export default function ReDefinitionContent() {
   // Liczba WPROST z konfiguracji przekierowan.
   //
   // Wczesniej stala tu wlasna lista szesciu sciezek przefiltrowana przez
@@ -1139,7 +1149,7 @@ export default function ReDefinitionPage() {
           </P>
           <P>
             The claim at least has an address now.{' '}
-            <Link href="/money" className="underline decoration-soft-line-strong underline-offset-2">
+            <Link href="/asks?tab=money" className="underline decoration-soft-line-strong underline-offset-2">
               /money
             </Link>{' '}
             answers the four questions this product used to leave scattered across four screens:
@@ -1285,7 +1295,7 @@ export default function ReDefinitionPage() {
               prowadzic do trasy, ktora znika. */}
           <p className="mb-4">
             <Link
-              href="/money?tab=paid"
+              href="/asks?tab=paid"
               className="inline-flex items-center gap-2 rounded-pill bg-soft-accent-soft px-4 py-2.5 font-soft-display text-[13.5px] font-bold text-soft-accent-deep transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97]"
             >
               Watch the money land →

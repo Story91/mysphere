@@ -276,7 +276,7 @@ export default function SoftSignInHero({
           uzasadnienia jest sloganem. `Link`, a nie `onClick` - to nawigacja,
           wiec ma dzialac srodkowym przyciskiem myszy i w nowej karcie. */}
       <Link
-        href="/re-definition"
+        href="/how?tab=re-definition"
         className="soft-hero-rise mt-5 inline-block text-[12.5px] font-semibold text-white/70 underline decoration-white/30 underline-offset-4 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
         style={{ ['--rise-delay' as string]: '240ms' }}
       >

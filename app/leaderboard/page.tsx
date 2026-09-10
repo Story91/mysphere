@@ -1,11 +1,15 @@
 import { redirect } from 'next/navigation';
 
 /**
- * /leaderboard nie jest juz strona - "Paid" mieszka jako zakladka na /money
- * (?tab=paid). Powod scalenia: skarga "za duzo pozycji w nawigacji", a obie
- * strony mowia o pieniadzach - ta o cudzych, /money o wlasnych.
+ * /leaderboard nie jest juz strona - "Paid" mieszka jako zakladka na /asks
+ * (?tab=paid). Powod scalenia: skarga "za duzo pozycji w nawigacji", a wszystkie
+ * te strony mowia o pieniadzach - ta o cudzych, ?tab=money o wlasnych.
  *
- * Sama tresc zyje w ./LeaderboardContent.tsx i renderuje ja strona /money.
+ * DWA SCALENIA, JEDEN ADRES: najpierw Paid trafil na /money?tab=paid, potem
+ * cale /money trafilo na /asks. Ten redirect celuje juz w ADRES DOCELOWY,
+ * a nie w /money?tab=paid - inaczej kazde wejscie kosztowaloby dwa skoki.
+ *
+ * Sama tresc zyje w ./LeaderboardContent.tsx i renderuje ja strona /asks.
  *
  * DLACZEGO redirect() TUTAJ, A NIE WPIS W next.config.js: katalog musi zostac
  * trasa, bo /leaderboard/opengraph-image.tsx dalej serwuje karte OG dla linkow
@@ -15,5 +19,5 @@ import { redirect } from 'next/navigation';
  * poziomie page.tsx niczego w niej nie rusza.
  */
 export default function LeaderboardRedirect() {
-  redirect('/money?tab=paid');
+  redirect('/asks?tab=paid');
 }

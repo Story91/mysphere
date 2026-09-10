@@ -20,7 +20,7 @@ Because sealed work happens before payment, every card also shows the author's p
 3. Pick a funding mode. Escrow needs your wallet on Base and runs two prompts: approve the exact budget, then fund to lock it. On-resolve writes the Ask with no on-chain step.
 4. Others answer sealed. One answer per wallet, up to 5,000 characters, and never on your own Ask. You (the author) sign in, open the answers, and pick winners.
 5. Resolve. On-resolve pays each accepted answer by transfer. Escrow closes all seats in one `resolve` transaction that assigns balances; before the deadline that transaction must fill every seat, after the deadline you can award fewer.
-6. Collect. Escrow payouts and any returned budget wait in the contract until the recipient claims them from [/money](/money). There's no deadline to collect.
+6. Collect. Escrow payouts and any returned budget wait in the contract until the recipient claims them from [the Money tab](/asks?tab=money). There's no deadline to collect.
 
 ## How it flows
 
@@ -47,7 +47,7 @@ For escrowed Asks a fee applies only to budget that returns to the author: unuse
 
 $$\text{fee} = \left\lfloor \frac{\text{returned} \times \text{bps}}{10000} \right\rfloor, \qquad \text{toAuthor} = \text{returned} - \text{fee}$$
 
-An unresolved escrow can only be swept back 48 hours after the deadline (`settleExpired`). That window exists so the author has time to read the answers before anyone can reclaim. The button for sending an expired budget back sits on [/money](/money), in the Locked section.
+An unresolved escrow can only be swept back 48 hours after the deadline (`settleExpired`). That window exists so the author has time to read the answers before anyone can reclaim. The button for sending an expired budget back sits on [the Money tab](/asks?tab=money), in the Locked section.
 
 ## Check it onchain
 

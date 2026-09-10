@@ -2,35 +2,77 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import AsksContent from './AsksContent';
 import CuratorsContent from '../curators/CuratorsContent';
+import MoneyContent from '../money/MoneyContent';
+import LeaderboardContent from '../leaderboard/LeaderboardContent';
 
 /**
- * /asks - JEDNA strona, dwie zakladki: otwarte Aski i publiczny rejestr kuratorow.
+ * /asks - JEDNA strona, cztery zakladki: otwarte Aski, wlasna ksiega pieniedzy,
+ * publiczna tasma rozliczonych platnosci i rejestr kuratorow.
  *
- * === DLACZEGO SCALONE (kalka z /money) ===
- * Skarga o zbyt wielu pozycjach w belce zdjela wczesniej "Paid" pod /money.
- * "Curators" to ten sam rodzaj rzeczy w drugiej polowie: publiczny, sprawdzalny
- * zapis o cudzych pieniadzach na Base. Ask jest miejscem, gdzie pytasz i placisz;
- * rejestr kuratorow - miejscem, gdzie sprawdzasz, komu i na jakich warunkach te
- * pieniadze powierzasz. Jeden wpis w belce, przelacznik na stronie. Stare
- * /curators przekierowuje tutaj (redirect w app/curators/page.tsx).
+ * === DLACZEGO SCALONE ===
+ * Skarga o zbyt wielu pozycjach w belce zdjela wczesniej "Paid" pod /money,
+ * a potem "Curators" pod /asks. Teraz to samo spotkalo caly wpis "Money":
+ * zajmowal miejsce w gornej belce, a mowi o dokladnie tej samej rzeczy co Ask.
+ * Ask jest miejscem, w ktorym pieniadze sie zaczynaja; Money - jedynym,
+ * w ktorym widac, gdzie skonczyly; Paid - tym samym widokiem o cudzych
+ * pieniadzach; rejestr kuratorow - miejscem, gdzie sprawdzasz, komu te
+ * pieniadze powierzasz. Jeden wpis w belce, przelacznik na stronie.
  *
- * === ZAKLADKA W QUERY (?tab=curators), NIE W STANIE ===
- * Ten sam powod co na /money: linki maja dzialac, a przycisk wstecz ma wracac do
- * poprzedniej zakladki. Przelacznik to dwa <Link>-i - Next podmienia tresc bez
- * przeladowania, a URL zawsze mowi prawde o tym, co widac.
+ * Stare adresy przekierowuja tutaj i ZADEN z nich nie ginie:
+ *   /curators           -> /asks?tab=curators
+ *   /money              -> /asks?tab=money
+ *   /money?tab=paid     -> /asks?tab=paid
+ *   /leaderboard        -> /asks?tab=paid
  *
- * === DLACZEGO ASKI SA KLIENCKIE, A KURATORZY SERWEROWI ===
- * AsksContent jest kliencki (portfel, sesja SIWE, transakcje). CuratorsContent
- * jest serwerowy i ma wlasny cache (unstable_cache, 5 min) - dokladnie tak jak
- * LeaderboardContent na /money. Serwerowa strona-matka renderuje jeden ALBO drugi.
+ * === ZAKLADKA W QUERY (?tab=...), NIE W STANIE ===
+ * Linki maja dzialac, a przycisk wstecz ma wracac do poprzedniej zakladki.
+ * Przelacznik to cztery <Link>-i - Next podmienia tresc bez przeladowania,
+ * a URL zawsze mowi prawde o tym, co widac.
+ *
+ * === DLACZEGO CZTERY PIGULKI, A NIE DWIE ZAGNIEZDZONE ===
+ * Money mialo wlasny przelacznik Money/Paid. Wniesienie go tutaj w calosci
+ * dalby przelacznik w przelaczniku - dwa rzedy pigulek jeden pod drugim, gdzie
+ * drugi rzad pojawia sie i znika. Plaska czworka jest jednym rzedem i kazda
+ * pozycja ma wlasny adres.
+ *
+ * === DLACZEGO CZESC ZAKLADEK JEST SERWEROWA ===
+ * AsksContent i MoneyContent sa klienckie (portfel, sesja SIWE, transakcje).
+ * CuratorsContent i LeaderboardContent sa serwerowe i maja wlasny cache
+ * (unstable_cache) - przepisanie ich na klienta znaczyloby, ze kazdy
+ * odwiedzajacy placi odczyt kolekcji ze swojej przegladarki. Serwerowa
+ * strona-matka renderuje dokladnie jeden z nich.
+ *
+ * === <main> ===
+ * AsksContent i CuratorsContent nios wlasny <main> z tlem i min-h-screen.
+ * MoneyContent i LeaderboardContent nie - ich <main> stal dawniej w
+ * app/money/page.tsx, wiec tutaj dokladamy go przy renderze. W DOM ma byc
+ * zawsze dokladnie jeden <main>.
  */
 
 type SearchParams = { tab?: string | string[] };
 
-function isCuratorsTab(searchParams: SearchParams | undefined): boolean {
-  const tab = searchParams?.tab;
-  return (Array.isArray(tab) ? tab[0] : tab) === 'curators';
+type Tab = 'asks' | 'money' | 'paid' | 'curators';
+
+function currentTab(searchParams: SearchParams | undefined): Tab {
+  const raw = searchParams?.tab;
+  const tab = Array.isArray(raw) ? raw[0] : raw;
+  if (tab === 'money' || tab === 'paid' || tab === 'curators') return tab;
+  return 'asks';
 }
+
+/**
+ * Opis Askow ma POKRYCIE W KODZIE: sealed przez regule Firestore, escrow jako
+ * WYBOR autora ("can lock", nie "is locked"), wyplata z hashem obok odpowiedzi.
+ * Nie zamieniaj na obietnice bezwarunkowa - patrz historia w usunietym layoucie.
+ */
+const ASKS_DESCRIPTION =
+  'An Ask is a question with a budget, a number of seats and a deadline. Answers stay sealed: nobody can read what anyone else wrote before the author opens them. The author can lock the whole budget in an escrow contract up front, and every payout is recorded onchain next to the answer that earned it.';
+
+const CURATORS_DESCRIPTION =
+  'A dated record of what curators changed in listed Morpho vaults on Base: fee changes, curator changes, and vaults entering or leaving the listed set.';
+
+const MONEY_DESCRIPTION =
+  'Everything money-shaped in one place. Your side: what the escrow contract owes you, what your open Asks are holding, what people paid you, and what you spent. The Paid tab: a public timeline of settled payments between people, every line with a transaction anyone can open and check.';
 
 /**
  * Metadane zalezne od zakladki - i JEDYNE zrodlo metadanych /asks.
@@ -42,18 +84,17 @@ function isCuratorsTab(searchParams: SearchParams | undefined): boolean {
  * zrodla metadanych rozjezdzalyby sie na zakladce Kuratorow (og/twitter
  * "Open asks" na stronie o prowizjach).
  *
- * Opis Askow ma POKRYCIE W KODZIE: sealed przez regule Firestore, escrow jako
- * WYBOR autora ("can lock", nie "is locked"), wyplata z hashem obok odpowiedzi.
- * Nie zamieniaj na obietnice bezwarunkowa - patrz historia w usunietym layoucie.
+ * Zakladki money i paid przynosza tu metadane z dawnego app/money/page.tsx
+ * w calosci: `tab=paid` dostaje jeszcze starsze metadane /leaderboard, zeby
+ * link wyslany po dwoch przekierowaniach opisywal to, co czlowiek zobaczy -
+ * publiczna tasme, nie prywatna ksiege. Paid jest tez jedyna z tych dwoch
+ * zakladek z trescia publiczna, wiec TYLKO ona ma byc indeksowana; widok
+ * money bez portfela nie pokazuje niczego i zostaje przy noindex.
  */
-const ASKS_DESCRIPTION =
-  'An Ask is a question with a budget, a number of seats and a deadline. Answers stay sealed: nobody can read what anyone else wrote before the author opens them. The author can lock the whole budget in an escrow contract up front, and every payout is recorded onchain next to the answer that earned it.';
-
-const CURATORS_DESCRIPTION =
-  'A dated record of what curators changed in listed Morpho vaults on Base: fee changes, curator changes, and vaults entering or leaving the listed set.';
-
 export function generateMetadata({ searchParams }: { searchParams: SearchParams }): Metadata {
-  if (isCuratorsTab(searchParams)) {
+  const tab = currentTab(searchParams);
+
+  if (tab === 'curators') {
     return {
       title: 'Curator record',
       description: CURATORS_DESCRIPTION,
@@ -69,6 +110,29 @@ export function generateMetadata({ searchParams }: { searchParams: SearchParams 
         description: CURATORS_DESCRIPTION,
       },
       alternates: { canonical: 'https://mysphere.fun/asks?tab=curators' },
+    };
+  }
+
+  if (tab === 'paid') {
+    return {
+      // Bez marki: dokłada ja `title.template` z layoutu glownego.
+      title: 'Paid: money moving',
+      description:
+        'A public timeline of settled payments between people. Every line carries a transaction anyone can open and check. No points, no activity score.',
+      openGraph: {
+        title: 'Paid: the only feed where the timeline is money',
+        description: 'Settled payments between people, each one verifiable onchain.',
+        type: 'website',
+      },
+      alternates: { canonical: 'https://mysphere.fun/asks?tab=paid' },
+    };
+  }
+
+  if (tab === 'money') {
+    return {
+      title: 'Your money',
+      description: MONEY_DESCRIPTION,
+      robots: { index: false, follow: true },
     };
   }
 
@@ -95,33 +159,63 @@ function TabPill({ href, active, children }: { href: string; active: boolean; ch
   );
 }
 
+/**
+ * Szerokosc kolumny przelacznika sledzi aktywna zakladke, zeby pigulki staly
+ * nad lewa krawedzia tresci, a nie obok niej.
+ */
+const TAB_COLUMN: Record<Tab, string> = {
+  asks: 'max-w-[640px]',
+  money: 'max-w-[640px]',
+  paid: 'max-w-[620px]',
+  curators: 'max-w-[760px]',
+};
+
 export default function AsksPage({ searchParams }: { searchParams: SearchParams }) {
-  const curators = isCuratorsTab(searchParams);
+  const tab = currentTab(searchParams);
+
+  const switcher = (
+    <nav
+      aria-label="Asks views"
+      /* flex-wrap, bo cztery pigulki przy 320px nie mieszcza sie w jednym
+         rzedzie - maja sie zlamac, a nie wyjechac poza ekran. */
+      className="inline-flex flex-wrap items-center gap-1 rounded-card border border-soft-line bg-soft-sunken p-1 sm:rounded-pill"
+    >
+      <TabPill href="/asks" active={tab === 'asks'}>
+        Asks
+      </TabPill>
+      <TabPill href="/asks?tab=money" active={tab === 'money'}>
+        Money
+      </TabPill>
+      <TabPill href="/asks?tab=paid" active={tab === 'paid'}>
+        Paid
+      </TabPill>
+      <TabPill href="/asks?tab=curators" active={tab === 'curators'}>
+        Curators
+      </TabPill>
+    </nav>
+  );
+
+  // Money i Paid nie nios wlasnego <main> - dostaja go tutaj, razem
+  // z przelacznikiem w srodku, zeby na stronie stal dokladnie jeden <main>.
+  if (tab === 'money' || tab === 'paid') {
+    return (
+      <main className="min-h-screen bg-soft-bg font-soft">
+        <div className={`mx-auto w-full px-4 pb-6 pt-10 sm:px-5 ${TAB_COLUMN[tab]}`}>{switcher}</div>
+        {tab === 'paid' ? <LeaderboardContent /> : <MoneyContent />}
+      </main>
+    );
+  }
 
   return (
     <>
-      {/* Przelacznik stoi NAD trescia obu zakladek. Kazda zakladka niesie WLASNY
-          <main> z tlem i min-h-screen (AsksContent / CuratorsContent), wiec
-          w DOM jest zawsze dokladnie jeden <main>; ten pasek to <nav> nad nim.
-          Szerokosc kolumny sledzi aktywna zakladke (Aski 640, Kuratorzy 760),
-          zeby pigulki staly nad lewa krawedzia tresci, a nie obok niej. */}
+      {/* Przelacznik stoi NAD trescia zakladki, ktora niesie WLASNY <main>
+          z tlem i min-h-screen (AsksContent / CuratorsContent); ten pasek to
+          <nav> nad nim. */}
       <div className="bg-soft-bg pt-8">
-        <div className={`mx-auto w-full px-4 sm:px-5 ${curators ? 'max-w-[760px]' : 'max-w-[640px]'}`}>
-          <nav
-            aria-label="Asks views"
-            className="inline-flex items-center gap-1 rounded-pill border border-soft-line bg-soft-sunken p-1"
-          >
-            <TabPill href="/asks" active={!curators}>
-              Asks
-            </TabPill>
-            <TabPill href="/asks?tab=curators" active={curators}>
-              Curators
-            </TabPill>
-          </nav>
-        </div>
+        <div className={`mx-auto w-full px-4 sm:px-5 ${TAB_COLUMN[tab]}`}>{switcher}</div>
       </div>
 
-      {curators ? <CuratorsContent /> : <AsksContent />}
+      {tab === 'curators' ? <CuratorsContent /> : <AsksContent />}
     </>
   );
 }

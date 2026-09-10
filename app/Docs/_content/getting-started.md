@@ -16,11 +16,11 @@ MySphere spans several networks, and each part of the app lives where it belongs
 
 - [/basechat](/basechat) is the feed: posts on seven networks, tips, paid unlocks, creator support, paid pins, profiles, and the Ask composer.
 - [/asks](/asks) holds open Asks, sealed answers, resolving, and the curator record tab.
-- [/money](/money) is your own ledger plus the public Paid tape of settled tips.
+- [/asks?tab=money](/asks?tab=money) is your own ledger; the Paid tab next to it is the public tape of settled tips.
 - [/startpad](/startpad) is the token launchpad; each token has its own page with a chart and trade panel.
 - [/b20](/b20) lists every B20 token on Base, and can create one straight against the network factory.
 - [/how](/how) lists every action you can take today, each with its price and what you sign.
-- [/re-definition](/re-definition) is the state of the product: what runs now and what is still being built.
+- [/how?tab=re-definition](/how?tab=re-definition) is the state of the product: what runs now and what is still being built.
 - [/Docs](/Docs) is this documentation.
 
 Invite links land on `/join`, and every post, profile, tip, and Ask has a public share page (`/post/<id>`, `/u/<address>`, `/tip/<hash>`, `/ask/<id>`).

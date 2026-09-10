@@ -364,7 +364,7 @@ export default async function LeaderboardContent() {
             Open the feed
           </Link>
           <Link
-            href="/re-definition"
+            href="/how?tab=re-definition"
             className="rounded-pill bg-soft-surface px-5 py-3 font-soft text-[14px] font-semibold text-soft-ink-muted shadow-card transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97]"
           >
             Why money, not likes

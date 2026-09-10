@@ -1,14 +1,21 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
+import ReDefinitionContent, { RE_DEFINITION_METADATA } from '../re-definition/ReDefinitionContent';
 
 /**
  * /how - instrukcja obslugi produktu dla czlowieka, ktory wlasnie wszedl.
  *
- * Komponent SERWEROWY: zero interaktywnosci, wiec prerenderuje sie do
- * statycznego HTML-a i nie ciagnie ani kilobajta JS-a. To samo podejscie co
- * /re-definition.
+ * Komponent SERWEROWY: zero interaktywnosci, wiec nie ciagnie ani kilobajta
+ * JS-a. To samo podejscie co w manifescie obok.
  *
- * === CZYM TA STRONA NIE JEST ===
- * NIE jest manifestem. /re-definition tlumaczy, DLACZEGO ten produkt istnieje
+ * CENA PRZELACZNIKA: odkad strona czyta `searchParams` (zakladka w query),
+ * Next renderuje ja na zadanie, a nie raz przy buildzie. Nie ma tu zadnego
+ * odczytu danych, wiec render kosztuje sam HTML - ale "prerenderuje sie do
+ * statycznego HTML-a" przestalo byc prawda i nie ma po co tego udawac.
+ * Ta sama zamiana zaszla wczesniej na /asks, kiedy doszly tam zakladki.
+ *
+ * === CZYM TA ZAKLADKA NIE JEST ===
+ * NIE jest manifestem. Zakladka obok tlumaczy, DLACZEGO ten produkt istnieje
  * i czym rozni sie od reszty - i ma prawo byc tam teza, ktora dopiero
  * powstaje. Ta strona odpowiada na inne pytanie: CO MOGE TU ZROBIC TERAZ.
  * Kazdy krok musi dac sie wykonac dzisiaj, bez czekania na cokolwiek.
@@ -58,18 +65,58 @@ import Link from 'next/link';
  * gorsze niz jeden krok wiecej w instrukcji.
  */
 
-export const metadata = {
-  // Marke doklada `title.template` z layoutu glownego.
-  title: 'How it works',
-  description:
-    'What you can do on MySphere today: post onchain, tip in USDC, sell part of a post, ask a question with a budget, launch a token on the Startpad curve, collect what you are owed, and look up what a vault curator changed.',
-  openGraph: {
-    title: 'How MySphere works',
+type SearchParams = { tab?: string | string[] };
+
+/**
+ * /how - DWIE zakladki: instrukcja i manifest.
+ *
+ * === DLACZEGO SCALONE ===
+ * Belka miala osobny wpis "Re-Definition" i osobny "How", stojace obok siebie.
+ * To sa dwa pytania o ten sam produkt: "co da sie zrobic teraz" i "dlaczego to
+ * w ogole istnieje". Jeden wpis w belce, przelacznik na stronie - kalka
+ * z /asks (Asks / Money / Paid / Curators). Stare /re-definition przekierowuje
+ * tutaj (redirect w app/re-definition/page.tsx).
+ *
+ * PODZIAL TRESCI SIE NIE ZMIENIA. Ta zakladka nadal nie ma prawa do ani jednego
+ * zdania w czasie przyszlym; rzeczy, ktorych jeszcze nie ma, siedza w zakladce
+ * obok, ze statusem. Wspolny adres nie jest pozwoleniem na mieszanie jednego
+ * z drugim - jest tylko skroceniem drogi miedzy nimi.
+ *
+ * === ZAKLADKA W QUERY, NIE W STANIE ===
+ * Ten sam powod co na /asks: linki maja dzialac (manifest jest linkowany
+ * z feedu, z profili i z /how), a przycisk wstecz ma wracac do poprzedniej
+ * zakladki. Przelacznik to dwa <Link>-i, obie zakladki sa serwerowe i statyczne.
+ */
+function isReDefinitionTab(searchParams: SearchParams | undefined): boolean {
+  const tab = searchParams?.tab;
+  return (Array.isArray(tab) ? tab[0] : tab) === 're-definition';
+}
+
+/**
+ * Metadane zalezne od zakladki. Manifest przynosi swoje wlasne z
+ * ReDefinitionContent - stoja przy tresci, ktora opisuja, a nie tutaj.
+ */
+export function generateMetadata({ searchParams }: { searchParams: SearchParams }): Metadata {
+  if (isReDefinitionTab(searchParams)) {
+    return {
+      ...RE_DEFINITION_METADATA,
+      alternates: { canonical: 'https://mysphere.fun/how?tab=re-definition' },
+    };
+  }
+
+  return {
+    // Marke doklada `title.template` z layoutu glownego.
+    title: 'How it works',
     description:
-      'Post onchain, tip in USDC, put part of a post behind a payment, ask a question with a budget and seats, launch a token on a bonding curve. Every amount settles onchain with a hash.',
-    type: 'article',
-  },
-};
+      'What you can do on MySphere today: post onchain, tip in USDC, sell part of a post, ask a question with a budget, launch a token on the Startpad curve, collect what you are owed, and look up what a vault curator changed.',
+    openGraph: {
+      title: 'How MySphere works',
+      description:
+        'Post onchain, tip in USDC, put part of a post behind a payment, ask a question with a budget and seats, launch a token on a bonding curve. Every amount settles onchain with a hash.',
+      type: 'article',
+    },
+  };
+}
 
 /* ------------------------------------------------------------------ */
 
@@ -357,7 +404,7 @@ function Go({ href, children }: { href: string; children: React.ReactNode }) {
 
 /* ------------------------------------------------------------------ */
 
-export default function HowPage() {
+function HowContent() {
   return (
     <main className="min-h-screen bg-soft-bg font-soft">
       <div className="mx-auto max-w-[760px] px-5 py-14 sm:px-8 sm:py-20">
@@ -384,7 +431,7 @@ export default function HowPage() {
           the step says so in the step. What is still being built is listed
           on{' '}
           <Link
-            href="/re-definition"
+            href="/how?tab=re-definition"
             className="font-semibold text-soft-primary-deep underline decoration-soft-line underline-offset-4 hover:text-soft-primary"
           >
             Re-Definition
@@ -454,7 +501,7 @@ export default function HowPage() {
               timeline of money that moved between two people. Names and
               faces on both ends, and a transaction on every line.
             </P>
-            <Go href="/money?tab=paid">See what people paid each other</Go>
+            <Go href="/asks?tab=paid">See what people paid each other</Go>
           </Step>
 
           {/* ---------------------------------------------------------- */}
@@ -575,7 +622,7 @@ export default function HowPage() {
               we owned the clock. The button exists, it names the fee, and it
               has never been pressed for real by anyone.
             </P>
-            <Go href="/money">Open Money</Go>
+            <Go href="/asks?tab=money">Open Money</Go>
           </Step>
 
           {/* ---------------------------------------------------------- */}
@@ -799,5 +846,55 @@ export default function HowPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+
+/** Jedna pigulka przelacznika. Aktywna wyglada jak aktywny wpis w belce. */
+function TabPill({ href, active, children }: { href: string; active: boolean; children: React.ReactNode }) {
+  return (
+    <Link
+      href={href}
+      aria-current={active ? 'page' : undefined}
+      className={`inline-flex items-center justify-center rounded-pill px-5 py-2 font-soft-display text-[13.5px] font-bold transition-[background-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-sunken ${
+        active ? 'bg-soft-primary text-white shadow-chip' : 'text-soft-ink-muted hover:bg-soft-surface'
+      }`}
+    >
+      {children}
+    </Link>
+  );
+}
+
+export default function HowPage({ searchParams }: { searchParams: SearchParams }) {
+  const manifesto = isReDefinitionTab(searchParams);
+
+  return (
+    <>
+      {/* Przelacznik stoi NAD trescia obu zakladek. Kazda z nich niesie WLASNY
+          <main> z tlem i min-h-screen, wiec w DOM jest zawsze dokladnie jeden
+          <main>; ten pasek to <nav> nad nim. Szerokosc kolumny sledzi aktywna
+          zakladke (instrukcja 760, manifest 1080), zeby pigulki staly nad lewa
+          krawedzia tresci, a nie obok niej. */}
+      <div className="bg-soft-bg pt-8">
+        <div
+          className={`mx-auto w-full px-5 sm:px-8 ${manifesto ? 'max-w-[1080px]' : 'max-w-[760px]'}`}
+        >
+          <nav
+            aria-label="How views"
+            className="inline-flex items-center gap-1 rounded-pill border border-soft-line bg-soft-sunken p-1"
+          >
+            <TabPill href="/how" active={!manifesto}>
+              How
+            </TabPill>
+            <TabPill href="/how?tab=re-definition" active={manifesto}>
+              Re-Definition
+            </TabPill>
+          </nav>
+        </div>
+      </div>
+
+      {manifesto ? <ReDefinitionContent /> : <HowContent />}
+    </>
   );
 }
