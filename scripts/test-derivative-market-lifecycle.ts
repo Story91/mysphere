@@ -23,11 +23,22 @@ import { getAddress } from "ethers";
  *   SIDE       "long" albo "short", domyslnie "long"
  *   CLOSE      "nie" zeby zostawic pozycje otwarta zamiast ja zamykac
  *   CONFIRM    musi byc "tak" na sieci innej niz lokalna
+ *
+ * TRADER_MNEMONIC (w .env.local) - jesli ustawiona, transakcje podpisuje TEN
+ * portfel zamiast domyslnego konta hardhata (ADMIN_PRIVATE_KEY). Wazne przy
+ * handlu na wlasnym rynku: tworca feedu moze otworzyc na nim najwyzej 2%
+ * limitu OI (CREATOR_OI_CAP_BPS w DerivativeMarket.sol - ochrona przed
+ * manipulacja wlasna cena), wiec ten sam portfel co przy
+ * create-sample-derivative-market.ts czesto w ogole nie przejdzie.
+ * Portfel z TRADER_MNEMONIC potrzebuje wlasnego zasilenia w USDC i gaz.
  */
 async function main() {
-  const [signer] = await ethers.getSigners();
-  const trader = getAddress(signer.address);
-  const chainId = Number((await ethers.provider.getNetwork()).chainId);
+  const provider = ethers.provider;
+  const trader = process.env.TRADER_MNEMONIC
+    ? ethers.Wallet.fromPhrase(process.env.TRADER_MNEMONIC).connect(provider)
+    : (await ethers.getSigners())[0];
+  const traderAddress = getAddress(trader.address);
+  const chainId = Number((await provider.getNetwork()).chainId);
   const isLocal = network.name === "hardhat" || network.name === "localhost";
 
   if (!isLocal && process.env.CONFIRM !== "tak") {
@@ -45,15 +56,15 @@ async function main() {
   const leverage = Number(process.env.LEVERAGE ?? "2");
   const shouldClose = (process.env.CLOSE ?? "tak").toLowerCase() !== "nie";
 
-  const market = await ethers.getContractAt("DerivativeMarket", marketAddress);
+  const market = (await ethers.getContractAt("DerivativeMarket", marketAddress)).connect(trader);
   const usdcAddress = getAddress(await market.USDC());
-  const usdc = await ethers.getContractAt("IERC20", usdcAddress);
+  const usdc = (await ethers.getContractAt("IERC20", usdcAddress)).connect(trader);
   const oracleAddress = getAddress(await market.ORACLE());
-  const oracle = await ethers.getContractAt("PriceOracleRegistry", oracleAddress);
+  const oracle = (await ethers.getContractAt("PriceOracleRegistry", oracleAddress)).connect(trader);
   const oracleMarketId: bigint = await market.ORACLE_MARKET_ID();
 
   console.log("siec       ", `${network.name} (chainId ${chainId})`);
-  console.log("trader     ", trader);
+  console.log("trader     ", traderAddress);
   console.log("rynek      ", marketAddress);
   console.log("kierunek   ", isLong ? "long" : "short");
   console.log("margin     ", ethers.formatUnits(marginUsdc, 6), "USDC");
@@ -75,7 +86,7 @@ async function main() {
     ).wait();
   }
 
-  const allowance: bigint = await usdc.allowance(trader, marketAddress);
+  const allowance: bigint = await usdc.allowance(traderAddress, marketAddress);
   if (allowance < marginUsdc) {
     console.log("zatwierdzam USDC dla rynku...");
     await (await usdc.approve(marketAddress, marginUsdc)).wait();
@@ -84,10 +95,10 @@ async function main() {
   console.log("otwieram pozycje...");
   await (await market.openPosition(isLong, marginUsdc, leverage)).wait();
 
-  const pos = await market.getPosition(trader);
-  const pnl: bigint = await market.unrealizedPnl(trader);
-  const liqPrice: bigint = await market.liquidationPrice(trader);
-  const ratioBps: bigint = await market.marginRatioBps(trader);
+  const pos = await market.getPosition(traderAddress);
+  const pnl: bigint = await market.unrealizedPnl(traderAddress);
+  const liqPrice: bigint = await market.liquidationPrice(traderAddress);
+  const ratioBps: bigint = await market.marginRatioBps(traderAddress);
 
   console.log("");
   console.log("POZYCJA OTWARTA");
@@ -112,7 +123,7 @@ async function main() {
 
   console.log("");
   console.log("GOTOWE");
-  console.log(JSON.stringify({ market: marketAddress, trader, side: isLong ? "long" : "short", tx: receipt?.hash }, null, 2));
+  console.log(JSON.stringify({ market: marketAddress, trader: traderAddress, side: isLong ? "long" : "short", tx: receipt?.hash }, null, 2));
 }
 
 main().catch((error) => {
