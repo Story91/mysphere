@@ -47,8 +47,12 @@ contract PriceOracleRegistry is ReentrancyGuard {
     /*  PARAMETRY                                                              */
     /* ====================================================================== */
 
-    /** Kaucja feedu. 100 USDC (6 miejsc). */
-    uint256 public constant BOND_AMOUNT = 100e6;
+    /**
+     * DOLNA GRANICA kaucji feedu, 100 USDC (6 miejsc). Tworca moze wlozyc
+     * wiecej i zwykle bedzie chcial: limit OI jego rynku jest wprost
+     * proporcjonalny do kaucji (patrz DerivativeMarket.maxOpenInterest).
+     */
+    uint256 public constant MIN_BOND_AMOUNT = 100e6;
 
     /** Kaucja zglaszajacego. Nizsza niz kaucja feedu - zgloszenie ma byc realne. */
     uint256 public constant CHALLENGE_BOND = 25e6;
@@ -144,6 +148,7 @@ contract PriceOracleRegistry is ReentrancyGuard {
     event ChallengeOpened(uint256 indexed marketId, address indexed challenger, uint256 disputedPrice, uint256 bond);
     event ChallengeResolved(uint256 indexed marketId, address indexed challenger, bool upheld, uint256 reward);
     event InsuranceFundSet(address indexed fund);
+    event BondToppedUp(uint256 indexed marketId, address indexed from, uint256 amount, uint256 bond);
 
     error ZeroAddress();
     error EmptySymbol();
@@ -158,6 +163,7 @@ contract PriceOracleRegistry is ReentrancyGuard {
     error TimestampInFuture();
     error TimestampStale();
     error NoBond();
+    error BondTooSmall();
     error PriceFrozen();
     error ChallengeWindowClosed();
     error ChallengeAlreadyOpen();
@@ -185,18 +191,20 @@ contract PriceOracleRegistry is ReentrancyGuard {
     /* ====================================================================== */
 
     /**
-     * Rejestruje feed. Kaucja BOND_AMOUNT musi byc wczesniej zatwierdzona.
+     * Rejestruje feed. `bondAmount` (>= MIN_BOND_AMOUNT) musi byc wczesniej
+     * zatwierdzone; im wieksza kaucja, tym wiekszy limit OI rynku.
      * `initialPrice` w WAD - 1 USD to 1e18, nie 1e8 i nie 1e6.
      */
-    function registerMarket(string calldata symbol, uint256 initialPrice)
+    function registerMarket(string calldata symbol, uint256 initialPrice, uint256 bondAmount)
         external
         nonReentrant
         returns (uint256 marketId)
     {
         if (bytes(symbol).length == 0) revert EmptySymbol();
         if (initialPrice == 0) revert ZeroPrice();
+        if (bondAmount < MIN_BOND_AMOUNT) revert BondTooSmall();
 
-        USDC.safeTransferFrom(msg.sender, address(this), BOND_AMOUNT);
+        USDC.safeTransferFrom(msg.sender, address(this), bondAmount);
 
         marketId = ++marketCount;
         Market storage m = _markets[marketId];
@@ -206,13 +214,28 @@ contract PriceOracleRegistry is ReentrancyGuard {
         m.price = initialPrice;
         m.updatedAt = uint64(block.timestamp);
         m.createdAt = uint64(block.timestamp);
-        m.bond = BOND_AMOUNT;
+        m.bond = bondAmount;
         m.cumulative = 0;
         m.head = 0;
         m.filled = 1;
         _obs[marketId][0] = Observation({cumulative: 0, timestamp: uint64(block.timestamp)});
 
         emit MarketRegistered(marketId, msg.sender, symbol, initialPrice);
+    }
+
+    /**
+     * Dokladanie kaucji. Otwarte dla KAZDEGO - kaucja jest zabezpieczeniem
+     * traderow, wiec kto chce podniesc limit OI rynku, moze go doplacic.
+     * Nie ma sciezki wyjscia: kaucji nie da sie wycofac. Rynek, ktory raz
+     * urosl, nie kurczy sie w chwili, gdy tworca zmienia zdanie.
+     */
+    function topUpBond(uint256 marketId, uint256 amount) external nonReentrant {
+        Market storage m = _requireMarket(marketId);
+        if (m.slashed) revert MarketIsSlashed();
+        if (amount == 0) revert NoBond();
+        USDC.safeTransferFrom(msg.sender, address(this), amount);
+        m.bond += amount;
+        emit BondToppedUp(marketId, msg.sender, amount, m.bond);
     }
 
     function setPublisher(uint256 marketId, address publisher) external {
