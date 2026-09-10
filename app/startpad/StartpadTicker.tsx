@@ -14,7 +14,9 @@ import {
   LIVE_WATCH,
   NATIVE_SYMBOL,
 } from './config';
+import { tapeAmount } from './[address]/detailShared';
 import { POOL_SWAP_EVENT } from './[address]/poolSwaps';
+import { useEthUsd } from './useEthUsd';
 import { fetchLogos, recallLogos } from './logos';
 import { loadFeedSnapshot, loadSnapshot } from './snapshot';
 import { SPHERE_TOKEN_ADDRESS } from './sphere/sphereConfig';
@@ -72,6 +74,10 @@ const TONE_CLASS: Record<TickerItem['tone'], string> = {
 export default function StartpadTicker() {
   const readClient = usePublicClient({ chainId: LAUNCHPAD_CHAIN.id });
   const chainId = ACTIVE_LAUNCHPAD_NETWORK.chain.id;
+  // Kurs ETH/USD z tego samego zrodla, co tablica - pasek ma pokazywac
+  // dolary, a nie ulamki ETH, ktore nikomu nic nie mowia. Gdy kursu jeszcze
+  // nie ma, `tapeAmount` sam wraca do jednostki natywnej.
+  const { usd: ethUsd } = useEthUsd();
   const [items, setItems] = useState<TickerItem[]>([]);
   const [poolId, setPoolId] = useState<`0x${string}` | null>(null);
   const seeded = useRef(false);
@@ -321,9 +327,7 @@ export default function StartpadTicker() {
               <span className="font-extrabold">{item.symbol}</span>
               <span className={TONE_CLASS[item.tone]}>{item.label}</span>
               {item.eth !== undefined && (
-                <span className="text-sp-shade/50">
-                  {item.eth < 0.0001 ? '<0.0001' : item.eth.toFixed(4)} {NATIVE_SYMBOL}
-                </span>
+                <span className="text-sp-shade/50">{tapeAmount(item.eth, ethUsd, NATIVE_SYMBOL)}</span>
               )}
             </Link>
           ))}
