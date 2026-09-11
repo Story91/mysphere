@@ -61,6 +61,44 @@ function NavLinkLabel({ label, isActive }: { label: string; isActive: boolean })
   );
 }
 
+/**
+ * Kolor obwodki per trasa.
+ *
+ * Belka ma siedem widocznych pozycji, wszystkie tej samej wielkosci i w tym
+ * samym ksztalcie. Zanim to powstalo, jedyna roznica miedzy nimi byl napis -
+ * a napis czyta sie dopiero po tym, jak wzrok juz gdzies wyladowal. Kolor
+ * obwodki daje kazdej trasie staly znak rozpoznawczy, ktory dziala katem oka.
+ *
+ * JEDEN SYSTEM, NIE SIEDEM OZDOBNIKOW: gradient ma zawsze ten sam ksztalt -
+ * atrament, kolor trasy, atrament. Zmienia sie wylacznie srodkowy odcien.
+ * Dlatego siedem pigulek obok siebie czyta sie jako jeden pasek, a nie jako
+ * siedem osobnych komponentow.
+ *
+ * WYPELNIENIE ZOSTAJE WSPOLNE: biale w spoczynku, fioletowe na trasie
+ * aktywnej. Kolor trasy siedzi w obwodce i nigdzie indziej - wypelnianie
+ * pigulki pomaranczem czy zielenia zabiloby kontrast bialego napisu
+ * (na #f5a73b bialy tekst ma 1,9:1, czyli jest nieczytelny).
+ *
+ * Odcienie sa dobrane tak, zeby kreska byla widoczna na bialym tle - kazdy
+ * ma wzgledem bieli co najmniej 2:1.
+ */
+const NAV_ACCENT: Record<string, string> = {
+  MySphere: '#a21caf',   // fuksja, ta sama co sufiks etykiety
+  Asks: '#0b9a51',       // zielen pieniedzy, ta sama co --sp-up
+  MyBase: '#0052ff',     // firmowy niebieski Base
+  MyCamp: '#c2410c',     // przypalony pomarancz, zeby nie mylil sie z CAMP
+  MyAgents: '#0e7490',
+  MyClaw: '#dc2626',
+  Startpad: '#5f4ec2',   // fiolet marki
+  '$SPHERE': '#8f45df',  // --sp-brand-strong
+  CAMP: '#f5a73b',       // pomarancz Camp Network
+  Perps: '#1f6fb2',      // --sp-info
+  How: '#64748b',        // najciszsza pozycja w belce i tak ma wygladac
+};
+
+/** Oba konce gradientu. Atrament z palety, nie czern absolutna. */
+const NAV_ACCENT_INK = '#16141b';
+
 const MOBILE_MENU_ID = 'mobile-nav-menu';
 
 /**
@@ -95,41 +133,28 @@ function NavItem({
   const style = NAV_ITEM_VARIANT[variant];
 
   /**
-   * Startpad OGLADANY Z INNEJ STRONY dostaje delikatna obwodke w kolorze marki.
+   * Obwodka w gradiencie: atrament -> kolor trasy -> atrament.
    *
-   * To jest jedyne miejsce w belce, ktore prowadzi do rynku - reszta zakladek
-   * to czytanie. Bez wyroznienia ginelo miedzy nimi, mimo ze jest tam
-   * najwiecej powodow, zeby wejsc.
+   * TECHNIKA: dwa tla naraz. `padding-box` maluje wnetrze pigulki,
+   * `border-box` maluje obwodke, a `border: 2px solid transparent` sprawia,
+   * ze gradient widac WYLACZNIE w ramce. Dziala na `rounded-pill` bez
+   * dodatkowego elementu, wiec uklad flexa w belce i odstepy miedzy
+   * pigulkami zostaja nietkniete.
    *
-   * ZADNEGO MIGANIA: pigulka pulsujaca w kolko przy kazdym ekranie zamienia
-   * sie po minucie w szum, ktory mozg uczy sie omijac - a przy `prefers-
-   * reduced-motion` po prostu nie wolno jej ruszac. Wystarczy, ze wyglada
-   * inaczej niz sasiedzi.
+   * Poswiata pod spodem to ten sam kolor przy 13% - tyle, zeby kreska nie
+   * wygladala jak doklejona do bialego tla. Zadnego migania: pigulka
+   * pulsujaca przy kazdym ekranie zamienia sie po minucie w szum, ktory mozg
+   * uczy sie omijac, a przy `prefers-reduced-motion` nie wolno jej ruszac.
    */
-  const highlight = !isActive && link.label === 'Startpad';
-
-  /**
-   * CAMP dostaje obwodke w gradiencie czarny-pomaranczowy-czarny.
-   *
-   * To jedyna pozycja w belce prowadzaca do OBCEJ sieci - reszta zakladek
-   * mieszka na Base albo Arc. Zwykla pigulka nie niosla tej roznicy, a to
-   * wlasnie ona decyduje, czy czlowiek bedzie mial na czym zaplacic.
-   * Pomaranczowy jest kolorem Campa, czarny domyka obwodke po obu stronach,
-   * zeby pigulka nie wygladala jak niedokonczony gradient.
-   *
-   * TECHNIKA: dwa tla naraz. `padding-box` maluje wnetrze, `border-box`
-   * maluje obwodke - przy `border: 2px solid transparent` gradient widac
-   * wylacznie w ramce. Dziala na `rounded-pill` bez dodatkowego elementu,
-   * wiec nie psuje ukladu flexa w belce ani odstepow miedzy pigulkami.
-   */
-  const isCamp = link.label === 'CAMP';
-  const campFill = isActive ? 'rgb(124,107,218)' : 'rgb(255,255,255)';
-  const campStyle = isCamp
+  const accent = NAV_ACCENT[link.label];
+  const fill = isActive ? 'rgb(124,107,218)' : 'rgb(255,255,255)';
+  const accentStyle = accent
     ? {
         border: '2px solid transparent',
         background:
-          `linear-gradient(${campFill}, ${campFill}) padding-box, ` +
-          'linear-gradient(90deg, #16141b 0%, #f5a73b 50%, #16141b 100%) border-box',
+          `linear-gradient(${fill}, ${fill}) padding-box, ` +
+          `linear-gradient(90deg, ${NAV_ACCENT_INK} 0%, ${accent} 50%, ${NAV_ACCENT_INK} 100%) border-box`,
+        boxShadow: `0 0 0 3px ${accent}21`,
       }
     : undefined;
 
@@ -137,24 +162,22 @@ function NavItem({
     <Link
       href={link.href}
       onClick={onClick}
-      style={campStyle}
+      style={accentStyle}
       aria-current={isActive ? 'page' : undefined}
       /* RUCH: zostaje samo nacisniecie. Nawigacja jest klikana dziesiatki razy
          dziennie - podnoszenie pigulki na hover po dziesiatym razie juz nie
          cieszy, tylko opoznia. */
       className={`${style.layout} items-center px-4 py-2.5 rounded-pill font-soft-display text-sm font-bold border transition-[background-color,border-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface ${
-        isCamp
-          ? `${isActive ? 'text-soft-on-primary' : 'text-soft-ink'} shadow-[0_0_0_3px_rgba(245,167,59,0.14)] ${isActive ? style.active : style.idle}`
+        accent
+          ? `${isActive ? 'text-soft-on-primary' : 'text-soft-ink'} ${isActive ? style.active : style.idle}`
           : isActive
           ? `bg-soft-primary border-soft-primary text-soft-on-primary ${style.active}`
-          : highlight
-            ? `bg-soft-primary/10 border-soft-primary text-soft-primary-deep shadow-[0_0_0_3px_rgba(124,107,218,0.12)] ${style.idle}`
-            : `bg-soft-surface border-soft-line text-soft-ink-muted ${style.idle}`
+          : `bg-soft-surface border-soft-line text-soft-ink-muted ${style.idle}`
       }`}
     >
       {/* Ikony sa dekoracja przy tekstowej etykiecie obok - czytnik ekranu ma
           przeczytac "MyCamp", a nie "Camp MyCamp". */}
-      {isCamp && (
+      {link.label === 'CAMP' && (
         <Image src="/Camp.png" alt="" width={14} height={14} className="rounded-sm flex-shrink-0" />
       )}
       {link.label === 'MyCamp' && (
