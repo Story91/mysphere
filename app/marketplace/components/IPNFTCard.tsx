@@ -99,10 +99,14 @@ export default function IPNFTCard({
       className={`rounded-xl p-[2px] ${frameClasses(mediaType)} transition hover:scale-[1.02]`}
       title={name}
     >
-      <button 
-        type="button" 
-        onClick={() => onPreview?.(nft)} 
-        className="w-full text-left"
+      {/* div, nie <button>: w srodku jest przycisk kopiowania ID, a <button>
+          w <button> to nieprawidlowy HTML i ostrzezenie hydratacji Reacta. */}
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => onPreview?.(nft)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPreview?.(nft); } }}
+        className="w-full text-left cursor-pointer"
       >
         {/* Inner card with solid white background like MyCamp */}
         <div className={`rounded-[12px] overflow-hidden bg-white/90 border ${
@@ -244,7 +248,7 @@ export default function IPNFTCard({
             </div>
           )}
         </div>
-      </button>
+      </div>
       
       {/* Explorer link */}
       <a
