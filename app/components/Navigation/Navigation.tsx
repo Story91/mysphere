@@ -108,16 +108,44 @@ function NavItem({
    */
   const highlight = !isActive && link.label === 'Startpad';
 
+  /**
+   * CAMP dostaje obwodke w gradiencie czarny-pomaranczowy-czarny.
+   *
+   * To jedyna pozycja w belce prowadzaca do OBCEJ sieci - reszta zakladek
+   * mieszka na Base albo Arc. Zwykla pigulka nie niosla tej roznicy, a to
+   * wlasnie ona decyduje, czy czlowiek bedzie mial na czym zaplacic.
+   * Pomaranczowy jest kolorem Campa, czarny domyka obwodke po obu stronach,
+   * zeby pigulka nie wygladala jak niedokonczony gradient.
+   *
+   * TECHNIKA: dwa tla naraz. `padding-box` maluje wnetrze, `border-box`
+   * maluje obwodke - przy `border: 2px solid transparent` gradient widac
+   * wylacznie w ramce. Dziala na `rounded-pill` bez dodatkowego elementu,
+   * wiec nie psuje ukladu flexa w belce ani odstepow miedzy pigulkami.
+   */
+  const isCamp = link.label === 'CAMP';
+  const campFill = isActive ? 'rgb(124,107,218)' : 'rgb(255,255,255)';
+  const campStyle = isCamp
+    ? {
+        border: '2px solid transparent',
+        background:
+          `linear-gradient(${campFill}, ${campFill}) padding-box, ` +
+          'linear-gradient(90deg, #16141b 0%, #f5a73b 50%, #16141b 100%) border-box',
+      }
+    : undefined;
+
   return (
     <Link
       href={link.href}
       onClick={onClick}
+      style={campStyle}
       aria-current={isActive ? 'page' : undefined}
       /* RUCH: zostaje samo nacisniecie. Nawigacja jest klikana dziesiatki razy
          dziennie - podnoszenie pigulki na hover po dziesiatym razie juz nie
          cieszy, tylko opoznia. */
       className={`${style.layout} items-center px-4 py-2.5 rounded-pill font-soft-display text-sm font-bold border transition-[background-color,border-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface ${
-        isActive
+        isCamp
+          ? `${isActive ? 'text-soft-on-primary' : 'text-soft-ink'} shadow-[0_0_0_3px_rgba(245,167,59,0.14)] ${isActive ? style.active : style.idle}`
+          : isActive
           ? `bg-soft-primary border-soft-primary text-soft-on-primary ${style.active}`
           : highlight
             ? `bg-soft-primary/10 border-soft-primary text-soft-primary-deep shadow-[0_0_0_3px_rgba(124,107,218,0.12)] ${style.idle}`
@@ -126,6 +154,9 @@ function NavItem({
     >
       {/* Ikony sa dekoracja przy tekstowej etykiecie obok - czytnik ekranu ma
           przeczytac "MyCamp", a nie "Camp MyCamp". */}
+      {isCamp && (
+        <Image src="/Camp.png" alt="" width={14} height={14} className="rounded-sm flex-shrink-0" />
+      )}
       {link.label === 'MyCamp' && (
         /* brightness-110 bylo podbiciem pod ciemne szklo. Na bialej pigulce
            rozjasnia logo Camp bez powodu. */
@@ -193,6 +224,12 @@ export default function Navigation() {
     // strona, do ktorej nie prowadzi zaden link, z punktu widzenia
     // uzytkownika nie istnieje (ta sama zasada, co przy /startpad wyzej).
     { href: '/startpad/sphere', label: '$SPHERE' },
+    // CAMP - targ IP NFT na Camp Network (484). Jedyna pozycja w belce, ktora
+    // prowadzi poza Base i Arc, wiec ma wlasna obwodke w gradiencie (NavItem).
+    // Do 11.09.2026 trasa /marketplace stala w DISABLED_ROUTES i nie prowadzil
+    // do niej zaden link; po wdrozeniu IPMarketV4 na mainnet jest odwrotnie -
+    // to jedyne miejsce, gdzie da sie wybic wlasne IP i nim obracac.
+    { href: '/marketplace', label: 'CAMP' },
     // Perps zaraz za $SPHERE, bo to ten sam ruch co Startpad, tylko o stopien
     // dalej: tam tworca wystawia token na krzywej, tu wystawia FEED i rynek
     // lewarowany na Arc. Bez tego wpisu /derivatives bylo dokladnie tym, przed

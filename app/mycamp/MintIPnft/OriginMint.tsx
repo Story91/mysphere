@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from "@campnetwork/origin/react";
+import { LicenseType, type LicenseTerms } from "@campnetwork/origin";
 import { useWalletClient } from 'wagmi';
 import type { Address } from "viem/accounts";
 import { useToast } from '../components/Toast';
@@ -14,12 +15,13 @@ interface OriginMintProps {
   onSuccess?: (tokenId: string) => void;
 }
 
-type LicenseTerms = {
-  price: bigint;
-  duration: number;
-  royaltyBps: number;
-  paymentToken: Address;
-};
+/**
+ * Typ warunkow licencji bierzemy z SDK, a nie przepisujemy u siebie.
+ *
+ * Wlasna kopia rozjechala sie z paczka: w @campnetwork/origin 1.3.x doszlo
+ * wymagane pole `licenseType`, a kopia go nie miala, wiec TypeScript uznawal
+ * obiekt za poprawny do momentu, w ktorym SDK i tak by go odrzucilo.
+ */
 
 // Upload to IPFS function
 async function uploadToIPFS(file: File): Promise<string> {
@@ -183,12 +185,15 @@ export default function OriginMint({
       }
 
       // Define license terms (exactly as in working example)
-      const license = {
+      // DURATION_BASED = licencja na czas, jedyny wariant, ktory obsluguje
+      // nasz interfejs. SINGLE_PAYMENT i X402 wymagaja `duration: 0`.
+      const license: LicenseTerms = {
         price: BigInt(0),
-        duration: 2629800, // 30 days in seconds
+        duration: 2629800, // 30 dni w sekundach
         royaltyBps: 0,
         paymentToken: "0x0000000000000000000000000000000000000000" as Address,
-      } as LicenseTerms;
+        licenseType: LicenseType.DURATION_BASED,
+      };
 
       // Create metadata (ERC721 media best practices)
       const siteOrigin = typeof window !== 'undefined' ? window.location.origin : '';

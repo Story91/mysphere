@@ -9,7 +9,15 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { TwitterAPI } from '@campnetwork/origin';
+/**
+ * SpotifyAPI i TwitterAPI mieszkaja w @campnetwork/sdk, NIE w @campnetwork/origin.
+ *
+ * Camp rozdzielil paczki: od @campnetwork/origin 1.3.x te dwie klasy zniknely
+ * z eksportow (zero wystapien w core.d.ts i w bundlu), a zyja dalej w osobnej
+ * @campnetwork/sdk. Nigdzie tego nie ogloszono - nie ma CHANGELOG ani sekcji
+ * migracji. Obie paczki siedza obok siebie w package.json wlasnie dlatego.
+ */
+import { TwitterAPI } from '@campnetwork/sdk';
 import { guardCampRead } from '../../../utils/camp/proxyGuard';
 
 // Trasa czyta dane z zadania (nextUrl / naglowki), wiec nie da sie jej

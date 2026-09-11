@@ -20,7 +20,47 @@ const ERC721_ABI = [
     inputs: [{ name: 'tokenId', type: 'uint256' }],
     outputs: [{ type: 'string' }],
   },
+  {
+    // Camp Origin oznacza tu stan pracy: 0 ACTIVE, 1 DELETED, 2 DISPUTED.
+    name: 'dataStatus',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'tokenId', type: 'uint256' }],
+    outputs: [{ type: 'uint8' }],
+  },
 ] as const;
+
+/**
+ * Stan pracy wedlug Camp Origin.
+ *
+ * PO CO TO CZYTAMY: wystawienie na sprzedaz pracy zgloszonej jako naruszenie
+ * albo usunietej przez tworce to nie jest usterka kosmetyczna, tylko ryzyko
+ * prawne i strata pieniedzy kupujacego. Camp prowadzi ten rejestr w kontrakcie
+ * IpNFT, wiec wystarczy go przeczytac - nie potrzeba do tego sesji SDK.
+ *
+ * Blad odczytu NIE ukrywa pracy. Starsze kolekcje moga nie miec tej funkcji,
+ * a chowanie czyjegos NFT dlatego, ze RPC nie odpowiedzialo, byloby gorsze
+ * od pokazania go.
+ */
+export const DATA_STATUS = { ACTIVE: 0, DELETED: 1, DISPUTED: 2 } as const;
+
+async function readDataStatus(
+  client: ReturnType<typeof createPublicClient>,
+  contract: string,
+  tokenId: string,
+): Promise<number> {
+  try {
+    const v = await client.readContract({
+      address: contract as `0x${string}`,
+      abi: ERC721_ABI,
+      functionName: 'dataStatus',
+      args: [BigInt(tokenId)],
+    });
+    return Number(v);
+  } catch {
+    return DATA_STATUS.ACTIVE;
+  }
+}
 
 const BLOCKSCOUT = 'https://camp.cloud.blockscout.com/api';
 
@@ -103,7 +143,9 @@ export async function fetchIpNftsFor(address: string) {
         
       const mediaUrl = (metadata?.animation_url || metadata?.animationUrl || image) ? ipfsToHttp(metadata?.animation_url || metadata?.animationUrl || image) : '';
       const mimeOut = (metadata?.properties?.mimeType || metadata?.mimeType || '').toString();
+      const status = await readDataStatus(client, o.contractAddress, o.tokenID);
       return {
+        status,
         contract: contractAddress,
         tokenId: o.tokenID,
         tokenUri,
@@ -116,7 +158,8 @@ export async function fetchIpNftsFor(address: string) {
     })
   );
 
-  return items;
+  // Prace usuniete i zgloszone jako naruszenie nie trafiaja do siatki.
+  return items.filter((i: any) => i.status === DATA_STATUS.ACTIVE);
 }
 
 export async function fetchRecentIpNfts(limit: number = 50) {
@@ -185,7 +228,9 @@ export async function fetchRecentIpNfts(limit: number = 50) {
 
       const mediaUrl = (metadata?.animation_url || metadata?.animationUrl || image) ? ipfsToHttp(metadata?.animation_url || metadata?.animationUrl || image) : '';
       const mimeOut = (metadata?.properties?.mimeType || metadata?.mimeType || '').toString();
+      const status = await readDataStatus(client, IP_NFT_CONTRACT, o.tokenID);
       return {
+        status,
         contract: IP_NFT_CONTRACT,
         tokenId: o.tokenID,
         tokenUri,
@@ -199,7 +244,8 @@ export async function fetchRecentIpNfts(limit: number = 50) {
     })
   );
 
-  return items;
+  // Prace usuniete i zgloszone jako naruszenie nie trafiaja do siatki.
+  return items.filter((i: any) => i.status === DATA_STATUS.ACTIVE);
 }
 
 

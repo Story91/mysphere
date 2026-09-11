@@ -36,6 +36,11 @@ const MintIpModal = dynamic(() => import('./components/MintIpModal'), {
   ssr: false
 });
 
+// Ten sam wymog ssr:false co wyzej - komponent nosi wlasny CampProvider.
+const RoyaltiesPanel = dynamic(() => import('./components/RoyaltiesPanel'), {
+  ssr: false
+});
+
 // Zdjecie hero z Unsplash (Unsplash License - darmowe uzycie komercyjne, podpis
 // nieobowiazkowy). Parametry auto/w/q daja ~1800px WebP z ich CDN, bez
 // pobierania pliku do repo.
@@ -331,7 +336,14 @@ export default function MarketplacePage() {
             <MarketplaceGrid mode="my" onOpenListModal={(nft) => { setPrefillTokenId(nft?.tokenId); setShowCreateModal(true); }} />
           )}
           {activeView === 'activity' && <ActivityFeed />}
-          {activeView === 'dashboard' && <DashboardView />}
+          {activeView === 'dashboard' && (
+            <div className="space-y-4">
+              {/* Tantiemy Campa stoja NAD naszym dashboardem, bo to jedyne
+                  miejsce w aplikacji, gdzie da sie je w ogole zobaczyc. */}
+              <RoyaltiesPanel />
+              <DashboardView />
+            </div>
+          )}
         </div>
       </div>
 

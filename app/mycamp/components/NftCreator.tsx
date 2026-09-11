@@ -8,6 +8,7 @@ import OriginMint from '../MintIPnft/OriginMint';
 import { uploadToIPFS } from '../MintIPnft/upload';
 import { useToast } from './Toast';
 import FalImageGenerator from './FalImageGenerator';
+import { LicenseType } from '@campnetwork/origin';
 
 interface GeneratedImage {
   data: string;
@@ -181,11 +182,15 @@ export default function NftCreator() {
       const priceWei: bigint = BigInt(Math.floor(campAmount * 1e18));
 
       // Define license terms for Origin SDK
+      // licenseType doszlo jako pole WYMAGANE w @campnetwork/origin 1.3.x.
+      // DURATION_BASED to licencja na czas; SINGLE_PAYMENT i X402 wymagaja
+      // `duration: 0`, wiec nie pasuja do tego formularza.
       const license = {
         price: priceWei,
-        duration: 2629800, // 30 days
+        duration: 2629800, // 30 dni
         royaltyBps: 0,
         paymentToken: "0x0000000000000000000000000000000000000000" as any,
+        licenseType: LicenseType.DURATION_BASED,
       };
 
       // Create metadata (user-provided name/description + enriched attributes)

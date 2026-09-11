@@ -49,7 +49,8 @@
   "dependencies": {
     "@base-org/account": "^1.1.1",
     "@base-org/account-ui": "^1.0.1",
-    "@campnetwork/origin": "^0.0.9",
+    "@campnetwork/origin": "^1.3.2",
+    "@campnetwork/sdk": "^1.4.5",
     "@coinbase/cdp-sdk": "^1.36.0",
     "@coinbase/x402": "^2.1.0",
     "@farcaster/miniapp-node": "^0.1.11",
