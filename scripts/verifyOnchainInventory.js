@@ -154,8 +154,8 @@ const TARGETS = [
     label: 'BaseMorningGame (czy jest na mainnecie?)', source: 'app/basemorning/config/contract.ts:1' },
   { address: '0xf528f920d0ce1d1ea230b0ec10f0f64b8f43cbac', chainId: 484, kind: 'plain',
     label: 'SimpleIPNFTMarketplace', source: 'app/marketplace/config/simpleMarketplace.ts:4' },
-  { address: '0xF90733b9eCDa3b49C250B2C3E3E42c96fC93324E', chainId: 484, kind: 'erc721',
-    label: 'DEFAULT_IP_NFT_CONTRACT', source: 'app/marketplace/config/simpleMarketplace.ts:1653' },
+  { address: '0x39EeE1C3989f0dD543Dee60f8582F7F81F522C38', chainId: 484, kind: 'erc721',
+    label: 'DEFAULT_IP_NFT_CONTRACT (Origin IP NFT, mainnet)', source: 'app/marketplace/config/simpleMarketplace.ts:1663' },
 
   /* --- B. obce kontrakty, ktore wolamy --- */
   { address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', chainId: 8453, kind: 'erc20',

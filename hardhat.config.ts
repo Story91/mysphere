@@ -68,7 +68,16 @@ const config = {
           evmVersion: "cancun"
         }
       }
-    ]
+    ],
+    // IPmarketV4 z runs: 200 wychodzi na 24771 bajtow, czyli ~200 ponad limit
+    // EIP-170 (24576) - wezel odrzuci deploy. Override tylko dla tego pliku:
+    // runs: 1 optymalizuje pod rozmiar, reszta kontraktow ma bajtkod bez zmian.
+    overrides: {
+      "contracts/IPmarketV4.sol": {
+        version: "0.8.20",
+        settings: { optimizer: { enabled: true, runs: 1 }, viaIR: true }
+      }
+    }
   },
   paths: {
     // Jedno drzewo kontraktow. Wczesniej wskazywalo na ./camp-contract, wiec

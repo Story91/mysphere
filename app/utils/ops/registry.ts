@@ -360,9 +360,9 @@ export const WATCHED_CONTRACTS: WatchedContract[] = [
    * /route.ts przeszedl na `enableSpendPermissions` z SDK i zaden plik nie
    * podaje tego adresu. Trzymanie go tutaj znaczyloby, ze konsola ops wskazuje
    * `source`, ktorego nie ma, czyli klamie o wlasnej konfiguracji. */
-  { key: 'ipnft-484', address: '0xF90733b9eCDa3b49C250B2C3E3E42c96fC93324E', chainId: 484, expects: 'no-code',
-    label: 'DEFAULT_IP_NFT_CONTRACT', source: 'app/marketplace/config/simpleMarketplace.ts',
-    note: 'Known: no bytecode at this address on Camp. The marketplace config points at nothing.' },
+  { key: 'ipnft-484', address: '0x39EeE1C3989f0dD543Dee60f8582F7F81F522C38', chainId: 484, expects: 'code',
+    label: 'DEFAULT_IP_NFT_CONTRACT (Origin IP NFT)', source: 'app/marketplace/config/simpleMarketplace.ts',
+    note: 'Camp Origin IP NFT on mainnet (ERC-721 "IP", DATANFT_CONTRACT_ADDRESS in @campnetwork/origin 1.3.2). Replaced the Basecamp testnet address 0xF907...324E, which has no code on 484.' },
   { key: 'ipmarket-484', address: '0xf528f920d0ce1d1ea230b0ec10f0f64b8f43cbac', chainId: 484, expects: 'no-code',
     label: 'SimpleIPNFTMarketplace', source: 'app/marketplace/config/simpleMarketplace.ts',
     note: 'Known: no bytecode at this address on Camp.' },
