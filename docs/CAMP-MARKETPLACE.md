@@ -60,24 +60,33 @@ nam nazywac jej gwarancja.
 
 ### 2.1 ZROBIONE - SDK podniesiony do 1.3.2
 
-`package.json` ma `@campnetwork/origin: ^0.0.9`. Najnowsza to **1.3.2**
-(opublikowana 2026-02-05). To nie jest roznica kosmetyczna:
+Bylo `^0.0.9`, jest `^1.3.2` (opublikowana 2026-02-05). Roznica nie byla
+kosmetyczna:
 
-- 0.0.9 **nie zna srodowiska mainnet** - zaszyte adresy to testnetowe
-  `0x5c5e6b45...` i `0xF90733b9...`. Caly mainnet obslugujemy recznie obok SDK.
+- 0.0.9 **nie znala srodowiska mainnet** - zaszyte adresy byly testnetowe
+  (`0x5c5e6b45...`, `0xF90733b9...`), wiec chain 484 obslugiwalismy recznie
+  obok SDK.
 - `buyAccess` w 0.0.9: `(tokenId, periods, value?)`. W 1.3.2:
   `(buyer, tokenId, expectedPrice, expectedDuration, expectedPaymentToken,
   expectedProtocolFeeBps?, expectedAppFeeBps?)` - czyli **ochrona przed
-  podmiana ceny miedzy odczytem a transakcja**, ktorej dzis nie mamy.
+  podmiana ceny miedzy odczytem a transakcja**. Nasza sciezka "kup dostep"
+  idzie przez wlasny kontrakt, wiec tej ochrony nadal nie ma (patrz 2.4).
 - `mintFile` w 0.0.9 przyjmuje jednego rodzica (`parentId`), w 1.3.2 do osmiu
   (`parents[]`).
 
 **Pulapka przy migracji:** `SpotifyAPI` i `TwitterAPI` **zniknely** z paczki
 `@campnetwork/origin` w 1.3.2 (zero wystapien w `core.d.ts`, bundlu i README).
-Zyja dalej w OSOBNEJ paczce `@campnetwork/sdk` (1.4.5). Mamy trzy importy do
-przepiecia: `app/api/camp/spotify/route.ts`, `app/api/camp/twitter/route.ts`,
-`app/api/camp/spotify/mint-nft/route.ts`. Camp nie oglosil tego nigdzie -
-nie ma CHANGELOG ani sekcji migracji.
+Zyja dalej w OSOBNEJ paczce `@campnetwork/sdk` (1.4.5), z ta sama sygnatura
+`fetchUserByWalletAddress`. Trzy importy przepiete: `app/api/camp/spotify/
+route.ts`, `app/api/camp/twitter/route.ts`, `app/api/camp/spotify/mint-nft/
+route.ts`. Obie trasy sprawdzone po zmianie, oddaja 200. Camp nie oglosil tego
+nigdzie - nie ma CHANGELOG ani sekcji migracji, stad komentarz przy kazdym
+imporcie.
+
+Trzecia zmiana lamiaca: `LicenseTerms` dostal wymagane pole `licenseType`.
+OriginMint mial wlasna kopie tego typu bez tego pola, wiec TypeScript
+przepuszczal obiekt, ktory SDK i tak by odrzucilo. Kopia usunieta, typ idzie
+z paczki, obie sciezki mintu ustawiaja `DURATION_BASED`.
 
 ### 2.2 ZROBIONE - tantiemy widoczne i do odbioru
 
