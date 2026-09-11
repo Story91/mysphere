@@ -19,12 +19,15 @@ import adapters from '../../deployments/pythAdapters.5042002.json';
  * Pyth to oracle PULL. Cena na lancuchu jest tak swieza, jak ostatni, kto ja
  * wypchnal. Adapter po `maxAge` (3600 s) oddaje 0, a rynek wtedy spada na
  * TWAP wlasnego rejestru - czyli na cene publikowana przez tworce rynku.
- * Stan z 11.09.2026: BTC/USD ktos odswieza co kilkadziesiat sekund; akcje
- * (AAPL, TSLA, NVDA, SPY) i ETH stoja od tygodni, bo kontrakt Pytha na Arc
- * nie przeszedl upgrade'u z 26.08 i odrzuca nowe podpisy Hermesa - nasz
- * keeper nie moze ich wypchnac. Dlatego UI MUSI pokazac wiek ceny, a nie
- * tylko nazwe feedu: rynek "na AAPL" ze stęchlym feedem to rynek na cenie
- * tworcy z etykieta AAPL.
+ * Stan z 11.09.2026: kontrakt Pytha na Arc (0x2880...) nie przeszedl
+ * upgrade'u z 26.08 i odrzuca nowe podpisy Hermesa; BTC/USD ktos tam jeszcze
+ * odswieza, wiec adapter BTC czyta z niego. Reszta (ETH, TSLA, XAU, EUR)
+ * czyta z NASZEGO PythReceiver (contracts/derivatives/PythReceiver.sol),
+ * ktory weryfikuje te same podpisy Hermesa i do ktorego keeper wypycha
+ * ceny co 15 min. AAPL, NVDA i SPY nie sa objete kluczem API wlasciciela
+ * (Hermes: "not entitled") - dlatego ich tu nie ma. UI i tak MUSI pokazac
+ * wiek ceny, a nie tylko nazwe feedu: rynek "na TSLA" ze stęchlym feedem to
+ * rynek na cenie tworcy z etykieta TSLA.
  */
 export type IndexFeed = {
   /** "AAPL/USD" - tak, jak nazywa go Pyth. */
@@ -34,12 +37,14 @@ export type IndexFeed = {
   address: Address;
   priceId: `0x${string}`;
   maxAge: number;
+  /** Kontrakt, z ktorego adapter czyta: nasz PythReceiver albo (BTC) kontrakt Pytha. */
+  pyth: Address;
 };
 
 type AdapterFile = {
   chainId: number;
   pyth: string;
-  adapters: Record<string, { address: string; priceId: string; maxAge: number }>;
+  adapters: Record<string, { address: string; priceId: string; maxAge: number; pyth?: string }>;
 };
 
 const file = adapters as AdapterFile;
@@ -52,6 +57,7 @@ export const INDEX_FEEDS: IndexFeed[] = Object.entries(file.adapters).map(([symb
   address: entry.address as Address,
   priceId: entry.priceId as `0x${string}`,
   maxAge: entry.maxAge,
+  pyth: (entry.pyth ?? file.pyth) as Address,
 }));
 
 export const ZERO_FEED = '0x0000000000000000000000000000000000000000' as Address;

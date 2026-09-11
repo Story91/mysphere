@@ -7,42 +7,40 @@
       "priceId": "0xe62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43",
       "maxAge": 3600,
       "deployer": "0xD4885A5aa53446843CABcDE1F35DE9b4E906030e",
-      "deployedAt": "2026-09-11T00:23:55.451Z"
-    },
-    "AAPL/USD": {
-      "address": "0x16E52f0bCB8fdb8e91440bb88097a52f713a1F2a",
-      "priceId": "0x49f6b65cb1de6b10eaf75e7c03ca029c306d0357e91b5311b175084a5ad55688",
-      "maxAge": 3600,
-      "deployer": "0xD4885A5aa53446843CABcDE1F35DE9b4E906030e",
-      "deployedAt": "2026-09-11T00:42:22.210Z"
+      "deployedAt": "2026-09-11T00:23:55.451Z",
+      "pyth": "0x2880aB155794e7179c9eE2e38200202908C17B43"
     },
     "TSLA/USD": {
-      "address": "0x94495De32F2f14962fF775316f70a1Cc2DE4cF06",
+      "address": "0xb1D75f26a08A576269FB96843b0A1e74DB815153",
       "priceId": "0x16dad506d7db8da01c87581c87ca897a012a153557d4d578c3b9c9e1bc0632f1",
       "maxAge": 3600,
+      "pyth": "0xf6dc0a2CC5345f012D16e0676c4CE8684CB9B651",
       "deployer": "0xD4885A5aa53446843CABcDE1F35DE9b4E906030e",
-      "deployedAt": "2026-09-11T00:42:29.441Z"
-    },
-    "NVDA/USD": {
-      "address": "0x74079c394342a92C8Be0eccb83734e86D64451A5",
-      "priceId": "0xb1073854ed24cbc755dc527418f52b7d271f6cc967bbf8d8129112b18860a593",
-      "maxAge": 3600,
-      "deployer": "0xD4885A5aa53446843CABcDE1F35DE9b4E906030e",
-      "deployedAt": "2026-09-11T00:42:36.155Z"
-    },
-    "SPY/USD": {
-      "address": "0x860Fa55809Cc1E5a45F7beCa637979b05306e6Fd",
-      "priceId": "0x19e09bb805456ada3979a7d1cbb4b6d63babc3a0f8e8a9509f68afa5c4c11cd5",
-      "maxAge": 3600,
-      "deployer": "0xD4885A5aa53446843CABcDE1F35DE9b4E906030e",
-      "deployedAt": "2026-09-11T00:42:43.171Z"
+      "deployedAt": "2026-09-11T01:36:46.677Z"
     },
     "ETH/USD": {
-      "address": "0xe7Cacc0E84F93261dd2F740D472E6857E44Ce989",
+      "address": "0xC1a62e3d40A7FE614049F190f444949d390566A5",
       "priceId": "0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace",
       "maxAge": 3600,
+      "pyth": "0xf6dc0a2CC5345f012D16e0676c4CE8684CB9B651",
       "deployer": "0xD4885A5aa53446843CABcDE1F35DE9b4E906030e",
-      "deployedAt": "2026-09-11T00:42:50.003Z"
+      "deployedAt": "2026-09-11T01:36:38.974Z"
+    },
+    "XAU/USD": {
+      "address": "0xa637a044257954895CEbeC9D2c9049e95b348075",
+      "priceId": "0x765d2ba906dbc32ca17cc11f5310a89e9ee1f6420508c63861f2f8ba4ee34bb2",
+      "maxAge": 3600,
+      "pyth": "0xf6dc0a2CC5345f012D16e0676c4CE8684CB9B651",
+      "deployer": "0xD4885A5aa53446843CABcDE1F35DE9b4E906030e",
+      "deployedAt": "2026-09-11T01:36:53.966Z"
+    },
+    "EUR/USD": {
+      "address": "0x74aB8aD577fB49dc4930D8BBAD144c7a230143e6",
+      "priceId": "0xa995d00bb36a63cef7fd2c287dc105fc8f3d93779f062f09551b0af3e81ec30b",
+      "maxAge": 3600,
+      "pyth": "0xf6dc0a2CC5345f012D16e0676c4CE8684CB9B651",
+      "deployer": "0xD4885A5aa53446843CABcDE1F35DE9b4E906030e",
+      "deployedAt": "2026-09-11T01:37:01.711Z"
     }
   }
 }

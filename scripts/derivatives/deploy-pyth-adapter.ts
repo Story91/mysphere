@@ -33,6 +33,17 @@ import path from "path";
 
 const CHAIN_ID = 5042002;
 const PYTH_ARC_TESTNET = "0x2880aB155794e7179c9eE2e38200202908C17B43";
+
+/**
+ * Zrodlo domyslne: NASZ PythReceiver (deployments/pythReceiver.<chainId>.json),
+ * bo kontrakt Pytha na Arc odrzuca aktualizacje Hermesa po 26.08.2026 i tylko
+ * BTC/USD ktos tam jeszcze odswieza. PYTH=... nadpisuje (np. dla BTC).
+ */
+function defaultPyth(): string {
+  const file = path.join(__dirname, "..", "..", "deployments", `pythReceiver.${CHAIN_ID}.json`);
+  if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, "utf8")).receiver;
+  return PYTH_ARC_TESTNET;
+}
 const PYTH_ABI = [
   "function getPriceUnsafe(bytes32) view returns (tuple(int64 price,uint64 conf,int32 expo,uint256 publishTime))",
 ];
@@ -49,14 +60,20 @@ async function main() {
   if (!priceId || !/^0x[0-9a-fA-F]{64}$/.test(priceId)) throw new Error("PRICE_ID musi byc bytes32 (0x + 64 hex).");
   if (!symbol) throw new Error("SYMBOL jest wymagane, np. BTC/USD.");
   const maxAge = Number(process.env.MAX_AGE || 3600);
-  const pythAddress = process.env.PYTH || PYTH_ARC_TESTNET;
+  const pythAddress = process.env.PYTH || defaultPyth();
 
   const pyth = new ethers.Contract(pythAddress, PYTH_ABI, provider);
-  const p = await pyth.getPriceUnsafe(priceId);
-  const nowSec = Math.floor(Date.now() / 1000);
-  const age = nowSec - Number(p.publishTime);
-  console.log(`Pyth ${symbol}: price=${p.price} expo=${p.expo} publishTime=${p.publishTime} wiek=${age}s (MAX_AGE=${maxAge}s)`);
-  if (age > maxAge) console.log("UWAGA: cena jest starsza niz MAX_AGE - adapter oddaje 0, dopoki ktos nie wypchnie aktualizacji.");
+  try {
+    const p = await pyth.getPriceUnsafe(priceId);
+    const nowSec = Math.floor(Date.now() / 1000);
+    const age = nowSec - Number(p.publishTime);
+    console.log(`Pyth ${symbol}: price=${p.price} expo=${p.expo} publishTime=${p.publishTime} wiek=${age}s (MAX_AGE=${maxAge}s)`);
+    if (age > maxAge) console.log("UWAGA: cena jest starsza niz MAX_AGE - adapter oddaje 0, dopoki ktos nie wypchnie aktualizacji.");
+  } catch {
+    // Swiezy PythReceiver nie ma jeszcze tego feedu - pierwsza aktualizacja
+    // przyjdzie z keepera po wdrozeniu adaptera. To nie jest blad.
+    console.log(`Pyth ${symbol}: brak feedu pod ${pythAddress} (pusty odbiornik?) - adapter oddaje 0 do pierwszej aktualizacji.`);
+  }
 
   const [deployer] = await ethers.getSigners();
   const adapter = await (await ethers.getContractFactory("PythAggregatorAdapter")).deploy(
@@ -67,13 +84,15 @@ async function main() {
   );
   await adapter.waitForDeployment();
   const address = await adapter.getAddress();
-  const answer = await adapter.latestAnswer();
-  console.log(`PythAggregatorAdapter ${symbol}: ${address} (latestAnswer=${ethers.formatEther(answer)} USD)`);
+  // latestAnswer rewertuje, gdy odbiornik nie ma jeszcze feedu (udokumentowane
+  // w adapterze). Wdrozenie juz sie udalo - adres MUSI trafic do pliku.
+  const answer = await adapter.latestAnswer().catch(() => null);
+  console.log(`PythAggregatorAdapter ${symbol}: ${address} (latestAnswer=${answer == null ? "brak feedu" : ethers.formatEther(answer) + " USD"})`);
 
   if (!isLocal) {
     const file = path.join(__dirname, "..", "..", "deployments", `pythAdapters.${CHAIN_ID}.json`);
     const json = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : { chainId: CHAIN_ID, pyth: pythAddress, adapters: {} };
-    json.adapters[symbol] = { address, priceId, maxAge, deployer: deployer.address, deployedAt: new Date().toISOString() };
+    json.adapters[symbol] = { address, priceId, maxAge, pyth: pythAddress, deployer: deployer.address, deployedAt: new Date().toISOString() };
     fs.writeFileSync(file, JSON.stringify(json, null, 2) + "\n");
     console.log(`zapisano ${file}`);
   }

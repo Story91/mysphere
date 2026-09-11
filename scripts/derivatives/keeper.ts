@@ -88,7 +88,7 @@ const PYTH_ABI = [
 
 type Row = Record<string, string | number | boolean>;
 
-type AdapterEntry = { address: string; priceId: string; maxAge: number };
+type AdapterEntry = { address: string; priceId: string; maxAge: number; pyth?: string };
 
 function readPythAdapters(): { pyth?: string; adapters: Record<string, AdapterEntry> } {
   const file = path.join(__dirname, "..", "..", "deployments", `pythAdapters.${CHAIN_ID}.json`);
@@ -223,9 +223,11 @@ async function main() {
   const hermesUrl = process.env.HERMES_URL || "https://hermes.pyth.network";
   const pyth: Row[] = [];
   if (pythCfg.pyth) {
-    const pythContract = new ethers.Contract(pythCfg.pyth, PYTH_ABI, provider);
     for (const [symbol, entry] of Object.entries(pythCfg.adapters)) {
-      const row: Row = { symbol, adapter: entry.address };
+      // Kazdy adapter czyta z WLASNEGO zrodla: nasz PythReceiver (przyjmuje
+      // Hermesa) albo kontrakt Pytha (BTC, odswiezany przez kogos innego).
+      const pythContract = new ethers.Contract(entry.pyth ?? pythCfg.pyth, PYTH_ABI, provider);
+      const row: Row = { symbol, adapter: entry.address, source: entry.pyth ?? pythCfg.pyth };
       try {
         const p = await pythContract.getPriceUnsafe(entry.priceId);
         const age = now - Number(p.publishTime);

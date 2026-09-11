@@ -26,7 +26,7 @@ import {
   oracleAbi,
 } from './config';
 import { fmtAge, fmtBps, fmtUsdc, fmtWadCompact, usdc, wad } from './format';
-import { INDEX_FEEDS, PYTH_ADDRESS, ZERO_FEED, adapterAbi, feedByAddress, pythAbi } from './indexFeeds';
+import { INDEX_FEEDS, ZERO_FEED, adapterAbi, feedByAddress, pythAbi } from './indexFeeds';
 
 /**
  * ZALOZENIE RYNKU - trzy transakcje, w tej kolejnosci i nie inaczej.
@@ -161,7 +161,7 @@ export default function CreateMarketModal({
     (async () => {
       try {
         const [raw, round] = await Promise.all([
-          client.readContract({ address: PYTH_ADDRESS, abi: pythAbi, functionName: 'getPriceUnsafe', args: [f.priceId] }),
+          client.readContract({ address: f.pyth, abi: pythAbi, functionName: 'getPriceUnsafe', args: [f.priceId] }),
           client.readContract({ address: f.address, abi: adapterAbi, functionName: 'latestRoundData' }),
         ]);
         if (cancelled) return;
@@ -389,7 +389,7 @@ export default function CreateMarketModal({
                 {selectedFeed.symbol} on Arc was last updated {fmtAge(feedState.publishTime)} ago at {fmtWadCompact(feedState.price)}.
                 Older than {Math.round(selectedFeed.maxAge / 3600)}h, so the adapter returns 0 and this market would run on YOUR
                 registry price until Pyth refreshes. Pyth&apos;s Arc contract currently rejects new Hermes signatures, so
-                nobody can refresh it from here. Label it that way or wait.
+                our keeper refreshes it only for feeds it is entitled to. Label it that way or wait.
               </p>
             ) : (
               <p className="text-xs text-muted-foreground">
