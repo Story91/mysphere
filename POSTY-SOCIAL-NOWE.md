@@ -226,6 +226,69 @@ zamknięta, kontrakt stoi na mainnecie ze zweryfikowanym źródłem. Ale:*
 
 ---
 
+## 11. Perps na Arc — keeper i błąd, który znaleźliśmy sami
+
+> Our perps on Arc testnet had a liquidation button and nobody to press it.
+>
+> Funding was 8 hours overdue. One position sat at −169 bps margin ratio —
+> below zero, so the insurance fund was already covering it — and it stayed
+> open because liquidation only ran when someone opened the market page.
+>
+> Wrote a keeper today. First run: settled funding for $0.0012, liquidated
+> the position for $0.0067. Gas on Arc is USDC, so that's the whole bill.
+>
+> Also found that our "Max" button put the entire USDC balance into margin.
+> On Arc, gas comes out of the same balance. Max meant "can't pay for the
+> transaction you're about to send." Fixed: Max now keeps 0.05 USDC back.
+
+*Dlaczego to działa jako post: dwie liczby do sprawdzenia na Arcscan
+(0xa9544f4f… i 0x46cd9209…), jedna właściwość Arc, której ludzie nie znają
+(gaz to to samo USDC co depozyt), i przyznanie się do błędu w produkcie.
+Bez „we're excited". Perps są na TESTNECIE — nie pisać inaczej.*
+
+## 11a. Krótki, na X
+
+> Perps keeper on Arc, first run:
+> settleFunding — 8h overdue — $0.0012
+> liquidate — position at −169 bps — $0.0067
+>
+> Gas is USDC. The bill is the bill.
+
+## 11b. Techniczny — dla ludzi, którzy sprawdzą
+
+> Two things Arc's docs say that changed our perps code today.
+>
+> 1. Native USDC (gas, 18 dec) and ERC-20 USDC at 0x3600… (6 dec) are one
+> balance. Our Max-margin button ignored that. Now: balance − 0.05 USDC.
+>
+> 2. Finality is instant and blocks are 1s, so a keeper is cheap. Ours polls
+> the factory, settles funding past FUNDING_INTERVAL, liquidates below
+> MAINTENANCE_MARGIN_BPS. Dry-run by default.
+>
+> Next: index price from Pyth. Pull oracle, so we wrote an adapter that
+> returns 0 on a stale price instead of reverting — a revert there would
+> freeze funding and closes for the whole market. Stale means the market
+> falls back to the bonded registry TWAP. On testnet today: BTC/USD 48s old,
+> ETH/USD 15 days old. That gap is why the fallback exists.
+
+## PL — 11. Keeper
+
+> Nasze perpsy na Arc testnet miały przycisk „likwiduj" i nikogo, kto by go
+> nacisnął.
+>
+> Funding zaległy o 8 godzin. Jedna pozycja na −169 bps — czyli poniżej zera,
+> fundusz już dopłacał — i żyła, bo likwidacja działała tylko, gdy ktoś
+> wszedł na stronę rynku.
+>
+> Dziś keeper. Pierwszy bieg: funding za 0,0012 $, likwidacja za 0,0067 $.
+> Gaz na Arc to USDC, więc to cały rachunek.
+>
+> Przy okazji: przycisk „Max" wpisywał całe saldo USDC w depozyt. Na Arc gaz
+> schodzi z tego samego salda. „Max" znaczyło „nie zapłacisz za transakcję,
+> którą zaraz wyślesz". Naprawione — Max zostawia 0,05 USDC.
+
+---
+
 # Czego NIE pisać
 
 - **„Zdecentralizowany", „rewolucyjny", „przełomowy"** — nic nie znaczą i
@@ -255,3 +318,8 @@ zamknięta, kontrakt stoi na mainnecie ze zweryfikowanym źródłem. Ale:*
   gorzej, niż gdybyśmy sami o tym powiedzieli.
 - **Cokolwiek w czasie teraźniejszym o Asku w feedzie** — model danych jest,
   widoku w feedzie jeszcze nie.
+- **Perps jako produkt „na mainnecie" albo „z prawdziwym oracle"** — moduł
+  stoi na **Arc testnet**, indeks to własny rejestr z kaucją, a adapter Pytha
+  jest napisany i przetestowany, ale **nie podpięty do żadnego rynku**
+  (pole feedu jest immutable, potrzebny nowy rynek). Keeper działa co 15 min
+  z jednego portfela — nie „sieć keeperów".
