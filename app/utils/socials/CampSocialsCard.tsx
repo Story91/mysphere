@@ -32,6 +32,7 @@ import {
 } from '@campnetwork/origin/react';
 import {
   CAMP_CLIENT_ID,
+  CAMP_ENVIRONMENT,
   CAMP_SOCIALS,
   buildCampRedirectUri,
   connectedPlatformList,
@@ -540,7 +541,7 @@ export default function CampSocialsCard({ address }: CampSocialsCardProps) {
   }
 
   return (
-    <CampProvider clientId={CAMP_CLIENT_ID} redirectUri={redirectUri}>
+    <CampProvider clientId={CAMP_CLIENT_ID} redirectUri={redirectUri} environment={CAMP_ENVIRONMENT}>
       <CampSocialsInner address={address} />
     </CampProvider>
   );

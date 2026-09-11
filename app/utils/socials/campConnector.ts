@@ -24,6 +24,26 @@ export type CampSocialId = 'twitter' | 'spotify' | 'tiktok';
  */
 export const CAMP_CLIENT_ID = process.env.NEXT_PUBLIC_CAMP_CLIENT_ID || '';
 
+/**
+ * Srodowisko Camp Origin. MUSI byc PRODUCTION i nie wolno tego pominac.
+ *
+ * ZMIERZONE 2026-09-11: SDK domyslnie ustawia "DEVELOPMENT" (tak stoi w jego
+ * wlasnej dokumentacji: `[options.environment="DEVELOPMENT"]`). W tym trybie
+ * cale Origin rozmawia z backendem TESTNETU
+ * (origin-backend-iota.vercel.app) i testnetowymi kontraktami Basecamp
+ * (123420001114), podczas gdy portfel czlowieka stoi na Camp mainnet (484).
+ *
+ * OBJAW, ktory to ujawnil: mint konczyl sie bledem o podpisie, a do portfela
+ * NIE DOCHODZILA zadna transakcja. I nie mogla - backend testnetu nie wystawi
+ * podpisu dla mintu, ktory ma wyladowac na mainnecie. To nie byl blad portfela
+ * ani sieci, tylko jedno pominiete pole w konfiguracji.
+ *
+ * Kontrola zgodnosci: w trybie PRODUCTION SDK wskazuje DATANFT pod
+ * 0x39EeE1C3989f0dD543Dee60f8582F7F81F522C38 - dokladnie ten adres, ktory mamy
+ * w DEFAULT_IP_NFT_CONTRACT. Czyli jedno i drugie mowi o tej samej kolekcji.
+ */
+export const CAMP_ENVIRONMENT = 'PRODUCTION' as const;
+
 export interface CampSocialDescriptor {
   id: CampSocialId;
   label: string;

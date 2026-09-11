@@ -205,12 +205,33 @@ export default function OriginMint({
       console.log("Calling origin.mintFile...");
       showToast("🔐 Signing transaction with Origin SDK...", 'info', 4000, { key: 'flow' });
       
-            const result = await origin.mintFile(file, metadata, license, undefined, {
-        // Dla obrazu SDK uzyje samej pracy jako podgladu i wpisze
-        // `image: ipfs://<cid>`. Audio, wideo i tekst zostaja bez miniatury -
-        // karta pokazuje wtedy nazwe medium zamiast zmyslonej grafiki.
-        useAssetAsPreview: file.type.startsWith('image/'),
-      });
+            /**
+       * Podglad jest MILE WIDZIANY, ale nie moze blokowac mintu.
+       *
+       * ZGLOSZENIE 11.09: "Failed to upload preview image to IPFS: Failed to
+       * get presigned URL (HTTP 400) ... account surpassing plan limits".
+       * Ten 403 przychodzi z Pinaty PO STRONIE CAMPA, nie z naszego konta -
+       * my zadnego klucza do Pinaty juz nie uzywamy. Czyli o powodzeniu mintu
+       * decydowal limit planu na cudzym koncie.
+       *
+       * Praca jest wazniejsza od miniatury: gdy podglad nie przechodzi,
+       * powtarzamy mint bez niego. Token wtedy nie ma `image`, a karta pokazuje
+       * nazwe medium - to znosna strata w porownaniu z brakiem tokena.
+       */
+      const wantsPreview = file.type.startsWith('image/');
+      let result: string | null = null;
+      try {
+        result = await origin.mintFile(file, metadata, license, undefined, {
+          useAssetAsPreview: wantsPreview,
+        });
+      } catch (previewError: any) {
+        const msg = String(previewError?.message || '');
+        const previewFailed = wantsPreview && /preview image|presigned url|plan limits|surpassing plan/i.test(msg);
+        if (!previewFailed) throw previewError;
+        console.warn('Podglad odrzucony przez backend Campa, mintuje bez niego:', msg);
+        showToast('Preview upload is rate-limited on Camp. Minting without a thumbnail.', 'warning', 4000, { key: 'flow' });
+        result = await origin.mintFile(file, metadata, license);
+      }
       setSuccess(result);
 
       console.log("✅ IP registration successful! Token ID:", result);
@@ -234,15 +255,24 @@ export default function OriginMint({
       // Provide specific error messages
       let errorMessage = "IP registration failed";
       
+      /* UWAGA na brzmienie: ten blad NIE pochodzi z portfela.
+       *
+       * Mint sklada sie z dwoch etapow. Najpierw backend Campa wystawia podpis
+       * dla przyszlego tokena (registerIpNFT), dopiero potem cokolwiek trafia
+       * do portfela. Gdy padnie etap pierwszy, portfel nie jest nawet pytany -
+       * a stary komunikat brzmial "approve in wallet", czyli kazal czlowiekowi
+       * szukac okna, ktore nigdy sie nie otworzy. Tak wygladal blad z 11.09,
+       * gdy SDK stalo na domyslnym DEVELOPMENT i podpisu odmawial backend
+       * testnetu. */
       if (error.message?.includes("signature") || error.message?.includes("Failed to get signature")) {
-        errorMessage = "Transaction signature failed. Please approve in wallet.";
-        showToast("❌ Transaction signature failed. Please approve in wallet.", 'error', 5000, { key: 'err' });
+        errorMessage = "Camp Origin refused to sign this mint. Sign out of Camp in this window, sign in again, and retry.";
+        showToast(errorMessage, 'error', 6000, { key: 'err' });
       } else if (error.message?.includes("network")) {
-        errorMessage = "Network error. Make sure you're on BaseCamp testnet.";
-        showToast("❌ Network error. Please switch to BaseCamp testnet.", 'error', 5000, { key: 'err' });
+        errorMessage = "Network error. Make sure your wallet is on Camp Network (chain 484).";
+        showToast('Network error. Switch your wallet to Camp Network (chain 484).', 'error', 5000, { key: 'err' });
       } else if (error.message?.includes("gas")) {
         errorMessage = "Insufficient gas fees.";
-        showToast("❌ Insufficient gas fees. Please add CAMP tokens.", 'error', 5000, { key: 'err' });
+        showToast('Not enough CAMP for gas on Camp Network.', 'error', 5000, { key: 'err' });
       } else if (error.message?.includes("user rejected") || error.message?.includes("User rejected")) {
         errorMessage = "Transaction rejected by user.";
         showToast("❌ Transaction cancelled by user.", 'warning', 3000, { key: 'err' });

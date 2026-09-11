@@ -35,6 +35,7 @@ import { ToastProvider } from '../../mycamp/components/Toast';
 import OriginMint from '../../mycamp/MintIPnft/OriginMint';
 import {
   CAMP_CLIENT_ID,
+  CAMP_ENVIRONMENT,
   buildCampRedirectUri,
   describeCampError,
 } from '../../utils/socials/campConnector';
@@ -332,7 +333,7 @@ export default function MintIpModal({ onClose, onMinted }: MintIpModalProps) {
   }
 
   return (
-    <CampProvider clientId={CAMP_CLIENT_ID} redirectUri={redirectUri}>
+    <CampProvider clientId={CAMP_CLIENT_ID} redirectUri={redirectUri} environment={CAMP_ENVIRONMENT}>
       {/* OriginMint zglasza postep przez useToast, ktory bez tego providera rzuca. */}
       <ToastProvider>
         <MintIpInner onClose={onClose} onMinted={onMinted} />
