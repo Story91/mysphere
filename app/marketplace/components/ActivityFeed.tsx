@@ -331,24 +331,24 @@ export default function ActivityFeed() {
 
   if (loading) {
     return (
-      <div className="bg-black/40 border border-white/10 rounded-xl p-6">
+      <div className="bg-white border border-soft-line rounded-xl p-6">
         <div className="flex items-center justify-center">
-          <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-orange-500"></div>
-          <span className="ml-3 text-white/70">Loading marketplace activity...</span>
+          <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-t-2 border-b-2 border-soft-primary"></div>
+          <span className="ml-3 text-soft-ink-muted">Loading marketplace activity...</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-black/40 border border-white/10 rounded-xl p-6">
+    <div className="bg-white border border-soft-line rounded-xl p-6">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-white">Marketplace Activity</h3>
-        <span className="text-xs text-white/50">Live Feed</span>
+        <h3 className="text-lg font-semibold text-soft-ink">Marketplace Activity</h3>
+        <span className="text-xs text-soft-ink-muted">Live Feed</span>
       </div>
       
       {events.length === 0 ? (
-        <div className="text-center py-8 text-white/60">
+        <div className="text-center py-8 text-soft-ink-muted">
           <div className="text-2xl mb-2">📈</div>
           <div>No recent activity</div>
           <div className="text-xs mt-1">Be the first to trade!</div>
@@ -358,7 +358,7 @@ export default function ActivityFeed() {
           {events.map((event, index) => (
             <div 
               key={`${event.txHash}-${index}`}
-              className="flex items-center justify-between p-3 bg-black/30 rounded-lg border border-white/5"
+              className="flex items-center justify-between p-3 bg-soft-surface-sunken rounded-lg border border-soft-line"
             >
               <div className="flex items-center gap-3">
                 <div className="text-lg">{getEventIcon(event.type)}</div>
@@ -369,7 +369,7 @@ export default function ActivityFeed() {
                     {event.type === 'offer' && 'Offer Made'}
                     {event.type === 'cancel' && 'Listing Cancelled'}
                   </div>
-                  <div className="text-xs text-white/50">
+                  <div className="text-xs text-soft-ink-muted">
                     by {event.seller.slice(0, 6)}...{event.seller.slice(-4)}
                     {event.buyer && (
                       <> to {event.buyer.slice(0, 6)}...{event.buyer.slice(-4)}</>
@@ -378,10 +378,10 @@ export default function ActivityFeed() {
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-sm font-medium text-orange-400">
+                <div className="text-sm font-medium text-soft-accent-deep">
                   {event.price} $CAMP
                 </div>
-                <div className="text-xs text-white/50">
+                <div className="text-xs text-soft-ink-muted">
                   {formatTimeAgo(event.timestamp)}
                 </div>
               </div>
@@ -393,7 +393,7 @@ export default function ActivityFeed() {
                               href={`https://camp.cloud.blockscout.com/address/${MARKETPLACE_ADDRESS}/transactions`}
               target="_blank"
               rel="noreferrer"
-              className="text-xs text-orange-400 hover:text-orange-300 underline"
+              className="text-xs text-soft-accent-deep hover:text-soft-accent-deep underline"
             >
               View all transactions →
             </a>

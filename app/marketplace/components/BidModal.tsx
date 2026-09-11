@@ -37,15 +37,15 @@ export default function BidModal({ auctionId, minPrice, onClose }: { auctionId: 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
-      <div className="bg-gray-900 border border-gray-700 rounded-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white border border-soft-line rounded-[26px] max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-between items-start mb-6">
-          <h2 className="text-xl font-bold text-white">Place Bid</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">✕</button>
+          <h2 className="text-xl font-bold text-soft-ink">Place Bid</h2>
+          <button onClick={onClose} className="text-soft-ink-muted hover:text-soft-ink">✕</button>
         </div>
         <div className="space-y-3 text-sm">
           <div className="text-gray-400">Minimum: <span className="text-white">{Number(minPrice) / 1e18} CAMP</span></div>
-          <input placeholder="Amount (CAMP)" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full bg-black/40 border border-gray-700 rounded px-3 py-2 text-white" />
-          <button onClick={onBid} disabled={isPending || isConfirming} className="w-full py-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-lg disabled:opacity-50">
+          <input placeholder="Amount (CAMP)" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full bg-white border border-soft-line rounded px-3 py-2 text-soft-ink" />
+          <button onClick={onBid} disabled={isPending || isConfirming} className="w-full py-2 bg-soft-primary text-white rounded-lg disabled:opacity-50">
             {isPending || isConfirming ? 'Processing...' : 'Place Bid'}
           </button>
         </div>

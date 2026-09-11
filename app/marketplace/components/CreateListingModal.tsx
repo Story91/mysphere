@@ -332,13 +332,13 @@ export default function CreateListingModal({ onClose, prefillTokenId }: CreateLi
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
-      <div className="bg-gray-900 border border-gray-700 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white border border-soft-line rounded-[26px] max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="flex justify-between items-start mb-6">
-          <h2 className="text-2xl font-bold text-white">List IP NFT for Sale</h2>
+          <h2 className="text-2xl font-bold text-soft-ink">List IP NFT for Sale</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white transition-colors"
+            className="text-soft-ink-muted hover:text-soft-ink transition-colors"
           >
             ✕
           </button>
@@ -347,8 +347,8 @@ export default function CreateListingModal({ onClose, prefillTokenId }: CreateLi
         {/* Loading state */}
         {loadingNfts && (
           <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
-            <span className="ml-3 text-gray-400">Loading your NFTs...</span>
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-t-2 border-b-2 border-soft-primary"></div>
+            <span className="ml-3 text-soft-ink-muted">Loading your NFTs...</span>
           </div>
         )}
 
@@ -358,8 +358,8 @@ export default function CreateListingModal({ onClose, prefillTokenId }: CreateLi
           {/* Select NFT */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-sm text-gray-400">Select your IP NFT</label>
-              <span className="text-xs text-gray-500">{address ? '' : 'Connect wallet to see your IP'}</span>
+              <label className="text-sm text-soft-ink-muted">Select your IP NFT</label>
+              <span className="text-xs text-soft-ink-soft">{address ? '' : 'Connect wallet to see your IP'}</span>
             </div>
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-60 overflow-y-auto">
               {myNfts.map((n) => (
@@ -367,20 +367,20 @@ export default function CreateListingModal({ onClose, prefillTokenId }: CreateLi
                   key={`${n.contract}-${n.tokenId}`}
                   onClick={() => { setTokenId(n.tokenId); setNftContract(n.contract); }}
                   className={`relative aspect-square rounded-lg overflow-hidden border ${
-                    tokenId === n.tokenId ? 'border-orange-500 ring-2 ring-orange-500/40' : 'border-gray-700'
+                    tokenId === n.tokenId ? 'border-soft-accent ring-2 ring-soft-accent/30' : 'border-gray-700'
                   }`}
                   title={n?.metadata?.name || `#${n.tokenId}`}
                 >
                   {n.image ? (
                     <img src={n.image} alt={n?.metadata?.name || 'IP'} className="w-full h-full object-cover" />
                   ) : (
-                    <div className="w-full h-full bg-zinc-800" />
+                    <div className="w-full h-full bg-white" />
                   )}
-                  <div className="absolute bottom-1 left-1 text-[10px] px-1.5 py-0.5 rounded bg-black/70 text-white">#{n.tokenId}</div>
+                  <div className="absolute bottom-1 left-1 text-[10px] px-1.5 py-0.5 rounded bg-black/70 text-soft-ink">#{n.tokenId}</div>
                 </button>
               ))}
             </div>
-            <div className="mt-2 text-xs text-gray-400 break-all">
+            <div className="mt-2 text-xs text-soft-ink-muted break-all">
               Selected Token: {tokenId || '—'}
               {nftContract && (
                 <>
@@ -392,7 +392,7 @@ export default function CreateListingModal({ onClose, prefillTokenId }: CreateLi
                 <button 
                   onClick={refreshApprovalState}
                   disabled={isChecking}
-                  className="ml-2 px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs"
+                  className="ml-2 px-2 py-1 bg-soft-surface-sunken hover:bg-soft-surface-sunken rounded text-xs"
                 >
                   {isChecking ? '...' : '🔄'}
                 </button>
@@ -402,20 +402,20 @@ export default function CreateListingModal({ onClose, prefillTokenId }: CreateLi
 
           {/* Sale Price */}
           <div>
-            <label className="text-sm text-gray-400 block mb-2">Sale Price (CAMP)</label>
+            <label className="text-sm text-soft-ink-muted block mb-2">Sale Price (CAMP)</label>
             <input
               type="number"
               step="0.01"
               value={price}
               onChange={(e) => setPrice(e.target.value)}
               placeholder="0.00"
-              className="w-full bg-black/50 border border-gray-700 rounded-lg px-3 py-2 text-white focus:border-orange-500 focus:outline-none"
+              className="w-full bg-soft-surface-sunken border border-soft-line rounded-lg px-3 py-2 text-soft-ink focus:border-soft-accent focus:outline-none"
             />
           </div>
 
           {/* Royalty */}
           <div>
-            <label className="text-sm text-gray-400 block mb-2">Creator Royalty (%)</label>
+            <label className="text-sm text-soft-ink-muted block mb-2">Creator Royalty (%)</label>
             <input
               type="number"
               min="0"
@@ -423,14 +423,14 @@ export default function CreateListingModal({ onClose, prefillTokenId }: CreateLi
               step="0.1"
               value={royaltyPercent}
               onChange={(e) => setRoyaltyPercent(e.target.value)}
-              className="w-full bg-black/50 border border-gray-700 rounded-lg px-3 py-2 text-white focus:border-orange-500 focus:outline-none"
+              className="w-full bg-soft-surface-sunken border border-soft-line rounded-lg px-3 py-2 text-soft-ink focus:border-soft-accent focus:outline-none"
             />
-            <p className="text-xs text-gray-500 mt-1">Max 10%</p>
+            <p className="text-xs text-soft-ink-soft mt-1">Max 10%</p>
           </div>
 
           {/* License Presets */}
           <div>
-            <label className="text-sm text-gray-400 block mb-2">License Preset</label>
+            <label className="text-sm text-soft-ink-muted block mb-2">License Preset</label>
             <div className="grid grid-cols-2 gap-2">
               {LICENSE_PRESETS.map((preset) => (
                 <button
@@ -438,8 +438,8 @@ export default function CreateListingModal({ onClose, prefillTokenId }: CreateLi
                   onClick={() => handlePresetSelect(preset.name)}
                   className={`py-2 px-3 rounded-lg border text-sm transition-all ${
                     selectedPreset === preset.name
-                      ? 'bg-orange-500 text-white border-orange-500'
-                      : 'bg-black/50 text-gray-400 border-gray-700 hover:border-gray-600'
+                      ? 'bg-soft-primary text-white border-soft-accent'
+                      : 'bg-soft-surface-sunken text-soft-ink-muted border-soft-line hover:border-soft-line'
                   }`}
                 >
                   {preset.name}
@@ -449,8 +449,8 @@ export default function CreateListingModal({ onClose, prefillTokenId }: CreateLi
           </div>
 
           {/* License Terms */}
-          <div className="bg-black/50 border border-gray-700 rounded-lg p-4">
-            <h3 className="text-sm font-semibold text-white mb-3">License Terms</h3>
+          <div className="bg-soft-surface-sunken border border-soft-line rounded-lg p-4">
+            <h3 className="text-sm font-semibold text-soft-ink mb-3">License Terms</h3>
             <div className="space-y-3">
               <label className="flex items-center gap-2">
                 <input
@@ -459,7 +459,7 @@ export default function CreateListingModal({ onClose, prefillTokenId }: CreateLi
                   onChange={(e) => setCommercialUse(e.target.checked)}
                   className="w-4 h-4"
                 />
-                <span className="text-sm text-gray-300">Allow Commercial Use</span>
+                <span className="text-sm text-soft-ink-muted">Allow Commercial Use</span>
               </label>
               <label className="flex items-center gap-2">
                 <input
@@ -468,23 +468,23 @@ export default function CreateListingModal({ onClose, prefillTokenId }: CreateLi
                   onChange={(e) => setDerivativeWorks(e.target.checked)}
                   className="w-4 h-4"
                 />
-                <span className="text-sm text-gray-300">Allow Derivative Works</span>
+                <span className="text-sm text-soft-ink-muted">Allow Derivative Works</span>
               </label>
               <div>
-                <label className="text-xs text-gray-400 block mb-1">License Duration (days, 0 = permanent)</label>
+                <label className="text-xs text-soft-ink-muted block mb-1">License Duration (days, 0 = permanent)</label>
                 <input
                   type="number"
                   min="0"
                   value={licenseDuration}
                   onChange={(e) => setLicenseDuration(e.target.value)}
-                  className="w-full bg-black/50 border border-gray-700 rounded px-2 py-1 text-white text-sm focus:border-orange-500 focus:outline-none"
+                  className="w-full bg-soft-surface-sunken border border-soft-line rounded px-2 py-1 text-soft-ink text-sm focus:border-soft-accent focus:outline-none"
                 />
               </div>
             </div>
           </div>
 
           {/* Access Options */}
-          <div className="bg-black/50 border border-gray-700 rounded-lg p-4">
+          <div className="bg-soft-surface-sunken border border-soft-line rounded-lg p-4">
             <label className="flex items-center gap-2 mb-3">
               <input
                 type="checkbox"
@@ -492,37 +492,37 @@ export default function CreateListingModal({ onClose, prefillTokenId }: CreateLi
                 onChange={(e) => setAllowAccess(e.target.checked)}
                 className="w-4 h-4"
               />
-              <span className="text-sm font-semibold text-white">Allow Temporary Access</span>
+              <span className="text-sm font-semibold text-soft-ink">Allow Temporary Access</span>
             </label>
             {/* Disable form if NFT is not from internal IP contract (creator not controlled) */}
             {allowAccess && nftContract && nftContract.toLowerCase() !== DEFAULT_IP_NFT_CONTRACT.toLowerCase() && (
-              <div className="text-xs text-amber-400">Access terms are only available for IP minted in the marketplace collection. This NFT contract is external.</div>
+              <div className="text-xs text-soft-accent-deep">Access terms are only available for IP minted in the marketplace collection. This NFT contract is external.</div>
             )}
             {allowAccess && nftContract && nftContract.toLowerCase() === DEFAULT_IP_NFT_CONTRACT.toLowerCase() && (
               <div className="space-y-3">
                 {!ownerOk && (
-                  <div className="text-xs text-amber-400">Only the current token owner can set access terms.</div>
+                  <div className="text-xs text-soft-accent-deep">Only the current token owner can set access terms.</div>
                 )}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs text-gray-400 block mb-1">Access Price per Period (CAMP)</label>
+                    <label className="text-xs text-soft-ink-muted block mb-1">Access Price per Period (CAMP)</label>
                     <input
                       type="number"
                       step="0.01"
                       value={accessPrice}
                       onChange={(e) => setAccessPrice(e.target.value)}
                       placeholder="0.00"
-                      className="w-full bg-black/50 border border-gray-700 rounded px-2 py-1 text-white text-sm focus:border-orange-500 focus:outline-none"
+                      className="w-full bg-soft-surface-sunken border border-soft-line rounded px-2 py-1 text-soft-ink text-sm focus:border-soft-accent focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-400 block mb-1">Period Duration (days)</label>
+                    <label className="text-xs text-soft-ink-muted block mb-1">Period Duration (days)</label>
                     <input
                       type="number"
                       min="1"
                       value={accessDuration}
                       onChange={(e) => setAccessDuration(e.target.value)}
-                      className="w-full bg-black/50 border border-gray-700 rounded px-2 py-1 text-white text-sm focus:border-orange-500 focus:outline-none"
+                      className="w-full bg-soft-surface-sunken border border-soft-line rounded px-2 py-1 text-soft-ink text-sm focus:border-soft-accent focus:outline-none"
                     />
                   </div>
                 </div>
@@ -552,18 +552,18 @@ export default function CreateListingModal({ onClose, prefillTokenId }: CreateLi
                       }
                     }}
                     disabled={!tokenId || isSavingTerms || !ownerOk}
-                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                    className="px-4 py-2 bg-soft-info text-white rounded hover:bg-[#1a5f9a] disabled:opacity-50"
                   >
                     {isSavingTerms ? 'Saving...' : (termsReady ? 'Update Terms' : 'Save Terms')}
                   </button>
                   {termsReady ? (
-                    <span className="text-xs text-green-400">Terms ready ✓</span>
+                    <span className="text-xs text-[#0b9a51]">Terms ready ✓</span>
                   ) : (
-                    <span className="text-xs text-gray-400">Save terms before listing</span>
+                    <span className="text-xs text-soft-ink-muted">Save terms before listing</span>
                   )}
                 </div>
                 {termsReady && (
-                  <div className="text-xs text-green-300 bg-green-500/10 border border-green-500/30 rounded px-2 py-1 inline-flex items-center gap-2">
+                  <div className="text-xs text-[#0b9a51] bg-[#edfff4] border border-[#9de7bb] rounded px-2 py-1 inline-flex items-center gap-2">
                     <span>Saved terms:</span>
                     <span className="font-semibold">{accessPrice || '—'} CAMP</span>
                     <span>•</span>
@@ -576,8 +576,8 @@ export default function CreateListingModal({ onClose, prefillTokenId }: CreateLi
 
           {/* Error Message */}
           {submitError && (
-            <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-3">
-              <p className="text-red-400 text-sm">
+            <div className="bg-[#ffefef] border border-[#f3b4b4] rounded-lg p-3">
+              <p className="text-[#a32020] text-sm">
                 {submitError}
               </p>
             </div>
@@ -585,8 +585,8 @@ export default function CreateListingModal({ onClose, prefillTokenId }: CreateLi
 
           {/* Success Message */}
           {submitSuccess && (
-            <div className="bg-green-500/10 border border-green-500/50 rounded-lg p-3">
-              <p className="text-green-400 text-sm">
+            <div className="bg-[#edfff4] border border-[#9de7bb] rounded-lg p-3">
+              <p className="text-[#0b9a51] text-sm">
                 Listing created successfully! 🎉
               </p>
             </div>
@@ -595,11 +595,11 @@ export default function CreateListingModal({ onClose, prefillTokenId }: CreateLi
           {/* Approval Status */}
           {tokenId && nftContract && (
             <div className={`text-sm p-3 rounded-lg border flex justify-between items-center ${
-              isChecking ? 'bg-yellow-500/10 border-yellow-500/50 text-yellow-400' :
-              !ownerOk ? 'bg-red-500/10 border-red-500/50 text-red-400' :
-              alreadyListed ? 'bg-orange-500/10 border-orange-500/50 text-orange-400' :
-              isApproved ? 'bg-green-500/10 border-green-500/50 text-green-400' :
-              'bg-orange-500/10 border-orange-500/50 text-orange-400'
+              isChecking ? 'bg-soft-accent-soft border border-soft-accent/40 border-soft-line text-soft-accent-deep' :
+              !ownerOk ? 'bg-[#ffefef] border border-[#f3b4b4] border-soft-line text-[#a32020]' :
+              alreadyListed ? 'bg-soft-accent-soft border border-soft-accent/40 border-soft-line text-soft-accent-deep' :
+              isApproved ? 'bg-[#edfff4] border border-[#9de7bb] border-soft-line text-[#0b9a51]' :
+              'bg-soft-accent-soft border border-soft-accent/40 border-soft-line text-soft-accent-deep'
             }`}>
               <span>
                 {isChecking ? '🔄 Checking ownership and approval...' :
@@ -611,7 +611,7 @@ export default function CreateListingModal({ onClose, prefillTokenId }: CreateLi
               <button 
                 onClick={refreshApprovalState}
                 disabled={isChecking}
-                className="ml-2 px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs font-mono"
+                className="ml-2 px-3 py-1 bg-soft-surface-sunken hover:bg-soft-surface-sunken rounded text-xs font-mono"
                 title="Refresh approval status"
               >
                 {isChecking ? '...' : '🔄'}
@@ -623,7 +623,7 @@ export default function CreateListingModal({ onClose, prefillTokenId }: CreateLi
           <div className="flex gap-3">
             <button
               onClick={onClose}
-              className="flex-1 py-3 px-4 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
+              className="flex-1 py-3 px-4 bg-white text-soft-ink rounded-lg hover:bg-soft-line transition-colors"
             >
               Cancel
             </button>
@@ -633,14 +633,14 @@ export default function CreateListingModal({ onClose, prefillTokenId }: CreateLi
                 <button
                   onClick={() => { writeErc721({ address: nftContract as `0x${string}`, abi: ERC721_ABI, functionName: 'approve', args: [MARKETPLACE_ADDRESS as `0x${string}`, BigInt(tokenId || '0')] }); toast.loading('Approving marketplace...'); }}
                   disabled={isApproving || !tokenId}
-                  className="py-3 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm"
+                  className="py-3 px-4 bg-soft-info text-white rounded-lg hover:bg-[#1a5f9a] disabled:opacity-50 text-sm"
                 >
                   {isApproving ? 'Approving...' : 'Approve Token'}
                 </button>
                 <button
                   onClick={() => { writeErc721({ address: nftContract as `0x${string}`, abi: ERC721_ABI, functionName: 'setApprovalForAll', args: [MARKETPLACE_ADDRESS as `0x${string}`, true] }); toast.loading('Approving all tokens...'); }}
                   disabled={isApproving}
-                  className="py-3 px-4 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm"
+                  className="py-3 px-4 bg-[#0b9a51] text-white rounded-lg hover:bg-[#08803f] disabled:opacity-50 text-sm"
                 >
                   Approve All
                 </button>
@@ -649,7 +649,7 @@ export default function CreateListingModal({ onClose, prefillTokenId }: CreateLi
             <button
               onClick={handleCreateListing}
               disabled={isSubmitting || !address || !tokenId || !price || !ownerOk || !isApproved || alreadyListed || (allowAccess && nftContract?.toLowerCase() === DEFAULT_IP_NFT_CONTRACT.toLowerCase() && !termsReady)}
-              className="flex-1 py-3 px-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold rounded-lg hover:from-orange-600 hover:to-amber-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 py-3 px-4 bg-soft-primary text-white font-bold rounded-lg hover:bg-soft-primary-deep transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting || isPending || isConfirming ? 'Processing...' : 'Create Listing'}
             </button>

@@ -90,11 +90,11 @@ export default function PreviewModal({ nft: item, onClose }: PreviewModalProps) 
 
   return (
     <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
-      <div className="bg-zinc-900 border border-white/10 rounded-lg max-w-2xl w-full overflow-hidden" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white border border-soft-line rounded-lg max-w-2xl w-full overflow-hidden" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="p-3 border-b border-white/10 flex items-center justify-between">
+        <div className="p-3 border-b border-soft-line flex items-center justify-between">
           <div className="text-sm font-medium truncate pr-3">{metadata?.name || 'Preview'}</div>
-          <button onClick={onClose} className="text-white/70 hover:text-white text-sm">Close</button>
+          <button onClick={onClose} className="text-soft-ink-muted hover:text-soft-ink text-sm">Close</button>
         </div>
         
         {/* Content */}
@@ -115,9 +115,9 @@ export default function PreviewModal({ nft: item, onClose }: PreviewModalProps) 
           
           {/* Text Viewer */}
           {mediaType === 'text' && (
-            <div className="w-full h-[60vh] bg-zinc-950 border border-white/5 rounded p-3 overflow-auto">
+            <div className="w-full h-[60vh] bg-zinc-950 border border-soft-line rounded p-3 overflow-auto">
               {loadingText ? (
-                <div className="text-white/70 text-sm flex items-center">
+                <div className="text-soft-ink-muted text-sm flex items-center">
                   Loading
                   <span className="inline-flex ml-1">
                     <span className="animate-pulse">.</span>
@@ -126,9 +126,9 @@ export default function PreviewModal({ nft: item, onClose }: PreviewModalProps) 
                   </span>
                 </div>
               ) : emptyText ? (
-                <div className="text-white/60 text-sm">Empty file</div>
+                <div className="text-soft-ink-muted text-sm">Empty file</div>
               ) : (
-                <pre className="whitespace-pre-wrap break-words text-white/90 text-sm">{text}</pre>
+                <pre className="whitespace-pre-wrap break-words text-soft-ink-muted text-sm">{text}</pre>
               )}
             </div>
           )}
@@ -144,16 +144,16 @@ export default function PreviewModal({ nft: item, onClose }: PreviewModalProps) 
           
           {/* No media URL message */}
           {!mediaUrl && mediaType !== 'image' && (
-            <div className="text-sm text-white/70">No mediaUrl found. Open on Explorer.</div>
+            <div className="text-sm text-soft-ink-muted">No mediaUrl found. Open on Explorer.</div>
           )}
         </div>
         
         {/* Info bar */}
-        <div className="px-3 pb-3 text-xs text-white/60 flex items-center gap-3 flex-wrap">
+        <div className="px-3 pb-3 text-xs text-soft-ink-muted flex items-center gap-3 flex-wrap">
           <span>Type: {mediaType}</span>
           {mime && <span>MIME: {mime}</span>}
           <a 
-            className="underline hover:text-white" 
+            className="underline hover:text-soft-ink" 
             target="_blank" 
             rel="noreferrer" 
                             href={`https://camp.cloud.blockscout.com/token/${item.contract || DEFAULT_IP_NFT_CONTRACT}/instance/${item.tokenId || item.id}`}
@@ -162,7 +162,7 @@ export default function PreviewModal({ nft: item, onClose }: PreviewModalProps) 
           </a>
           {mediaUrl && (
             <a 
-              className="underline hover:text-white" 
+              className="underline hover:text-soft-ink" 
               target="_blank" 
               rel="noreferrer" 
               href={mediaUrl.startsWith('http') ? mediaUrl : mediaUrl.replace('ipfs://', 'https://ipfs.io/ipfs/')}
@@ -174,11 +174,11 @@ export default function PreviewModal({ nft: item, onClose }: PreviewModalProps) 
             <div className="ml-auto flex items-center gap-2">
               <span className="text-orange-400 font-bold">{Number(terms.price) / 1e18} CAMP / {Number(terms.duration) / 86400}d</span>
               {creator && <span className="text-white/60">by {creator.slice(0,6)}...{creator.slice(-4)}</span>}
-              <input type="number" min={1} value={periods} onChange={(e) => setPeriods(Math.max(1, Number(e.target.value || '1')))} className="w-14 bg-black/40 border border-white/10 rounded px-1 py-0.5 text-white" />
-              <button onClick={handleBuyAccess} className="px-3 py-1 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded border border-orange-500/40">Buy Access</button>
+              <input type="number" min={1} value={periods} onChange={(e) => setPeriods(Math.max(1, Number(e.target.value || '1')))} className="w-14 bg-white border border-soft-line rounded px-1 py-0.5 text-soft-ink" />
+              <button onClick={handleBuyAccess} className="px-3 py-1 bg-soft-primary text-white rounded border border-soft-line">Buy Access</button>
             </div>
           ) : (
-            <div className="ml-auto text-white/50">No temporary access available</div>
+            <div className="ml-auto text-soft-ink-muted">No temporary access available</div>
           )}
         </div>
       </div>

@@ -202,24 +202,24 @@ export default function CreateAuctionModal({ nftContract: initialNftContract, to
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
-      <div className="bg-gray-900 border border-gray-700 rounded-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white border border-soft-line rounded-[26px] max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-between items-start mb-6">
-          <h2 className="text-xl font-bold text-white">Create Auction</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">✕</button>
+          <h2 className="text-xl font-bold text-soft-ink">Create Auction</h2>
+          <button onClick={onClose} className="text-soft-ink-muted hover:text-soft-ink">✕</button>
         </div>
 
         <div className="space-y-4 text-sm">
           {/* NFT Selection */}
           <div>
-            <label className="block text-gray-400 mb-1">Select NFT</label>
+            <label className="block text-soft-ink-muted mb-1">Select NFT</label>
             {loadingNfts ? (
-              <div className="w-full bg-black/40 border border-gray-700 rounded px-3 py-8 text-center text-gray-500">
+              <div className="w-full bg-white border border-soft-line rounded px-3 py-8 text-center text-soft-ink-soft">
                 Loading your NFTs...
               </div>
             ) : userNfts.length === 0 ? (
-              <div className="w-full bg-black/40 border border-gray-700 rounded px-3 py-8 text-center">
+              <div className="w-full bg-white border border-soft-line rounded px-3 py-8 text-center">
                 <p className="text-gray-500">No available NFTs</p>
-                <p className="text-xs text-gray-600 mt-2">
+                <p className="text-xs text-soft-ink-soft mt-2">
                   All your NFTs are already listed or in auction
                 </p>
               </div>
@@ -234,7 +234,7 @@ export default function CreateAuctionModal({ nftContract: initialNftContract, to
                     setSelectedNft(null);
                   }
                 }}
-                className="w-full bg-black/40 border border-gray-700 rounded px-3 py-2 text-white"
+                className="w-full bg-white border border-soft-line rounded px-3 py-2 text-soft-ink"
               >
                 <option value="">Choose an NFT...</option>
                 {userNfts.map((nft) => (
@@ -248,13 +248,13 @@ export default function CreateAuctionModal({ nftContract: initialNftContract, to
 
           {/* NFT Preview */}
           {selectedNftDetails && (
-            <div className="bg-black/20 border border-gray-700 rounded-lg p-3">
+            <div className="bg-white border border-soft-line rounded-lg p-3">
               {loadingPreview ? (
-                <div className="text-center py-4 text-gray-500">Loading preview...</div>
+                <div className="text-center py-4 text-soft-ink-soft">Loading preview...</div>
               ) : (
                 <div className="flex gap-3">
                   {/* Image */}
-                  <div className="w-20 h-20 bg-black/40 rounded-lg overflow-hidden flex-shrink-0">
+                  <div className="w-20 h-20 bg-white rounded-lg overflow-hidden flex-shrink-0">
                     {selectedNftDetails.image || selectedNftDetails.metadata?.image ? (
                       <img 
                         src={
@@ -268,7 +268,7 @@ export default function CreateAuctionModal({ nftContract: initialNftContract, to
                         }}
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-600">
+                      <div className="w-full h-full flex items-center justify-center text-soft-ink-soft">
                         🖼️
                       </div>
                     )}
@@ -279,12 +279,12 @@ export default function CreateAuctionModal({ nftContract: initialNftContract, to
                     <h4 className="text-white font-semibold truncate">
                       {selectedNftDetails.metadata?.name || `Token #${selectedNftDetails.tokenId}`}
                     </h4>
-                    <p className="text-xs text-gray-400 truncate">
+                    <p className="text-xs text-soft-ink-muted truncate">
                       {selectedNftDetails.metadata?.description || 'No description'}
                     </p>
                     <div className="flex gap-2 mt-1">
                       {selectedNftDetails.metadata?.attributes?.map((attr: any, i: number) => (
-                        <span key={i} className="text-xs bg-gray-800 px-2 py-0.5 rounded">
+                        <span key={i} className="text-xs bg-white px-2 py-0.5 rounded">
                           {attr.trait_type}: {attr.value}
                         </span>
                       )).slice(0, 2)}
@@ -296,61 +296,61 @@ export default function CreateAuctionModal({ nftContract: initialNftContract, to
           )}
 
           <div>
-            <label className="block text-gray-400 mb-1">Minimum Price (CAMP)</label>
+            <label className="block text-soft-ink-muted mb-1">Minimum Price (CAMP)</label>
             <input 
               type="number" 
               step="0.001"
               value={minPrice} 
               onChange={(e) => setMinPrice(e.target.value)} 
-              className="w-full bg-black/40 border border-gray-700 rounded px-3 py-2 text-white" 
+              className="w-full bg-white border border-soft-line rounded px-3 py-2 text-soft-ink" 
               placeholder="0.01"
             />
           </div>
           
           <div>
-            <label className="block text-gray-400 mb-1">
+            <label className="block text-soft-ink-muted mb-1">
               Reserve Price (CAMP) 
-              <span className="text-xs text-gray-500 ml-1">(optional - min to sell)</span>
+              <span className="text-xs text-soft-ink-soft ml-1">(optional - min to sell)</span>
             </label>
             <input 
               type="number" 
               step="0.001"
               value={reservePrice} 
               onChange={(e) => setReservePrice(e.target.value)} 
-              className="w-full bg-black/40 border border-gray-700 rounded px-3 py-2 text-white" 
+              className="w-full bg-white border border-soft-line rounded px-3 py-2 text-soft-ink" 
               placeholder={minPrice || "Same as minimum"}
             />
           </div>
           
           <div>
-            <label className="block text-gray-400 mb-1">
+            <label className="block text-soft-ink-muted mb-1">
               Bid Increment (CAMP)
-              <span className="text-xs text-gray-500 ml-1">(min outbid amount)</span>
+              <span className="text-xs text-soft-ink-soft ml-1">(min outbid amount)</span>
             </label>
             <input 
               type="number" 
               step="0.001"
               value={bidIncrement} 
               onChange={(e) => setBidIncrement(e.target.value)} 
-              className="w-full bg-black/40 border border-gray-700 rounded px-3 py-2 text-white" 
+              className="w-full bg-white border border-soft-line rounded px-3 py-2 text-soft-ink" 
               placeholder="0.001"
             />
           </div>
           
           <div>
-            <label className="block text-gray-400 mb-1">Duration</label>
+            <label className="block text-soft-ink-muted mb-1">Duration</label>
             <div className="flex gap-2">
-              <input type="number" min={1} value={durationValue} onChange={(e) => setDurationValue(e.target.value)} className="w-28 bg-black/40 border border-gray-700 rounded px-3 py-2 text-white" />
-              <select value={durationUnit} onChange={(e) => setDurationUnit(e.target.value as any)} className="bg-black/40 border border-gray-700 rounded px-3 py-2 text-white">
+              <input type="number" min={1} value={durationValue} onChange={(e) => setDurationValue(e.target.value)} className="w-28 bg-white border border-soft-line rounded px-3 py-2 text-soft-ink" />
+              <select value={durationUnit} onChange={(e) => setDurationUnit(e.target.value as any)} className="bg-white border border-soft-line rounded px-3 py-2 text-soft-ink">
                 <option value="minutes">Minutes</option>
                 <option value="hours">Hours</option>
                 <option value="days">Days</option>
               </select>
             </div>
-            <p className="text-xs text-gray-500 mt-1">⏰ Auto-extends 5 min on last-minute bids</p>
+            <p className="text-xs text-soft-ink-soft mt-1">⏰ Auto-extends 5 min on last-minute bids</p>
           </div>
 
-          <button onClick={onCreate} disabled={isPending || isConfirming} className="w-full py-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-lg disabled:opacity-50">
+          <button onClick={onCreate} disabled={isPending || isConfirming} className="w-full py-2 bg-soft-primary text-white rounded-lg disabled:opacity-50">
             {isPending || isConfirming ? 'Processing...' : 'Create Auction'}
           </button>
         </div>

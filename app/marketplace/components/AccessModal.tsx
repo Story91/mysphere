@@ -57,10 +57,10 @@ export default function AccessModal({ nft, onClose }: AccessModalProps) {
   if (loadingTerms) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-        <div className="bg-gray-900 border border-gray-700 rounded-2xl max-w-md w-full p-6">
+        <div className="bg-white border border-soft-line rounded-[26px] max-w-md w-full p-6">
           <div className="flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
-            <span className="ml-3 text-white">Loading access terms...</span>
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-t-2 border-b-2 border-soft-primary"></div>
+            <span className="ml-3 text-soft-ink">Loading access terms...</span>
           </div>
         </div>
       </div>
@@ -73,15 +73,15 @@ export default function AccessModal({ nft, onClose }: AccessModalProps) {
   if (!hasAccess) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
-        <div className="bg-gray-900 border border-gray-700 rounded-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="bg-white border border-soft-line rounded-[26px] max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
           <div className="flex justify-between items-start mb-6">
-            <h2 className="text-xl font-bold text-white">Temporary Access</h2>
-            <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">✕</button>
+            <h2 className="text-xl font-bold text-soft-ink">Temporary Access</h2>
+            <button onClick={onClose} className="text-soft-ink-muted hover:text-soft-ink transition-colors">✕</button>
           </div>
           <div className="text-center py-8">
             <div className="text-gray-400 mb-4">⚠️</div>
             <div className="text-white font-medium mb-2">No Access Available</div>
-            <div className="text-sm text-gray-400">This NFT doesn't have temporary access enabled by the owner.</div>
+            <div className="text-sm text-soft-ink-muted">This NFT doesn't have temporary access enabled by the owner.</div>
           </div>
         </div>
       </div>
@@ -135,22 +135,22 @@ export default function AccessModal({ nft, onClose }: AccessModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
-      <div className="bg-gray-900 border border-gray-700 rounded-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white border border-soft-line rounded-[26px] max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-between items-start mb-6">
-          <h2 className="text-xl font-bold text-white">Buy Temporary Access</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">✕</button>
+          <h2 className="text-xl font-bold text-soft-ink">Buy Temporary Access</h2>
+          <button onClick={onClose} className="text-soft-ink-muted hover:text-soft-ink transition-colors">✕</button>
         </div>
 
         <div className="space-y-4">
           {/* NFT Preview */}
-          <div className="flex items-center gap-3 p-3 bg-black/40 rounded-lg">
+          <div className="flex items-center gap-3 p-3 bg-white rounded-lg">
             {nft.image && (
               <img src={nft.image} alt={nft.metadata?.name} className="w-12 h-12 rounded object-cover" />
             )}
             <div>
               <div className="text-white font-medium">{nft.metadata?.name || `#${nft.tokenId}`}</div>
               <div 
-                className="text-xs text-gray-400 cursor-pointer hover:text-orange-400" 
+                className="text-xs text-soft-ink-muted cursor-pointer hover:text-soft-accent-deep" 
                 onClick={() => {
                   navigator.clipboard.writeText(nft.tokenId);
                   toast.success('Token ID copied!');
@@ -163,9 +163,9 @@ export default function AccessModal({ nft, onClose }: AccessModalProps) {
           </div>
 
           {/* Access Details */}
-          <div className="bg-black/40 border border-gray-700 rounded-lg p-4">
-            <h3 className="text-sm font-semibold text-white mb-2">Access Terms</h3>
-            <div className="text-sm text-gray-300 space-y-1">
+          <div className="bg-white border border-soft-line rounded-lg p-4">
+            <h3 className="text-sm font-semibold text-soft-ink mb-2">Access Terms</h3>
+            <div className="text-sm text-soft-ink-muted space-y-1">
               <div>Price: <span className="text-orange-400">{accessPrice} $CAMP</span> per period</div>
               <div>Duration: <span className="text-blue-400">{accessDuration} days</span> per period</div>
             </div>
@@ -173,31 +173,31 @@ export default function AccessModal({ nft, onClose }: AccessModalProps) {
 
           {/* Periods Input */}
           <div>
-            <label className="text-sm text-gray-400 block mb-2">Number of Periods</label>
+            <label className="text-sm text-soft-ink-muted block mb-2">Number of Periods</label>
             <input
               type="number"
               min="1"
               max="12"
               value={periods}
               onChange={(e) => setPeriods(e.target.value)}
-              className="w-full bg-black/50 border border-gray-700 rounded-lg px-3 py-2 text-white focus:border-orange-500 focus:outline-none"
+              className="w-full bg-soft-surface-sunken border border-soft-line rounded-lg px-3 py-2 text-soft-ink focus:border-soft-accent focus:outline-none"
             />
-            <div className="text-xs text-gray-500 mt-1">
+            <div className="text-xs text-soft-ink-soft mt-1">
               Total: {parseInt(periods || '1') * parseInt(accessDuration)} days
             </div>
           </div>
 
           {/* Total Price */}
-          <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3">
-            <div className="text-sm text-gray-300">Total Price</div>
-            <div className="text-lg font-bold text-orange-400">{totalPrice.toFixed(2)} $CAMP</div>
+          <div className="bg-soft-accent-soft border border-soft-accent/40 rounded-lg p-3">
+            <div className="text-sm text-soft-ink-muted">Total Price</div>
+            <div className="text-lg font-bold text-soft-accent-deep">{totalPrice.toFixed(2)} $CAMP</div>
           </div>
 
           {/* Buy Button */}
           <button
             onClick={handleBuyAccess}
             disabled={loading || isPending || isConfirming || !address}
-            className="w-full py-3 px-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-3 px-4 bg-soft-primary text-white font-bold rounded-lg hover:bg-soft-primary-deep transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading || isPending || isConfirming ? 'Processing...' : `Buy Access (${totalPrice.toFixed(2)} $CAMP)`}
           </button>
