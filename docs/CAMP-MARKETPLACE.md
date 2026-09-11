@@ -13,69 +13,81 @@ pochodza z artefaktow npm, nie z ogloszen Campa).
 
 ---
 
-## 0. NAJWAZNIEJSZE: Camp Origin jest porzucony (ustalone 2026-09-11)
+## 0. WERDYKT: Camp to pusty lancuch. Nie budowac tu dalej.
 
-**Mintowanie IP NFT na Camp mainnet nie dziala dzis dla nikogo i nie da sie
-tego naprawic z naszej strony.**
+Ustalone 2026-09-11 z czterech niezaleznych zrodel. Wniosek jest jeden i nie
+jest przyjemny.
 
-Dowod bezposredni - `scripts/tryMintCamp.mjs`, mint z linii polecen, bez
-przegladarki i bez rozszerzenia portfela, portfelem 0xD488...030e, na
+### 0.1 Firma istnieje i ma pieniadze - i to nie jest pocieszenie
+
+30 mln USD lacznie, Series A 25 mln w kwietniu 2025 prowadzona przez 1kx
+i Blockchain Capital, 22 osoby na marzec 2026. Mainnet ruszyl 28 sierpnia 2025.
+To nie jest projekt oszukanczy ani porzucony przez znikajacy zespol. To dobrze
+sfinansowany projekt, ktory nie znalazl uzytkownikow.
+
+### 0.2 Lancuch nie ma ruchu uzytkownikow
+
+Blockscout pokazuje ok. 3 tys. transakcji dziennie. Sprawdzilismy, czym one sa:
+z 25 ostatnich transakcji 17 to `setPrice`, `setFares` i `setPriceForArbitrum`
+kierowane na `0x3c2269811836af69497E5F486A85D7316753cf62`, czyli endpoint
+LayerZero. To aktualizacje cen mostu - infrastruktura rozmawiajaca sama ze
+soba, nie ludzie.
+
+### 0.3 Duze kolekcje sa martwe od roku
+
+| Kolekcja | Posiadaczy | Transferow | Ostatni ruch |
+|---|---|---|---|
+| Ghosty Trip Onchain Inventory | 161 554 | 175 145 | 333 dni temu |
+| StoryChain Stories | 30 948 | 125 805 | 317 dni temu |
+| Clawdia | 2 269 | 26 546 | 351 dni temu |
+| **IP NFT (Origin)** | **32** | **265** | **133 dni temu** |
+
+Szescioocyfrowe liczby posiadaczy pochodza z okresu launchu i airdropu
+(sierpien-pazdziernik 2025). Potem wszystko stanelo. Wlasna kolekcja Origin
+jest paradoksalnie NAJSWIEZSZA pozycja na tej liscie - i tak stoi od maja.
+
+### 0.4 Origin nie dziala i nikt tego nie naprawia
+
+Mint z linii polecen (`scripts/tryMintCamp.mjs`), portfelem 0xD488...030e,
 environment PRODUCTION:
 
 | Etap | Wynik |
 |---|---|
-| logowanie do Camp Origin | **udane**, sesja wydana poprawnie |
-| wysylka pliku | 403 `Unable to perform this action due to account surpassing plan limits` |
+| logowanie do Camp Origin | **udane** |
+| wysylka pliku | 403 `account surpassing plan limits` |
 | rejestracja mintu (podpis) | 403, ta sama tresc |
 
-Czyli nasze dane i sesja sa poprawne. Odmawia backend Campa - i na
-przechowywaniu pliku, i na podpisie. Komunikat pochodzi z Pinaty: konto IPFS
-po stronie Campa przestalo byc oplacane.
+Komunikat pochodzi z Pinaty. Konto IPFS po stronie Campa przestalo byc
+oplacane. Do tego: `@campnetwork/origin` 1.3.2 z 5 lutego 2026, prace stanely
+na `1.4.0-alpha.9` i nigdy nie trafily na stable; `origin-app` bez commita od
+listopada 2025; jedyne aktywne repozytorium w organizacji Campa to niezwiazany
+projekt o pamieci agentow AI.
 
-### Co mowia pozostale zrodla
+### 0.5 Token
 
-- **Lancuch.** Kolekcja `0x39EeE1...2C38`: 265 transferow LACZNIE, wszystkie
-  to minty z adresu zero, 32 posiadaczy. Ostatni mint **1 maja 2026**. Ani
-  jednego transferu wtornego w calej historii - nikt nigdy tego nie odsprzedal.
-- **SDK.** `@campnetwork/origin` 1.3.2 z 5 lutego 2026, prace stanely na
-  `1.4.0-alpha.9` i nigdy nie trafily na stable. `@campnetwork/sdk` 1.4.5
-  z lutego 2025.
-- **Kod Campa.** `origin-app` bez commita od listopada 2025. Jedyne aktywne
-  repozytorium w ich organizacji to niezwiazany projekt o pamieci agentow AI,
-  pisany przez jedna osobe.
-- **Token.** CAMP usuniety z par spot Bybit 25 sierpnia 2026 z powodu niskiego
-  wolumenu; cena ok. 0,03% ceny startowej.
-- **Ruch.** Siec formalnie zyje: bloki leca, RPC wytrzymuje obciazenie, ale
-  2-3 tys. transakcji dziennie i wykorzystanie sieci 0,0076%.
+Szczyt 0,27 USD, dzis ok. 0,007 - spadek ponad 97%. Airdrop odebralo 9,5%
+uprawnionych, cena po TGE spadla o 87,5%. Bybit usunal pary spot 25 sierpnia
+2026 za niski wolumen. Gaz na tym lancuchu placi sie wiec tokenem bez
+plynnosci.
 
-Trzy niezalezne zrodla wskazuja ten sam moment: pierwsza polowa 2026 to koniec
-realnego utrzymywania Origin. Zapowiedzi wygaszenia NIE MA - to po prostu
-ciche porzucenie.
+### 0.6 Co z tego wynika
 
-### Co to znaczy dla nas
+**Marketplace IP NFT na Camp nie ma sensu jako produkt.** Nie ma podazy, bo
+backend odmawia mintu. Nie ma popytu - w calej historii kolekcji Origin nie
+doszlo do ANI JEDNEJ odsprzedazy. Nie ma wsparcia. Nie ma plynnosci.
 
-Marketplace jako **produkt na Camp** nie ma sensu: nie ma podazy (nikt nie
-zmintuje, bo backend odmawia), nie ma popytu (32 posiadaczy, zero obrotu
-wtornego), nie ma wsparcia (SDK i backend bez opiekuna), nie ma plynnosci
-(gaz placony tokenem po delistingu).
+**Co zostaje z wykonanej pracy:**
 
-Sensowne pozostaja dwie rzeczy:
+| Rzecz | Wartosc poza Campem |
+|---|---|
+| `app/api/ipfs` - proxy z lancuchem bramek | **pelna** - dziala dla dowolnej tresci IPFS, niezaleznie od lancucha |
+| IPMarketV4 (listing, oferty, aukcje, licencje) | **pelna** - zwykly Solidity, da sie wdrozyc gdziekolwiek |
+| Interfejs marketplace (siatka, filtry, karty, modale) | **duza** - pod warunkiem, ze adres kolekcji i chainId zostana konfiguracja |
+| Klej do Origin (MintIpModal, RoyaltiesPanel, SDK) | **zadna** - to jest specyficzne dla Campa |
 
-1. **Zostawic jako demo techniczne.** IPMarketV4 stoi, kod dziala, 265 prac da
-   sie przegladac. Kosztu biezacego nie ma.
-2. **Trzymac kod przenosny.** Adres kolekcji i chainId maja byc konfiguracja,
-   nie zalozeniem wbitym w komponenty - zeby ta sama warstwa (listing, oferty,
-   aukcje, licencje) dala sie postawic na lancuchu, ktory zyje.
-
-Czego NIE robic: nie inwestowac kolejnych tygodni w integracje z Origin przy
-zalozeniu, ze przyjda uzytkownicy z Campa.
-
-### Decyzja do podjecia
-
-Na produkcji stoi widoczny przycisk "Mint an IP", ktory zawsze konczy sie
-bledem po stronie Campa. Do wyboru: (a) wylaczyc sam mint i zostawic reszte
-targu, (b) zaparkowac cala trase jak wczesniej, (c) zostawic jak jest
-z uczciwym komunikatem o odmowie. Dzis dziala wariant (c).
+**Rekomendacja: zamrozic.** Nie inwestowac kolejnych godzin w integracje
+z Origin. Jesli idea targu IP ma byc kontynuowana, to na lancuchu, ktory ma
+uzytkownikow - a warstwa kontraktu i interfejsu juz jest i jest przenosna.
 
 ---
 
