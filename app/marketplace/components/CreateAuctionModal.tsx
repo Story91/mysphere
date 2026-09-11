@@ -7,6 +7,7 @@ import { toast } from 'react-hot-toast';
 import { MARKETPLACE_ADDRESS, MARKETPLACE_ABI, DEFAULT_IP_NFT_CONTRACT } from '../config/simpleMarketplace';
 import { createCampPublicClient } from '../config/campClient';
 import { fetchIpNftsFor } from '@/app/mycamp/api/fetchIpNfts';
+import { ipfsToHttp } from '@/utils/ipfs';
 
 export default function CreateAuctionModal({ nftContract: initialNftContract, tokenId: initialTokenId, onClose }: { nftContract?: `0x${string}`; tokenId?: bigint; onClose: () => void }) {
   const { address } = useAccount();
@@ -137,7 +138,7 @@ export default function CreateAuctionModal({ nftContract: initialNftContract, to
           }) as string;
           
           if (uri) {
-            const metaUrl = uri.startsWith('http') ? uri : uri.replace('ipfs://', 'https://ipfs.io/ipfs/');
+            const metaUrl = ipfsToHttp(uri);
             const response = await fetch(metaUrl);
             const metadata = await response.json();
             
@@ -201,7 +202,7 @@ export default function CreateAuctionModal({ nftContract: initialNftContract, to
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-soft-ink/50 p-4" onClick={onClose}>
       <div className="bg-white border border-soft-line rounded-[26px] max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-between items-start mb-6">
           <h2 className="text-xl font-bold text-soft-ink">Create Auction</h2>
@@ -218,7 +219,7 @@ export default function CreateAuctionModal({ nftContract: initialNftContract, to
               </div>
             ) : userNfts.length === 0 ? (
               <div className="w-full bg-white border border-soft-line rounded px-3 py-8 text-center">
-                <p className="text-gray-500">No available NFTs</p>
+                <p className="text-soft-ink-soft">No available NFTs</p>
                 <p className="text-xs text-soft-ink-soft mt-2">
                   All your NFTs are already listed or in auction
                 </p>
@@ -257,10 +258,7 @@ export default function CreateAuctionModal({ nftContract: initialNftContract, to
                   <div className="w-20 h-20 bg-white rounded-lg overflow-hidden flex-shrink-0">
                     {selectedNftDetails.image || selectedNftDetails.metadata?.image ? (
                       <img 
-                        src={
-                          (selectedNftDetails.image || selectedNftDetails.metadata?.image || '')
-                            .replace('ipfs://', 'https://ipfs.io/ipfs/')
-                        }
+                        src={ipfsToHttp(selectedNftDetails.image || selectedNftDetails.metadata?.image || '')}
                         alt={selectedNftDetails.metadata?.name || `Token #${selectedNftDetails.tokenId}`}
                         className="w-full h-full object-cover"
                         onError={(e) => {
@@ -269,14 +267,14 @@ export default function CreateAuctionModal({ nftContract: initialNftContract, to
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-soft-ink-soft">
-                        🖼️
+                        
                       </div>
                     )}
                   </div>
                   
                   {/* Details */}
                   <div className="flex-1 min-w-0">
-                    <h4 className="text-white font-semibold truncate">
+                    <h4 className="text-soft-ink font-semibold truncate">
                       {selectedNftDetails.metadata?.name || `Token #${selectedNftDetails.tokenId}`}
                     </h4>
                     <p className="text-xs text-soft-ink-muted truncate">

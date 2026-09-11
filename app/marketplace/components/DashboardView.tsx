@@ -8,6 +8,7 @@ import { MARKETPLACE_ADDRESS, MARKETPLACE_ABI, DEFAULT_IP_NFT_CONTRACT } from '.
 import { createCampPublicClient } from '../config/campClient';
 import CreateAuctionModal from './CreateAuctionModal';
 import BidModal from './BidModal';
+import { ipfsToHttp } from '@/utils/ipfs';
 
 export default function DashboardView() {
   const { address, isConnected } = useAccount();
@@ -502,7 +503,7 @@ export default function DashboardView() {
                 }) as string;
                 
                 if (tokenURI) {
-                  const ipfsUrl = tokenURI.replace('ipfs://', 'https://ipfs.io/ipfs/');
+                  const ipfsUrl = ipfsToHttp(tokenURI);
                   const response = await fetch(ipfsUrl);
                   metadata = await response.json();
                 }
@@ -661,13 +662,13 @@ export default function DashboardView() {
           functionName: 'tokenURI',
           args: [tokenId],
         }) as string;
-        const metaUrl = uri?.startsWith('http') ? uri : uri?.replace('ipfs://', 'https://ipfs.io/ipfs/');
+        const metaUrl = ipfsToHttp(uri);
         if (metaUrl) {
           const meta = await fetch(metaUrl, { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null);
           const anim = meta?.animation_url || meta?.animationUrl || '';
           const img = meta?.image || '';
           const media = anim || img || '';
-          const mediaHttp = media?.startsWith('http') ? media : media?.replace('ipfs://', 'https://ipfs.io/ipfs/');
+          const mediaHttp = ipfsToHttp(media);
           const mime = (meta?.properties?.mimeType || meta?.mimeType || '').toString();
           let type: 'image' | 'audio' | 'video' | 'text' | 'unknown' = 'unknown';
           const lower = (mime || media).toLowerCase();
@@ -924,9 +925,8 @@ export default function DashboardView() {
   if (!isConnected) {
     return (
       <div className="text-center py-20">
-        <div className="text-6xl mb-4">🔐</div>
-        <h2 className="text-2xl font-bold text-soft-ink mb-4">Connect Wallet</h2>
-        <p className="text-gray-400">Connect your wallet to view your dashboard</p>
+                <h2 className="text-2xl font-bold text-soft-ink mb-4">Connect Wallet</h2>
+        <p className="text-soft-ink-muted">Connect your wallet to view your dashboard</p>
       </div>
     );
   }
@@ -936,17 +936,17 @@ export default function DashboardView() {
       {/* Dashboard Header */}
       <div className="mb-8">
         <h2 className="text-3xl font-bold text-soft-ink mb-2">My Dashboard</h2>
-        <p className="text-gray-400">Manage your listings, offers, and earnings</p>
+        <p className="text-soft-ink-muted">Manage your listings, offers, and earnings</p>
       </div>
 
       {/* Tabs - Mobile Responsive */}
       <div className="flex flex-wrap gap-1 sm:gap-2 mb-8 border-b border-soft-line overflow-x-auto">
         {[
-          { id: 'listings', label: 'My Listings', icon: '📋', shortLabel: 'Listings' },
-          { id: 'offers', label: 'Offers Received', icon: '💰', shortLabel: 'Offers' },
-          { id: 'earnings', label: 'Earnings', icon: '💵', shortLabel: 'Earnings' },
-          { id: 'access', label: 'My Access', icon: '🔑', shortLabel: 'Access' },
-          { id: 'auctions', label: 'Auctions', icon: '🔨', shortLabel: 'Auctions' },
+          { id: 'listings', label: 'My Listings', icon: '', shortLabel: 'Listings' },
+          { id: 'offers', label: 'Offers Received', icon: '', shortLabel: 'Offers' },
+          { id: 'earnings', label: 'Earnings', icon: '', shortLabel: 'Earnings' },
+          { id: 'access', label: 'My Access', icon: '', shortLabel: 'Access' },
+          { id: 'auctions', label: 'Auctions', icon: '', shortLabel: 'Auctions' },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -968,7 +968,7 @@ export default function DashboardView() {
       {loading ? (
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-4 border-soft-accent border-t-transparent mx-auto mb-4"></div>
-          <p className="text-gray-400">Loading dashboard...</p>
+          <p className="text-soft-ink-muted">Loading dashboard...</p>
         </div>
       ) : (
         <>
@@ -978,8 +978,7 @@ export default function DashboardView() {
               <h3 className="text-xl font-bold text-soft-ink mb-6">My Active Listings</h3>
               {myListings.filter(l => l.isActive).length === 0 ? (
                 <div className="bg-white border border-soft-line rounded-xl p-12 text-center">
-                  <div className="text-5xl mb-4">📦</div>
-                  <p className="text-gray-400 mb-4">You don't have any active listings</p>
+                                    <p className="text-soft-ink-muted mb-4">You don't have any active listings</p>
                   <p className="text-soft-ink-soft text-sm">List your IP NFTs to start selling</p>
                 </div>
               ) : (
@@ -1003,8 +1002,7 @@ export default function DashboardView() {
               <h3 className="text-xl font-bold text-soft-ink mb-6">Offers Received</h3>
               {myOffers.length === 0 ? (
                 <div className="bg-white border border-soft-line rounded-xl p-12 text-center">
-                  <div className="text-5xl mb-4">💌</div>
-                  <p className="text-gray-400">No offers received yet</p>
+                                    <p className="text-soft-ink-muted">No offers received yet</p>
                   <p className="text-soft-ink-soft text-sm mt-2">Offers will appear here when buyers make them</p>
                 </div>
               ) : (
@@ -1013,17 +1011,17 @@ export default function DashboardView() {
                     <div key={`${offer.listingId}-${offer.offerIndex}`} className="bg-white border border-soft-line rounded-xl p-4 sm:p-6">
                       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                         <div>
-                          <h4 className="text-white font-semibold mb-2">
+                          <h4 className="text-soft-ink font-semibold mb-2">
                             Offer for Listing #{offer.listingId}
                           </h4>
                           <p className="text-soft-ink-muted text-sm">
                             Amount: <span className="text-orange-400 font-bold">{formatEther(offer.price || 0n)} CAMP</span>
                           </p>
                           <p className="text-soft-ink-muted text-sm">
-                            From: <span className="text-white">{offer.buyer?.slice(0, 6)}...{offer.buyer?.slice(-4)}</span>
+                            From: <span className="text-soft-ink">{offer.buyer?.slice(0, 6)}...{offer.buyer?.slice(-4)}</span>
                           </p>
                           <p className="text-soft-ink-muted text-sm">
-                            Duration: <span className="text-white">{Number(offer.duration) / 86400} days</span>
+                            Duration: <span className="text-soft-ink">{Number(offer.duration) / 86400} days</span>
                           </p>
                         </div>
                         <div className="flex gap-2 justify-end sm:justify-start">
@@ -1049,7 +1047,7 @@ export default function DashboardView() {
               <h3 className="text-xl font-bold text-soft-ink mb-6">My Earnings</h3>
               <div className="bg-soft-surface-sunken border border-soft-line rounded-xl p-4 sm:p-8">
                 <div className="text-center">
-                  <p className="text-gray-300 mb-2">Available to Withdraw</p>
+                  <p className="text-soft-ink-muted mb-2">Available to Withdraw</p>
                   <p className="text-3xl sm:text-5xl font-bold text-soft-accent-deep mb-4 sm:mb-8">
                     {userEarnings ? formatEther(userEarnings) : '0'} CAMP
                   </p>
@@ -1069,7 +1067,7 @@ export default function DashboardView() {
               {/* Pending Returns Section - always show */}
               <div className="mt-6 bg-soft-surface-sunken border border-soft-line rounded-xl p-4 sm:p-6">
                 <div className="text-center">
-                  <p className="text-gray-300 mb-2">Auction Refunds Available</p>
+                  <p className="text-soft-ink-muted mb-2">Auction Refunds Available</p>
                   <p className="text-2xl sm:text-3xl font-bold text-soft-info mb-4">
                     {myPendingReturns ? formatEther(myPendingReturns) : '0'} CAMP
                   </p>
@@ -1231,7 +1229,7 @@ function AccessCard({ access, onRenew }: { access: any; onRenew: () => void }) {
   }, [access.expiryTime]);
   
   const imageUrl = access.metadata?.image?.startsWith('ipfs://') 
-    ? access.metadata.image.replace('ipfs://', 'https://ipfs.io/ipfs/')
+    ? ipfsToHttp(access.metadata.image)
     : access.metadata?.image;
   
   return (
@@ -1246,7 +1244,7 @@ function AccessCard({ access, onRenew }: { access: any; onRenew: () => void }) {
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-soft-ink-soft">
-            <span className="text-4xl">🖼️</span>
+            <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-soft-ink-faint">No image</span>
           </div>
         )}
         
@@ -1254,7 +1252,7 @@ function AccessCard({ access, onRenew }: { access: any; onRenew: () => void }) {
         <div className={`absolute top-2 right-2 px-2 sm:px-3 py-1 rounded-full text-xs font-semibold ${
           timeLeft === 'Expired' ? 'bg-red-500/80' : 'bg-green-500/80'
         } text-soft-ink backdrop-blur`}>
-          {timeLeft === 'Expired' ? '⏱️ Expired' : `⏱️ ${timeLeft}`}
+          {timeLeft === 'Expired' ? 'Expired' : timeLeft}
                 </div>
               </div>
 
@@ -1313,7 +1311,7 @@ function AccessTermsInline({ tokenId }: { tokenId: string }) {
   }, [tokenId]);
   if (!terms) return <p className="text-soft-ink-soft text-xs">No access terms</p>;
   return (
-    <p className="text-soft-ink-muted text-sm">Terms: <span className="text-white font-semibold">{Number(terms.price) / 1e18} CAMP</span> / <span className="text-white">{Number(terms.duration) / 86400} days</span></p>
+    <p className="text-soft-ink-muted text-sm">Terms: <span className="font-bold text-soft-ink">{Number(terms.price) / 1e18} CAMP</span> / <span className="text-soft-ink">{Number(terms.duration) / 86400} days</span></p>
   );
 }
 
@@ -1353,11 +1351,11 @@ function AuctionCardWithPreview({
           args: [BigInt(auction.tokenId)],
         }) as string;
 
-        const metaUrl = tokenUri?.startsWith('ipfs://') ? tokenUri.replace('ipfs://', 'https://ipfs.io/ipfs/') : tokenUri;
+        const metaUrl = ipfsToHttp(tokenUri);
         if (metaUrl) {
           const metadata = await fetch(metaUrl, { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null);
           setNftData({
-            image: metadata?.image?.replace('ipfs://', 'https://ipfs.io/ipfs/'),
+            image: ipfsToHttp(metadata?.image),
             name: metadata?.name
           });
         }
@@ -1383,7 +1381,7 @@ function AuctionCardWithPreview({
       <div className="aspect-square bg-soft-surface-sunken relative">
         {loading ? (
           <div className="w-full h-full flex items-center justify-center">
-            <div className="text-gray-500">Loading...</div>
+            <div className="text-soft-ink-soft">Loading...</div>
           </div>
         ) : nftData?.image ? (
           <img 
@@ -1393,12 +1391,12 @@ function AuctionCardWithPreview({
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-soft-ink-soft">
-            <span className="text-4xl">🖼️</span>
+            <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-soft-ink-faint">No image</span>
           </div>
         )}
         
         {/* Auction ID Badge */}
-        <div className="absolute top-2 left-2 px-2 py-1 bg-black/80 rounded text-xs text-soft-ink font-semibold">
+        <div className="absolute top-2 left-2 px-2 py-1 bg-soft-ink/50 rounded text-xs text-soft-ink font-semibold">
           Auction #{auction.auctionId}
         </div>
       </div>
@@ -1419,24 +1417,24 @@ function AuctionCardWithPreview({
             className="text-soft-ink-muted hover:text-soft-ink transition-colors text-sm"
             title="Copy full token ID"
           >
-            {copied ? '✓' : '📋'}
+            {copied ? 'Copied' : 'Copy'}
           </button>
         </div>
         
         {/* Auction Details */}
         <div className="space-y-1 text-sm mb-4">
-          <div className="text-gray-400">
-            Min: <span className="text-white">{formatEther(auction.minPrice)} CAMP</span>
+          <div className="text-soft-ink-muted">
+            Min: <span className="text-soft-ink">{formatEther(auction.minPrice)} CAMP</span>
           </div>
-          <div className="text-gray-400">
+          <div className="text-soft-ink-muted">
             Highest: <span className="text-orange-400 font-semibold">{formatEther(auction.highestBid)} CAMP</span>
           </div>
-          <div className="text-gray-400">
+          <div className="text-soft-ink-muted">
             Time left: <span className="text-yellow-400">{formatTimeLeft(auction.endTime)}</span>
           </div>
           {auction.highestBidder && (
-            <div className="text-gray-400">
-              Top bidder: <span className="text-white">{auction.highestBidder.slice(0,6)}...{auction.highestBidder.slice(-4)}</span>
+            <div className="text-soft-ink-muted">
+              Top bidder: <span className="text-soft-ink">{auction.highestBidder.slice(0,6)}...{auction.highestBidder.slice(-4)}</span>
             </div>
           )}
         </div>
@@ -1497,11 +1495,11 @@ function ListingCardWithPreview({ listing, onCancel, isCancelling }: { listing: 
           args: [BigInt(listing.tokenId)],
         }) as string;
 
-        const metaUrl = tokenUri?.startsWith('ipfs://') ? tokenUri.replace('ipfs://', 'https://ipfs.io/ipfs/') : tokenUri;
+        const metaUrl = ipfsToHttp(tokenUri);
         if (metaUrl) {
           const metadata = await fetch(metaUrl, { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null);
           setNftData({
-            image: metadata?.image?.replace('ipfs://', 'https://ipfs.io/ipfs/'),
+            image: ipfsToHttp(metadata?.image),
             name: metadata?.name,
             type: metadata?.properties?.type || metadata?.attributes?.find((a: any) => a.trait_type === 'Media Type')?.value || 'image'
           });
@@ -1542,9 +1540,9 @@ function ListingCardWithPreview({ listing, onCancel, isCancelling }: { listing: 
           ) : (
             <div className="w-full h-full bg-soft-surface-sunken flex items-center justify-center">
               <div className="text-xs text-soft-ink-soft">
-                {nftData?.type === 'audio' ? '🎵' : 
-                 nftData?.type === 'video' ? '🎥' : 
-                 nftData?.type === 'text' ? '📄' : '📷'}
+                {nftData?.type === 'audio' ? 'Audio' : 
+                 nftData?.type === 'video' ? 'Video' : 
+                 nftData?.type === 'text' ? 'Text' : 'Image'}
               </div>
             </div>
           )}
@@ -1557,8 +1555,8 @@ function ListingCardWithPreview({ listing, onCancel, isCancelling }: { listing: 
           </h4>
           <div className="space-y-1 text-sm">
             <div className="flex items-center gap-2">
-              <p className="text-gray-400">
-                Token ID: <span className="text-white">
+              <p className="text-soft-ink-muted">
+                Token ID: <span className="text-soft-ink">
                   {listing.tokenId?.toString().length > 20 
                     ? `${listing.tokenId.toString().slice(0, 8)}...${listing.tokenId.toString().slice(-6)}`
                     : listing.tokenId?.toString()}
@@ -1573,25 +1571,25 @@ function ListingCardWithPreview({ listing, onCancel, isCancelling }: { listing: 
                 className="text-soft-ink-muted hover:text-soft-ink transition-colors text-xs"
                 title="Copy full token ID"
               >
-                {copied ? '✓' : '📋'}
+                {copied ? 'Copied' : 'Copy'}
               </button>
             </div>
-            <p className="text-gray-400">
+            <p className="text-soft-ink-muted">
               Price: <span className="text-orange-400 font-bold">{listing.price ? formatEther(listing.price) : '0'} CAMP</span>
             </p>
             {terms && (
-              <p className="text-gray-400">
-                Terms: <span className="text-white font-semibold">{Number(terms.price) / 1e18} CAMP</span> / <span className="text-white">{Number(terms.duration) / 86400} days</span>
+              <p className="text-soft-ink-muted">
+                Terms: <span className="font-bold text-soft-ink">{Number(terms.price) / 1e18} CAMP</span> / <span className="text-soft-ink">{Number(terms.duration) / 86400} days</span>
               </p>
             )}
-            <p className="text-gray-400">
-              Type: <span className="text-white">{nftData?.type || 'Unknown'}</span>
+            <p className="text-soft-ink-muted">
+              Type: <span className="text-soft-ink">{nftData?.type || 'Unknown'}</span>
             </p>
-            <p className="text-gray-400">
-              Status: <span className="text-green-400">🟢 Active</span>
+            <p className="text-soft-ink-muted">
+              Status: <span className="font-bold text-[#0b9a51]">Active</span>
             </p>
             {listing.offers?.length > 0 && (
-              <p className="text-gray-400">
+              <p className="text-soft-ink-muted">
                 Offers: <span className="text-yellow-400">{listing.offers.length} pending</span>
               </p>
             )}
@@ -1661,11 +1659,11 @@ function BidCardWithNFTPreview({
           args: [BigInt(auction.tokenId)],
         }) as string;
 
-        const metaUrl = tokenUri?.startsWith('ipfs://') ? tokenUri.replace('ipfs://', 'https://ipfs.io/ipfs/') : tokenUri;
+        const metaUrl = ipfsToHttp(tokenUri);
         if (metaUrl) {
           const metadata = await fetch(metaUrl, { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null);
           setNftData({
-            image: metadata?.image?.replace('ipfs://', 'https://ipfs.io/ipfs/'),
+            image: ipfsToHttp(metadata?.image),
             name: metadata?.name,
             type: metadata?.properties?.type || 'Unknown'
           });
@@ -1698,7 +1696,7 @@ function BidCardWithNFTPreview({
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-soft-ink-soft">
-            <span className="text-2xl">🖼️</span>
+            <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-soft-ink-faint">No image</span>
           </div>
         )}
       </div>
@@ -1706,7 +1704,7 @@ function BidCardWithNFTPreview({
       {/* Auction Info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
-          <span className="text-white font-semibold">
+          <span className="font-bold text-soft-ink">
             {nftData?.name || `Token #${auction.tokenId.toString().slice(0, 8)}...`}
           </span>
           <span className="text-soft-ink-muted text-sm">
@@ -1716,12 +1714,12 @@ function BidCardWithNFTPreview({
             <span className={`px-2 py-0.5 rounded text-xs font-bold ${
               auctionEnded ? 'bg-[#0b9a51] text-white' : 'bg-[#edfff4] border border-[#9de7bb] text-[#0b9a51] border border-transparent'
             }`}>
-              {auctionEnded ? '🏆 WON!' : '✅ WINNING'}
+              {auctionEnded ? 'Won' : 'Winning'}
             </span>
           )}
           {!isWinning && auction.highestBidder && (
             <span className="px-2 py-0.5 rounded bg-[#ffefef] border border-[#f3b4b4] text-[#a32020] border border-transparent text-xs font-bold">
-              ❌ OUTBID
+              Outbid
             </span>
           )}
         </div>
@@ -1734,7 +1732,7 @@ function BidCardWithNFTPreview({
         
         {auction.highestBidder && (
           <div className="text-soft-ink-muted text-sm">
-            Top bidder: <span className={`${isWinning ? 'text-green-400' : 'text-white'}`}>
+            Top bidder: <span className={`${isWinning ? 'text-green-400' : 'text-soft-ink'}`}>
               {isWinning ? 'You' : `${auction.highestBidder.slice(0,6)}...${auction.highestBidder.slice(-4)}`}
             </span>
           </div>
@@ -1809,7 +1807,7 @@ function RenewAccessModal({ tokenId, terms, onClose }: { tokenId: string; terms:
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-soft-ink/50 p-4" onClick={onClose}>
       <div className="bg-white border border-soft-line rounded-[26px] max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold text-soft-ink">Renew Access</h2>
@@ -1827,14 +1825,14 @@ function RenewAccessModal({ tokenId, terms, onClose }: { tokenId: string; terms:
                   className="px-2 py-1 bg-soft-surface-sunken hover:bg-soft-surface-sunken text-soft-ink-muted text-xs rounded transition-colors"
                   title="Copy full Token ID"
                 >
-                  📋
+                  Copy
                 </button>
               </div>
             </div>
             {terms && (
               <div className="bg-white rounded-lg p-3 text-sm">
-                <p className="text-gray-400">Price per period: <span className="text-white font-semibold">{(Number(terms.price) / 1e18).toFixed(4)} CAMP</span></p>
-                <p className="text-gray-400">Duration per period: <span className="text-white">{durationDays} days</span></p>
+                <p className="text-soft-ink-muted">Price per period: <span className="font-bold text-soft-ink">{(Number(terms.price) / 1e18).toFixed(4)} CAMP</span></p>
+                <p className="text-soft-ink-muted">Duration per period: <span className="text-soft-ink">{durationDays} days</span></p>
               </div>
             )}
           </div>

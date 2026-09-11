@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { useAccount } from 'wagmi';
 import { motion } from 'framer-motion';
 import dynamic from 'next/dynamic';
@@ -30,19 +29,25 @@ const CreateAuctionModal = dynamic(() => import('./components/CreateAuctionModal
   ssr: false
 });
 
+// ssr:false jest tu WYMOGIEM, nie optymalizacja: CampProvider i hooki SDK Campa
+// wolaja useContext/useState warunkowo, wiec przy renderze serwerowym liczba
+// hookow rozjezdza sie z hydracja.
+const MintIpModal = dynamic(() => import('./components/MintIpModal'), {
+  ssr: false
+});
 
-// Zdjecie hero. Unsplash License: darmowe uzycie komercyjne, podpis autora
-// mile widziany - stad link w rogu sekcji. Parametry auto/w/q daja ~1800px
-// WebP z CDN Unsplash, bez pobierania pliku do repo.
+// Zdjecie hero z Unsplash (Unsplash License - darmowe uzycie komercyjne, podpis
+// nieobowiazkowy). Parametry auto/w/q daja ~1800px WebP z ich CDN, bez
+// pobierania pliku do repo.
 const HERO = {
   src: 'https://images.unsplash.com/photo-1698899114691-3e4a5d9be3dc?auto=format&fit=crop&w=1800&q=70',
-  credit: { name: 'Francisco Gonzalez', href: 'https://unsplash.com/photos/-jmYFZ9CQ80' },
 };
 
 export default function MarketplacePage() {
   const { address, isConnected } = useAccount();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showCreateAuction, setShowCreateAuction] = useState<any>(null);
+  const [showMintModal, setShowMintModal] = useState(false);
   const [prefillTokenId, setPrefillTokenId] = useState<string | null>(null);
   
   // Check for list and auction parameters in URL
@@ -254,14 +259,6 @@ export default function MarketplacePage() {
               </dl>
             </div>
           </div>
-          <a
-            href={HERO.credit.href}
-            target="_blank"
-            rel="noreferrer"
-            className="absolute bottom-2 right-3 text-[10px] text-white/45 hover:text-white/80"
-          >
-            Photo: {HERO.credit.name} / Unsplash
-          </a>
         </motion.section>
 
         {/* Zakladki + akcje */}
@@ -290,24 +287,36 @@ export default function MarketplacePage() {
             </div>
           </nav>
 
-          {isConnected && (
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => { setPrefillTokenId(null); setShowCreateModal(true); }}
-                className="rounded-pill bg-soft-primary px-5 py-2.5 text-[13px] font-bold text-white shadow-[var(--soft-shadow-chip)] transition hover:bg-soft-primary-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary-deep"
-              >
-                List an IP
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowCreateAuction({})}
-                className="rounded-pill bg-white px-5 py-2.5 text-[13px] font-bold text-soft-ink ring-1 ring-soft-line transition hover:bg-soft-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
-              >
-                Start an auction
-              </button>
-            </div>
-          )}
+          {/* Mint jest widoczny zawsze - to pierwszy krok dla kazdego, kto nie ma
+              jeszcze zadnego IP NFT, a samo okno prowadzi przez portfel i sesje
+              Campa. Wystawianie i aukcje wymagaja juz podlaczonego portfela. */}
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setShowMintModal(true)}
+              className="rounded-pill bg-soft-primary px-5 py-2.5 text-[13px] font-bold text-white shadow-[var(--soft-shadow-chip)] transition hover:bg-soft-primary-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary-deep"
+            >
+              Mint an IP
+            </button>
+            {isConnected && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => { setPrefillTokenId(null); setShowCreateModal(true); }}
+                  className="rounded-pill bg-white px-5 py-2.5 text-[13px] font-bold text-soft-ink ring-1 ring-soft-line transition hover:bg-soft-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                >
+                  List an IP
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateAuction({})}
+                  className="rounded-pill bg-white px-5 py-2.5 text-[13px] font-bold text-soft-ink ring-1 ring-soft-line transition hover:bg-soft-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                >
+                  Start an auction
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Tresc */}
@@ -325,6 +334,19 @@ export default function MarketplacePage() {
           {activeView === 'dashboard' && <DashboardView />}
         </div>
       </div>
+
+      {showMintModal && (
+        <MintIpModal
+          onClose={() => setShowMintModal(false)}
+          onMinted={() => {
+            // Blockscout potrzebuje chwili, zanim pokaze swiezy transfer.
+            // Zakladka "My IP" czyta wlasnie z niego, wiec przeladowujemy ja
+            // dopiero po zamknieciu okna, a nie w tej samej sekundzie.
+            setShowMintModal(false);
+            setActiveView('my-ip');
+          }}
+        />
+      )}
 
       {showCreateModal && (
         <CreateListingModal onClose={() => setShowCreateModal(false)} prefillTokenId={prefillTokenId || undefined} />

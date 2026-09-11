@@ -70,7 +70,15 @@ export async function fetchIpNftsFor(address: string) {
         })) as string;
         const metaUrl = ipfsToHttp(tokenUri);
         if (metaUrl) {
-          metadata = await fetch(metaUrl, { cache: 'no-store' })
+          metadata = await fetch(metaUrl, {
+            // BEZ `cache: 'no-store'`: tresc IPFS jest adresowana skrotem, wiec
+            // nie ma czego odswiezac, a /api/ipfs oddaje ja z naglowkiem
+            // `immutable`. Wczesniejsze `no-store` kazalo przegladarce
+            // pobierac kazda metadana od nowa przy kazdym wejsciu.
+            // Limit czasu, bo bez niego jedna zawieszona bramka trzymala
+            // cale Promise.all - i siatka nie pokazywala sie wcale.
+            signal: AbortSignal.timeout(12_000),
+          })
             .then((r) => (r.ok ? r.json() : null))
             .catch(() => null);
           if (metadata?.image) image = ipfsToHttp(metadata.image);
@@ -149,7 +157,15 @@ export async function fetchRecentIpNfts(limit: number = 50) {
         })) as string;
         const metaUrl = ipfsToHttp(tokenUri);
         if (metaUrl) {
-          metadata = await fetch(metaUrl, { cache: 'no-store' })
+          metadata = await fetch(metaUrl, {
+            // BEZ `cache: 'no-store'`: tresc IPFS jest adresowana skrotem, wiec
+            // nie ma czego odswiezac, a /api/ipfs oddaje ja z naglowkiem
+            // `immutable`. Wczesniejsze `no-store` kazalo przegladarce
+            // pobierac kazda metadana od nowa przy kazdym wejsciu.
+            // Limit czasu, bo bez niego jedna zawieszona bramka trzymala
+            // cale Promise.all - i siatka nie pokazywala sie wcale.
+            signal: AbortSignal.timeout(12_000),
+          })
             .then((r) => (r.ok ? r.json() : null))
             .catch(() => null);
           if (metadata?.image) image = ipfsToHttp(metadata.image);

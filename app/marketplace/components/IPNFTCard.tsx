@@ -1,8 +1,9 @@
 "use client";
 
 import { DEFAULT_IP_NFT_CONTRACT } from '../config/simpleMarketplace';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAccount } from 'wagmi';
+import { ipfsToHttp } from '@/utils/ipfs';
 
 interface IPNFTCardProps {
   nft: any;
@@ -29,6 +30,13 @@ const MEDIUM: Record<string, { label: string; bar: string }> = {
   unknown: { label: 'Work', bar: 'bg-soft-line-strong' },
 };
 
+/** Skrot dlugiego uint256 do postaci, ktora miesci sie w podpisie karty. */
+function formatTokenIdShort(id: string | number | bigint): string {
+  const str = String(id ?? '');
+  if (!str) return '';
+  return str.length > 14 ? `${str.slice(0, 6)}…${str.slice(-4)}` : str;
+}
+
 const btn = {
   primary:
     'flex-1 rounded-pill bg-soft-primary px-3 py-1.5 text-[12px] font-bold text-white transition hover:bg-soft-primary-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary-deep',
@@ -52,8 +60,35 @@ export default function IPNFTCard({
 }: IPNFTCardProps) {
   const { address } = useAccount();
   const [imageError, setImageError] = useState(false);
+  /**
+   * Jedno ponowienie zanim karta powie "preview unavailable".
+   *
+   * DLACZEGO: publiczne bramki IPFS odpowiadaja 429, gdy strona otwiera
+   * kilkadziesiat kart naraz. Bez ponowienia pierwszy nieudany obraz zostawal
+   * pusty na stale, chociaz ta sama tresc schodzila poprawnie sekunde pozniej.
+   */
+  const [retry, setRetry] = useState(0);
+  const imgRef = useRef<HTMLImageElement | null>(null);
   const [copied, setCopied] = useState(false);
   const [nowTs, setNowTs] = useState<number>(Math.floor(Date.now() / 1000));
+
+  /**
+   * Nadzor nad obrazem, ktory nigdy nie doszedl.
+   *
+   * ZMIERZONE: przy kilkudziesieciu kartach naraz czesc zadan o obraz zostaje
+   * przerwana (net::ERR_ABORTED). Przerwanie NIE wywoluje `onError`, wiec
+   * element zostawal na zawsze w stanie `complete === false` - karta byla pusta,
+   * chociaz ta sama tresc pobrana recznie schodzila w kilkanascie milisekund.
+   * Po przerwie sprawdzamy stan i prosimy o obraz jeszcze raz.
+   */
+  useEffect(() => {
+    if (imageError || retry > 1) return;
+    const t = setTimeout(() => {
+      const el = imgRef.current;
+      if (el && !el.complete) setRetry((r) => r + 1);
+    }, 6000);
+    return () => clearTimeout(t);
+  }, [retry, imageError]);
 
   useEffect(() => {
     if (nft?.saleType !== 'auction') return;
@@ -64,16 +99,16 @@ export default function IPNFTCard({
   const isOwner = address && nft.seller?.toLowerCase() === address.toLowerCase();
   const isAuctionSeller = nft.saleType === 'auction' && isOwner;
   const metadata = nft.metadata || {};
-  const name = metadata.name || `IP NFT #${String(nft.tokenId || '').slice(0, 6)}`;
+  // Token ID Origin to pelne uint256 (77 cyfr). Skracamy go tylko w podpisie
+  // pod tytulem, gdzie da sie go skopiowac w calosci - nie w nazwie, bo
+  // "IP NFT #287579" wygladalo jak prawdziwy numer, a bylo szescioma
+  // pierwszymi cyframi zupelnie innej liczby.
+  const shortId = formatTokenIdShort(nft.tokenId || nft.id || '');
+  const name = metadata.name || (shortId ? `IP NFT ${shortId}` : 'Untitled IP NFT');
   const image = nft.image || metadata.image || '';
   const mediaType = (nft.type || 'image').toLowerCase();
   const medium = MEDIUM[mediaType] || MEDIUM.unknown;
 
-  const formatTokenId = (id: string) => {
-    if (!id) return '';
-    const str = id.toString();
-    return str.length > 15 ? `${str.slice(0, 6)}…${str.slice(-4)}` : str;
-  };
 
   const formatTimeLeft = (endTime?: number | string | bigint) => {
     if (!endTime) return '';
@@ -130,10 +165,18 @@ export default function IPNFTCard({
       >
         {image && !imageError ? (
           <img
-            src={image}
+            key={retry}
+            ref={imgRef}
+            src={ipfsToHttp(image)}
             alt={name}
             loading="lazy"
-            onError={() => setImageError(true)}
+            onError={() => {
+              if (retry < 2) {
+                setTimeout(() => setRetry((r) => r + 1), 1500);
+                return;
+              }
+              setImageError(true);
+            }}
             className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
           />
         ) : (
@@ -145,14 +188,14 @@ export default function IPNFTCard({
 
         {(mediaType === 'audio' || mediaType === 'video' || mediaType === 'text') && image && !imageError && (
           <div className="absolute inset-0 flex items-end justify-start p-2 opacity-0 transition group-hover:opacity-100 motion-reduce:transition-none">
-            <span className="rounded-pill bg-soft-ink/85 px-3 py-1 text-[12px] font-bold text-white backdrop-blur">
+            <span className="rounded-pill bg-soft-ink/85 px-3 py-1 text-[12px] font-bold text-soft-ink backdrop-blur">
               {mediaType === 'text' ? 'Read' : 'Play'}
             </span>
           </div>
         )}
 
         {nft.saleType === 'auction' && (
-          <span className="absolute left-2 top-2 rounded-pill bg-soft-ink/85 px-2.5 py-1 text-[11px] font-bold tabular-nums text-white backdrop-blur">
+          <span className="absolute left-2 top-2 rounded-pill bg-soft-ink/85 px-2.5 py-1 text-[11px] font-bold tabular-nums text-soft-ink backdrop-blur">
             {formatTimeLeft(nft.endTime)}
           </span>
         )}
@@ -195,7 +238,7 @@ export default function IPNFTCard({
             className="font-mono tabular-nums underline decoration-dotted underline-offset-2 hover:text-soft-ink"
             title="Copy token id"
           >
-            #{formatTokenId(nft.tokenId || nft.id || '')}
+            #{shortId}
           </button>
           {copied && <span className="font-bold text-[#0b9a51]">Copied</span>}
           <span aria-hidden>·</span>
