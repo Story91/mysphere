@@ -287,6 +287,86 @@ Bez „we're excited". Perps są na TESTNECIE — nie pisać inaczej.*
 > schodzi z tego samego salda. „Max" znaczyło „nie zapłacisz za transakcję,
 > którą zaraz wyślesz". Naprawione — Max zostawia 0,05 USDC.
 
+## 12. Perps na Arc — ekran dla tradera, nie dla protokołu
+
+> Rebuilt the perps screen on Arc testnet. The old one was written by the
+> people who wrote the contract, and it showed: bond, challenges, premium
+> in bps, eight cards, and the order form somewhere below the funding
+> chart.
+>
+> New one answers one question before you click: how much am I risking and
+> where do I get liquidated. Three numbers above the button — position
+> size, liquidation price with distance from mark, entry with price impact.
+> All computed with the same arithmetic the contract runs, so the preview
+> is the fill, not an estimate.
+>
+> Chart is real feed history from PriceSubmitted logs — mark, entry and
+> liquidation drawn as lines, and the liquidation line moves while you drag
+> the leverage slider. On mobile the order form is a bottom sheet.
+>
+> One honest detail: the "Change" column says "since 5h ago", not "24h",
+> because that's how far one getLogs window reaches on Arc. If there are
+> fewer than two prices in the window, it shows a dash. Zero would be a lie.
+>
+> Market info — bond, challenges, insurance fund, keeper actions — is one
+> tab away. Nothing was removed, it just stopped being the first thing you
+> see.
+
+*Dlaczego to działa jako post: przyznanie, kto pisał stary ekran i po czym
+to widać; jedna decyzja projektowa („trzy liczby przed przyciskiem");
+jedna rzecz, której inni nie robią („since 5h ago" zamiast „24h").
+Testnet — pisać „on Arc testnet". Nie pisać „inspired by Hyperliquid".*
+
+## 12a. Krótki, na X
+
+> Perps on Arc testnet, new screen.
+>
+> Before the button: size, liq price, entry. Same math as the contract.
+> Liq line on the chart moves with the leverage slider.
+> "Change" says "since 5h ago" — one log window, no fake 24h.
+
+## 12b. Techniczny — dla ludzi, którzy sprawdzą
+
+> What changed under the perps screen on Arc testnet.
+>
+> 1. MarketDetail.tsx went from 1,887 lines to ~300. The vAMM math
+> (swap, previewOpen, liquidation price) is a separate module with a mocha
+> test — previewOpen mirrors DerivativeMarket.openPosition including
+> rounding direction, and the test pins the sides: long liq below entry,
+> short above, reject below min margin, reject over OI cap.
+>
+> 2. Chart is lightweight-charts fed by PriceSubmitted events, time from
+> the event's timestamp argument, no getBlock per point. Blockdaemon's RPC
+> takes 50k blocks per getLogs; Arc mints a block every 0.51 s, so one
+> window is ~5.5 h. We fire four windows in parallel — ~23 h — because the
+> feed had last updated 9 h earlier and the chart was empty.
+>
+> 3. The price axis autoscales to the series, so a mark 40% above index
+> (normal on a thin vAMM) fell off the canvas together with its label.
+> Fixed with autoscaleInfoProvider extended by every drawn price line.
+>
+> 4. Failed reads still render as "n/a", never as $0.00. That rule survived
+> the rewrite.
+
+## PL — 12. Ekran dla tradera
+
+> Przepisaliśmy ekran perpsów na Arc testnet. Stary pisali ludzie od
+> kontraktu i było to widać: kaucja, challenge'e, premia w bps, osiem kart,
+> a formularz gdzieś pod wykresem fundingu.
+>
+> Nowy odpowiada na jedno pytanie przed kliknięciem: ile ryzykuję i gdzie
+> mnie wyrzuci. Trzy liczby nad przyciskiem — rozmiar pozycji, cena
+> likwidacji z odległością od marku, wejście z poślizgiem. Liczone tą samą
+> arytmetyką, co kontrakt, więc podgląd to wypełnienie, nie szacunek.
+>
+> Wykres z prawdziwych logów feedu: mark, wejście i likwidacja jako linie,
+> a linia likwidacji przesuwa się, gdy ciągniesz suwak dźwigni. Na telefonie
+> formularz to dolny arkusz.
+>
+> Jeden szczegół: kolumna „Zmiana" mówi „od 5 h", nie „24 h", bo tyle sięga
+> jedno okno logów na Arc. Mniej niż dwie ceny w oknie — kreska. Zero byłoby
+> kłamstwem.
+
 ---
 
 # Czego NIE pisać
