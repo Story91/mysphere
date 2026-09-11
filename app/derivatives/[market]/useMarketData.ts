@@ -200,19 +200,37 @@ export function useMarketData(market: Address) {
         setPosition(null);
       }
 
-      // Historia cen z logow feedu. Okno celowo krotkie - to sparkline,
-      // a nie pelny wykres, wiec nie ma powodu przeczesywac calego lancucha.
+      // Historia cen z logow feedu.
+      //
+      // Blockdaemon przyjmuje okno 50k blokow na jedno `eth_getLogs`, a Arc
+      // robi blok co 0,51 s - jedno okno to ok. 5,5 h. Wykres z zakresem
+      // "24h" potrzebuje wiecej, wiec pytamy o CZTERY okna po 40k naraz
+      // (ok. 23 h). Cztery zapytania, nie dwadziescia - rate-limit Arca liczy
+      // zapytania, a nie bloki. Aktywnosc rynku (nizej) zostaje w ostatnim
+      // oknie: to lista dwudziestu wpisow, nie wykres.
       const head = await client.getBlockNumber();
       const from = head > 40_000n ? head - 40_000n : 0n;
       try {
-        const logs = await client.getContractEvents({
-          address: ORACLE_ADDRESS,
-          abi: oracleAbi,
-          eventName: 'PriceSubmitted',
-          args: { marketId: id },
-          fromBlock: from,
-          toBlock: head,
-        });
+        const CHUNK = 40_000n;
+        const CHUNKS = 4;
+        const windows = Array.from({ length: CHUNKS }, (_, i) => {
+          const to = head - CHUNK * BigInt(i);
+          const lo = to > CHUNK ? to - CHUNK + 1n : 0n;
+          return { fromBlock: i === 0 ? (head > CHUNK ? head - CHUNK : 0n) : lo, toBlock: i === 0 ? head : to };
+        }).filter((w) => w.toBlock > 0n);
+        const chunks = await Promise.all(
+          windows.map((w) =>
+            client.getContractEvents({
+              address: ORACLE_ADDRESS,
+              abi: oracleAbi,
+              eventName: 'PriceSubmitted',
+              args: { marketId: id },
+              fromBlock: w.fromBlock,
+              toBlock: w.toBlock,
+            }),
+          ),
+        );
+        const logs = chunks.flat();
         const points: PricePoint[] = [];
         for (const l of logs) {
           const a = (l as unknown as { args: { price?: bigint; timestamp?: bigint } }).args;
