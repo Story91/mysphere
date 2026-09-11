@@ -29,6 +29,7 @@ import {
 import { fetchIpNftsFor } from '../../mycamp/api/fetchIpNfts';
 import {
   CAMP_CLIENT_ID,
+  CAMP_ENVIRONMENT,
   buildCampRedirectUri,
   describeCampError,
 } from '../../utils/socials/campConnector';
@@ -219,7 +220,7 @@ export default function RoyaltiesPanel() {
   if (!CAMP_CLIENT_ID) return null;
 
   return (
-    <CampProvider clientId={CAMP_CLIENT_ID} redirectUri={redirectUri}>
+    <CampProvider clientId={CAMP_CLIENT_ID} redirectUri={redirectUri} environment={CAMP_ENVIRONMENT}>
       <RoyaltiesInner />
     </CampProvider>
   );
