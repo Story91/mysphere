@@ -248,7 +248,21 @@ async function main() {
           row.feeUsdc = formatUnits(fee, 18);
         }
       } catch (error) {
-        row.error = firstLine(error);
+        // 0x2acbe915 = InvalidWormholeVaa. Stan z 11.09.2026: kontrakt Pytha na
+        // Arc testnet (wersja 1.4.5-alpha.1) nie przeszedl upgrade'u z 26.08,
+        // a Hermes od tego dnia podpisuje aktualizacje nowym zestawem
+        // (guardian set 1, 3 podpisy). Kontrakt przyjmuje tylko zestaw 7
+        // Wormhole (13 podpisow). Kazdy endpoint Hermesa (v2, v1, beta,
+        // po timestampie) oddaje nowy format - nie da sie tego obejsc po naszej
+        // stronie. Do czasu upgrade'u przez Pyth cene BTC/USD na Arc
+        // odswiezaja inne aplikacje ze starym formatem, a adapter po MAX_AGE
+        // oddaje 0 i rynek spada na TWAP rejestru.
+        const msg = firstLine(error);
+        const data = (error as { data?: string }).data;
+        row.error =
+          data === "0x2acbe915"
+            ? "InvalidWormholeVaa: kontrakt Pytha na Arc nie przyjmuje podpisow Hermesa po upgrade 08.2026 (czeka na upgrade kontraktu przez Pyth)"
+            : msg;
       }
       pyth.push(row);
     }
