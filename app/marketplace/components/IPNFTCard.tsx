@@ -16,349 +16,252 @@ interface IPNFTCardProps {
   mode?: 'explore' | 'my' | 'live';
 }
 
-export default function IPNFTCard({ 
-  nft, 
-  onPreview, 
-  onList, 
-  onBuy, 
+/**
+ * Karta jak etykieta w galerii: praca u gory, pod nia bialy podpis - tytul,
+ * medium, numer, warunki licencji. Kolor medium jest tylko na jednej kresce
+ * pod obrazem, zeby siatka nie krzyczala 40 ramkami naraz.
+ */
+const MEDIUM: Record<string, { label: string; bar: string }> = {
+  image: { label: 'Image', bar: 'bg-soft-accent' },
+  audio: { label: 'Audio', bar: 'bg-[#18bd64]' },
+  video: { label: 'Video', bar: 'bg-[#e05a6b]' },
+  text: { label: 'Text', bar: 'bg-soft-info' },
+  unknown: { label: 'Work', bar: 'bg-soft-line-strong' },
+};
+
+const btn = {
+  primary:
+    'flex-1 rounded-pill bg-soft-primary px-3 py-1.5 text-[12px] font-bold text-white transition hover:bg-soft-primary-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary-deep',
+  secondary:
+    'flex-1 rounded-pill bg-soft-surface-sunken px-3 py-1.5 text-[12px] font-bold text-soft-ink transition hover:bg-soft-line focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary',
+  accent:
+    'flex-1 rounded-pill bg-soft-accent-soft px-3 py-1.5 text-[12px] font-bold text-soft-accent-deep transition hover:bg-soft-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-accent',
+  status: 'flex-1 rounded-pill px-3 py-1.5 text-center text-[12px] font-bold',
+};
+
+export default function IPNFTCard({
+  nft,
+  onPreview,
+  onList,
+  onBuy,
   onOffer,
   onAccess,
   onBid,
   showOfferAlways = false,
-  mode = 'explore'
+  mode = 'explore',
 }: IPNFTCardProps) {
   const { address } = useAccount();
   const [imageError, setImageError] = useState(false);
   const [copied, setCopied] = useState(false);
   const [nowTs, setNowTs] = useState<number>(Math.floor(Date.now() / 1000));
-  
-  // live timer for auctions
+
   useEffect(() => {
     if (nft?.saleType !== 'auction') return;
     const t = setInterval(() => setNowTs(Math.floor(Date.now() / 1000)), 1000);
     return () => clearInterval(t);
   }, [nft?.saleType]);
-  
-  // For auctions, check if user is the auction seller
-  // For regular NFTs, check if user is the NFT seller/owner
+
   const isOwner = address && nft.seller?.toLowerCase() === address.toLowerCase();
   const isAuctionSeller = nft.saleType === 'auction' && isOwner;
   const metadata = nft.metadata || {};
-  const name = metadata.name || `IP NFT #${nft.tokenId}`;
+  const name = metadata.name || `IP NFT #${String(nft.tokenId || '').slice(0, 6)}`;
   const image = nft.image || metadata.image || '';
-  
-  // Get media type
   const mediaType = (nft.type || 'image').toLowerCase();
-  
-  // Format token ID display - show first and last parts
+  const medium = MEDIUM[mediaType] || MEDIUM.unknown;
+
   const formatTokenId = (id: string) => {
     if (!id) return '';
     const str = id.toString();
-    if (str.length > 15) return `${str.slice(0, 6)}...${str.slice(-4)}`;
-    return str;
-  };
-  
-  // Get frame gradient classes based on media type (like in MyCamp)
-  const frameClasses = (type: string) => {
-    switch(type) {
-      case 'image':
-        return 'bg-gradient-to-br from-orange-500 via-amber-400 to-orange-600';
-      case 'audio':
-        return 'bg-gradient-to-br from-emerald-500 via-green-500 to-lime-400';
-      case 'video':
-        return 'bg-gradient-to-br from-rose-600 via-red-500 to-orange-500';
-      case 'text':
-        return 'bg-gradient-to-br from-sky-500 via-blue-500 to-indigo-500';
-      default:
-        return 'bg-gradient-to-br from-slate-500 to-slate-300';
-    }
+    return str.length > 15 ? `${str.slice(0, 6)}…${str.slice(-4)}` : str;
   };
 
   const formatTimeLeft = (endTime?: number | string | bigint) => {
     if (!endTime) return '';
-    const end = Number(endTime);
-    const seconds = Math.max(0, end - nowTs);
+    const seconds = Math.max(0, Number(endTime) - nowTs);
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     const s = seconds % 60;
     const pad = (n: number) => n.toString().padStart(2, '0');
-    if (h > 24) return `${Math.floor(h/24)}d ${h%24}h`;
-    return `${pad(h)}:${pad(m)}:${pad(s)}`;
+    if (h > 24) return `${Math.floor(h / 24)}d ${h % 24}h left`;
+    return `${pad(h)}:${pad(m)}:${pad(s)} left`;
   };
 
-  // Get attributes
   const attributes = metadata.attributes || [];
-  const licenseCommercial = attributes.find((a: any) => a.trait_type === 'Commercial Use')?.value;
-  const licenseDerivative = attributes.find((a: any) => a.trait_type === 'Derivative Works')?.value;
-  const licenseDuration = attributes.find((a: any) => a.trait_type === 'License Duration (days)')?.value;
-  // In marketplace, use listing price primarily, fallback to native price for non-listed items
-  const displayPrice = nft.isListed ? nft.price : attributes.find((a: any) => a.trait_type === 'Price (native)')?.value;
-  
+  const attr = (t: string) => attributes.find((a: any) => a.trait_type === t)?.value;
+  const licenseCommercial = attr('Commercial Use');
+  const licenseDerivative = attr('Derivative Works');
+  const licenseDuration = attr('License Duration (days)');
+  const displayPrice = nft.isListed ? nft.price : attr('Price (native)');
+  const fmt = (v: any) => {
+    const n = parseFloat(v);
+    return Number.isFinite(n) ? n.toLocaleString(undefined, { maximumFractionDigits: 2 }) : String(v);
+  };
+
+  const priceLabel =
+    nft.saleType === 'auction'
+      ? Number(nft.highestBid || 0) > 0
+        ? { k: 'Top bid', v: `${fmt(nft.highestBid)} CAMP` }
+        : { k: 'Starts at', v: `${fmt(nft.minPrice)} CAMP` }
+      : displayPrice
+      ? { k: nft.isListed ? 'Price' : 'Asked', v: `${fmt(displayPrice)} CAMP` }
+      : null;
+
+  const licenseBits = [
+    licenseCommercial !== undefined && (String(licenseCommercial).toLowerCase() === 'true' || licenseCommercial === 'Yes' ? 'Commercial' : 'Personal only'),
+    licenseDerivative !== undefined && (String(licenseDerivative).toLowerCase() === 'true' || licenseDerivative === 'Yes' ? 'Remix ok' : 'No remix'),
+    licenseDuration !== undefined && `${licenseDuration} days`,
+  ].filter(Boolean) as string[];
+
+  const explorerHref = `https://camp.cloud.blockscout.com/token/${nft.contract || DEFAULT_IP_NFT_CONTRACT}/instance/${nft.tokenId || nft.id}`;
+
   return (
-    <div 
-      className={`rounded-xl p-[2px] ${frameClasses(mediaType)} transition hover:scale-[1.02]`}
+    <article
+      className="group flex flex-col overflow-hidden rounded-[20px] bg-white shadow-[var(--soft-shadow-card)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[var(--soft-shadow-float)] motion-reduce:transition-none motion-reduce:hover:translate-y-0"
       title={name}
     >
-      {/* div, nie <button>: w srodku jest przycisk kopiowania ID, a <button>
-          w <button> to nieprawidlowy HTML i ostrzezenie hydratacji Reacta. */}
+      {/* Praca. div z rola przycisku, bo w podpisie jest osobny przycisk kopiowania. */}
       <div
         role="button"
         tabIndex={0}
+        aria-label={`Open ${name}`}
         onClick={() => onPreview?.(nft)}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPreview?.(nft); } }}
-        className="w-full text-left cursor-pointer"
+        className="relative aspect-square cursor-pointer bg-soft-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-soft-primary"
       >
-        {/* Inner card with solid white background like MyCamp */}
-        <div className={`rounded-[12px] overflow-hidden bg-white/90 border ${
-          nft.saleType === 'auction' ? 'border-amber-500/50 ring-2 ring-amber-400/20' : 'border-black/10'
-        }`}>
-          {/* Image container */}
-          <div className="aspect-square relative group">
-            {image && !imageError ? (
-              <img 
-                src={image.replace('ipfs://', 'https://ipfs.io/ipfs/')}
-                alt={name}
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  setImageError(true);
-                  (e.currentTarget.style.filter = 'blur(16px)');
-                  (e.currentTarget.src = 'data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22200%22><rect width=%22200%22 height=%22200%22 fill=%22%23111%22/></svg>');
-                }}
-              />
-            ) : (
-              <div className="w-full h-full bg-gradient-to-br from-zinc-800 to-zinc-900" style={{ filter: 'blur(10px)' }} />
-            )}
-            
-            {/* Price/auction badge (top left) */}
-            {nft.saleType === 'auction' ? (
-              <div className="absolute top-2 left-2 text-[11px] px-2.5 py-0.5 rounded bg-black text-amber-300 font-bold border border-amber-500/40 shadow-md">
-                {Number(nft.highestBid || 0) > 0 
-                  ? `${parseFloat(nft.highestBid).toFixed(1)} $CAMP` 
-                  : `${parseFloat(nft.minPrice).toFixed(1)} $CAMP`}
-              </div>
-            ) : displayPrice && (
-              <div className="absolute top-2 left-2 text-[11px] px-2.5 py-0.5 rounded bg-black text-orange-400 font-bold border border-orange-500/40 shadow-md">
-                {displayPrice} $CAMP
-              </div>
-            )}
-            
-            {/* Media/Auction time badge */}
-            <div className="absolute bottom-2 right-2 flex gap-2">
-              {nft.saleType === 'auction' && (
-                <div className="text-[10px] px-2 py-0.5 rounded bg-black/80 text-white border border-white/20">
-                  {formatTimeLeft(nft.endTime)}
-                </div>
-              )}
-              <div className="text-[10px] px-2 py-0.5 rounded bg-white/80 text-black border border-black/20 uppercase">
-                {mediaType}
-              </div>
-            </div>
-
-
-
-            {/* Auction badge (top left) */}
-            {nft.isAuctioned && (
-              <div className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded bg-red-500 text-white border border-red-600 font-bold">
-                🔥 AUCTION
-              </div>
-            )}
-            
-            {/* Listed badge removed - status is already shown in button at bottom */}
-
-            {/* Contract badge (top right) - only if different from default */}
-            {nft.contract && nft.contract.toLowerCase() !== '0xf90733b9ecda3b49c250b2c3e3e42c96fc93324e'.toLowerCase() && (
-              <div className="absolute top-2 right-2 text-[9px] px-1.5 py-0.5 rounded bg-purple-500/80 text-white border border-purple-400/40">
-                {nft.contract.slice(0, 4)}...{nft.contract.slice(-2)}
-              </div>
-            )}
-            
-            {/* Play/Read overlay for media files */}
-            {(mediaType === 'audio' || mediaType === 'video' || mediaType === 'text') && (
-              <div className={`absolute inset-0 flex items-center justify-center ${image ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'} transition-opacity bg-black/40`}>
-                <div className="flex items-center gap-2 text-white text-sm font-medium px-3 py-2 rounded-full bg-black/60 border border-white/10">
-                  <span className="text-lg">
-                    {mediaType === 'audio' ? '🎵' : mediaType === 'video' ? '🎥' : '📖'}
-                  </span>
-                  <span>{mediaType === 'text' ? 'Read' : 'Play'}</span>
-                  <span className="text-xs">▶</span>
-                </div>
-              </div>
-            )}
+        {image && !imageError ? (
+          <img
+            src={image}
+            alt={name}
+            loading="lazy"
+            onError={() => setImageError(true)}
+            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+          />
+        ) : (
+          <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-soft-ink-faint">
+            <span className="font-soft-display text-[28px] font-extrabold">{medium.label}</span>
+            <span className="text-[11px] font-bold uppercase tracking-[0.1em]">preview unavailable</span>
           </div>
-        </div>
-        
-        {/* Info section below image */}
-        <div className="p-2">
-          <div 
-            className={`text-black font-bold leading-tight ${
-              name.length > 34 ? 'text-sm' : 
-              name.length > 22 ? 'text-base' : 
-              'text-lg'
-            }`} 
-            style={{ 
-              fontFamily: 'ClashDisplay, ui-sans-serif, system-ui',
-              wordBreak: 'break-word',
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden'
-            }}
+        )}
+
+        {(mediaType === 'audio' || mediaType === 'video' || mediaType === 'text') && image && !imageError && (
+          <div className="absolute inset-0 flex items-end justify-start p-2 opacity-0 transition group-hover:opacity-100 motion-reduce:transition-none">
+            <span className="rounded-pill bg-soft-ink/85 px-3 py-1 text-[12px] font-bold text-white backdrop-blur">
+              {mediaType === 'text' ? 'Read' : 'Play'}
+            </span>
+          </div>
+        )}
+
+        {nft.saleType === 'auction' && (
+          <span className="absolute left-2 top-2 rounded-pill bg-soft-ink/85 px-2.5 py-1 text-[11px] font-bold tabular-nums text-white backdrop-blur">
+            {formatTimeLeft(nft.endTime)}
+          </span>
+        )}
+        {nft.isAuctioned && nft.saleType !== 'auction' && (
+          <span className="absolute left-2 top-2 rounded-pill bg-soft-accent px-2.5 py-1 text-[11px] font-bold text-white">
+            In auction
+          </span>
+        )}
+      </div>
+
+      {/* Kreska medium */}
+      <div className={`h-1 ${medium.bar}`} aria-hidden />
+
+      {/* Podpis */}
+      <div className="flex flex-1 flex-col gap-2 p-3">
+        <div className="flex items-start justify-between gap-2">
+          <h3
+            className="font-soft-display text-[15px] font-extrabold leading-snug text-soft-ink"
+            style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', wordBreak: 'break-word' }}
           >
             {name}
-          </div>
-          <div className="text-xs text-black/70 mt-1">
-            ID:
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                const full = (nft.tokenId || nft.id || '').toString();
-                if (!full) return;
-                navigator.clipboard?.writeText(full).then(() => {
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 1000);
-                }).catch(() => {});
-              }}
-              className="ml-1 underline decoration-dotted hover:text-black"
-              title="Copy token id"
-              type="button"
-            >
-              {formatTokenId(nft.tokenId || nft.id || '')}
-            </button>
-            {copied && <span className="ml-1 text-green-600">Copied</span>}
-          </div>
-
-          {/* License info pills (descriptive) */}
-          {(licenseCommercial !== undefined || licenseDerivative !== undefined || licenseDuration !== undefined) && (
-            <div className="mt-2 flex flex-wrap gap-1">
-              {licenseCommercial !== undefined && (
-                <span className="text-[10px] px-2 py-0.5 rounded bg-black/10 border border-black/20 text-black/80">
-                  Commercial: {String(licenseCommercial)}
-                </span>
-              )}
-              {licenseDerivative !== undefined && (
-                <span className="text-[10px] px-2 py-0.5 rounded bg-black/10 border border-black/20 text-black/80">
-                  Derivatives: {String(licenseDerivative)}
-                </span>
-              )}
-              {licenseDuration !== undefined && (
-                <span className="text-[10px] px-2 py-0.5 rounded bg-black/10 border border-black/20 text-black/80">
-                  License: {licenseDuration}d
-                </span>
-              )}
-            </div>
-          )}
+          </h3>
+          <span className="shrink-0 rounded-pill bg-soft-surface-sunken px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-soft-ink-muted">
+            {medium.label}
+          </span>
         </div>
+
+        <div className="flex items-center gap-1.5 text-[11px] text-soft-ink-soft">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              const full = (nft.tokenId || nft.id || '').toString();
+              if (!full) return;
+              navigator.clipboard?.writeText(full).then(() => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1200);
+              }).catch(() => {});
+            }}
+            className="font-mono tabular-nums underline decoration-dotted underline-offset-2 hover:text-soft-ink"
+            title="Copy token id"
+          >
+            #{formatTokenId(nft.tokenId || nft.id || '')}
+          </button>
+          {copied && <span className="font-bold text-[#0b9a51]">Copied</span>}
+          <span aria-hidden>·</span>
+          <a
+            href={explorerHref}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="underline decoration-dotted underline-offset-2 hover:text-soft-ink"
+          >
+            Explorer
+          </a>
+        </div>
+
+        {licenseBits.length > 0 && (
+          <p className="text-[11px] font-bold text-soft-ink-muted">{licenseBits.join(' · ')}</p>
+        )}
+
+        {priceLabel && (
+          <div className="mt-auto flex items-baseline justify-between pt-1">
+            <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-soft-ink-soft">{priceLabel.k}</span>
+            <span className="font-soft-display text-[16px] font-extrabold tabular-nums text-soft-ink">{priceLabel.v}</span>
+          </div>
+        )}
+
+        {(onList || onBuy || onOffer || onAccess || typeof onBid === 'function') && (
+          <div className="flex gap-1.5">
+            {nft.saleType === 'auction' && !isAuctionSeller && typeof onBid === 'function' && (
+              <button type="button" onClick={(e) => { e.stopPropagation(); onBid(nft); }} className={btn.primary}>
+                Bid
+              </button>
+            )}
+            {isAuctionSeller && (
+              <span className={`${btn.status} bg-soft-accent-soft text-soft-accent-deep`}>
+                Your auction{Number(nft.highestBid || 0) === 0 ? ' · no bids' : ''}
+              </span>
+            )}
+            {isOwner && nft.isAuctioned && nft.saleType !== 'auction' && (
+              <span className={`${btn.status} bg-soft-accent-soft text-soft-accent-deep`}>Your auction</span>
+            )}
+            {nft.saleType !== 'auction' && !nft.isAuctioned && isOwner && !nft.isListed && onList && (
+              <button type="button" onClick={(e) => { e.stopPropagation(); onList(nft); }} className={btn.primary}>
+                List
+              </button>
+            )}
+            {isOwner && nft.isListed && !nft.isAuctioned && (
+              <span className={`${btn.status} bg-[#edfff4] text-[#0b9a51]`}>Listed</span>
+            )}
+            {!isOwner && nft.isListed && onBuy && (
+              <button type="button" onClick={(e) => { e.stopPropagation(); onBuy(nft); }} className={btn.primary}>
+                Buy
+              </button>
+            )}
+            {!isOwner && nft.isListed && onAccess && (
+              <button type="button" onClick={(e) => { e.stopPropagation(); onAccess(nft); }} className={btn.accent}>
+                Licence
+              </button>
+            )}
+            {(!isOwner || showOfferAlways) && onOffer && nft.saleType !== 'auction' && (
+              <button type="button" onClick={(e) => { e.stopPropagation(); onOffer(nft); }} className={btn.secondary}>
+                Offer
+              </button>
+            )}
+          </div>
+        )}
       </div>
-      
-      {/* Explorer link */}
-      <a
-        href={`https://camp.cloud.blockscout.com/token/${nft.contract || DEFAULT_IP_NFT_CONTRACT}/instance/${nft.tokenId || nft.id}`}
-        target="_blank"
-        rel="noreferrer"
-        className="block text-[10px] text-black/70 hover:text-black underline px-2 pb-2"
-        onClick={(e) => e.stopPropagation()}
-      >
-        View on Explorer
-      </a>
-      
-      
-      {/* Action buttons for marketplace */}
-      {(onList || onBuy || onOffer || onAccess || (typeof onBid === 'function')) && (
-        <div className="px-2 pb-2 flex gap-1">
-          {/* Auction buttons - only show Bid for non-sellers */}
-          {nft.saleType === 'auction' && (
-            <>
-              {!isAuctionSeller && typeof onBid === 'function' && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); onBid(nft); }}
-                  className="flex-1 py-1 px-2 bg-amber-600 text-white text-[10px] font-semibold rounded border border-amber-700 hover:bg-amber-700 transition-colors"
-                >
-                  Bid
-                </button>
-              )}
-              {isAuctionSeller && (
-                <div className="flex-1 flex flex-col gap-1">
-                  <div className="py-1 px-2 bg-amber-500/20 text-amber-400 text-[10px] font-semibold rounded border border-amber-500/40 text-center">
-                    🔨 Your Auction
-                  </div>
-                  {Number(nft.highestBid || 0) > 0 && (
-                    <div className="py-1 px-2 bg-green-500/20 text-green-400 text-[10px] font-semibold rounded border border-green-500/40 text-center">
-                      Current Bid: {parseFloat(nft.highestBid).toFixed(1)} $CAMP
-                    </div>
-                  )}
-                  {Number(nft.highestBid || 0) === 0 && (
-                    <div className="py-1 px-2 bg-gray-500/20 text-gray-400 text-[10px] font-semibold rounded border border-gray-500/40 text-center">
-                      No bids yet • Min: {parseFloat(nft.minPrice).toFixed(1)} $CAMP
-                    </div>
-                  )}
-                </div>
-              )}
-            </>
-          )}
-          
-          {/* Auction status for owned NFTs */}
-          {isOwner && nft.isAuctioned && (
-            <div className="flex-1 py-1 px-2 bg-red-500/20 text-red-100 text-[10px] font-semibold rounded border border-red-500/40 text-center">
-              🔥 Your Auction
-            </div>
-          )}
-          
-          {/* Regular listing buttons - only show if not an auction */}
-          {nft.saleType !== 'auction' && !nft.isAuctioned && isOwner && !nft.isListed && onList && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onList(nft);
-              }}
-              className="flex-1 py-1 px-2 bg-orange-500 text-white text-[10px] font-semibold rounded border border-orange-600 hover:bg-orange-600 transition-colors"
-            >
-              List
-            </button>
-          )}
-          
-          {isOwner && nft.isListed && !nft.isAuctioned && (
-            <div className="flex-1 py-1 px-2 bg-green-500/20 text-green-400 text-[10px] font-semibold rounded border border-green-500/40 text-center">
-              🏷️ Listed
-            </div>
-          )}
-          
-          {!isOwner && nft.isListed && onBuy && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onBuy(nft);
-              }}
-              className="flex-1 py-1 px-2 bg-green-500 text-white text-[10px] font-semibold rounded border border-green-600 hover:bg-green-600 transition-colors"
-            >
-              Buy
-            </button>
-          )}
-
-          {!isOwner && nft.isListed && onAccess && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onAccess(nft);
-              }}
-              className="flex-1 py-1 px-2 bg-amber-500 text-white text-[10px] font-semibold rounded border border-amber-600 hover:bg-amber-600 transition-colors"
-            >
-              Access
-            </button>
-          )}
-          
-          {(!isOwner || showOfferAlways) && onOffer && nft.saleType !== 'auction' && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onOffer(nft);
-              }}
-              className="flex-1 py-1 px-2 bg-blue-500 text-white text-[10px] font-semibold rounded border border-blue-600 hover:bg-blue-600 transition-colors"
-            >
-              Offer
-            </button>
-          )}
-        </div>
-      )}
-    </div>
+    </article>
   );
 }

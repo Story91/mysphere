@@ -934,8 +934,19 @@ export default function MarketplaceGrid({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
+      <div className="space-y-4" aria-busy="true" aria-label="Loading works">
+        <div className="h-[58px] rounded-[22px] bg-white/70" />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="overflow-hidden rounded-[20px] bg-white shadow-[var(--soft-shadow-card)]">
+              <div className="aspect-square animate-pulse bg-soft-surface-sunken" />
+              <div className="space-y-2 p-3">
+                <div className="h-3.5 w-3/4 animate-pulse rounded bg-soft-surface-sunken" />
+                <div className="h-3 w-1/2 animate-pulse rounded bg-soft-surface-sunken" />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -945,70 +956,76 @@ export default function MarketplaceGrid({
     return <AuctionView onBack={() => setFilters({ ...filters, saleType: 'all' })} />;
   }
 
+  const listedCount = filteredNFTs.filter((n) => n.isListed).length;
+  const totalCount = mode === 'explore' ? totalListingsCount : filteredNFTs.length;
+  const sectionTitle = mode === 'my' ? 'Your IP' : mode === 'live' ? 'Fresh mints on Camp' : 'Listed for sale or licence';
+
   return (
-    <div className="space-y-6">
-      
-      {/* Filter Bar */}
+    <div className="space-y-4">
       <FilterBar filters={filters} setFilters={setFilters} />
-      
-      {/* Filter pills removed (use only FilterBar) */}
-      
-      {/* Stats */}
-      <div className="flex items-center justify-between px-4">
-        <h2 className="text-2xl font-bold text-orange-200">
-          IP NFT Marketplace
-        </h2>
-        <div className="text-sm text-orange-200/70">
-          {mode === 'explore' ? totalListingsCount : filteredNFTs.length} items • {filteredNFTs.filter(n => n.isListed).length} listed
+
+      <div className="flex items-baseline justify-between px-1">
+        <h2 className="font-soft-display text-[20px] font-extrabold text-soft-ink">{sectionTitle}</h2>
+        <p className="text-[13px] font-bold tabular-nums text-soft-ink-soft">
+          {totalCount} {totalCount === 1 ? 'work' : 'works'}
+          {mode !== 'explore' && listedCount > 0 ? ` · ${listedCount} listed` : ''}
+        </p>
+      </div>
+
+      {filteredNFTs.length > 0 ? (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
+          {pageItems.map((nft) => (
+            <IPNFTCard
+              key={`${nft.contract}-${nft.tokenId}`}
+              nft={nft}
+              onPreview={setPreview}
+              onList={handleList}
+              onBuy={handleBuy}
+              onOffer={handleOffer}
+              onAccess={handleAccess}
+              onBid={handleBid}
+              showOfferAlways={mode === 'live'}
+              mode={mode}
+            />
+          ))}
         </div>
-      </div>
-      
-      {/* Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-        {pageItems.map((nft) => (
-          <IPNFTCard
-            key={`${nft.contract}-${nft.tokenId}`}
-            nft={nft}
-            onPreview={setPreview}
-            onList={handleList}
-            onBuy={handleBuy}
-            onOffer={handleOffer}
-            onAccess={handleAccess}
-            onBid={handleBid}
-            showOfferAlways={mode === 'live'}
-            mode={mode}
-          />
-        ))}
-      </div>
-      
-      {/* Empty State */}
-      {filteredNFTs.length === 0 && (
-        <div className="text-center py-12">
-          <p className="text-orange-200/70">No NFTs found matching your criteria</p>
+      ) : (
+        <div className="rounded-[22px] bg-white px-6 py-14 text-center shadow-[var(--soft-shadow-card)]">
+          <p className="font-soft-display text-[18px] font-extrabold text-soft-ink">
+            {mode === 'my' ? 'No IP NFTs in this wallet yet' : mode === 'live' ? 'No mints match these filters' : 'Nothing listed yet'}
+          </p>
+          <p className="mx-auto mt-1.5 max-w-md text-[13px] text-soft-ink-muted">
+            {mode === 'my'
+              ? 'Mint a work on Camp Origin and it shows up here, ready to list.'
+              : mode === 'live'
+              ? 'Try a different medium or clear the price range.'
+              : 'Be the first: open My IP and list a work for sale or licence.'}
+          </p>
         </div>
       )}
-      
-      {/* Pagination */}
+
       {totalPages > 1 && (
-        <div className="flex items-center gap-2 justify-center">
-          <button 
-            disabled={page === 1} 
-            onClick={() => setPage(p => Math.max(1, p - 1))} 
-            className="px-3 py-1 text-xs rounded-lg border text-white/80 border-white/10 disabled:opacity-40"
+        <nav aria-label="Pages" className="flex items-center justify-center gap-2 pt-2">
+          <button
+            type="button"
+            disabled={page === 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            className="rounded-pill bg-white px-4 py-1.5 text-[13px] font-bold text-soft-ink ring-1 ring-soft-line transition hover:bg-soft-surface-sunken disabled:opacity-40"
           >
-            Prev
+            Previous
           </button>
-          <div className="text-xs text-white/70">{page} / {totalPages}</div>
-          <button 
-            disabled={page === totalPages} 
-            onClick={() => setPage(p => Math.min(totalPages, p + 1))} 
-            className="px-3 py-1 text-xs rounded-lg border text-white/80 border-white/10 disabled:opacity-40"
+          <span className="text-[13px] font-bold tabular-nums text-soft-ink-soft">{page} / {totalPages}</span>
+          <button
+            type="button"
+            disabled={page === totalPages}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            className="rounded-pill bg-white px-4 py-1.5 text-[13px] font-bold text-soft-ink ring-1 ring-soft-line transition hover:bg-soft-surface-sunken disabled:opacity-40"
           >
             Next
           </button>
-        </div>
+        </nav>
       )}
-      
+
       {/* Preview Modal */}
       {preview && (
         <PreviewModal nft={preview} onClose={() => setPreview(null)} />
