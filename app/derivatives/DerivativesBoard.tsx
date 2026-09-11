@@ -27,6 +27,7 @@ import FaucetBanner from './FaucetBanner';
 import YourPositions from './YourPositions';
 import CreateMarketModal from './CreateMarketModal';
 import { feedByAddress } from './indexFeeds';
+import FeedIcon, { instrumentBase, instrumentName } from './FeedIcon';
 import PerpsGuide, { premiumBps } from './PerpsGuide';
 
 /**
@@ -641,7 +642,9 @@ export default function DerivativesBoard() {
                   href={`/derivatives/${row.address}`}
                   className="grid grid-cols-2 gap-x-4 gap-y-3 border-b border-sp-shade/10 px-4 py-3.5 transition-colors last:border-b-0 hover:bg-sp-hover lg:grid-cols-[1.6fr_1fr_0.9fr_1.1fr_1.3fr_0.9fr] lg:items-center lg:gap-y-0"
                 >
-                  <div className="col-span-2 lg:col-span-1">
+                  <div className="col-span-2 flex items-center gap-3 lg:col-span-1">
+                    <FeedIcon base={feedByAddress(row.indexFeed)?.base ?? instrumentBase(row.symbol)} size={38} />
+                    <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-base font-bold text-sp-ink">{row.symbol}</span>
                       {row.slashed ? (
@@ -660,10 +663,14 @@ export default function DerivativesBoard() {
                         </Badge>
                       ) : null}
                     </div>
-                    <p className="mt-0.5 text-[11px] text-sp-ink-soft">
-                      {row.createdAt != null ? `${fmtAge(row.createdAt)} old` : 'age unknown'}
-                      {row.mature === false && row.maxOpenInterest != null ? ` - cap ${fmtWadCompact(row.maxOpenInterest)}` : ''}
+                    <p className="mt-0.5 truncate text-[11px] text-sp-ink-soft">
+                      {/* Nazwa instrumentu + skad indeks. "Tesla · Pyth" mowi traderowi
+                          wiecej niz wiek rynku; wiek i cap zostaja w tooltipie badge'a. */}
+                      {instrumentName(feedByAddress(row.indexFeed)?.base ?? instrumentBase(row.symbol))}
+                      {row.indexFeed && row.indexFeed !== ZERO ? ' · index via Pyth' : row.indexFeed === ZERO ? ' · index from registry' : ''}
+                      {row.mature === false && row.maxOpenInterest != null ? ` · cap ${fmtWadCompact(row.maxOpenInterest)}` : ''}
                     </p>
+                    </div>
                   </div>
 
                   <div className="lg:text-right">
@@ -737,13 +744,6 @@ export default function DerivativesBoard() {
                     {/* Skad indeks: adapter Pytha (funding za cena z zewnatrz) albo
                         rejestr (cena publikowana przez tworce). Ta roznica jest
                         wazniejsza dla tradera niz wiek ostatniego wpisu w rejestrze. */}
-                    {row.indexFeed && row.indexFeed !== ZERO ? (
-                      <p className="text-[11px] font-semibold text-sp-brand-deep">
-                        index: {feedByAddress(row.indexFeed)?.symbol ?? shortAddress(row.indexFeed)} via Pyth
-                      </p>
-                    ) : row.indexFeed === ZERO ? (
-                      <p className="text-[11px] text-sp-ink-soft">index: registry</p>
-                    ) : null}
                   </div>
                 </Link>
               );

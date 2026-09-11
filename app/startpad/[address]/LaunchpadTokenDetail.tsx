@@ -34,6 +34,7 @@ import {
 import { parseMetadataUri, pickTokenImage } from '../metadata';
 import { usePairedMarket } from '../../derivatives/usePairedMarket';
 import { feedByAddress, pairedMarketSymbol } from '../../derivatives/indexFeeds';
+import FeedIcon, { instrumentName } from '../../derivatives/FeedIcon';
 import { fetchLogos } from '../logos';
 import { fetchTokenCounters, type TokenCounters } from '../blockscout';
 import { useEthUsd } from '../useEthUsd';
@@ -667,14 +668,16 @@ function TokenHeader({
                     href={`/derivatives/${pairedMarket}`}
                     className="inline-flex items-center gap-1.5 rounded-full border border-soft-primary/30 bg-soft-primary/[0.06] px-3 py-1 font-bold text-sp-ink hover:border-soft-primary"
                   >
-                    Paired with {pairedFeed.symbol} · trade the perp
+                    <FeedIcon base={pairedFeed.base} size={18} />
+                    Paired with {instrumentName(pairedFeed.base)} · trade the perp
                   </Link>
                 ) : pairedFeed && pairedMarket === '' ? (
                   <Link
                     href={`/derivatives?new=1&feed=${pairedFeed.address}&symbol=${encodeURIComponent(pairedMarketSymbol(pairedFeed.base, core.symbol))}`}
                     className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-sp-shade/30 px-3 py-1 font-bold text-sp-ink hover:border-soft-primary"
                   >
-                    Paired with {pairedFeed.symbol} · no perp market yet, open one
+                    <FeedIcon base={pairedFeed.base} size={18} />
+                    Paired with {instrumentName(pairedFeed.base)} · no perp market yet, open one
                   </Link>
                 ) : (
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-sp-shade/15 px-3 py-1 font-bold text-sp-shade/60">

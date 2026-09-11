@@ -6,6 +6,7 @@ import type { Address } from 'viem';
 import { Badge } from '@/components/ui/badge';
 import { fmtDuration, fmtPct, fmtPctPlain, fmtPrice, fmtWadCompact, oiPercent } from '../format';
 import { Dot, Unknown, UpDown, Val } from '../ui';
+import FeedIcon, { instrumentBase } from '../FeedIcon';
 import type { MarketListItem } from '../useMarketList';
 import type { FundingView } from './math';
 import type { Snapshot } from './types';
@@ -70,6 +71,7 @@ export default function MarketHeader({
       <div className="flex min-w-0 flex-wrap items-center gap-x-6 gap-y-3 overflow-x-auto">
         {/* Rynek + stan feedu */}
         <div className="flex min-w-0 items-center gap-2">
+          <FeedIcon base={instrumentBase(snap.symbol)} size={40} />
           <label className="relative inline-flex items-center">
             <select
               aria-label="Switch market"

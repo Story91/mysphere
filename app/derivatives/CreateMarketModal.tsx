@@ -27,6 +27,7 @@ import {
 } from './config';
 import { fmtAge, fmtBps, fmtUsdc, fmtWadCompact, usdc, wad } from './format';
 import { INDEX_FEEDS, ZERO_FEED, adapterAbi, feedByAddress, pythAbi } from './indexFeeds';
+import FeedIcon, { instrumentName } from './FeedIcon';
 
 /**
  * ZALOZENIE RYNKU - trzy transakcje, w tej kolejnosci i nie inaczej.
@@ -372,10 +373,19 @@ export default function CreateMarketModal({
               <option value={ZERO_FEED}>Your own feed in the registry (you publish prices)</option>
               {INDEX_FEEDS.map((f) => (
                 <option key={f.address} value={f.address}>
-                  {f.symbol} via Pyth
+                  {instrumentName(f.base)} ({f.symbol}) via Pyth
                 </option>
               ))}
             </select>
+            {selectedFeed && (
+              <div className="flex items-center gap-2.5 rounded-lg border border-sp-shade/10 bg-sp-surface px-2.5 py-2">
+                <FeedIcon base={selectedFeed.base} size={30} />
+                <div className="min-w-0 text-xs">
+                  <p className="font-bold text-sp-ink">{instrumentName(selectedFeed.base)}</p>
+                  <p className="text-sp-ink-soft">{selectedFeed.symbol} · Pyth price id {selectedFeed.priceId.slice(0, 10)}…</p>
+                </div>
+              </div>
+            )}
             {selectedFeed == null ? (
               <p className="text-xs text-muted-foreground">
                 Traders are funded against the price you submit. The bond is what keeps you honest.
@@ -477,10 +487,13 @@ export default function CreateMarketModal({
           </div>
 
           {/* Kaucja nie jest oplata rejestracyjna, tylko zakladem. Tworca ma to
-              przeczytac ZANIM podpisze, a nie dowiedziec sie przy scieciu. */}
-          <div className="rounded-[12px] border border-amber-500/25 bg-amber-500/[0.06] p-3 text-xs leading-[1.55] text-muted-foreground">
-            <p className="font-semibold text-foreground">What you are committing to</p>
-            <ul className="mt-1.5 list-disc space-y-1 pl-4">
+              przeczytac ZANIM podpisze - ale nie musi tego czytac przy KAZDYM
+              otwarciu okna. Zwiniete domyslnie, na dole formularza (11.09). */}
+          <details className="group rounded-[12px] border border-amber-500/25 bg-amber-500/[0.06] text-xs leading-[1.55] text-muted-foreground">
+            <summary className="cursor-pointer select-none px-3 py-2.5 font-semibold text-foreground marker:text-amber-500">
+              What you are committing to <span className="ml-1 font-normal text-muted-foreground group-open:hidden">· bond at risk, you publish the price, fee share</span>
+            </summary>
+            <ul className="list-disc space-y-1 px-3 pb-3 pl-7">
               <li>
                 You become this market&apos;s price publisher. The index every trader is funded against is whatever you
                 submit, so the feed has to keep being updated or the market stops accepting new positions.
@@ -529,7 +542,7 @@ export default function CreateMarketModal({
                 )}
               </li>
             </ul>
-          </div>
+          </details>
 
           {wrongChain && <p className="text-xs text-destructive">Switch your wallet to {DERIV_CHAIN.name}.</p>}
           {error && <p className="text-xs text-destructive">{error}</p>}

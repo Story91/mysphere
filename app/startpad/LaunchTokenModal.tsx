@@ -57,6 +57,7 @@ import { browserStorage, clearPendingProfile, postProfileWithRetry, savePendingP
 import { resolveMediaUrl } from './metadata';
 import { arcTestnet } from './arcChain';
 import { INDEX_FEEDS, feedByAddress, pairedMarketSymbol } from '../derivatives/indexFeeds';
+import FeedIcon, { instrumentName } from '../derivatives/FeedIcon';
 import { resizeImageFile } from './logoUpload';
 import { expectedAttempts, HEX_SUBSTITUTES, isMineable } from '../utils/b20/addressing';
 import { mineLaunchpadVanity, predictLaunchpadVanity, type LaunchpadVanityContext } from '../utils/b20/launchpadVanity';
@@ -1692,14 +1693,17 @@ export default function LaunchTokenModal({
                             Pair with a market index{' '}
                             <span className="text-[10.5px] font-bold text-sp-shade/35">optional · Arc only</span>
                           </span>
-                          <select value={pairedFeed} onChange={(event) => setPairedFeed(event.target.value)} className={FIELD}>
-                            <option value="">No pairing</option>
-                            {INDEX_FEEDS.map((f) => (
-                              <option key={f.address} value={f.address}>
-                                {f.symbol} via Pyth
-                              </option>
-                            ))}
-                          </select>
+                          <span className="flex items-center gap-2.5">
+                            {pairedIndex && <FeedIcon base={pairedIndex.base} size={36} />}
+                            <select value={pairedFeed} onChange={(event) => setPairedFeed(event.target.value)} className={FIELD}>
+                              <option value="">No pairing</option>
+                              {INDEX_FEEDS.map((f) => (
+                                <option key={f.address} value={f.address}>
+                                  {instrumentName(f.base)} ({f.symbol}) via Pyth
+                                </option>
+                              ))}
+                            </select>
+                          </span>
                         </label>
                         <p className={HINT}>
                           {pairedIndex
