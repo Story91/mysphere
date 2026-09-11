@@ -23,36 +23,25 @@ interface OriginMintProps {
  * obiekt za poprawny do momentu, w ktorym SDK i tak by go odrzucilo.
  */
 
-// Upload to IPFS function
-async function uploadToIPFS(file: File): Promise<string> {
-  const formData = new FormData();
-  formData.append('file', file);
-
-  // Jedyny realny klucz to NEXT_PUBLIC_PINATA_JWT. Wariant NEXT_PUBLIC_PINATA_JWT_TOKEN
-  // nigdy nie istnial w env, wiec fallback byl martwym kodem i zostal usuniety.
-  const PINATA_JWT = process.env.NEXT_PUBLIC_PINATA_JWT;
-  
-  if (!PINATA_JWT) {
-    console.error("PINATA_JWT environment variable is not set.");
-    throw new Error("Pinata JWT token is missing");
-  }
-
-  const response = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${PINATA_JWT}`
-    },
-    body: formData
-  });
-
-  if (!response.ok) {
-    console.error(`Failed to upload to IPFS: ${response.statusText}`);
-    throw new Error(`Failed to upload file: ${response.statusText}`);
-  }
-
-  const result = await response.json();
-  return `https://gateway.pinata.cloud/ipfs/${result.IpfsHash}`;
-}
+/**
+ * PLIKU NIE WYSYLAMY JUZ SAMI.
+ *
+ * Bylo tak: plik szedl na wlasne konto Pinaty, potem pobieralismy go z powrotem,
+ * a adres bramki Pinaty wpisywalismy do metadanych jako `image`. Dwa skutki,
+ * oba zle:
+ *
+ * 1. 2026-09-11 konto Pinaty zostalo ZABLOKOWANE za przekroczenie planu -
+ *    `pinFileToIPFS` oddaje 403 "Account blocked due to plan usage limit".
+ *    Mintowanie przestalo dzialac w calosci, na kazdym pliku.
+ * 2. Adres prywatnej bramki wpisany do metadanych umiera razem z kontem.
+ *    Dokladnie stad wziely sie puste miniatury na calym marketplace: stare
+ *    tokeny maja w `image` adres bramki, ktora dzis odpowiada 403.
+ *
+ * `origin.mintFile` wysyla plik SAM, przez presigned URL backendu Campa, i przy
+ * `useAssetAsPreview` wpisuje do metadanych `ipfs://<cid>` - czyli adres
+ * niezalezny od jakiejkolwiek bramki. Nasz wlasny klucz do Pinaty przestal byc
+ * do czegokolwiek potrzebny.
+ */
 
 export default function OriginMint({ 
   image, 
@@ -154,19 +143,8 @@ export default function OriginMint({
         }
       }
       
-      // Upload to IPFS first
-      console.log("📤 Uploading to IPFS...");
-      showToast("📤 Uploading file to IPFS...", 'info', 2000, { key: 'flow' });
-      const ipfsUrl = await uploadToIPFS(image);
-      console.log("✅ IPFS URL:", ipfsUrl);
-      showToast("✅ File uploaded to IPFS", 'success', 1200, { key: 'flow' });
-
-      // Fetch file from IPFS to ensure it's available
-      console.log("Fetching file from IPFS:", ipfsUrl);
-      showToast("🔄 Fetching file from IPFS...", 'info', 1500, { key: 'flow' });
-      const response = await fetch(ipfsUrl);
-      const blob = await response.blob();
-      const file = new File([blob], image.name, { type: image.type });
+      // Plik idzie prosto do mintFile - Camp wysyla go wlasnym kanalem.
+      const file = image;
 
       // Determine media kind and size limits
       const isImage = file.type.startsWith('image/');
@@ -209,11 +187,9 @@ export default function OriginMint({
         properties: { mimeType: file.type },
         external_url: siteOrigin ? `${siteOrigin}/mycamp` : undefined,
       };
-      if (isImage) {
-        metadata.image = ipfsUrl;
-      } else {
-        metadata.animation_url = ipfsUrl;
-      }
+      // `image` ustawia SDK na `ipfs://<cid>` po wyslaniu pliku (patrz
+      // useAssetAsPreview nizej). Wpisanie tu adresu bramki oznaczaloby
+      // miniature, ktora umiera razem z ta bramka - juz raz tak bylo.
 
       console.log("Starting IP registration...", {
         fileSize: fileSizeMB.toFixed(2) + "MB",
@@ -229,7 +205,12 @@ export default function OriginMint({
       console.log("Calling origin.mintFile...");
       showToast("🔐 Signing transaction with Origin SDK...", 'info', 4000, { key: 'flow' });
       
-            const result = await origin.mintFile(file, metadata, license);
+            const result = await origin.mintFile(file, metadata, license, undefined, {
+        // Dla obrazu SDK uzyje samej pracy jako podgladu i wpisze
+        // `image: ipfs://<cid>`. Audio, wideo i tekst zostaja bez miniatury -
+        // karta pokazuje wtedy nazwe medium zamiast zmyslonej grafiki.
+        useAssetAsPreview: file.type.startsWith('image/'),
+      });
       setSuccess(result);
 
       console.log("✅ IP registration successful! Token ID:", result);
