@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { parseEther, createPublicClient, http } from 'viem';
+import { parseEther } from 'viem';
 import { toast } from 'react-hot-toast';
 import IPNFTCard from './IPNFTCard';
 import FilterBar from './FilterBar';
@@ -12,8 +12,8 @@ import BidModal from './BidModal';
 import OfferModal from './OfferModal';
 import AuctionView from './AuctionView';
 import { fetchIpNftsFor, fetchRecentIpNfts } from '../../mycamp/api/fetchIpNfts';
-import { baseCampChain } from '@/app/contracts/BaseCampPostContract';
 import { MARKETPLACE_ADDRESS, MARKETPLACE_ABI } from '../config/simpleMarketplace';
+import { createCampPublicClient } from '../config/campClient';
 
 export default function MarketplaceGrid({
   mode = 'explore',
@@ -107,10 +107,7 @@ export default function MarketplaceGrid({
     console.log(`🔮 Prefetching page ${pageToFetch} in background...`);
 
     try {
-      const client = createPublicClient({
-        chain: baseCampChain,
-        transport: http(baseCampChain.rpcUrls.default.http[0]),
-      });
+      const client = createCampPublicClient();
 
       const cache = getListingCache();
       let allActiveAuctionIds: bigint[] = cache.activeAuctionIds || [];
@@ -269,10 +266,7 @@ export default function MarketplaceGrid({
           const userNFTs = await fetchIpNftsFor(address);
           
           // Check which tokens are already listed on marketplace
-          const client = createPublicClient({
-            chain: baseCampChain,
-            transport: http('https://rpc.basecamp.t.raas.gelato.cloud')
-          });
+          const client = createCampPublicClient();
           
           // Get listing count first
           const listingCount = await client.readContract({
@@ -386,10 +380,7 @@ export default function MarketplaceGrid({
         } else {
         
         try {
-          const client = createPublicClient({
-            chain: baseCampChain,
-            transport: http(baseCampChain.rpcUrls.default.http[0]),
-          });
+          const client = createCampPublicClient();
           console.log('🔍 Fetching active listings from marketplace:', MARKETPLACE_ADDRESS);
           
           // Sprawdź cache
@@ -748,10 +739,7 @@ export default function MarketplaceGrid({
               const userNFTs = await fetchIpNftsFor(address);
               
               // Check which tokens are already listed on marketplace
-              const client = createPublicClient({
-                chain: baseCampChain,
-                transport: http('https://rpc.basecamp.t.raas.gelato.cloud')
-              });
+              const client = createCampPublicClient();
               
               // Get listing count first
               const listingCount = await client.readContract({

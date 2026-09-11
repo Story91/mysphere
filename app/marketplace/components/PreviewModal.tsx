@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { createPublicClient, http, parseEther } from 'viem';
+import { parseEther } from 'viem';
 import { toast } from 'react-hot-toast';
 import { MARKETPLACE_ADDRESS, MARKETPLACE_ABI } from '../config/simpleMarketplace';
+import { createCampPublicClient } from '../config/campClient';
 
 interface PreviewModalProps {
   nft: any;
@@ -62,7 +63,7 @@ export default function PreviewModal({ nft: item, onClose }: PreviewModalProps) 
     (async () => {
       try {
         if (!item?.tokenId) return;
-        const client = createPublicClient({ transport: http('https://rpc.basecamp.t.raas.gelato.cloud') });
+        const client = createCampPublicClient();
         const t = await client.readContract({ address: MARKETPLACE_ADDRESS as `0x${string}`, abi: MARKETPLACE_ABI, functionName: 'getTerms', args: [BigInt(item.tokenId)] }) as any;
         if (t && (t.price ?? 0n) > 0n && (t.duration ?? 0n) > 0n) {
           setTerms({ price: t.price as bigint, duration: t.duration as bigint, paymentToken: t.paymentToken as string });

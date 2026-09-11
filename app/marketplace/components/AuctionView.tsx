@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { parseEther, formatEther, createPublicClient, http } from 'viem';
+import { parseEther, formatEther } from 'viem';
 import { toast } from 'react-hot-toast';
 import BidModal from './BidModal';
-import { baseCampChain } from '@/app/contracts/BaseCampPostContract';
 import { MARKETPLACE_ADDRESS, MARKETPLACE_ABI, DEFAULT_IP_NFT_CONTRACT } from '../config/simpleMarketplace';
+import { createCampPublicClient } from '../config/campClient';
 
 interface Auction {
   auctionId: number;
@@ -56,10 +56,7 @@ export default function AuctionView({ onBack }: { onBack?: () => void }) {
   const fetchAuctions = async () => {
     setLoading(true);
     try {
-      const client = createPublicClient({
-        chain: baseCampChain,
-        transport: http('https://rpc.basecamp.t.raas.gelato.cloud')
-      });
+      const client = createCampPublicClient();
 
       const count = await client.readContract({
         address: MARKETPLACE_ADDRESS as `0x${string}`,

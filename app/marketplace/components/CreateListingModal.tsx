@@ -5,9 +5,9 @@ import { useAccount } from 'wagmi';
 import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { toast } from 'react-hot-toast';
 import { MARKETPLACE_ADDRESS, MARKETPLACE_ABI, DEFAULT_IP_NFT_CONTRACT, LICENSE_PRESETS } from '../config/simpleMarketplace';
-import { parseEther, createPublicClient, http } from 'viem';
+import { createCampPublicClient } from '../config/campClient';
+import { parseEther } from 'viem';
 import { fetchIpNftsFor } from '../../mycamp/api/fetchIpNfts';
-import { baseCampChain } from '@/app/contracts/BaseCampPostContract';
 
 interface CreateListingModalProps {
   onClose: () => void;
@@ -68,10 +68,7 @@ export default function CreateListingModal({ onClose, prefillTokenId }: CreateLi
         const items = await fetchIpNftsFor(address);
         
         // Check which NFTs are already in auctions
-        const client = createPublicClient({
-          chain: baseCampChain,
-          transport: http()
-        });
+        const client = createCampPublicClient();
         
         const auctionCount = await client.readContract({
           address: MARKETPLACE_ADDRESS as `0x${string}`,
@@ -183,18 +180,7 @@ export default function CreateListingModal({ onClose, prefillTokenId }: CreateLi
     if (!address || !tokenId || !nftContract) return;
     setIsChecking(true);
     try {
-      const client = createPublicClient({ 
-        chain: {
-          id: 325000,
-          name: 'BaseCamp Testnet',
-          nativeCurrency: { name: 'Camp', symbol: 'CAMP', decimals: 18 },
-          rpcUrls: {
-            default: { http: ['https://rpc.basecamp.t.raas.gelato.cloud'] },
-            public: { http: ['https://rpc.basecamp.t.raas.gelato.cloud'] }
-          }
-        },
-        transport: http('https://rpc.basecamp.t.raas.gelato.cloud')
-      });
+      const client = createCampPublicClient();
       const owner = await client.readContract({ address: nftContract as `0x${string}`, abi: ERC721_ABI, functionName: 'ownerOf', args: [BigInt(tokenId)] }) as string;
       const ownerMatch = owner?.toLowerCase() === address.toLowerCase();
       setOwnerOk(ownerMatch);
@@ -264,10 +250,7 @@ export default function CreateListingModal({ onClose, prefillTokenId }: CreateLi
       if (!tokenId || !nftContract) return;
       try {
         if (nftContract.toLowerCase() !== DEFAULT_IP_NFT_CONTRACT.toLowerCase()) return;
-        const client = createPublicClient({ 
-          chain: { id: 325000, name: 'BaseCamp Testnet', nativeCurrency: { name: 'Camp', symbol: 'CAMP', decimals: 18 }, rpcUrls: { default: { http: ['https://rpc.basecamp.t.raas.gelato.cloud'] }, public: { http: ['https://rpc.basecamp.t.raas.gelato.cloud'] } } }, 
-          transport: http('https://rpc.basecamp.t.raas.gelato.cloud') 
-        });
+        const client = createCampPublicClient();
         // Creator is not authoritative anymore; owner controls terms. Kept for display only if needed.
         try {
           const c = await client.readContract({ address: MARKETPLACE_ADDRESS as `0x${string}`, abi: MARKETPLACE_ABI, functionName: 'tokenCreators', args: [BigInt(tokenId)] }) as `0x${string}`;

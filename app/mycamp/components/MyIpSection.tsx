@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useAccount } from 'wagmi';
-import { createPublicClient, http } from 'viem';
+
 import Link from 'next/link';
 import { fetchIpNftsFor } from '../api/fetchIpNfts';
-import { baseCampChain } from '@/app/contracts/BaseCampPostContract';
 import { MARKETPLACE_ADDRESS, MARKETPLACE_ABI } from '../../marketplace/config/simpleMarketplace';
+import { createCampPublicClient } from '../../marketplace/config/campClient';
 
 export default function MyIpSection() {
   const { address } = useAccount();
@@ -33,10 +33,7 @@ export default function MyIpSection() {
   // Check which tokens are listed on marketplace and in auctions
   const checkListedTokens = async (nfts: any[]) => {
     try {
-      const client = createPublicClient({
-        chain: baseCampChain,
-        transport: http('https://rpc.basecamp.t.raas.gelato.cloud')
-      });
+      const client = createCampPublicClient();
       
       // Get listing count first
       const listingCount = await client.readContract({

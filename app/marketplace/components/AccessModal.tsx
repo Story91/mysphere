@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { parseEther, createPublicClient, http } from 'viem';
+import { parseEther } from 'viem';
 import { toast } from 'react-hot-toast';
 import { MARKETPLACE_ADDRESS, MARKETPLACE_ABI } from '../config/simpleMarketplace';
+import { createCampPublicClient } from '../config/campClient';
 
 interface AccessModalProps {
   nft: any;
@@ -25,18 +26,7 @@ export default function AccessModal({ nft, onClose }: AccessModalProps) {
   useEffect(() => {
     const fetchTerms = async () => {
       try {
-        const client = createPublicClient({
-          chain: {
-            id: 325000,
-            name: 'BaseCamp Testnet',
-            nativeCurrency: { name: 'Camp', symbol: 'CAMP', decimals: 18 },
-            rpcUrls: {
-              default: { http: ['https://rpc.basecamp.t.raas.gelato.cloud'] },
-              public: { http: ['https://rpc.basecamp.t.raas.gelato.cloud'] }
-            }
-          },
-          transport: http('https://rpc.basecamp.t.raas.gelato.cloud')
-        });
+        const client = createCampPublicClient();
         
         const termsData = await client.readContract({
           address: MARKETPLACE_ADDRESS as `0x${string}`,

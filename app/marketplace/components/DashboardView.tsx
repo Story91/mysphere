@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { formatEther, parseEther, createPublicClient, http } from 'viem';
+import { formatEther, parseEther } from 'viem';
 import { toast } from 'react-hot-toast';
 import { MARKETPLACE_ADDRESS, MARKETPLACE_ABI, DEFAULT_IP_NFT_CONTRACT } from '../config/simpleMarketplace';
+import { createCampPublicClient } from '../config/campClient';
 import CreateAuctionModal from './CreateAuctionModal';
 import BidModal from './BidModal';
-import { baseCampChain } from '@/app/contracts/BaseCampPostContract';
 
 export default function DashboardView() {
   const { address, isConnected } = useAccount();
@@ -82,7 +82,7 @@ export default function DashboardView() {
 
   const refreshInspector = async () => {
     try {
-      const client = createPublicClient({ chain: baseCampChain, transport: http('https://rpc.basecamp.t.raas.gelato.cloud') });
+      const client = createCampPublicClient();
       const bal = await client.getBalance({ address: MARKETPLACE_ADDRESS as `0x${string}` });
       setContractBalance(bal);
       if (inspectAddr && /^0x[a-fA-F0-9]{40}$/.test(inspectAddr)) {
@@ -130,10 +130,7 @@ export default function DashboardView() {
     if (!address) return;
     
     try {
-      const client = createPublicClient({
-        chain: baseCampChain,
-        transport: http(),
-      });
+      const client = createCampPublicClient();
 
       // Get listing count
       const listingCount = await client.readContract({
@@ -228,7 +225,7 @@ export default function DashboardView() {
   const fetchMyAuctions = async () => {
     if (!address) return;
     try {
-      const client = createPublicClient({ chain: baseCampChain, transport: http('https://rpc.basecamp.t.raas.gelato.cloud') });
+      const client = createCampPublicClient();
       const count = await client.readContract({ address: MARKETPLACE_ADDRESS as `0x${string}`, abi: MARKETPLACE_ABI, functionName: 'auctionCount' }) as bigint;
       const rows: Array<{ auctionId: number; nftContract: string; tokenId: bigint; minPrice: bigint; endTime: bigint; highestBid: bigint; highestBidder: string; active: boolean }> = [];
       for (let i = 1; i <= Number(count); i++) {
@@ -248,7 +245,7 @@ export default function DashboardView() {
   const fetchActiveAuctions = async () => {
     if (!address) return;
     try {
-      const client = createPublicClient({ chain: baseCampChain, transport: http('https://rpc.basecamp.t.raas.gelato.cloud') });
+      const client = createCampPublicClient();
       const count = await client.readContract({ address: MARKETPLACE_ADDRESS as `0x${string}`, abi: MARKETPLACE_ABI, functionName: 'auctionCount' }) as bigint;
       
       // Check if user has pending returns (indicator they've been outbid)
@@ -298,10 +295,7 @@ export default function DashboardView() {
   const fetchAccessData = async () => {
     if (!address) return;
     try {
-      const client = createPublicClient({ 
-        chain: baseCampChain, 
-        transport: http('https://rpc.basecamp.t.raas.gelato.cloud') 
-      });
+      const client = createCampPublicClient();
       
       const purchasedAccess: any[] = [];
       
@@ -620,10 +614,7 @@ export default function DashboardView() {
     if (!tokenIdStr) return;
     try {
       const tokenId = BigInt(tokenIdStr);
-      const client = createPublicClient({ 
-        chain: baseCampChain, 
-        transport: http('https://rpc.basecamp.t.raas.gelato.cloud') 
-      });
+      const client = createCampPublicClient();
       const terms = await client.readContract({
         address: MARKETPLACE_ADDRESS as `0x${string}`,
         abi: MARKETPLACE_ABI,
@@ -888,10 +879,7 @@ export default function DashboardView() {
   const loadOrigin = async () => {
     if (!address) return;
     try {
-      const client = createPublicClient({ 
-        chain: baseCampChain, 
-        transport: http('https://rpc.basecamp.t.raas.gelato.cloud') 
-      });
+      const client = createCampPublicClient();
       // getOriginUsage and userConsent were removed from optimized contract
       // Set default values
       const multiplier = BigInt(1);
@@ -1317,7 +1305,7 @@ function AccessTermsInline({ tokenId }: { tokenId: string }) {
   useEffect(() => {
     (async () => {
       try {
-        const client = createPublicClient({ chain: baseCampChain, transport: http('https://rpc.basecamp.t.raas.gelato.cloud') });
+        const client = createCampPublicClient();
         const t = await client.readContract({ address: MARKETPLACE_ADDRESS as `0x${string}`, abi: MARKETPLACE_ABI, functionName: 'getTerms', args: [BigInt(tokenId)] }) as any;
         if (t && (t.price ?? 0n) > 0n && (t.duration ?? 0n) > 0n) setTerms({ price: t.price, duration: t.duration });
       } catch {}
@@ -1352,10 +1340,7 @@ function AuctionCardWithPreview({
   useEffect(() => {
     const fetchNFTData = async () => {
       try {
-        const client = createPublicClient({
-          chain: baseCampChain,
-          transport: http('https://rpc.basecamp.t.raas.gelato.cloud')
-        });
+        const client = createCampPublicClient();
 
         const ERC721_ABI = [
           { name: 'tokenURI', type: 'function', stateMutability: 'view', inputs: [{ name: 'tokenId', type: 'uint256' }], outputs: [{ type: 'string' }] }
@@ -1499,10 +1484,7 @@ function ListingCardWithPreview({ listing, onCancel, isCancelling }: { listing: 
   useEffect(() => {
     const fetchNFTData = async () => {
       try {
-        const client = createPublicClient({
-          chain: baseCampChain,
-          transport: http('https://rpc.basecamp.t.raas.gelato.cloud')
-        });
+        const client = createCampPublicClient();
 
         const ERC721_ABI = [
           { name: 'tokenURI', type: 'function', stateMutability: 'view', inputs: [{ name: 'tokenId', type: 'uint256' }], outputs: [{ type: 'string' }] }
@@ -1535,7 +1517,7 @@ function ListingCardWithPreview({ listing, onCancel, isCancelling }: { listing: 
     (async () => {
       try {
         if ((listing.nftContract as string)?.toLowerCase() !== DEFAULT_IP_NFT_CONTRACT.toLowerCase()) return;
-        const client = createPublicClient({ chain: baseCampChain, transport: http('https://rpc.basecamp.t.raas.gelato.cloud') });
+        const client = createCampPublicClient();
         const t = await client.readContract({ address: MARKETPLACE_ADDRESS as `0x${string}`, abi: MARKETPLACE_ABI, functionName: 'getTerms', args: [BigInt(listing.tokenId)] }) as any;
         if ((t?.price ?? 0n) > 0n && (t?.duration ?? 0n) > 0n) setTerms({ price: t.price as bigint, duration: t.duration as bigint });
       } catch {}
@@ -1666,10 +1648,7 @@ function BidCardWithNFTPreview({
   useEffect(() => {
     const fetchNFTData = async () => {
       try {
-        const client = createPublicClient({
-          chain: baseCampChain,
-          transport: http('https://rpc.basecamp.t.raas.gelato.cloud')
-        });
+        const client = createCampPublicClient();
 
         const ERC721_ABI = [
           { name: 'tokenURI', type: 'function', stateMutability: 'view', inputs: [{ name: 'tokenId', type: 'uint256' }], outputs: [{ type: 'string' }] }
