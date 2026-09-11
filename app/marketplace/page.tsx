@@ -6,9 +6,8 @@ import { useAccount } from 'wagmi';
 import { motion } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { createPublicClient, http } from 'viem';
-import { baseCampChain } from '@/app/contracts/BaseCampPostContract';
 import { MARKETPLACE_ADDRESS, MARKETPLACE_ABI, DEFAULT_IP_NFT_CONTRACT } from './config/simpleMarketplace';
+import { createCampPublicClient } from './config/campClient';
 
 // Dynamicznie importuj komponenty które używają wagmi hooks
 const MarketplaceGrid = dynamic(() => import('./components/MarketplaceGrid'), {
@@ -63,7 +62,7 @@ export default function MarketplacePage() {
   useEffect(() => {
     (async () => {
       try {
-        const client = createPublicClient({ chain: baseCampChain, transport: http(baseCampChain.rpcUrls.default.http[0]) });
+        const client = createCampPublicClient();
         // Active listings count
         let listed = 0;
         try {
