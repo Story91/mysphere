@@ -595,7 +595,7 @@ export default function TipButton({ recipientAddress, postId, className = '' }: 
                           : 'bg-soft-surface border-soft-line hover:bg-soft-sunken text-soft-ink-muted'
                       }`}
                     >
-                      {selectedTokenConfig.decimals === 6 ? '$' : ''}{amount}
+                      {selectedToken === 'USDC' || selectedToken === 'USDG' ? '$' : ''}{amount}
                   </button>
                   ))}
                 </div>

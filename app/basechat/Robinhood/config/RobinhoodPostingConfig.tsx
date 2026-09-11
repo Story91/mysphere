@@ -11,7 +11,7 @@ import {
   isRobinhoodPostContractDeployed,
 } from '../contracts/RobinhoodPostContract';
 
-// Komunikat pokazywany dopoki kontrakt postow nie jest wdrozony na Robinhood Chain.
+// Komunikat na wypadek pustego adresu kontraktu (np. po redeployu bez env).
 export const ROBINHOOD_POSTING_DISABLED_MESSAGE = 'Posting on Robinhood Chain is not live yet';
 
 function RobinhoodLogo({ className }: { className: string }) {
@@ -32,7 +32,7 @@ export const ROBINHOOD_POSTING: ChainWithComposer = {
   explorerTxUrl: `${ROBINHOOD_CONFIG.explorerUrl}/tx/`,
   explorerButtonLabel: 'View on Blockscout',
 
-  // Jedyny lancuch, na ktorym kontrakt postow nie jest jeszcze wdrozony.
+  // Kontrakt wdrozony 2026-08-05; isLive zostaje jako bezpiecznik.
   isLive: isRobinhoodPostContractDeployed,
   notLiveMessage: ROBINHOOD_POSTING_DISABLED_MESSAGE,
 
@@ -68,7 +68,7 @@ export const ROBINHOOD_POSTING: ChainWithComposer = {
       >
         <span className="font-medium">{ROBINHOOD_POSTING_DISABLED_MESSAGE}.</span>{' '}
         <span className="opacity-80">
-          Tipping on Robinhood Chain already works - only onchain posting waits for the contract deployment.
+          Tipping on Robinhood Chain already works - only onchain posting waits for the contract address.
         </span>
       </div>
     ),
