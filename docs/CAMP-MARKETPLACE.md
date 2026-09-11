@@ -1,5 +1,11 @@
 # Marketplace IP NFT na Camp - co dziala, czego brakuje, co powiedziec
 
+> **Aktualizacja 2026-09-11 (po naprawach).** Zrobione: upgrade SDK do 1.3.2
+> wraz z migracja SpotifyAPI/TwitterAPI do @campnetwork/sdk, `licenseType`
+> w obu sciezkach mintu, filtr `dataStatus === ACTIVE` na liscie prac, panel
+> tantiem ERC-6551 w zakladce Dashboard. Punkty 2.3 (AppRegistry) i czesc
+> 2.4 zostaja - powody przy kazdym z nich ponizej.
+
 Stan na 2026-09-11. Zrodla: wlasne pomiary na Camp mainnet (484), ABI
 IPMarketV4, rozpakowana paczka `@campnetwork/origin@1.3.2` (docs.campnetwork.xyz
 i npmjs.com blokuja automatyczny dostep przez Cloudflare, wiec twarde dane
@@ -52,7 +58,7 @@ nam nazywac jej gwarancja.
 
 ## 2. Czego brakuje
 
-### 2.1 Bloker wszystkiego: siedzimy na SDK sprzed dwoch wersji glownych
+### 2.1 ZROBIONE - SDK podniesiony do 1.3.2
 
 `package.json` ma `@campnetwork/origin: ^0.0.9`. Najnowsza to **1.3.2**
 (opublikowana 2026-02-05). To nie jest roznica kosmetyczna:
@@ -73,17 +79,18 @@ przepiecia: `app/api/camp/spotify/route.ts`, `app/api/camp/twitter/route.ts`,
 `app/api/camp/spotify/mint-nft/route.ts`. Camp nie oglosil tego nigdzie -
 nie ma CHANGELOG ani sekcji migracji.
 
-### 2.2 Royalties - najwieksza dziura merytoryczna
+### 2.2 ZROBIONE - tantiemy widoczne i do odbioru
 
 Camp daje kazdemu IP NFT wlasne konto ERC-6551 (Token Bound Account) i natywne
 royalties przez `royaltyBps` w warunkach licencji. Metody: `getRoyalties`,
 `claimRoyalties`, `getOrCreateRoyaltyVault`, `getTokenBoundAccount`.
 
-Nasz IPMarketV4 **tego nie widzi**. Tworca moze miec naliczone royalties
-Campa i nie ma w naszym interfejsie zadnego sposobu, zeby je zobaczyc ani
-odebrac. Minimum do zrobienia: saldo TBA na karcie NFT i przycisk odbioru.
+Nasz IPMarketV4 tego nie widzi. `RoyaltiesPanel` w zakladce Dashboard czyta
+te konta obok kontraktu: saldo per praca i przycisk odbioru. Nadal NIE
+ustawiamy `royaltyBps` przy mincie (jest twardo 0) - to decyzja produktowa,
+bo dotyczy tego, ile tworca bierze z kazdej pozniejszej licencji.
 
-### 2.3 AppRegistry - nasz model przychodowy, ktorego nie wlaczylismy
+### 2.3 DO DECYZJI - AppRegistry, nasz model przychodowy
 
 `Auth`/`CampProvider` przyjmuja `appId`, a `buyAccess` ma `expectedAppFeeBps`.
 Rejestr aplikacji stoi pod `0xd09F15aA280F9109aCd403cA920e67D40Cb6C3FA`.
@@ -94,12 +101,19 @@ Efekt: MySphere bierze prowizje od kazdej licencji na derywat, protokolarnie,
 bez wlasnego kontraktu. To najwiekszy zysk przy najmniejszym nakladzie z calej
 tej listy.
 
+**NIE ZROBIONE swiadomie.** Wymaga trzech rzeczy, ktore nie sa zmiana w kodzie:
+rejestracji aplikacji w kontrakcie AppRegistry (transakcja, gaz, publiczny
+wpis), wybicia genesis IPNFT MySphere i decyzji o wysokosci prowizji.
+Pierwsze dwa wydaja pieniadze wlasciciela i zostawiaja slad na lancuchu,
+trzecia jest decyzja biznesowa. Do odpalenia jedna sesja, gdy zapadnie
+decyzja o stawce.
+
 ### 2.4 Reszta, wedlug wartosci
 
 | Funkcja | Metoda SDK | Po co |
 |---|---|---|
-| Status danych | `origin.dataStatus(tokenId)`, `DataStatus.DISPUTED` | Nie wystawiac IP zgloszonego jako naruszenie. Filtr to jedna linia, a ryzyko jest prawne. |
-| Smart odczyty | `getTokenInfoSmart`, `buyAccessSmart` | Jeden round-trip zamiast kilku; `buyAccessSmart` zwraca null, gdy user juz ma dostep. |
+| ~~Status danych~~ ZROBIONE | `dataStatus(uint256)` czytany bezposrednio z kontraktu | Filtr `ACTIVE` w `fetchIpNfts`. Odczyt nie wymaga sesji SDK. |
+| Smart odczyty | `getTokenInfoSmart`, `buyAccessSmart` | Jeden round-trip zamiast kilku. **Uwaga: to nie jest sama optymalizacja.** Przelaczenie "kup dostep" na `buyAccessSmart` przenosi licencje z NASZEGO kontraktu do kontraktu Campa - inny adres trzyma warunki, inaczej plynie oplata. Decyzja architektoniczna, nie refaktor. |
 | Drzewo pochodzenia | `parents[]` (do 8) | Remiksy to cala teza Campa. Drzewo na karcie to przewaga nad oficjalnym Origin. |
 | Licencja wieczysta | `LicenseType.SINGLE_PAYMENT` | Dzis mamy tylko czasowa. Oczywisty drugi wariant. Uwaga: przy SINGLE_PAYMENT i X402 `duration` musi byc 0. |
 | Operacje zbiorcze | `bulkMintFile`, `bulkBuyAccessSmart`, `previewBulkCost` | "Wrzuc 20 plikow", "kup caly zestaw" w jednej transakcji. Kontrakt `0x6B89810768b708465f31b6a8B8d753cc986489F1`. |
