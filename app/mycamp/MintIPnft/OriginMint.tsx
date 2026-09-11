@@ -229,7 +229,7 @@ export default function OriginMint({
         const previewFailed = wantsPreview && /preview image|presigned url|plan limits|surpassing plan/i.test(msg);
         if (!previewFailed) throw previewError;
         console.warn('Podglad odrzucony przez backend Campa, mintuje bez niego:', msg);
-        showToast('Preview upload is rate-limited on Camp. Minting without a thumbnail.', 'warning', 4000, { key: 'flow' });
+        showToast('Camp storage refused the thumbnail. Trying the mint without one.', 'warning', 4000, { key: 'flow' });
         result = await origin.mintFile(file, metadata, license);
       }
       setSuccess(result);
@@ -252,35 +252,35 @@ export default function OriginMint({
     } catch (error: any) {
       console.error("❌ IP registration failed:", error);
       
-      // Provide specific error messages
-      let errorMessage = "IP registration failed";
-      
-      /* UWAGA na brzmienie: ten blad NIE pochodzi z portfela.
+      /**
+       * KONIEC ZGADYWANIA - pokazujemy POWOD, nie nasza interpretacje.
        *
-       * Mint sklada sie z dwoch etapow. Najpierw backend Campa wystawia podpis
-       * dla przyszlego tokena (registerIpNFT), dopiero potem cokolwiek trafia
-       * do portfela. Gdy padnie etap pierwszy, portfel nie jest nawet pytany -
-       * a stary komunikat brzmial "approve in wallet", czyli kazal czlowiekowi
-       * szukac okna, ktore nigdy sie nie otworzy. Tak wygladal blad z 11.09,
-       * gdy SDK stalo na domyslnym DEVELOPMENT i podpisu odmawial backend
-       * testnetu. */
-      if (error.message?.includes("signature") || error.message?.includes("Failed to get signature")) {
-        errorMessage = "Camp Origin refused to sign this mint. Sign out of Camp in this window, sign in again, and retry.";
-        showToast(errorMessage, 'error', 6000, { key: 'err' });
-      } else if (error.message?.includes("network")) {
-        errorMessage = "Network error. Make sure your wallet is on Camp Network (chain 484).";
-        showToast('Network error. Switch your wallet to Camp Network (chain 484).', 'error', 5000, { key: 'err' });
-      } else if (error.message?.includes("gas")) {
-        errorMessage = "Insufficient gas fees.";
-        showToast('Not enough CAMP for gas on Camp Network.', 'error', 5000, { key: 'err' });
-      } else if (error.message?.includes("user rejected") || error.message?.includes("User rejected")) {
-        errorMessage = "Transaction rejected by user.";
-        showToast("❌ Transaction cancelled by user.", 'warning', 3000, { key: 'err' });
+       * Ten blok dwa razy wprowadzil w blad. Najpierw mowil "approve in
+       * wallet" przy awarii, w ktorej portfel nie byl nawet pytany. Potem
+       * kazal wylogowac sie z Campa przy awarii, ktorej wylogowanie nie
+       * dotyczy. Oba razy prawdziwa tresc bledu byla schowana.
+       *
+       * USTALONE 11.09.2026: mint na Camp mainnet nie dziala z powodow po
+       * STRONIE CAMPA. Ich backend odmawia i wysylki pliku ("account
+       * surpassing plan limits"), i podpisu. Ostatni mint w kolekcji
+       * 0x39EeE1...2C38 pochodzi z 1 maja 2026 - przez cztery miesiace nie
+       * powstal tam ani jeden token, wiec nie jest to usterka naszej
+       * integracji. Tego nie da sie naprawic z tej strony.
+       */
+      const detail = String(error?.message || error || 'unknown error');
+      const isCampQuota = /plan limits|surpassing plan|presigned url|upload preview/i.test(detail);
+      const isCampSignature = /signature|failed to register/i.test(detail);
+
+      let errorMessage: string;
+      if (isCampQuota || isCampSignature) {
+        errorMessage =
+          'Camp Origin refused this mint on its side: ' + detail +
+          '. That is Camp own storage and signing service, not your wallet and not this app.';
       } else {
-        errorMessage = error.message || "Unknown error occurred";
-        showToast(`❌ Error: ${errorMessage}`, 'error', 5000, { key: 'err' });
+        errorMessage = detail;
       }
-      
+      showToast(errorMessage, 'error', 9000, { key: 'err' });
+
       setError(errorMessage);
     } finally {
       setIsRegistering(false);

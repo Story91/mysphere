@@ -13,6 +13,72 @@ pochodza z artefaktow npm, nie z ogloszen Campa).
 
 ---
 
+## 0. NAJWAZNIEJSZE: Camp Origin jest porzucony (ustalone 2026-09-11)
+
+**Mintowanie IP NFT na Camp mainnet nie dziala dzis dla nikogo i nie da sie
+tego naprawic z naszej strony.**
+
+Dowod bezposredni - `scripts/tryMintCamp.mjs`, mint z linii polecen, bez
+przegladarki i bez rozszerzenia portfela, portfelem 0xD488...030e, na
+environment PRODUCTION:
+
+| Etap | Wynik |
+|---|---|
+| logowanie do Camp Origin | **udane**, sesja wydana poprawnie |
+| wysylka pliku | 403 `Unable to perform this action due to account surpassing plan limits` |
+| rejestracja mintu (podpis) | 403, ta sama tresc |
+
+Czyli nasze dane i sesja sa poprawne. Odmawia backend Campa - i na
+przechowywaniu pliku, i na podpisie. Komunikat pochodzi z Pinaty: konto IPFS
+po stronie Campa przestalo byc oplacane.
+
+### Co mowia pozostale zrodla
+
+- **Lancuch.** Kolekcja `0x39EeE1...2C38`: 265 transferow LACZNIE, wszystkie
+  to minty z adresu zero, 32 posiadaczy. Ostatni mint **1 maja 2026**. Ani
+  jednego transferu wtornego w calej historii - nikt nigdy tego nie odsprzedal.
+- **SDK.** `@campnetwork/origin` 1.3.2 z 5 lutego 2026, prace stanely na
+  `1.4.0-alpha.9` i nigdy nie trafily na stable. `@campnetwork/sdk` 1.4.5
+  z lutego 2025.
+- **Kod Campa.** `origin-app` bez commita od listopada 2025. Jedyne aktywne
+  repozytorium w ich organizacji to niezwiazany projekt o pamieci agentow AI,
+  pisany przez jedna osobe.
+- **Token.** CAMP usuniety z par spot Bybit 25 sierpnia 2026 z powodu niskiego
+  wolumenu; cena ok. 0,03% ceny startowej.
+- **Ruch.** Siec formalnie zyje: bloki leca, RPC wytrzymuje obciazenie, ale
+  2-3 tys. transakcji dziennie i wykorzystanie sieci 0,0076%.
+
+Trzy niezalezne zrodla wskazuja ten sam moment: pierwsza polowa 2026 to koniec
+realnego utrzymywania Origin. Zapowiedzi wygaszenia NIE MA - to po prostu
+ciche porzucenie.
+
+### Co to znaczy dla nas
+
+Marketplace jako **produkt na Camp** nie ma sensu: nie ma podazy (nikt nie
+zmintuje, bo backend odmawia), nie ma popytu (32 posiadaczy, zero obrotu
+wtornego), nie ma wsparcia (SDK i backend bez opiekuna), nie ma plynnosci
+(gaz placony tokenem po delistingu).
+
+Sensowne pozostaja dwie rzeczy:
+
+1. **Zostawic jako demo techniczne.** IPMarketV4 stoi, kod dziala, 265 prac da
+   sie przegladac. Kosztu biezacego nie ma.
+2. **Trzymac kod przenosny.** Adres kolekcji i chainId maja byc konfiguracja,
+   nie zalozeniem wbitym w komponenty - zeby ta sama warstwa (listing, oferty,
+   aukcje, licencje) dala sie postawic na lancuchu, ktory zyje.
+
+Czego NIE robic: nie inwestowac kolejnych tygodni w integracje z Origin przy
+zalozeniu, ze przyjda uzytkownicy z Campa.
+
+### Decyzja do podjecia
+
+Na produkcji stoi widoczny przycisk "Mint an IP", ktory zawsze konczy sie
+bledem po stronie Campa. Do wyboru: (a) wylaczyc sam mint i zostawic reszte
+targu, (b) zaparkowac cala trase jak wczesniej, (c) zostawic jak jest
+z uczciwym komunikatem o odmowie. Dzis dziala wariant (c).
+
+---
+
 ## 1. Co da sie zrobic na `/marketplace`
 
 Piec czynnosci, wszystkie na mainnecie Camp (chainId 484):
