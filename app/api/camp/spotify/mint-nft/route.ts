@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SpotifyAPI } from '@campnetwork/origin';
+/**
+ * SpotifyAPI i TwitterAPI mieszkaja w @campnetwork/sdk, NIE w @campnetwork/origin.
+ *
+ * Camp rozdzielil paczki: od @campnetwork/origin 1.3.x te dwie klasy zniknely
+ * z eksportow (zero wystapien w core.d.ts i w bundlu), a zyja dalej w osobnej
+ * @campnetwork/sdk. Nigdzie tego nie ogloszono - nie ma CHANGELOG ani sekcji
+ * migracji. Obie paczki siedza obok siebie w package.json wlasnie dlatego.
+ */
+import { SpotifyAPI } from '@campnetwork/sdk';
 
 // Types for NFT minting
 interface MusicNFTMetadata {
