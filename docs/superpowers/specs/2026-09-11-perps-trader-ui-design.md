@@ -65,8 +65,12 @@ Bez bps, bez bondow, bez adresu tworcy. To idzie do Market info.
 
 Kolejnosc od gory:
 1. Segment **Long / Short** (pelna szerokosc, zielony/czerwony jak dzis).
-2. **Margin (USDC)**: input z saldem obok, przyciski `25% 50% 75% Max`. Max = saldo minus 0
-   (fee schodzi z depozytu, kontrakt to obsluguje).
+2. **Margin (USDC)**: input z saldem obok, przyciski `25% 50% 75% Max`. Max = saldo minus
+   `GAS_RESERVE_USDC` (config.ts, 0,05 USDC). Na Arc gaz i kolateral to JEDNO saldo USDC
+   (docs Arc "EVM differences"), wiec "cale saldo" zostawia zero na `approve` i `open`.
+   Presety procentowe licza sie od tej samej kwoty (saldo minus rezerwa). Depozyt powyzej
+   niej blokuje przycisk i pokazuje ostrzezenie (juz w `MarketDetail`, 11.09). Fee schodzi
+   z depozytu, kontrakt to obsluguje.
 3. **Leverage**: slider + presety `1x 2x 5x 10x max` (presety > `maxLeverage` ukryte).
    Slider zmienia kolor na bursztynowy, gdy `preview.marginRatioBps < 2 * maintenanceBps`.
 4. **Trzy duze liczby** (grid 3 kolumny): **Position size** (notional w USD), **Liq. price**

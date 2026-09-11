@@ -144,7 +144,7 @@ export function filterRange(points: PricePoint[], range: ChartRange, now: number
 
 **Interfaces:** Props `{ snap, position, preview, feeSplit, side, setSide, margin, setMargin, leverage, setLeverage, address, wrongChain, busy, error, onOpen }`.
 
-- [ ] Uklad jak w spec (segment Long/Short, margin + `25/50/75/Max`, slider + presety, trzy liczby, pasek powodu, przycisk, `<details>` ze szczegolami, ostrzezenia globalne). Presety procentowe: `setMargin(fromUsdc(balance * n / 100n))`. Presety dzwigni: `[1,2,5,10,max]` filtrowane `<= maxLeverage`, bez duplikatow.
+- [ ] Uklad jak w spec (segment Long/Short, margin + `25/50/75/Max`, slider + presety, trzy liczby, pasek powodu, przycisk, `<details>` ze szczegolami, ostrzezenia globalne). Presety procentowe: `setMargin(fromUsdc(spendable * n / 100n))`, gdzie `spendable = max(0, balance - GAS_RESERVE_USDC)` (juz policzone w `MarketDetail` jako `spendable`/`overSpendable` - przeniesc 1:1; na Arc gaz schodzi z tego samego USDC, wiec `balance` wprost = obie transakcje padaja). `Max` = `spendable`. Presety dzwigni: `[1,2,5,10,max]` filtrowane `<= maxLeverage`, bez duplikatow.
 - [ ] Przycisk: tekst wg stanu: `!address` -> "Connect wallet" (disabled), `wrongChain` -> "Switch to Arc Testnet", `position` -> "Close your position first", `busy` -> busy, inaczej `Open long`/`Open short`. Kolory `bg-sp-up`/`bg-sp-down` z `text-sp-on-brand`... (sprawdzic kontrast; jesli brak tokenu tla, uzyc `bg-emerald-600`/`bg-red-600` tylko tu i zostawic komentarz).
 - [ ] Commit `feat(perps): panel zlecenia z presetami i kluczowymi liczbami`.
 
