@@ -26,6 +26,7 @@ import { Dot, UpDown } from './ui';
 import FaucetBanner from './FaucetBanner';
 import YourPositions from './YourPositions';
 import CreateMarketModal from './CreateMarketModal';
+import { feedByAddress } from './indexFeeds';
 import PerpsGuide, { premiumBps } from './PerpsGuide';
 
 /**
@@ -83,6 +84,8 @@ type Row = {
   slashed: boolean;
   priceUpdatedAt: number | null;
   feedActive: boolean | null;
+  /** Adres zewnetrznego feedu indeksu (adapter Pytha) albo zero = rejestr. null = odczyt padl. */
+  indexFeed: Address | null;
   /* zmiana indeksu z logow PriceSubmitted w oknie 40k blokow; null = < 2 punkty */
   change: number | null;
   changeSince: number | null;
@@ -213,7 +216,7 @@ export default function DerivativesBoard() {
       // Zapytanie 3: WSZYSTKO pozostale naraz - fundusz plus 12 odczytow na
       // rynek. Kolejnosc jest tu kontraktem miedzy budowaniem a odczytem, wiec
       // liczba `PER_MARKET` i lista ponizej musza sie zgadzac co do jednego.
-      const PER_MARKET = 12;
+      const PER_MARKET = 13;
       const marketCalls = live.flatMap(({ id, address }) => [
         { address, abi: marketAbi, functionName: 'markPrice' },
         { address, abi: marketAbi, functionName: 'indexPrice' },
@@ -227,6 +230,8 @@ export default function DerivativesBoard() {
         { address: ORACLE_ADDRESS, abi: oracleAbi, functionName: 'getMarket', args: [BigInt(id)] },
         { address: ORACLE_ADDRESS, abi: oracleAbi, functionName: 'marketStats', args: [BigInt(id)] },
         { address: ORACLE_ADDRESS, abi: oracleAbi, functionName: 'isActive', args: [BigInt(id)] },
+        // NA KONCU, zeby nie przesuwac indeksow at(0..11) powyzej.
+        { address, abi: marketAbi, functionName: 'CHAINLINK_FEED' },
       ]);
       const res = await client.multicall({
         contracts: [
@@ -272,6 +277,7 @@ export default function DerivativesBoard() {
           slashed: stats ? Boolean(stats[5]) : false,
           priceUpdatedAt: meta ? Number(meta[4]) : null,
           feedActive: at(11) == null ? null : Boolean(at(11)),
+          indexFeed: (at(12) as Address | null) ?? null,
           change: null,
           changeSince: null,
         };
@@ -728,6 +734,16 @@ export default function DerivativesBoard() {
                       {feedTone === 'down' ? 'halted' : feedTone === 'warn' ? 'aging' : feedTone === 'up' ? 'live' : 'unknown'}
                     </p>
                     <p className="text-[11px] text-sp-ink-soft">{feedAge != null ? `${fmtDuration(feedAge)} ago` : <Missing />}</p>
+                    {/* Skad indeks: adapter Pytha (funding za cena z zewnatrz) albo
+                        rejestr (cena publikowana przez tworce). Ta roznica jest
+                        wazniejsza dla tradera niz wiek ostatniego wpisu w rejestrze. */}
+                    {row.indexFeed && row.indexFeed !== ZERO ? (
+                      <p className="text-[11px] font-semibold text-sp-brand-deep">
+                        index: {feedByAddress(row.indexFeed)?.symbol ?? shortAddress(row.indexFeed)} via Pyth
+                      </p>
+                    ) : row.indexFeed === ZERO ? (
+                      <p className="text-[11px] text-sp-ink-soft">index: registry</p>
+                    ) : null}
                   </div>
                 </Link>
               );

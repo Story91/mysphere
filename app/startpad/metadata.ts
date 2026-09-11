@@ -77,6 +77,13 @@ export type TokenMetadata = {
   description: string | null;
   /** URI, ktorego nie umiemy rozpakowac - pokazujemy jako odnosnik, nie udajemy. */
   link: string | null;
+  /**
+   * Indeks, z ktorym tworca SPAROWAL token przy starcie (tylko Arc): symbol
+   * po stronie Pytha ("AAPL/USD") i adres adaptera feedu. To deklaracja w
+   * niezmiennych metadanych, nie dowod istnienia rynku - rynek sprawdza sie
+   * osobno po adresie feedu (usePairedMarket w module derywatow).
+   */
+  pairedIndex: { symbol: string; feed: string } | null;
 };
 
 const DATA_JSON_PREFIX = 'data:application/json;base64,';
@@ -101,25 +108,35 @@ function decodeBase64(value: string): string | null {
  * Czego NIE robimy: nie pobieramy tu niczego sieciowo. Ta funkcja jest czysta,
  * zeby dalo sie jej uzyc w renderze bez zawieszania widoku na cudzej bramie.
  */
+/** Symbol do 16 znakow z bezpiecznego alfabetu i adres 0x... - reszta odpada. */
+function parsePairedIndex(value: unknown): TokenMetadata['pairedIndex'] {
+  if (!value || typeof value !== 'object') return null;
+  const { symbol, feed } = value as { symbol?: unknown; feed?: unknown };
+  if (typeof symbol !== 'string' || typeof feed !== 'string') return null;
+  if (!/^[A-Za-z0-9./ -]{1,16}$/.test(symbol) || !/^0x[0-9a-fA-F]{40}$/.test(feed)) return null;
+  return { symbol, feed };
+}
+
 export function parseMetadataUri(uri: string | null | undefined): TokenMetadata {
-  const empty: TokenMetadata = { image: null, description: null, link: null };
+  const empty: TokenMetadata = { image: null, description: null, link: null, pairedIndex: null };
   if (!uri) return empty;
   const trimmed = uri.trim();
   if (trimmed === '') return empty;
 
   if (!trimmed.startsWith(DATA_JSON_PREFIX)) {
-    return { image: null, description: null, link: resolveMediaUrl(trimmed) };
+    return { image: null, description: null, link: resolveMediaUrl(trimmed), pairedIndex: null };
   }
 
   const decoded = decodeBase64(trimmed.slice(DATA_JSON_PREFIX.length));
   if (decoded === null) return empty;
 
   try {
-    const parsed = JSON.parse(decoded) as { image?: unknown; description?: unknown };
+    const parsed = JSON.parse(decoded) as { image?: unknown; description?: unknown; pairedIndex?: unknown };
     return {
       image: resolveMediaUrl(typeof parsed.image === 'string' ? parsed.image : null),
       description: typeof parsed.description === 'string' ? parsed.description.slice(0, 280) : null,
       link: null,
+      pairedIndex: parsePairedIndex(parsed.pairedIndex),
     };
   } catch {
     return empty;

@@ -32,6 +32,8 @@ import {
   ACTIVE_LAUNCHPAD_NETWORK,
 } from '../config';
 import { parseMetadataUri, pickTokenImage } from '../metadata';
+import { usePairedMarket } from '../../derivatives/usePairedMarket';
+import { feedByAddress, pairedMarketSymbol } from '../../derivatives/indexFeeds';
 import { fetchLogos } from '../logos';
 import { fetchTokenCounters, type TokenCounters } from '../blockscout';
 import { useEthUsd } from '../useEthUsd';
@@ -615,6 +617,12 @@ function TokenHeader({
   const image = pickTokenImage({ profileLogoUrl: profile?.logoUrl, metadataUri: core.config.metadataURI });
   const chainMeta = parseMetadataUri(core.config.metadataURI);
   const description = profile?.description ?? chainMeta.description;
+  /* ---- SPAROWANY INDEKS. Metadane mowia "AAPL/USD"; czy rynek na tym feedzie
+     istnieje, sprawdzamy w fabryce. Jest -> link do rynku. Nie ma -> link do
+     prefilowanego kreatora (kaucje placi ten, kto kliknie). Feed spoza naszej
+     listy adapterow pokazujemy, ale nie linkujemy - nie recze za cudzy adres. ---- */
+  const pairedFeed = chainMeta.pairedIndex ? feedByAddress(chainMeta.pairedIndex.feed) : null;
+  const pairedMarket = usePairedMarket(pairedFeed?.address);
   const website = socialUrl(profile?.website, '');
   const twitter = socialUrl(profile?.twitter, 'https://x.com/');
   const telegram = socialUrl(profile?.telegram, 'https://t.me/');
@@ -652,6 +660,29 @@ function TokenHeader({
               {core.name} · launched {timeAgo(core.startedAt)}
             </p>
             {description && <p className="mt-1.5 max-w-[560px] text-[12px] leading-[1.5] text-sp-shade/55">{description.slice(0, 280)}</p>}
+            {chainMeta.pairedIndex && (
+              <p className="mt-2 text-[12px]">
+                {pairedFeed && pairedMarket ? (
+                  <Link
+                    href={`/derivatives/${pairedMarket}`}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-soft-primary/30 bg-soft-primary/[0.06] px-3 py-1 font-bold text-sp-ink hover:border-soft-primary"
+                  >
+                    Paired with {pairedFeed.symbol} · trade the perp
+                  </Link>
+                ) : pairedFeed && pairedMarket === '' ? (
+                  <Link
+                    href={`/derivatives?new=1&feed=${pairedFeed.address}&symbol=${encodeURIComponent(pairedMarketSymbol(pairedFeed.base, core.symbol))}`}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-sp-shade/30 px-3 py-1 font-bold text-sp-ink hover:border-soft-primary"
+                  >
+                    Paired with {pairedFeed.symbol} · no perp market yet, open one
+                  </Link>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-sp-shade/15 px-3 py-1 font-bold text-sp-shade/60">
+                    Paired with {chainMeta.pairedIndex.symbol}
+                  </span>
+                )}
+              </p>
+            )}
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
