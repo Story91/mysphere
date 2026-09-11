@@ -20,6 +20,7 @@ const CampSocialsCard = dynamic(() => import('../../utils/socials/CampSocialsCar
   ),
 });
 import SpotifyTrackCard, { SpotifyTrackData } from './SpotifyTrackCard';
+import { parseSpotifyTrackId } from './spotifyLink';
 
 interface MusicSelectorProps {
   isOpen: boolean;
@@ -46,6 +47,21 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'recent' | 'saved' | 'albums' | 'playlists'>('recent');
   const [error, setError] = useState<string | null>(null);
+
+  /* ===== WKLEJONY LINK JEST DZIS JEDYNA DROGA, KTORA DZIALA =====
+     Sprawdzone 2026-09-11 na zywym API Campa, na 40 portfelach z podpietym
+     Spotify: kazdy ma lastSynced null, "recently played" puste, "saved"
+     odpowiada 401. Origin SDK 1.3.x nie ma juz klasy SpotifyAPI - Camp
+     zostawil sobie tylko podpinanie konta. Lista "z Twojego Spotify" nie
+     zapelni sie wiec nikomu, niezaleznie od naszego kodu.
+
+     Dlatego pole na link stoi NAD lista i dziala bez Campa: serwer czyta
+     publiczna strone osadzenia Spotify (app/api/spotify/track) i oddaje
+     utwor w tym samym ksztalcie, ktory posty nosza od zawsze. Lista z Campa
+     zostaje pod spodem - gdyby Camp kiedys znow zaczal synchronizowac. */
+  const [linkInput, setLinkInput] = useState('');
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
 
   // Dane naleza do konkretnego portfela. Bez tego po zmianie konta warunek
   // `!spotifyData` blokowal pobranie i modal pokazywal muzyke poprzedniego adresu.
@@ -167,6 +183,36 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
     onClose();
   };
 
+  const handleAddFromLink = async () => {
+    const trimmed = linkInput.trim();
+    if (!trimmed || linkBusy) return;
+
+    // Zly link odrzucamy od razu, bez podrozy na serwer - i mowimy, jaki ma byc.
+    if (!parseSpotifyTrackId(trimmed)) {
+      setLinkError('Paste a link to a single track, like https://open.spotify.com/track/...');
+      return;
+    }
+
+    setLinkBusy(true);
+    setLinkError(null);
+    try {
+      const response = await fetch(`/api/spotify/track?url=${encodeURIComponent(trimmed)}`);
+      const data = await response.json();
+      if (!data?.success || !data?.data) {
+        setLinkError(data?.error || 'Spotify did not return this track. Try again.');
+        return;
+      }
+      onSelectTrack(data.data);
+      setLinkInput('');
+      onClose();
+    } catch (err) {
+      console.error('❌ Error resolving Spotify link:', err);
+      setLinkError('Network error while reading the link. Try again.');
+    } finally {
+      setLinkBusy(false);
+    }
+  };
+
   const handleRefreshData = () => {
     // Clear cache and fetch fresh data
     if (address) {
@@ -259,6 +305,50 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
 
         {/* Content */}
         <div className="p-6 overflow-y-auto max-h-[calc(80vh-140px)]">
+          {/* Link do utworu - pierwszy, bo jako jedyny dziala dla kazdego. */}
+          <form
+            className="mb-5 rounded-card border border-soft-line bg-soft-sunken p-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void handleAddFromLink();
+            }}
+          >
+            <label htmlFor="spotify-track-link" className="block text-sm font-semibold text-soft-ink">
+              Paste a Spotify track link
+            </label>
+            <p className="mt-0.5 text-xs text-soft-ink-muted">
+              Share → Copy Song Link in Spotify, then paste it here. Works without linking any account.
+            </p>
+            <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+              <input
+                id="spotify-track-link"
+                type="text"
+                inputMode="url"
+                autoComplete="off"
+                value={linkInput}
+                onChange={(event) => {
+                  setLinkInput(event.target.value);
+                  if (linkError) setLinkError(null);
+                }}
+                placeholder="https://open.spotify.com/track/..."
+                disabled={linkBusy}
+                className="min-w-0 flex-1 rounded-pill border border-soft-line bg-soft-surface px-3 py-2 text-sm text-soft-ink placeholder:text-soft-ink-faint focus:outline-none focus:ring-2 focus:ring-soft-primary disabled:opacity-60"
+              />
+              <button
+                type="submit"
+                disabled={linkBusy || !linkInput.trim()}
+                className="rounded-pill bg-soft-primary px-4 py-2 text-sm font-semibold text-white shadow-chip transition-colors [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+              >
+                {linkBusy ? 'Reading…' : 'Add track'}
+              </button>
+            </div>
+            {linkError && (
+              <p role="alert" className="mt-2 text-xs text-soft-accent-deep">
+                {linkError}
+              </p>
+            )}
+          </form>
+
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin w-8 h-8 border-4 border-soft-primary border-t-transparent rounded-full"></div>
@@ -302,8 +392,8 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
                miejsca - bo w obu ta sama czynnosc blokuje robote. */
             <div className="py-6">
               <p className="mx-auto mb-4 max-w-[300px] text-center text-[13px] leading-[1.5] text-soft-ink-muted">
-                No Spotify tracks for this wallet yet. Link Spotify below and your recent listening
-                shows up here.
+                No Spotify account is linked to this wallet. Pasting a track link above works
+                without linking; linking below shows your Spotify name on your profile.
               </p>
               {address && <CampSocialsCard address={address} />}
             </div>
@@ -422,7 +512,7 @@ export default function MusicSelector({ isOpen, onClose, onSelectTrack }: MusicS
             {/* Karta utworu nie jest klikalna (SpotifyTrackCard nie przyjmuje
                 zadnego handlera wyboru) - dodaje wylacznie przycisk ➕. Stara
                 tresc obiecywala cos, czego nie da sie zrobic. */}
-            <div>💡 Click ➕ on a track to add it to your post</div>
+            <div>💡 Paste a track link above, or click ➕ on a track from your Camp history</div>
             <div className="text-xs opacity-75">
               📊 Data cached for 30 minutes • Use refresh button for latest tracks
             </div>

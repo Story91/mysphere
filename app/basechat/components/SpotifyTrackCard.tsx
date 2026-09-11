@@ -74,6 +74,8 @@ export default function SpotifyTrackCard({
   onVolumeChange
 }: SpotifyTrackCardProps) {
   const { track } = trackData;
+  // Osadzony odtwarzacz Spotify dla utworow bez preview_url - patrz nizej.
+  const [embedOpen, setEmbedOpen] = useState(false);
 
   return (
     <div 
@@ -148,16 +150,31 @@ export default function SpotifyTrackCard({
                 </button>
               )}
               
-              {/* No Preview Indicator */}
-              {!track?.preview_url && showAudioPlayer && (
-                <div 
-                  className="absolute inset-0 flex items-center justify-center bg-soft-ink/50 rounded transition-opacity duration-200 opacity-0 group-hover:opacity-100"
-                  title="No preview available for this track"
+              {/* ===== BEZ PODGLADU GRA OSADZENIE SPOTIFY, NIE PRZEKRESLONY GLOSNIK =====
+                  Spotify od listopada 2024 nie oddaje 30-sekundowych podgladow
+                  nowym aplikacjom, a utwor z wklejonego linku tez bywa bez
+                  audioPreview. Przekreslony glosnik mowil "nie da sie" - a da sie:
+                  oficjalny odtwarzacz osadzony (open.spotify.com/embed) gra bez
+                  klucza i bez logowania. Klik na okladke go rozwija. */}
+              {!track?.preview_url && showAudioPlayer && track?.id && (
+                <button
+                  type="button"
+                  onClick={() => setEmbedOpen((open) => !open)}
+                  className="absolute inset-0 flex items-center justify-center bg-black/50 rounded transition-opacity duration-200 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none"
+                  title={embedOpen ? 'Hide Spotify player' : 'Play in Spotify player'}
+                  aria-label={embedOpen ? 'Hide Spotify player' : 'Play in Spotify player'}
+                  aria-expanded={embedOpen}
                 >
-                  <svg className="w-4 h-4 text-soft-ink-faint" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636" />
-                  </svg>
-                </div>
+                  {embedOpen ? (
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  )}
+                </button>
               )}
             </div>
           )}
@@ -304,6 +321,18 @@ export default function SpotifyTrackCard({
                   </div>
                 )}
               </div>
+            )}
+
+            {/* Osadzony odtwarzacz Spotify - tylko dla utworow bez preview_url, po kliknieciu okladki. */}
+            {showAudioPlayer && !track?.preview_url && track?.id && embedOpen && (
+              <iframe
+                className="mt-2 w-full rounded-lg border-0"
+                style={{ height: 80 }}
+                src={`https://open.spotify.com/embed/track/${track.id}?utm_source=generator&theme=0`}
+                title={`Spotify player: ${track.name || 'track'}`}
+                loading="lazy"
+                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+              />
             )}
           </div>
         </div>

@@ -148,12 +148,12 @@ const config = {
       timeout: 120000
     },
     "camp-mainnet": {
-      url: process.env.CAMP_MAINNET_RPC_URL || "https://rpc.camp.raas.gelato.cloud",
+      url: process.env.CAMP_MAINNET_RPC_URL || "https://rpc-mainnet.campnetwork.xyz",
       accounts: deployerAccounts(),
       chainId: 484
     },
     "camp": {
-      url: process.env.CAMP_RPC_URL || "https://rpc.camp.raas.gelato.cloud",
+      url: process.env.CAMP_RPC_URL || "https://rpc-mainnet.campnetwork.xyz",
       accounts: deployerAccounts(),
       chainId: 484,
       gasPrice: "auto",

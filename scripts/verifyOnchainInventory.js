@@ -73,12 +73,11 @@ const CHAINS = {
   },
   484: {
     name: 'Camp Network',
-    // rpc.camp.raas.gelato.cloud jest wpisany na sztywno w
-    // app/contracts/BaseCampPostContract.ts:16-17. Trzymamy go PIERWSZY,
-    // bo pytanie brzmi "czy aplikacja moze sie dogadac z lancuchem", a nie
-    // "czy gdziekolwiek na swiecie stoi wezel Campa". Reszta to fallbacki
-    // dla samej weryfikacji istnienia kodu.
-    rpcs: [process.env.CAMP_RPC_URL, 'https://rpc.camp.raas.gelato.cloud', 'https://rpc-campnetwork.xyz', 'https://camp.cloud.blockscout.com/api/eth-rpc'],
+    // Ta sama kolejnosc, co w config/camp.ts (rpc-mainnet.campnetwork.xyz
+    // z docs Campa, potem eth-rpc Blockscouta). Dawny host gelato zniknal
+    // z DNS 2026-09 - pytanie brzmi "czy aplikacja moze sie dogadac
+    // z lancuchem", wiec sprawdzamy dokladnie te adresy, ktore ma aplikacja.
+    rpcs: [process.env.CAMP_RPC_URL, 'https://rpc-mainnet.campnetwork.xyz', 'https://camp.cloud.blockscout.com/api/eth-rpc'],
     explorer: 'https://camp.cloud.blockscout.com',
   },
   4663: {
