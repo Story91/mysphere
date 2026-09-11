@@ -34,7 +34,18 @@ import path from "path";
  *    pobiera podpisana aktualizacje z Hermesa i wola updatePriceFeeds,
  *    placac getUpdateFee w USDC. Hermes od 08.2026 wymaga klucza
  *    (PYTH_API_KEY); bez niego ten krok TYLKO raportuje wiek.
- * 5. Drukuje raport JSON i, gdy saldo gazu spadnie ponizej progu, linie
+ * 5. HEARTBEAT REJESTRU. `DerivativeMarket.openPosition` rewertuje
+ *    `OracleInactive`, gdy cena w PriceOracleRegistry ma wiecej niz
+ *    MAX_PRICE_AGE (1 h) - NIEZALEZNIE od tego, czy rynek czyta indeks z
+ *    adaptera Pytha. 11.09.2026 oba rynki stanely dokladnie tak: ARC-USD po
+ *    10 h ciszy, BTC-USD po 68 min, mimo swiezego Pytha. Keeper wysyla wiec
+ *    `submitPrice` dla kazdego rynku, ktorego cena w rejestrze ma wiecej niz
+ *    REGISTRY_HEARTBEAT_AFTER sekund. Zrodlo ceny: adapter (CHAINLINK_FEED),
+ *    jesli oddaje swieza liczbe; inaczej ostatnia cena rejestru (czysty
+ *    heartbeat - TWAP sie nie rusza, ale feed zyje). Skok przycinany do
+ *    MAX_DEVIATION_BPS, bo wiekszy rejestr odrzuca. Wysylac moze tylko
+ *    wystawca lub tworca feedu - keeper sprawdza to przed transakcja.
+ * 6. Drukuje raport JSON i, gdy saldo gazu spadnie ponizej progu, linie
  *    "GAZ NISKI" - keeper.ps1 zamienia ja w powiadomienie Windows.
  *
  * DOMYSLNIE DRY-RUN. Transakcje ida dopiero z KEEPER_CONFIRM=tak.
@@ -58,6 +69,10 @@ import path from "path";
  *   PYTH_API_KEY    klucz Hermesa (https://docs.pyth.network); bez niego brak wypychania
  *   PYTH_PUSH_AFTER po ilu sekundach wieku ceny wypychac, domyslnie "600"
  *   HERMES_URL      domyslnie https://hermes.pyth.network
+ *   REGISTRY_HEARTBEAT_AFTER  po ilu sekundach wieku ceny w rejestrze wyslac
+ *                   submitPrice, domyslnie "2400" (40 min; limit to 60 min,
+ *                   a keeper.ps1 chodzi co 15 min - zostaje zapas na jeden
+ *                   nieudany przebieg)
  */
 
 const CHAIN_ID = 5042002;
@@ -77,7 +92,22 @@ const MARKET_ABI = [
   "function marginRatioBps(address) view returns (int256)",
   "function settleFunding() external",
   "function liquidate(address) external returns (uint256)",
+  "function ORACLE() view returns (address)",
+  "function ORACLE_MARKET_ID() view returns (uint256)",
+  "function CHAINLINK_FEED() view returns (address)",
   "event PositionOpened(address indexed trader,bool isLong,uint256 marginUsdc,uint256 notional,uint256 size,uint256 entryPrice)",
+];
+
+const REGISTRY_ABI = [
+  "function getMarket(uint256) view returns (address creator,address publisher,string symbol,uint256 price,uint64 updatedAt,uint256 bond,bool slashed)",
+  "function MAX_PRICE_AGE() view returns (uint32)",
+  "function MAX_DEVIATION_BPS() view returns (uint16)",
+  "function MIN_UPDATE_INTERVAL() view returns (uint32)",
+  "function submitPrice(uint256 marketId,uint256 price,uint64 observedAt) external",
+];
+const FEED_ABI = [
+  "function latestRoundData() view returns (uint80,int256,uint256,uint256,uint80)",
+  "function decimals() view returns (uint8)",
 ];
 
 const PYTH_ABI = [
@@ -270,9 +300,108 @@ async function main() {
     }
   }
 
+  // ---- HEARTBEAT REJESTRU: rynek bez swiezej ceny w rejestrze nie przyjmuje pozycji ----
+  const heartbeatAfter = Number(process.env.REGISTRY_HEARTBEAT_AFTER || 2400);
+  const registry: Row[] = [];
+  for (let i = 0; i < count; i++) {
+    const marketAddress: string = await factory.allMarkets(i);
+    const market = new ethers.Contract(marketAddress, MARKET_ABI, provider);
+    const row: Row = { market: marketAddress };
+    try {
+      const [oracleAddress, marketId, feedAddress] = await Promise.all([
+        market.ORACLE(),
+        market.ORACLE_MARKET_ID(),
+        market.CHAINLINK_FEED(),
+      ]);
+      const oracle = new ethers.Contract(oracleAddress, REGISTRY_ABI, provider);
+      const [m, maxAge, maxDevBps, minInterval] = await Promise.all([
+        oracle.getMarket(marketId),
+        oracle.MAX_PRICE_AGE(),
+        oracle.MAX_DEVIATION_BPS(),
+        oracle.MIN_UPDATE_INTERVAL(),
+      ]);
+      const age = now - Number(m.updatedAt);
+      row.symbol = m.symbol;
+      row.ageSec = age;
+      row.active = !m.slashed && age <= Number(maxAge);
+      if (m.slashed) {
+        row.skipped = "feed ukarany (slashed) - submitPrice rewertuje";
+        registry.push(row);
+        continue;
+      }
+      if (age < heartbeatAfter) {
+        registry.push(row);
+        continue;
+      }
+      if (age < Number(minInterval)) {
+        row.skipped = "MIN_UPDATE_INTERVAL";
+        registry.push(row);
+        continue;
+      }
+      const me = signer.address.toLowerCase();
+      if (me !== String(m.publisher).toLowerCase() && me !== String(m.creator).toLowerCase()) {
+        row.skipped = `keeper ${signer.address} nie jest wystawca ani tworca (publisher ${m.publisher})`;
+        registry.push(row);
+        continue;
+      }
+
+      // Zrodlo ceny: adapter, jesli oddaje dodatnia i swieza liczbe. Inaczej
+      // ostatnia cena rejestru - feed zyje, TWAP stoi w miejscu.
+      const prev: bigint = m.price;
+      let price = prev;
+      let source = "registry (heartbeat, ta sama cena)";
+      if (feedAddress !== ethers.ZeroAddress) {
+        try {
+          const feed = new ethers.Contract(feedAddress, FEED_ABI, provider);
+          const [, answer, , updatedAt] = await feed.latestRoundData();
+          const decimals = Number(await feed.decimals());
+          if (answer > 0n && now - Number(updatedAt) <= Number(maxAge)) {
+            price = decimals === 18 ? answer : decimals < 18 ? answer * 10n ** BigInt(18 - decimals) : answer / 10n ** BigInt(decimals - 18);
+            source = `adapter ${feedAddress}`;
+          } else {
+            source = `registry (adapter ${feedAddress} oddal ${answer > 0n ? "stara" : "zerowa"} cene)`;
+          }
+        } catch (error) {
+          source = `registry (adapter nie odpowiada: ${firstLine(error)})`;
+        }
+      }
+      // Rejestr odrzuca skok wiekszy niz MAX_DEVIATION_BPS od poprzedniej ceny.
+      // Przycinamy zamiast rewertowac - nastepny przebieg dojdzie do reszty.
+      if (prev > 0n) {
+        const cap = (prev * BigInt(maxDevBps)) / 10_000n;
+        if (price > prev + cap) {
+          price = prev + cap;
+          source += " (przyciete do +MAX_DEVIATION_BPS)";
+        } else if (price + cap < prev) {
+          price = prev - cap;
+          source += " (przyciete do -MAX_DEVIATION_BPS)";
+        }
+      }
+      row.source = source;
+      row.price = formatUnits(price, 18);
+      if (!execute) {
+        row.skipped = "dry-run";
+        registry.push(row);
+        continue;
+      }
+      try {
+        // observedAt = czas ostatniego bloku: nie z przyszlosci, nie starszy
+        // niz MAX_PRICE_AGE i pozniejszy niz poprzedni wpis.
+        const tx = await oracle.connect(signer).getFunction("submitPrice")(marketId, price, BigInt(now));
+        await tx.wait();
+        row.submitTx = tx.hash;
+      } catch (error) {
+        row.submitError = firstLine(error);
+      }
+    } catch (error) {
+      row.error = firstLine(error);
+    }
+    registry.push(row);
+  }
+
   console.log(
     JSON.stringify(
-      { network: "arc-testnet", factory: factoryAddress, keeper: signer.address, gasUsdc, latestBlock: latest, execute, markets, pyth },
+      { network: "arc-testnet", factory: factoryAddress, keeper: signer.address, gasUsdc, latestBlock: latest, execute, markets, pyth, registry },
       null,
       2
     )
