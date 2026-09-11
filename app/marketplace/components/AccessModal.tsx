@@ -56,7 +56,7 @@ export default function AccessModal({ nft, onClose }: AccessModalProps) {
 
   if (loadingTerms) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-soft-ink/50 p-4">
         <div className="bg-white border border-soft-line rounded-[26px] max-w-md w-full p-6">
           <div className="flex items-center justify-center">
             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-t-2 border-b-2 border-soft-primary"></div>
@@ -72,15 +72,15 @@ export default function AccessModal({ nft, onClose }: AccessModalProps) {
   
   if (!hasAccess) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-soft-ink/50 p-4" onClick={onClose}>
         <div className="bg-white border border-soft-line rounded-[26px] max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
           <div className="flex justify-between items-start mb-6">
             <h2 className="text-xl font-bold text-soft-ink">Temporary Access</h2>
             <button onClick={onClose} className="text-soft-ink-muted hover:text-soft-ink transition-colors">✕</button>
           </div>
           <div className="text-center py-8">
-            <div className="text-gray-400 mb-4">⚠️</div>
-            <div className="text-white font-medium mb-2">No Access Available</div>
+            
+            <div className="text-soft-ink font-medium mb-2">No Access Available</div>
             <div className="text-sm text-soft-ink-muted">This NFT doesn't have temporary access enabled by the owner.</div>
           </div>
         </div>
@@ -134,7 +134,7 @@ export default function AccessModal({ nft, onClose }: AccessModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-soft-ink/50 p-4" onClick={onClose}>
       <div className="bg-white border border-soft-line rounded-[26px] max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-between items-start mb-6">
           <h2 className="text-xl font-bold text-soft-ink">Buy Temporary Access</h2>
@@ -148,7 +148,7 @@ export default function AccessModal({ nft, onClose }: AccessModalProps) {
               <img src={nft.image} alt={nft.metadata?.name} className="w-12 h-12 rounded object-cover" />
             )}
             <div>
-              <div className="text-white font-medium">{nft.metadata?.name || `#${nft.tokenId}`}</div>
+              <div className="text-soft-ink font-medium">{nft.metadata?.name || `#${nft.tokenId}`}</div>
               <div 
                 className="text-xs text-soft-ink-muted cursor-pointer hover:text-soft-accent-deep" 
                 onClick={() => {

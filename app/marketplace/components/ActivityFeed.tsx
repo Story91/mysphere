@@ -303,29 +303,30 @@ export default function ActivityFeed() {
     return `${Math.floor(diff / 86400)}d ago`;
   };
 
-  const getEventIcon = (type: string) => {
+  /** Kolor kropki przy zdarzeniu. Zastapil emoji - ten sam sygnal, mniej halasu. */
+  const getEventDot = (type: string) => {
     switch (type) {
-      case 'listing': return '🏷️';
-      case 'sale': return '💰';
-      case 'offer': return '📝';
-      case 'cancel': return '❌';
-      case 'auction': return '🔨';
-      case 'bid': return '💸';
-      case 'access': return '🔑';
-      default: return '📊';
+      case 'sale': return 'bg-[#0b9a51]';
+      case 'listing': return 'bg-soft-primary';
+      case 'offer': return 'bg-soft-info';
+      case 'auction': return 'bg-soft-accent';
+      case 'bid': return 'bg-soft-accent';
+      case 'access': return 'bg-soft-primary-deep';
+      case 'cancel': return 'bg-[#a32020]';
+      default: return 'bg-soft-line-strong';
     }
   };
 
   const getEventColor = (type: string) => {
     switch (type) {
-      case 'listing': return 'text-orange-400';
-      case 'sale': return 'text-green-400';
-      case 'offer': return 'text-blue-400';
-      case 'cancel': return 'text-red-400';
-      case 'auction': return 'text-amber-400';
-      case 'bid': return 'text-yellow-400';
-      case 'access': return 'text-purple-400';
-      default: return 'text-gray-400';
+      case 'listing': return 'text-soft-primary-deep';
+      case 'sale': return 'text-[#0b9a51]';
+      case 'offer': return 'text-soft-info';
+      case 'cancel': return 'text-[#a32020]';
+      case 'auction': return 'text-soft-accent-deep';
+      case 'bid': return 'text-soft-accent-deep';
+      case 'access': return 'text-soft-primary-deep';
+      default: return 'text-soft-ink-muted';
     }
   };
 
@@ -349,8 +350,7 @@ export default function ActivityFeed() {
       
       {events.length === 0 ? (
         <div className="text-center py-8 text-soft-ink-muted">
-          <div className="text-2xl mb-2">📈</div>
-          <div>No recent activity</div>
+                    <div>No recent activity</div>
           <div className="text-xs mt-1">Be the first to trade!</div>
         </div>
       ) : (
@@ -361,7 +361,7 @@ export default function ActivityFeed() {
               className="flex items-center justify-between p-3 bg-soft-surface-sunken rounded-lg border border-soft-line"
             >
               <div className="flex items-center gap-3">
-                <div className="text-lg">{getEventIcon(event.type)}</div>
+                <span aria-hidden className={`h-2.5 w-2.5 shrink-0 rounded-full ${getEventDot(event.type)}`} />
                 <div>
                   <div className={`text-sm font-medium ${getEventColor(event.type)}`}>
                     {event.type === 'listing' && 'NFT Listed'}

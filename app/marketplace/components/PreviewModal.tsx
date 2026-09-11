@@ -6,6 +6,7 @@ import { parseEther } from 'viem';
 import { toast } from 'react-hot-toast';
 import { MARKETPLACE_ADDRESS, MARKETPLACE_ABI, DEFAULT_IP_NFT_CONTRACT } from '../config/simpleMarketplace';
 import { createCampPublicClient } from '../config/campClient';
+import { ipfsToHttp } from '@/utils/ipfs';
 
 interface PreviewModalProps {
   nft: any;
@@ -36,7 +37,7 @@ export default function PreviewModal({ nft: item, onClose }: PreviewModalProps) 
     (async () => {
       try {
         // Don't add ipfs gateway if already has http
-        const url = mediaUrl.startsWith('http') ? mediaUrl : mediaUrl.replace('ipfs://', 'https://ipfs.io/ipfs/');
+        const url = ipfsToHttp(mediaUrl);
         const res = await fetch(url, { cache: 'no-store' });
         const txt = await res.text();
         if (!aborted) {
@@ -89,7 +90,7 @@ export default function PreviewModal({ nft: item, onClose }: PreviewModalProps) 
   };
 
   return (
-    <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-soft-ink/50 p-4" onClick={onClose}>
       <div className="bg-white border border-soft-line rounded-lg max-w-2xl w-full overflow-hidden" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="p-3 border-b border-soft-line flex items-center justify-between">
@@ -102,14 +103,14 @@ export default function PreviewModal({ nft: item, onClose }: PreviewModalProps) 
           {/* Audio Player */}
           {mediaType === 'audio' && mediaUrl && (
             <audio controls className="w-full">
-              <source src={mediaUrl.startsWith('http') ? mediaUrl : mediaUrl.replace('ipfs://', 'https://ipfs.io/ipfs/')} type={mime || 'audio/mpeg'} />
+              <source src={ipfsToHttp(mediaUrl)} type={mime || 'audio/mpeg'} />
             </audio>
           )}
           
           {/* Video Player */}
           {mediaType === 'video' && mediaUrl && (
             <video controls className="w-full max-h-[60vh]">
-              <source src={mediaUrl.startsWith('http') ? mediaUrl : mediaUrl.replace('ipfs://', 'https://ipfs.io/ipfs/')} type={mime || 'video/mp4'} />
+              <source src={ipfsToHttp(mediaUrl)} type={mime || 'video/mp4'} />
             </video>
           )}
           
@@ -136,7 +137,7 @@ export default function PreviewModal({ nft: item, onClose }: PreviewModalProps) 
           {/* Image Viewer */}
           {mediaType === 'image' && item.image && (
             <img 
-              src={item.image.startsWith('http') ? item.image : item.image.replace('ipfs://', 'https://ipfs.io/ipfs/')} 
+              src={ipfsToHttp(item.image)} 
               alt={metadata?.name || 'Image'} 
               className="w-full"
             />
@@ -165,7 +166,7 @@ export default function PreviewModal({ nft: item, onClose }: PreviewModalProps) 
               className="underline hover:text-soft-ink" 
               target="_blank" 
               rel="noreferrer" 
-              href={mediaUrl.startsWith('http') ? mediaUrl : mediaUrl.replace('ipfs://', 'https://ipfs.io/ipfs/')}
+              href={ipfsToHttp(mediaUrl)}
             >
               Open media
             </a>

@@ -14,6 +14,7 @@ import AuctionView from './AuctionView';
 import { fetchIpNftsFor, fetchRecentIpNfts } from '../../mycamp/api/fetchIpNfts';
 import { MARKETPLACE_ADDRESS, MARKETPLACE_ABI, DEFAULT_IP_NFT_CONTRACT } from '../config/simpleMarketplace';
 import { createCampPublicClient } from '../config/campClient';
+import { ipfsToHttp } from '@/utils/ipfs';
 
 export default function MarketplaceGrid({
   mode = 'explore',
@@ -164,7 +165,6 @@ export default function MarketplaceGrid({
           let mime = '';
           let mediaType: 'image' | 'video' | 'audio' | 'text' | 'unknown' = 'unknown';
           
-          const ipfsToHttp = (url: string) => url?.startsWith('ipfs://') ? url.replace('ipfs://', 'https://ipfs.io/ipfs/') : url;
           
           try {
             const ERC721_ABI = [{ name: 'tokenURI', type: 'function', stateMutability: 'view', inputs: [{ name: 'tokenId', type: 'uint256' }], outputs: [{ type: 'string' }] }] as const;
@@ -511,7 +511,6 @@ export default function MarketplaceGrid({
             let mediaType: 'image' | 'video' | 'audio' | 'text' | 'unknown' = 'unknown';
             
             // Helper function to convert IPFS URLs
-            const ipfsToHttp = (url: string) => url?.startsWith('ipfs://') ? url.replace('ipfs://', 'https://ipfs.io/ipfs/') : url;
             
             try {
               tokenUri = (await client.readContract({
@@ -610,7 +609,6 @@ export default function MarketplaceGrid({
               let mediaType: 'image' | 'video' | 'audio' | 'text' | 'unknown' = 'unknown';
               
               // Helper function to convert IPFS URLs
-              const ipfsToHttp = (url: string) => url?.startsWith('ipfs://') ? url.replace('ipfs://', 'https://ipfs.io/ipfs/') : url;
               
               try {
                 const nftContract = (a as any).nftContract ?? a[1];

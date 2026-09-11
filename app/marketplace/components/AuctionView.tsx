@@ -7,6 +7,7 @@ import { toast } from 'react-hot-toast';
 import BidModal from './BidModal';
 import { MARKETPLACE_ADDRESS, MARKETPLACE_ABI, DEFAULT_IP_NFT_CONTRACT } from '../config/simpleMarketplace';
 import { createCampPublicClient } from '../config/campClient';
+import { ipfsToHttp } from '@/utils/ipfs';
 
 interface Auction {
   auctionId: number;
@@ -119,13 +120,11 @@ export default function AuctionView({ onBack }: { onBack?: () => void }) {
               args: [a[2]]
             }) as string;
 
-            const metaUrl = tokenUri?.startsWith('ipfs://') 
-              ? tokenUri.replace('ipfs://', 'https://ipfs.io/ipfs/') 
-              : tokenUri;
+            const metaUrl = ipfsToHttp(tokenUri);
 
             if (metaUrl) {
               metadata = await fetch(metaUrl).then(r => r.ok ? r.json() : null).catch(() => null);
-              image = metadata?.image?.replace('ipfs://', 'https://ipfs.io/ipfs/') || '';
+              image = ipfsToHttp(metadata?.image) || '';
             }
           } catch {}
 
@@ -276,19 +275,19 @@ export default function AuctionView({ onBack }: { onBack?: () => void }) {
       <div className="bg-soft-surface-sunken border border-soft-line rounded-xl p-4">
         <div className="grid grid-cols-4 gap-4 text-sm">
           <div>
-            <div className="text-gray-400">Active Auctions</div>
+            <div className="text-soft-ink-muted">Active Auctions</div>
             <div className="text-xl font-bold text-soft-ink">{activeAuctions.length}</div>
           </div>
           <div>
-            <div className="text-gray-400">Floor Price</div>
+            <div className="text-soft-ink-muted">Floor Price</div>
             <div className="text-xl font-bold text-soft-accent-deep">{floorPrice.toFixed(3)} CAMP</div>
           </div>
           <div>
-            <div className="text-gray-400">Total Volume</div>
+            <div className="text-soft-ink-muted">Total Volume</div>
             <div className="text-xl font-bold text-soft-accent-deep">{totalVolume.toFixed(2)} CAMP</div>
           </div>
           <div>
-            <div className="text-gray-400">Ending Soon</div>
+            <div className="text-soft-ink-muted">Ending Soon</div>
             <div className="text-xl font-bold text-[#a32020]">
               {activeAuctions.filter(a => Number(a.endTime) - nowTs < 3600).length}
             </div>
@@ -368,7 +367,7 @@ export default function AuctionView({ onBack }: { onBack?: () => void }) {
                       {auction.image ? (
                         <img src={auction.image} alt="" className="w-full h-full object-cover" />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-xl">🖼️</div>
+                        <div className="w-full h-full flex items-center justify-center text-xl"></div>
                       )}
                     </div>
                     
@@ -393,7 +392,7 @@ export default function AuctionView({ onBack }: { onBack?: () => void }) {
                       <div className={`text-xs ${
                         Number(auction.endTime) - nowTs < 3600 
                           ? 'text-red-400 font-bold' 
-                          : 'text-gray-500'
+                          : 'text-soft-ink-soft'
                       }`}>
                         {formatTimeLeft(auction.endTime)}
                       </div>
@@ -421,7 +420,7 @@ export default function AuctionView({ onBack }: { onBack?: () => void }) {
                   <h2 className="text-2xl font-bold text-soft-ink">
                     {selectedAuction.metadata?.name || `Token #${selectedAuction.tokenId}`}
                   </h2>
-                  <p className="text-gray-400 mt-1">
+                  <p className="text-soft-ink-muted mt-1">
                     Auction #{selectedAuction.auctionId} • Seller: {selectedAuction.seller.slice(0, 8)}...{selectedAuction.seller.slice(-6)}
                   </p>
                 </div>
@@ -430,9 +429,9 @@ export default function AuctionView({ onBack }: { onBack?: () => void }) {
                     ? 'bg-[#a32020] text-white animate-pulse' 
                     : Number(selectedAuction.endTime) - nowTs < 86400
                     ? 'bg-soft-primary text-white'
-                    : 'bg-black/80 text-soft-ink border border-soft-line'
+                    : 'bg-soft-ink/50 text-soft-ink border border-soft-line'
                 }`}>
-                  ⏱️ {formatTimeLeft(selectedAuction.endTime)}
+                  {formatTimeLeft(selectedAuction.endTime)}
                 </div>
               </div>
             </div>
@@ -451,7 +450,7 @@ export default function AuctionView({ onBack }: { onBack?: () => void }) {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-8xl">
-                        🖼️
+                        
                       </div>
                     )}
                   </div>
@@ -488,7 +487,7 @@ export default function AuctionView({ onBack }: { onBack?: () => void }) {
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-soft-ink-muted">Reserve Price</span>
                         <div className="flex items-center gap-2">
-                          <span className="text-white font-medium">{formatEther(selectedAuction.reservePrice)} CAMP</span>
+                          <span className="text-soft-ink font-medium">{formatEther(selectedAuction.reservePrice)} CAMP</span>
                           {/* Calculate reserve status locally */}
                           {selectedAuction.highestBid >= selectedAuction.reservePrice ? (
                             <span className="text-xs bg-[#edfff4] border border-[#9de7bb] text-[#0b9a51] px-2 py-0.5 rounded">Met ✓</span>
@@ -500,13 +499,13 @@ export default function AuctionView({ onBack }: { onBack?: () => void }) {
                       
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-soft-ink-muted">Total Bids</span>
-                        <span className="text-white font-medium">{selectedAuction.totalBids}</span>
+                        <span className="text-soft-ink font-medium">{selectedAuction.totalBids}</span>
                       </div>
                       
                       {selectedAuction.bidIncrement > 0n && (
                         <div className="flex justify-between items-center">
                           <span className="text-sm text-soft-ink-muted">Bid Increment</span>
-                          <span className="text-white">{formatEther(selectedAuction.bidIncrement)} CAMP</span>
+                          <span className="text-soft-ink">{formatEther(selectedAuction.bidIncrement)} CAMP</span>
                         </div>
                       )}
                     </div>
@@ -514,7 +513,7 @@ export default function AuctionView({ onBack }: { onBack?: () => void }) {
                     {selectedAuction.highestBidder && selectedAuction.highestBidder !== '0x0000000000000000000000000000000000000000' && (
                       <div className="mt-3 pt-3 border-t border-soft-line">
                         <div className="text-sm text-soft-ink-muted">Current Leader</div>
-                        <div className="text-white font-medium">
+                        <div className="text-soft-ink font-medium">
                           {selectedAuction.highestBidder.slice(0, 12)}...{selectedAuction.highestBidder.slice(-10)}
                         </div>
                       </div>
@@ -549,7 +548,7 @@ export default function AuctionView({ onBack }: { onBack?: () => void }) {
                           {/* Warning if seller needs to act */}
                           {selectedAuction.seller.toLowerCase() === address?.toLowerCase() && (
                             <div className="bg-soft-accent-soft border border-soft-accent/40 rounded-lg p-3">
-                              <div className="text-soft-accent-deep font-semibold text-sm">⚠️ Action Required</div>
+                              <div className="text-soft-accent-deep font-semibold text-sm">Action required</div>
                               <div className="text-soft-ink-muted text-xs mt-1">
                                 If this NFT is also listed for sale, cancel the listing first before finalizing
                               </div>
@@ -603,12 +602,12 @@ export default function AuctionView({ onBack }: { onBack?: () => void }) {
 
                   {/* Bid history */}
                   <div className="bg-soft-surface-sunken rounded-xl p-4 border border-soft-line">
-                    <h3 className="text-white font-semibold mb-3">Bid History</h3>
+                    <h3 className="text-soft-ink font-semibold mb-3">Bid History</h3>
                     {selectedAuction.highestBid > 0n ? (
                       <div className="space-y-2">
                         <div className="bg-soft-accent-soft border border-soft-accent/40 rounded-lg p-3">
                           <div className="flex justify-between items-center">
-                            <div className="text-white">
+                            <div className="text-soft-ink">
                               {selectedAuction.highestBidder.slice(0, 8)}...{selectedAuction.highestBidder.slice(-6)}
                             </div>
                             <div className="text-orange-400 font-bold">
@@ -631,7 +630,7 @@ export default function AuctionView({ onBack }: { onBack?: () => void }) {
                   {/* NFT Details */}
                   {selectedAuction.metadata?.description && (
                     <div className="bg-soft-surface-sunken rounded-xl p-4 border border-soft-line">
-                      <h3 className="text-white font-semibold mb-2">Description</h3>
+                      <h3 className="text-soft-ink font-semibold mb-2">Description</h3>
                       <p className="text-soft-ink-muted text-sm">{selectedAuction.metadata.description}</p>
                     </div>
                   )}

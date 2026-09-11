@@ -331,7 +331,7 @@ export default function CreateListingModal({ onClose, prefillTokenId }: CreateLi
   }, [isTxError, submitError, txError]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-soft-ink/50 p-4" onClick={onClose}>
       <div className="bg-white border border-soft-line rounded-[26px] max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="flex justify-between items-start mb-6">
@@ -376,7 +376,7 @@ export default function CreateListingModal({ onClose, prefillTokenId }: CreateLi
                   ) : (
                     <div className="w-full h-full bg-white" />
                   )}
-                  <div className="absolute bottom-1 left-1 text-[10px] px-1.5 py-0.5 rounded bg-black/70 text-soft-ink">#{n.tokenId}</div>
+                  <div className="absolute bottom-1 left-1 text-[10px] px-1.5 py-0.5 rounded bg-soft-ink/50 text-soft-ink">#{n.tokenId}</div>
                 </button>
               ))}
             </div>
@@ -394,7 +394,7 @@ export default function CreateListingModal({ onClose, prefillTokenId }: CreateLi
                   disabled={isChecking}
                   className="ml-2 px-2 py-1 bg-soft-surface-sunken hover:bg-soft-surface-sunken rounded text-xs"
                 >
-                  {isChecking ? '...' : '🔄'}
+                  {isChecking ? 'Checking…' : 'Refresh'}
                 </button>
               )}
             </div>
@@ -587,7 +587,7 @@ export default function CreateListingModal({ onClose, prefillTokenId }: CreateLi
           {submitSuccess && (
             <div className="bg-[#edfff4] border border-[#9de7bb] rounded-lg p-3">
               <p className="text-[#0b9a51] text-sm">
-                Listing created successfully! 🎉
+                Listing created.
               </p>
             </div>
           )}
@@ -602,11 +602,11 @@ export default function CreateListingModal({ onClose, prefillTokenId }: CreateLi
               'bg-soft-accent-soft border border-soft-accent/40 border-soft-line text-soft-accent-deep'
             }`}>
               <span>
-                {isChecking ? '🔄 Checking ownership and approval...' :
-                 !ownerOk ? '❌ You are not the owner of this token' :
-                 alreadyListed ? '🏷️ This token is already listed on marketplace' :
-                 isApproved ? '✅ Marketplace approved - ready to list!' :
-                 '⚠️ Approve marketplace to transfer this token first'}
+                {isChecking ? 'Checking ownership and approval...' :
+                 !ownerOk ? 'You are not the owner of this token' :
+                 alreadyListed ? 'This token is already listed on marketplace' :
+                 isApproved ? 'Marketplace approved - ready to list!' :
+                 'Approve marketplace to transfer this token first'}
               </span>
               <button 
                 onClick={refreshApprovalState}
@@ -614,7 +614,7 @@ export default function CreateListingModal({ onClose, prefillTokenId }: CreateLi
                 className="ml-2 px-3 py-1 bg-soft-surface-sunken hover:bg-soft-surface-sunken rounded text-xs font-mono"
                 title="Refresh approval status"
               >
-                {isChecking ? '...' : '🔄'}
+                {isChecking ? 'Checking…' : 'Refresh'}
               </button>
             </div>
           )}

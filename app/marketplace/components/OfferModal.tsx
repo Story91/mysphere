@@ -62,7 +62,7 @@ export default function OfferModal({ nft, onClose }: OfferModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-soft-ink/50 p-4" onClick={onClose}>
       <div className="bg-white border border-soft-line rounded-[26px] max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-between items-start mb-6">
           <h2 className="text-xl font-bold text-soft-ink">Make Offer</h2>
@@ -76,7 +76,7 @@ export default function OfferModal({ nft, onClose }: OfferModalProps) {
               <img src={nft.image} alt={nft.metadata?.name} className="w-12 h-12 rounded object-cover" />
             )}
             <div>
-              <div className="text-white font-medium">{nft.metadata?.name || `#${nft.tokenId}`}</div>
+              <div className="text-soft-ink font-medium">{nft.metadata?.name || `#${nft.tokenId}`}</div>
               <div 
                 className="text-xs text-soft-ink-muted cursor-pointer hover:text-soft-accent-deep" 
                 onClick={() => {

@@ -276,7 +276,7 @@ export default function OriginMint({
         <button
           disabled={!image || !address || isRegistering || !ipName?.trim() || !origin}
           onClick={handleRegisterIP}
-          className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-lg font-medium shadow-lg hover:from-purple-700 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105"
+          className="w-full rounded-pill bg-soft-primary px-6 py-3 text-[14px] font-bold text-white transition hover:bg-soft-primary-deep disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary-deep"
         >
           {isRegistering ? (
             <div className="flex items-center justify-center">
@@ -284,25 +284,25 @@ export default function OriginMint({
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              Registering IP...
+              Minting…
             </div>
           ) : !origin ? (
-            "Connect MyOrigin First"
+            "Sign in to Camp first"
           ) : (
-            "Register IP"
+            "Mint this IP NFT"
           )}
         </button>
       
       {/* Error Display */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-red-600 text-sm">{error}</p>
+        <div className="rounded-2xl bg-[#ffefef] p-4">
+          <p className="text-[13px] font-bold text-[#a32020]">{error}</p>
         </div>
       )}
       
       {/* Success Display */}
       {success && (
-        <div className="w-full bg-green-50 border border-green-200 rounded-lg p-4">
+        <div className="w-full rounded-2xl bg-[#edfff4] p-4">
           <div className="flex items-center mb-2">
             <svg className="w-5 h-5 text-green-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
