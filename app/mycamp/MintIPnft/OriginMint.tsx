@@ -311,7 +311,7 @@ export default function OriginMint({
           </div>
           <p className="text-green-600 text-sm">Token ID: {success}</p>
           <a
-                            href={`https://camp.cloud.blockscout.com/token/0xF90733b9eCDa3b49C250B2C3E3E42c96fC93324E/instance/${success}`}
+                            href={`https://camp.cloud.blockscout.com/token/0x39EeE1C3989f0dD543Dee60f8582F7F81F522C38/instance/${success}`}
             target="_blank"
             rel="noopener noreferrer"
             className="text-xs text-blue-600 hover:text-blue-700 underline mt-2 inline-block"

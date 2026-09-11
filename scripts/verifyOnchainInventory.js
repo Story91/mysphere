@@ -152,8 +152,8 @@ const TARGETS = [
     label: 'BaseMorningGame (Base Sepolia)', source: 'app/basemorning/config/contract.ts:1 + hooks/useBaseMorningContract.ts:112' },
   { address: '0xdaD4777b825548F3eeAD4bc6cAC8499ca2776fC2', chainId: 8453, kind: 'plain',
     label: 'BaseMorningGame (czy jest na mainnecie?)', source: 'app/basemorning/config/contract.ts:1' },
-  { address: '0xf528f920d0ce1d1ea230b0ec10f0f64b8f43cbac', chainId: 484, kind: 'plain',
-    label: 'SimpleIPNFTMarketplace', source: 'app/marketplace/config/simpleMarketplace.ts:4' },
+  { address: '0xd02A166A186bcc5C537FeCD5103E9c1A94Bb49D6', chainId: 484, kind: 'plain',
+    label: 'IPMarketV4 (marketplace, Camp mainnet)', source: 'app/marketplace/config/simpleMarketplace.ts:14' },
   { address: '0x39EeE1C3989f0dD543Dee60f8582F7F81F522C38', chainId: 484, kind: 'erc721',
     label: 'DEFAULT_IP_NFT_CONTRACT (Origin IP NFT, mainnet)', source: 'app/marketplace/config/simpleMarketplace.ts:1663' },
 

@@ -12,7 +12,7 @@ import BidModal from './BidModal';
 import OfferModal from './OfferModal';
 import AuctionView from './AuctionView';
 import { fetchIpNftsFor, fetchRecentIpNfts } from '../../mycamp/api/fetchIpNfts';
-import { MARKETPLACE_ADDRESS, MARKETPLACE_ABI } from '../config/simpleMarketplace';
+import { MARKETPLACE_ADDRESS, MARKETPLACE_ABI, DEFAULT_IP_NFT_CONTRACT } from '../config/simpleMarketplace';
 import { createCampPublicClient } from '../config/campClient';
 
 export default function MarketplaceGrid({
@@ -616,7 +616,7 @@ export default function MarketplaceGrid({
                 const nftContract = (a as any).nftContract ?? a[1];
                 const tokenId = (a as any).tokenId ?? a[2];
                 const contractAddress = (!nftContract || nftContract === '0x0000000000000000000000000000000000000000') 
-                  ? '0xF90733b9eCDa3b49C250B2C3E3E42c96fC93324E' // DEFAULT_IP_NFT_CONTRACT
+                  ? DEFAULT_IP_NFT_CONTRACT
                   : nftContract;
                 
                 const ERC721_ABI = [

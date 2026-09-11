@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseEther } from 'viem';
 import { toast } from 'react-hot-toast';
-import { MARKETPLACE_ADDRESS, MARKETPLACE_ABI } from '../config/simpleMarketplace';
+import { MARKETPLACE_ADDRESS, MARKETPLACE_ABI, DEFAULT_IP_NFT_CONTRACT } from '../config/simpleMarketplace';
 import { createCampPublicClient } from '../config/campClient';
 
 interface PreviewModalProps {
@@ -156,7 +156,7 @@ export default function PreviewModal({ nft: item, onClose }: PreviewModalProps) 
             className="underline hover:text-white" 
             target="_blank" 
             rel="noreferrer" 
-                            href={`https://camp.cloud.blockscout.com/token/${item.contract || '0xF90733b9eCDa3b49C250B2C3E3E42c96fC93324E'}/instance/${item.tokenId || item.id}`}
+                            href={`https://camp.cloud.blockscout.com/token/${item.contract || DEFAULT_IP_NFT_CONTRACT}/instance/${item.tokenId || item.id}`}
           >
             Explorer
           </a>

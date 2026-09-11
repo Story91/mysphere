@@ -29,7 +29,6 @@ const FALLBACK_ROUTE = '/basechat';
 const DISABLED_ROUTES = [
   '/base',
   '/basemorning',
-  '/marketplace',
   // '/mycamp' ZOSTAJE WYLACZONE - i to jest przemyslane, nie zapomniane.
   //
   // Podpiecie kont NIE POTRZEBUJE tej strony. Konektor

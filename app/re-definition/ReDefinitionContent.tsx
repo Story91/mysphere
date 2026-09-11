@@ -116,11 +116,10 @@ const SHOW_READ_FURTHER = false;
  * Cztery adresy z tego repozytorium NIE PRZESZLY weryfikacji i dlatego ich tu
  * nie ma. Ta lista istnieje takze po to, zeby nikt ich tu nie dopisal:
  *
- *   0xF90733b9... i 0xf528f920... - kod aplikacji podaje je jako targ IP-NFT
- *     i kolekcje na Camp (484). Na tym lancuchu maja code=0x, balance=0
- *     I nonce=0, czyli nigdy nic tam nie zrobily. Nie sa ani kontraktem, ani
- *     uzywanym portfelem. marketplace/page.tsx pokazuje jeden z nich
- *     uzytkownikowi jako "IP Live source" - to osobny blad do naprawy.
+ *   0xF90733b9... i 0xf528f920... - do 2026-09-11 kod aplikacji podawal je
+ *     jako kolekcje IP-NFT i targ na Camp (484); to byly adresy z Basecamp
+ *     testnetu, na 484 code=0x. Zastapione: kolekcja Origin 0x39EeE1...2C38,
+ *     targ IPMarketV4 0xd02A166A...49D6 (nasz deploy, patrz simpleMarketplace.ts).
  *   0x0222ffA0... - deklarowana fabryka smart-kont CDP. Brak kodu na 84532
  *     I na 8453, a do tego BLEDNA SUMA KONTROLNA EIP-55: `getAddress()` go
  *     odrzuca. Adres skopiowany z eksploratora nie moze miec zlego checksumu,

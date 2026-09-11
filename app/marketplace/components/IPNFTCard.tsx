@@ -1,5 +1,6 @@
 "use client";
 
+import { DEFAULT_IP_NFT_CONTRACT } from '../config/simpleMarketplace';
 import { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
 
@@ -247,7 +248,7 @@ export default function IPNFTCard({
       
       {/* Explorer link */}
       <a
-        href={`https://camp.cloud.blockscout.com/token/${nft.contract || '0xF90733b9eCDa3b49C250B2C3E3E42c96fC93324E'}/instance/${nft.tokenId || nft.id}`}
+        href={`https://camp.cloud.blockscout.com/token/${nft.contract || DEFAULT_IP_NFT_CONTRACT}/instance/${nft.tokenId || nft.id}`}
         target="_blank"
         rel="noreferrer"
         className="block text-[10px] text-black/70 hover:text-black underline px-2 pb-2"

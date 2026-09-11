@@ -1,17 +1,11 @@
 // Simple IP NFT Marketplace configuration for Camp Network
 // This is the main marketplace contract with all required functions
 //
-// STAN 2026-09-11: adres targu ponizej to relikt Basecamp testnetu - na Camp
-// mainnet (484) eth_getCode zwraca 0x. Zrodlo kontraktu jest w
-// contracts/IPmarketV4.sol (ABI ponizej zgadza sie z nim 1:1, sprawdzone
-// przeciw artifacts/), deploy: `npx hardhat run scripts/deployIPmarket.js
-// --network camp`. Skrypt wypisuje nowy adres - wklej go tutaj, popraw wpis
-// 'ipmarket-484' w app/utils/ops/registry.ts i scripts/verifyOnchainInventory.js,
-// a potem usun '/marketplace' z DISABLED_ROUTES w config/routeStatus.js.
-// Deployer 0xD488...030e potrzebuje CAMP na gaz (patrz keeper-gas-alert).
-
-// Adres targu. NIE POTWIERDZONY lancuchowo - brak kodu na 484, czeka na deploy.
-export const MARKETPLACE_ADDRESS = '0xf528f920d0ce1d1ea230b0ec10f0f64b8f43cbac';
+// IPMarketV4 wdrozony na Camp mainnet (484) 2026-09-11 z contracts/IPmarketV4.sol
+// przez scripts/deployIPmarket.js (deployer 0xD488...030e). ABI ponizej zgadza
+// sie z kompilatem 1:1. ipNftContract ustawiony na kolekcje Origin (nizej).
+// Poprzedni 0xf528...cbac byl z Basecamp testnetu i na 484 nie mial kodu.
+export const MARKETPLACE_ADDRESS = '0xd02A166A186bcc5C537FeCD5103E9c1A94Bb49D6';
 
 // Full ABI from deployed contract V3
 export const MARKETPLACE_ABI = [
