@@ -40,6 +40,17 @@ export const DEPLOYED = FACTORY_ADDRESS !== '0x000000000000000000000000000000000
 /** Kolateral ma SZESC miejsc. Nie osiemnascie. */
 export const USDC_DECIMALS = 6;
 
+/**
+ * REZERWA NA GAZ, w USDC (6 miejsc). Na Arc gaz i kolateral to JEDNO saldo
+ * (docs "EVM differences": natywne USDC i ERC-20 pod 0x3600... to ten sam
+ * pieniadz w dwoch skalach). Przycisk "Max", ktory wpisuje cale saldo jako
+ * depozyt, zostawia zero na `approve` i `openPosition` i obie transakcje
+ * padaja na "insufficient funds". Docs "stable fee": ~0,001 USD za transfer,
+ * sufit 20 000 Gwei. 0,05 USDC pokrywa kilkadziesiat transakcji z zapasem
+ * i jest nie do zauwazenia przy depozycie.
+ */
+export const GAS_RESERVE_USDC = 50_000n;
+
 export const erc20Abi = [
   { type: 'function', name: 'balanceOf', stateMutability: 'view', inputs: [{ type: 'address' }], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'allowance', stateMutability: 'view', inputs: [{ type: 'address' }, { type: 'address' }], outputs: [{ type: 'uint256' }] },

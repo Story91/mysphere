@@ -29,6 +29,7 @@ import '../../startpad/sphere/sphere-motion.css';
 import {
   DERIV_CHAIN,
   FACTORY_ADDRESS,
+  GAS_RESERVE_USDC,
   ORACLE_ADDRESS,
   USDC_ADDRESS,
   erc20Abi,
@@ -59,74 +60,7 @@ import {
 import Sparkline from '../Sparkline';
 import { BPS, HEALTH_TOP_BPS, WAD, previewOpen, type Preview } from './math';
 import type { ActivityItem, Position, R, Snapshot } from './types';
-/** Zegar sekundowy. Zero do pierwszego efektu - inaczej SSR i klient sie roznia. */
-function useNow(): number {
-  const [now, setNow] = useState(0);
-  useEffect(() => {
-    setNow(Math.floor(Date.now() / 1_000));
-    const t = setInterval(() => setNow(Math.floor(Date.now() / 1_000)), 1_000);
-    return () => clearInterval(t);
-  }, []);
-  return now;
-}
-
-/* ========================================================================== */
-/*  DROBNE ELEMENTY UI                                                         */
-/* ========================================================================== */
-
-/** Odczyt, ktory sie nie powiodl. NIGDY nie podstawiamy w to miejsca zera. */
-function Unknown({ label = 'n/a' }: { label?: string }) {
-  return (
-    <span className="font-normal text-sp-ink-soft" title="This on-chain read failed - the value is unknown, not zero.">
-      {label}
-    </span>
-  );
-}
-
-/**
- * Kwota USDC (6 miejsc) z dokladnoscia, przy ktorej TRZY UDZIALY DALEJ SUMUJA
- * SIE DO OPLATY. `fmtUsdc` tnie do centa, wiec 0,195 + 0,045 + 0,060 pokazywalo
- * sie jako $0.20 + $0.05 + $0.06 = $0.31 przy oplacie $0.30 - podzial, ktory
- * nie domyka sie na ekranie, czyta sie jak blad, nawet gdy liczby pod spodem
- * sa co do jednostki zgodne z `notifyFee`. Ponizej dolara dajemy wiec szesc
- * miejsc, tak samo jak `fmtSignedWad` robi to dla premii i fundingu.
- */
-function fmtUsdcFine(value: bigint): string {
-  const n = Number(value) / 1e6;
-  if (!Number.isFinite(n)) return '-';
-  const abs = Math.abs(n);
-  return `$${n.toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: abs !== 0 && abs < 1 ? 6 : 2,
-  })}`;
-}
-
-function Val<T extends bigint | number | boolean>({ v, fmt }: { v: R<T>; fmt: (x: T) => string }) {
-  if (v === null || v === undefined) return <Unknown />;
-  return <>{fmt(v)}</>;
-}
-
-function TickerCell({ label, hint, children }: { label: string; hint?: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <div className="min-w-[92px] shrink-0 border-l border-sp-shade/10 px-3 first:border-l-0 first:pl-0">
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-sp-ink-soft">{label}</p>
-      <div className="text-sm font-bold tabular-nums text-sp-ink">{children}</div>
-      {hint ? <p className="text-[10px] leading-tight text-sp-ink-soft">{hint}</p> : null}
-    </div>
-  );
-}
-
-function Row({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3 py-[3px]">
-      <dt className="shrink-0 text-sp-ink-soft" title={hint}>
-        {label}
-      </dt>
-      <dd className="min-w-0 text-right font-medium tabular-nums text-sp-ink">{children}</dd>
-    </div>
-  );
-}
-
+import { Row, TickerCell, Unknown, Val, fmtUsdcFine, useNow } from '../ui';
 /* ========================================================================== */
 
 export default function MarketDetail({ market }: { market: Address }) {
@@ -435,6 +369,16 @@ export default function MarketDetail({ market }: { market: Address }) {
   }
 
   const marginAmount = usdc(margin);
+
+  /* ---- ILE WOLNO WPISAC. Saldo minus rezerwa na gaz (GAS_RESERVE_USDC w
+     config.ts): na Arc `approve` i `openPosition` placa z TEGO SAMEGO USDC,
+     ktore idzie na depozyt. `null` gdy salda nie znamy. ---- */
+  const spendable = useMemo<bigint | null>(() => {
+    const bal = snap?.usdcBalance ?? null;
+    if (bal === null) return null;
+    return bal > GAS_RESERVE_USDC ? bal - GAS_RESERVE_USDC : 0n;
+  }, [snap?.usdcBalance]);
+  const overSpendable = marginAmount !== null && spendable !== null && marginAmount > spendable;
 
   /* ---- PODGLAD ZLECENIA. Przelicza sie przy KAZDEJ zmianie pola. ---- */
   const preview = useMemo<Preview | null>(() => {
@@ -1328,7 +1272,8 @@ export default function MarketDetail({ market }: { market: Address }) {
                       <button
                         type="button"
                         className="underline decoration-sp-shade/30 underline-offset-2"
-                        onClick={() => setMargin(fromUsdc(balance))}
+                        title={`Max = balance minus ${fromUsdc(GAS_RESERVE_USDC)} USDC kept for gas`}
+                        onClick={() => setMargin(fromUsdc(spendable ?? 0n))}
                       >
                         {fmtUsdc(balance)}
                       </button>
@@ -1338,6 +1283,13 @@ export default function MarketDetail({ market }: { market: Address }) {
                 <Input id="deriv-margin" inputMode="decimal" value={margin} onChange={(e) => setMargin(e.target.value)} />
                 {margin.trim() !== '' && marginAmount === null && (
                   <p className="text-[11px] text-destructive">Enter a plain amount, at most 6 decimals.</p>
+                )}
+                {overSpendable && (
+                  <p className="text-[11px] text-destructive">
+                    On Arc gas is paid from this same USDC balance. Keep at least {fromUsdc(GAS_RESERVE_USDC)} USDC
+                    for the approve and open transactions
+                    {spendable !== null && spendable > 0n ? ` (max ${fmtUsdc(spendable)})` : ''}.
+                  </p>
                 )}
               </div>
 
@@ -1479,6 +1431,7 @@ export default function MarketDetail({ market }: { market: Address }) {
                   Boolean(snap.slashed) ||
                   snap.feedActive === false ||
                   Boolean(position) ||
+                  overSpendable ||
                   preview === null ||
                   Boolean(preview.reason)
                 }
