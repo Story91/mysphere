@@ -30,6 +30,15 @@ const CreateAuctionModal = dynamic(() => import('./components/CreateAuctionModal
   ssr: false
 });
 
+
+// Zdjecie hero. Unsplash License: darmowe uzycie komercyjne, podpis autora
+// mile widziany - stad link w rogu sekcji. Parametry auto/w/q daja ~1800px
+// WebP z CDN Unsplash, bez pobierania pliku do repo.
+const HERO = {
+  src: 'https://images.unsplash.com/photo-1698899114691-3e4a5d9be3dc?auto=format&fit=crop&w=1800&q=70',
+  credit: { name: 'Francisco Gonzalez', href: 'https://unsplash.com/photos/-jmYFZ9CQ80' },
+};
+
 export default function MarketplacePage() {
   const { address, isConnected } = useAccount();
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -135,174 +144,193 @@ export default function MarketplacePage() {
     })();
   }, []);
 
+  const tabs: Array<{ id: typeof activeView; label: string; hint: string }> = [
+    { id: 'explore', label: 'Listed', hint: 'For sale or licence' },
+    { id: 'live', label: 'Fresh mints', hint: 'Newest IP on Camp' },
+    ...(isConnected ? [{ id: 'my-ip' as const, label: 'My IP', hint: 'What you own' }] : []),
+    { id: 'activity', label: 'Activity', hint: 'Sales, bids, offers' },
+    ...(isConnected ? [{ id: 'dashboard' as const, label: 'Dashboard', hint: 'Your listings and earnings' }] : []),
+  ];
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-black via-gray-900 to-black">
-      {/* Compact Hero Section - Mobile Responsive */}
-      <div className="relative overflow-hidden border-b border-white/10">
-        <div className="absolute inset-0 bg-gradient-to-r from-orange-600/10 via-purple-600/10 to-blue-600/10 blur-3xl" />
-        
-        <div className="relative container mx-auto px-4 py-3">
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+    <div className="min-h-screen bg-soft-bg font-soft text-soft-ink">
+      <div className="mx-auto max-w-7xl px-3 pb-24 pt-3 sm:px-6 sm:pt-5">
+        {/* Hero: ciemnia fotograficzna - miejsce, gdzie powstaje oryginal.
+            Jedno zdjecie, przyciemnione do palety Soft Social, statystyki jako
+            muzealne etykiety na bialym. */}
+        <motion.section
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: [0.2, 0.8, 0.2, 1] }}
+          className="relative overflow-hidden rounded-[26px] bg-soft-ink shadow-[var(--soft-shadow-float)]"
+        >
+          <img
+            src={HERO.src}
+            alt=""
+            aria-hidden
+            className="absolute inset-0 h-full w-full object-cover opacity-70 saturate-[0.6]"
+            style={{ objectPosition: '50% 40%' }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#2e2a44]/95 via-[#2e2a44]/70 to-[#5f4ec2]/40" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#2e2a44]/90 via-transparent to-transparent" />
+
+          <div className="relative flex min-h-[260px] flex-col justify-between gap-6 p-5 sm:min-h-[320px] sm:p-8">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-2 rounded-pill bg-white/10 px-3 py-1.5 text-[12px] font-bold text-white/85 ring-1 ring-white/15 backdrop-blur">
+                <img src="/Camp.png" alt="" className="h-4 w-4" />
+                Camp Network
+                <span className="hidden text-white/50 sm:inline">·</span>
+                <span className="hidden text-white/60 sm:inline">IP NFT</span>
+              </div>
+              {/* RainbowKit w stylu strony: pigulka zamiast niebieskiego domyslnego
+                  przycisku. To jedyne miejsce na tej trasie, ktore przelacza portfel
+                  na Camp (484), wiec po polaczeniu pokazuje siec, nie tylko adres. */}
+              <ConnectButton.Custom>
+                {({ account, chain, openConnectModal, openChainModal, openAccountModal, mounted }) => {
+                  if (!mounted) return <span className="h-9" />;
+                  if (!account) {
+                    return (
+                      <button
+                        type="button"
+                        onClick={openConnectModal}
+                        className="rounded-pill bg-white px-4 py-2 text-[13px] font-bold text-soft-ink shadow-[var(--soft-shadow-chip)] transition hover:bg-soft-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-accent"
+                      >
+                        Connect for Camp
+                      </button>
+                    );
+                  }
+                  const wrong = chain?.unsupported || chain?.id !== 484;
+                  return (
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={openChainModal}
+                        className={`rounded-pill px-3 py-2 text-[12px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-accent ${
+                          wrong ? 'bg-soft-accent text-white hover:bg-soft-accent-deep' : 'bg-white/10 text-white ring-1 ring-white/15 hover:bg-white/20'
+                        }`}
+                      >
+                        {wrong ? 'Switch to Camp' : 'Camp'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={openAccountModal}
+                        className="rounded-pill bg-white px-3 py-2 text-[12px] font-bold text-soft-ink shadow-[var(--soft-shadow-chip)] transition hover:bg-soft-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-accent"
+                      >
+                        {account.displayName}
+                      </button>
+                    </div>
+                  );
+                }}
+              </ConnectButton.Custom>
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end">
+              <div>
+                <h1 className="font-soft-display text-[34px] font-extrabold leading-[1.02] text-white sm:text-[48px] lg:text-[56px]">
+                  Own the original.<br />
+                  <span className="text-soft-accent">Licence the rest.</span>
+                </h1>
+                <p className="mt-3 max-w-xl text-[14px] leading-relaxed text-white/75 sm:text-[15px]">
+                  Music, film, images and text minted as IP NFTs on Camp. Buy a work
+                  outright, bid in an auction, or pay for a licence and leave the
+                  original where it is.
+                </p>
+              </div>
+
+              <dl className="flex flex-wrap gap-2 lg:flex-col lg:items-end">
+                {[
+                  { k: 'Listed now', v: Number(stats.listed || 0).toLocaleString() },
+                  { k: 'Creators', v: Number(stats.creators || 0).toLocaleString() },
+                  { k: 'Traded', v: `${stats.volumeCamp.toFixed(2)} CAMP` },
+                ].map((s) => (
+                  <div
+                    key={s.k}
+                    className="flex min-w-[112px] items-baseline justify-between gap-3 rounded-2xl bg-white px-3.5 py-2 shadow-[var(--soft-shadow-chip)] lg:min-w-[180px]"
+                  >
+                    <dt className="text-[11px] font-bold uppercase tracking-[0.08em] text-soft-ink-soft">{s.k}</dt>
+                    <dd className="font-soft-display text-[18px] font-extrabold tabular-nums text-soft-ink">{s.v}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          </div>
+          <a
+            href={HERO.credit.href}
+            target="_blank"
+            rel="noreferrer"
+            className="absolute bottom-2 right-3 text-[10px] text-white/45 hover:text-white/80"
           >
-            <div className="flex items-center gap-2 sm:gap-3">
-              <span className="relative inline-flex items-center justify-center">
-                <span className="relative w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-white ring-2 ring-orange-400/50 shadow-lg flex items-center justify-center">
-                  <img src="/Camp.png" alt="CAMP" className="w-4 h-4 sm:w-6 sm:h-6" />
-                </span>
-              </span>
-              <h1
-                className="text-base sm:text-xl lg:text-2xl font-bold flex items-center gap-2"
-                style={{ fontFamily: 'Space Grotesk, ClashDisplay, Inter, ui-sans-serif, system-ui' }}
+            Photo: {HERO.credit.name} / Unsplash
+          </a>
+        </motion.section>
+
+        {/* Zakladki + akcje */}
+        <div className="mt-4 flex flex-col gap-3 sm:mt-5 lg:flex-row lg:items-center lg:justify-between">
+          <nav aria-label="Marketplace sections" className="-mx-3 overflow-x-auto px-3 sm:mx-0 sm:px-0">
+            <div className="inline-flex gap-1 rounded-pill bg-white p-1 shadow-[var(--soft-shadow-chip)]">
+              {tabs.map((t) => {
+                const active = activeView === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setActiveView(t.id)}
+                    title={t.hint}
+                    aria-current={active ? 'page' : undefined}
+                    className={`whitespace-nowrap rounded-pill px-4 py-2 text-[13px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
+                      active
+                        ? 'bg-soft-primary text-white shadow-[var(--soft-shadow-chip)]'
+                        : 'text-soft-ink-muted hover:bg-soft-surface-sunken hover:text-soft-ink'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                );
+              })}
+            </div>
+          </nav>
+
+          {isConnected && (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => { setPrefillTokenId(null); setShowCreateModal(true); }}
+                className="rounded-pill bg-soft-primary px-5 py-2.5 text-[13px] font-bold text-white shadow-[var(--soft-shadow-chip)] transition hover:bg-soft-primary-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary-deep"
               >
-                <span className="bg-gradient-to-r from-orange-400 via-pink-500 to-purple-600 bg-clip-text text-transparent">
-                  IP NFT Marketplace
-                </span>
-              </h1>
-              <span className="hidden lg:block text-gray-500 text-sm ml-2">
-                Trade and license intellectual property NFTs on Camp Network
-              </span>
+                List an IP
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowCreateAuction({})}
+                className="rounded-pill bg-white px-5 py-2.5 text-[13px] font-bold text-soft-ink ring-1 ring-soft-line transition hover:bg-soft-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+              >
+                Start an auction
+              </button>
             </div>
-            
-            {/* Stats - Mobile Responsive */}
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 bg-black/50 rounded-lg border border-orange-500/20">
-                <span className="text-xs sm:text-sm font-bold text-orange-400">{Number(stats.listed || 0)}</span>
-                <span className="text-xs text-gray-500">Listed</span>
-              </div>
-              <div className="flex sm:hidden md:flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 bg-black/50 rounded-lg border border-purple-500/20">
-                <span className="text-xs sm:text-sm font-bold text-purple-400">{Number(stats.creators || 0).toLocaleString()}</span>
-                <span className="text-xs text-gray-500">Creators</span>
-              </div>
-              <div className="flex sm:hidden lg:flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 bg-black/50 rounded-lg border border-blue-500/20">
-                <span className="text-xs sm:text-sm font-bold text-blue-400">{stats.volumeCamp.toFixed(2)}</span>
-                <span className="text-xs text-gray-500">CAMP</span>
-              </div>
-            </div>
-          </motion.div>
+          )}
+        </div>
+
+        {/* Tresc */}
+        <div className="mt-4 sm:mt-5">
+          {activeView === 'explore' && (
+            <MarketplaceGrid mode="explore" onOpenListModal={(nft) => { setPrefillTokenId(nft?.tokenId); setShowCreateModal(true); }} />
+          )}
+          {activeView === 'live' && (
+            <MarketplaceGrid mode="live" onOpenListModal={(nft) => { setPrefillTokenId(nft?.tokenId); setShowCreateModal(true); }} />
+          )}
+          {activeView === 'my-ip' && isConnected && (
+            <MarketplaceGrid mode="my" onOpenListModal={(nft) => { setPrefillTokenId(nft?.tokenId); setShowCreateModal(true); }} />
+          )}
+          {activeView === 'activity' && <ActivityFeed />}
+          {activeView === 'dashboard' && <DashboardView />}
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="container mx-auto px-4 py-6">
-        {/* Navigation - Mobile Responsive */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
-            {/* Main Navigation - Grid on mobile, flex on desktop */}
-            <div className="grid grid-cols-2 sm:flex gap-2">
-              <button
-                onClick={() => setActiveView('explore')}
-                className={`px-3 sm:px-6 py-2 rounded-lg font-medium transition-all text-sm sm:text-base ${
-                  activeView === 'explore'
-                    ? 'bg-orange-500 text-white'
-                    : 'bg-black/50 text-gray-400 hover:text-white border border-gray-800'
-                }`}
-              >
-                🔍 Explore
-              </button>
-              <button
-                onClick={() => setActiveView('live')}
-                className={`px-3 sm:px-6 py-2 rounded-lg font-medium transition-all text-sm sm:text-base ${
-                  activeView === 'live'
-                    ? 'bg-orange-500 text-white'
-                    : 'bg-black/50 text-gray-400 hover:text-white border border-gray-800'
-                }`}
-              >
-                🟢 IP Live
-              </button>
-              {isConnected && (
-                <button
-                  onClick={() => setActiveView('my-ip')}
-                  className={`px-3 sm:px-6 py-2 rounded-lg font-medium transition-all text-sm sm:text-base ${
-                    activeView === 'my-ip'
-                      ? 'bg-orange-500 text-white'
-                      : 'bg-black/50 text-gray-400 hover:text-white border border-gray-800'
-                  }`}
-                >
-                  🧩 My IP
-                </button>
-              )}
-              <button
-                onClick={() => setActiveView('activity')}
-                className={`px-3 sm:px-6 py-2 rounded-lg font-medium transition-all text-sm sm:text-base ${
-                  activeView === 'activity'
-                    ? 'bg-orange-500 text-white'
-                    : 'bg-black/50 text-gray-400 hover:text-white border border-gray-800'
-                }`}
-              >
-                🕒 Activity
-              </button>
-            </div>
-
-            {/* Action Buttons - Mobile responsive */}
-            <div className="flex flex-col sm:flex-row gap-2">
-              {isConnected && (
-                <>
-                  <button
-                    onClick={() => { setPrefillTokenId(null); setShowCreateModal(true); }}
-                    className="px-4 sm:px-6 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all text-sm sm:text-base"
-                  >
-                    + List NFT
-                  </button>
-                  <button
-                    onClick={() => setShowCreateAuction({})}
-                    className="px-4 sm:px-6 py-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold rounded-lg hover:from-orange-600 hover:to-amber-600 transition-all text-sm sm:text-base"
-                  >
-                    🎯 Auction
-                  </button>
-                  <button
-                    onClick={() => setActiveView('dashboard')}
-                    className="px-4 sm:px-6 py-2 bg-gradient-to-r from-gray-700 to-gray-800 text-white font-bold rounded-lg hover:from-gray-600 hover:to-gray-700 transition-all text-sm sm:text-base"
-                  >
-                    📊 Dashboard
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-
-        {/* Main Content Area */}
-        {activeView === 'explore' && (
-          <div className="animate-fadeIn">
-            <MarketplaceGrid mode="explore" onOpenListModal={(nft) => { setPrefillTokenId(nft?.tokenId); setShowCreateModal(true); }} />
-          </div>
-        )}
-        {activeView === 'live' && (
-          <div className="animate-fadeIn">
-            <MarketplaceGrid mode="live" onOpenListModal={(nft) => { setPrefillTokenId(nft?.tokenId); setShowCreateModal(true); }} />
-          </div>
-        )}
-        {activeView === 'activity' && (
-          <div className="animate-fadeIn">
-            <ActivityFeed />
-          </div>
-        )}
-        {activeView === 'dashboard' && (
-          <div className="animate-fadeIn">
-            {/* Placeholder until dashboard panel moved inline */}
-
-          </div>
-        )}
-        {activeView === 'my-ip' && isConnected && (
-          <div className="animate-fadeIn">
-            <MarketplaceGrid mode="my" onOpenListModal={(nft) => { setPrefillTokenId(nft?.tokenId); setShowCreateModal(true); }} />
-          </div>
-        )}
-        
-        {activeView === 'dashboard' && (
-          <DashboardView />
-        )}
-      </div>
-
-      {/* Create Listing Modal */}
       {showCreateModal && (
         <CreateListingModal onClose={() => setShowCreateModal(false)} prefillTokenId={prefillTokenId || undefined} />
       )}
-      
-      {/* Create Auction Modal */}
       {showCreateAuction && (
-        <CreateAuctionModal 
+        <CreateAuctionModal
           nftContract={showCreateAuction.nftContract}
           tokenId={showCreateAuction.tokenId}
           onClose={() => setShowCreateAuction(null)}
@@ -311,5 +339,3 @@ export default function MarketplacePage() {
     </div>
   );
 }
-
-

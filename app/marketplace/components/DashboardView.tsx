@@ -925,7 +925,7 @@ export default function DashboardView() {
     return (
       <div className="text-center py-20">
         <div className="text-6xl mb-4">🔐</div>
-        <h2 className="text-2xl font-bold text-white mb-4">Connect Wallet</h2>
+        <h2 className="text-2xl font-bold text-soft-ink mb-4">Connect Wallet</h2>
         <p className="text-gray-400">Connect your wallet to view your dashboard</p>
       </div>
     );
@@ -935,12 +935,12 @@ export default function DashboardView() {
     <div>
       {/* Dashboard Header */}
       <div className="mb-8">
-        <h2 className="text-3xl font-bold text-white mb-2">My Dashboard</h2>
+        <h2 className="text-3xl font-bold text-soft-ink mb-2">My Dashboard</h2>
         <p className="text-gray-400">Manage your listings, offers, and earnings</p>
       </div>
 
       {/* Tabs - Mobile Responsive */}
-      <div className="flex flex-wrap gap-1 sm:gap-2 mb-8 border-b border-gray-700 overflow-x-auto">
+      <div className="flex flex-wrap gap-1 sm:gap-2 mb-8 border-b border-soft-line overflow-x-auto">
         {[
           { id: 'listings', label: 'My Listings', icon: '📋', shortLabel: 'Listings' },
           { id: 'offers', label: 'Offers Received', icon: '💰', shortLabel: 'Offers' },
@@ -953,8 +953,8 @@ export default function DashboardView() {
             onClick={() => setActiveTab(tab.id as any)}
             className={`px-3 sm:px-6 py-2 sm:py-3 font-medium transition-all text-sm sm:text-base whitespace-nowrap ${
               activeTab === tab.id
-                ? 'text-white border-b-2 border-orange-500'
-                : 'text-gray-400 hover:text-white'
+                ? 'text-soft-ink border-t-2 border-b-2 border-soft-primary'
+                : 'text-soft-ink-muted hover:text-soft-ink'
             }`}
           >
             <span className="mr-1 sm:mr-2">{tab.icon}</span>
@@ -967,7 +967,7 @@ export default function DashboardView() {
       {/* Content */}
       {loading ? (
         <div className="text-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-orange-500 border-t-transparent mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-soft-accent border-t-transparent mx-auto mb-4"></div>
           <p className="text-gray-400">Loading dashboard...</p>
         </div>
       ) : (
@@ -975,12 +975,12 @@ export default function DashboardView() {
           {/* My Listings Tab */}
           {activeTab === 'listings' && (
             <div>
-              <h3 className="text-xl font-bold text-white mb-6">My Active Listings</h3>
+              <h3 className="text-xl font-bold text-soft-ink mb-6">My Active Listings</h3>
               {myListings.filter(l => l.isActive).length === 0 ? (
-                <div className="bg-black/40 border border-gray-700 rounded-xl p-12 text-center">
+                <div className="bg-white border border-soft-line rounded-xl p-12 text-center">
                   <div className="text-5xl mb-4">📦</div>
                   <p className="text-gray-400 mb-4">You don't have any active listings</p>
-                  <p className="text-gray-500 text-sm">List your IP NFTs to start selling</p>
+                  <p className="text-soft-ink-soft text-sm">List your IP NFTs to start selling</p>
                 </div>
               ) : (
                 <div className="grid gap-4">
@@ -1000,29 +1000,29 @@ export default function DashboardView() {
           {/* Offers Tab */}
           {activeTab === 'offers' && (
             <div>
-              <h3 className="text-xl font-bold text-white mb-6">Offers Received</h3>
+              <h3 className="text-xl font-bold text-soft-ink mb-6">Offers Received</h3>
               {myOffers.length === 0 ? (
-                <div className="bg-black/40 border border-gray-700 rounded-xl p-12 text-center">
+                <div className="bg-white border border-soft-line rounded-xl p-12 text-center">
                   <div className="text-5xl mb-4">💌</div>
                   <p className="text-gray-400">No offers received yet</p>
-                  <p className="text-gray-500 text-sm mt-2">Offers will appear here when buyers make them</p>
+                  <p className="text-soft-ink-soft text-sm mt-2">Offers will appear here when buyers make them</p>
                 </div>
               ) : (
                 <div className="grid gap-4">
                   {myOffers.map((offer, index) => (
-                    <div key={`${offer.listingId}-${offer.offerIndex}`} className="bg-black/40 border border-gray-700 rounded-xl p-4 sm:p-6">
+                    <div key={`${offer.listingId}-${offer.offerIndex}`} className="bg-white border border-soft-line rounded-xl p-4 sm:p-6">
                       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                         <div>
                           <h4 className="text-white font-semibold mb-2">
                             Offer for Listing #{offer.listingId}
                           </h4>
-                          <p className="text-gray-400 text-sm">
+                          <p className="text-soft-ink-muted text-sm">
                             Amount: <span className="text-orange-400 font-bold">{formatEther(offer.price || 0n)} CAMP</span>
                           </p>
-                          <p className="text-gray-400 text-sm">
+                          <p className="text-soft-ink-muted text-sm">
                             From: <span className="text-white">{offer.buyer?.slice(0, 6)}...{offer.buyer?.slice(-4)}</span>
                           </p>
-                          <p className="text-gray-400 text-sm">
+                          <p className="text-soft-ink-muted text-sm">
                             Duration: <span className="text-white">{Number(offer.duration) / 86400} days</span>
                           </p>
                         </div>
@@ -1030,7 +1030,7 @@ export default function DashboardView() {
                           <button
                             onClick={() => handleAcceptOffer(offer.listingId, offer.offerIndex)}
                             disabled={isAccepting}
-                            className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50"
+                            className="px-4 py-2 bg-[#0b9a51] text-white rounded-lg hover:bg-[#0b9a51] transition-colors disabled:opacity-50"
                           >
                             Accept
                           </button>
@@ -1046,41 +1046,41 @@ export default function DashboardView() {
           {/* Earnings Tab */}
           {activeTab === 'earnings' && (
             <div>
-              <h3 className="text-xl font-bold text-white mb-6">My Earnings</h3>
-              <div className="bg-gradient-to-br from-orange-600/20 to-amber-600/20 border border-orange-500/30 rounded-xl p-4 sm:p-8">
+              <h3 className="text-xl font-bold text-soft-ink mb-6">My Earnings</h3>
+              <div className="bg-soft-surface-sunken border border-soft-line rounded-xl p-4 sm:p-8">
                 <div className="text-center">
                   <p className="text-gray-300 mb-2">Available to Withdraw</p>
-                  <p className="text-3xl sm:text-5xl font-bold text-orange-400 mb-4 sm:mb-8">
+                  <p className="text-3xl sm:text-5xl font-bold text-soft-accent-deep mb-4 sm:mb-8">
                     {userEarnings ? formatEther(userEarnings) : '0'} CAMP
                   </p>
                   <button
                     onClick={handleWithdraw}
                     disabled={!userEarnings || userEarnings === 0n || isWithdrawing}
-                    className="px-8 py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold rounded-lg hover:from-orange-600 hover:to-amber-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+                    className="px-8 py-3 bg-soft-primary text-white font-bold rounded-lg hover:bg-soft-primary-deep transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
                   >
                     {isWithdrawing ? 'Processing...' : 'Withdraw Earnings'}
                   </button>
-                  <p className="text-gray-500 text-sm mt-4">
+                  <p className="text-soft-ink-soft text-sm mt-4">
                     Earnings come from sales, royalties, and access fees
                   </p>
                 </div>
               </div>
 
               {/* Pending Returns Section - always show */}
-              <div className="mt-6 bg-gradient-to-br from-blue-600/20 to-purple-600/20 border border-blue-500/30 rounded-xl p-4 sm:p-6">
+              <div className="mt-6 bg-soft-surface-sunken border border-soft-line rounded-xl p-4 sm:p-6">
                 <div className="text-center">
                   <p className="text-gray-300 mb-2">Auction Refunds Available</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-blue-400 mb-4">
+                  <p className="text-2xl sm:text-3xl font-bold text-soft-info mb-4">
                     {myPendingReturns ? formatEther(myPendingReturns) : '0'} CAMP
                   </p>
                   <button
                     onClick={handleWithdrawPendingReturns}
                     disabled={!myPendingReturns || myPendingReturns === 0n || isWithdrawingPending}
-                    className="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold rounded-lg hover:from-blue-600 hover:to-purple-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+                    className="px-6 py-2 bg-soft-primary text-white font-bold rounded-lg hover:bg-soft-primary-deep transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
                   >
                     {isWithdrawingPending ? 'Processing...' : 'Withdraw Refunds'}
                   </button>
-                  <p className="text-gray-500 text-xs mt-3">
+                  <p className="text-soft-ink-soft text-xs mt-3">
                     Refunds from unsuccessful auctions or overbids
                   </p>
                 </div>
@@ -1093,7 +1093,7 @@ export default function DashboardView() {
           {/* Access Tab */}
           {activeTab === 'access' && (
             <div>
-              <h3 className="text-xl font-bold text-white mb-6">My Access Rights</h3>
+              <h3 className="text-xl font-bold text-soft-ink mb-6">My Access Rights</h3>
               {/* (rest of access UI continues below) */}
                   </div>
           )}
@@ -1101,9 +1101,9 @@ export default function DashboardView() {
           {/* Auctions Tab */}
           {activeTab === 'auctions' && (
             <div>
-              <h3 className="text-xl font-bold text-white mb-6">My Auctions</h3>
+              <h3 className="text-xl font-bold text-soft-ink mb-6">My Auctions</h3>
               {myAuctions.filter(a => a.active).length === 0 ? (
-                <div className="bg-black/40 border border-gray-700 rounded-xl p-12 text-center text-gray-400">You have no auctions</div>
+                <div className="bg-white border border-soft-line rounded-xl p-12 text-center text-soft-ink-muted">You have no auctions</div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   {myAuctions.filter(a => a.active).map(a => (
@@ -1120,9 +1120,9 @@ export default function DashboardView() {
                   </div>
           )}
 
-              <h3 className="text-xl font-bold text-white mt-10 mb-4">My Bids</h3>
+              <h3 className="text-xl font-bold text-soft-ink mt-10 mb-4">My Bids</h3>
               {activeAuctions.length === 0 ? (
-                <div className="bg-black/40 border border-gray-700 rounded-xl p-12 text-center text-gray-400">You're not currently bidding on any auctions</div>
+                <div className="bg-white border border-soft-line rounded-xl p-12 text-center text-soft-ink-muted">You're not currently bidding on any auctions</div>
               ) : (
                 <div className="grid gap-3">
                   {activeAuctions.map(a => {
@@ -1155,12 +1155,12 @@ export default function DashboardView() {
 
           {activeTab === 'access' && (
             <>
-              <h3 className="text-xl font-bold text-white mb-4">My Purchased Access</h3>
+              <h3 className="text-xl font-bold text-soft-ink mb-4">My Purchased Access</h3>
               {myAccess.length === 0 ? (
-                <div className="bg-black/40 border border-gray-700 rounded-xl p-12 text-center">
-                  <p className="text-gray-400 text-lg mb-2">No Active Access Rights</p>
-                  <p className="text-gray-500 text-sm">You haven't purchased access to any NFTs yet.</p>
-                  <p className="text-gray-500 text-sm mt-2">Browse the marketplace to find NFTs with temporary access available.</p>
+                <div className="bg-white border border-soft-line rounded-xl p-12 text-center">
+                  <p className="text-soft-ink-muted text-lg mb-2">No Active Access Rights</p>
+                  <p className="text-soft-ink-soft text-sm">You haven't purchased access to any NFTs yet.</p>
+                  <p className="text-soft-ink-soft text-sm mt-2">Browse the marketplace to find NFTs with temporary access available.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1235,9 +1235,9 @@ function AccessCard({ access, onRenew }: { access: any; onRenew: () => void }) {
     : access.metadata?.image;
   
   return (
-    <div className="bg-black/40 border border-gray-700 rounded-xl overflow-hidden hover:border-gray-600 transition-all">
+    <div className="bg-white border border-soft-line rounded-xl overflow-hidden hover:border-soft-line transition-all">
       {/* NFT Image */}
-      <div className="aspect-square bg-black/60 relative">
+      <div className="aspect-square bg-soft-surface-sunken relative">
         {imageUrl ? (
           <img 
             src={imageUrl} 
@@ -1245,7 +1245,7 @@ function AccessCard({ access, onRenew }: { access: any; onRenew: () => void }) {
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-600">
+          <div className="w-full h-full flex items-center justify-center text-soft-ink-soft">
             <span className="text-4xl">🖼️</span>
           </div>
         )}
@@ -1253,24 +1253,24 @@ function AccessCard({ access, onRenew }: { access: any; onRenew: () => void }) {
         {/* Time left badge */}
         <div className={`absolute top-2 right-2 px-2 sm:px-3 py-1 rounded-full text-xs font-semibold ${
           timeLeft === 'Expired' ? 'bg-red-500/80' : 'bg-green-500/80'
-        } text-white backdrop-blur`}>
+        } text-soft-ink backdrop-blur`}>
           {timeLeft === 'Expired' ? '⏱️ Expired' : `⏱️ ${timeLeft}`}
                 </div>
               </div>
 
       {/* Card Content */}
       <div className="p-3 sm:p-4">
-        <h4 className="text-white font-semibold text-lg mb-1">
+        <h4 className="text-soft-ink font-semibold text-lg mb-1">
           {access.metadata?.name || `Token #${access.tokenId}`}
         </h4>
         
-        <p className="text-gray-400 text-sm mb-3">
+        <p className="text-soft-ink-muted text-sm mb-3">
           Token ID: #{access.tokenId.toString()}
         </p>
         
         {/* Access Terms */}
         {access.terms && (
-          <div className="text-xs text-gray-500 mb-3">
+          <div className="text-xs text-soft-ink-soft mb-3">
             <div>Price: {formatEther(access.terms.price)} CAMP per period</div>
             <div>Duration: {Number(access.terms.duration) / 86400} days per period</div>
             {access.periodsRemaining !== undefined && (
@@ -1282,7 +1282,7 @@ function AccessCard({ access, onRenew }: { access: any; onRenew: () => void }) {
               )}
         
         {/* Expiry Date */}
-        <div className="text-xs text-gray-400 mb-4">
+        <div className="text-xs text-soft-ink-muted mb-4">
           Expires: {new Date(Number(access.expiryTime) * 1000).toLocaleString()}
             </div>
         
@@ -1290,7 +1290,7 @@ function AccessCard({ access, onRenew }: { access: any; onRenew: () => void }) {
         {timeLeft !== 'Expired' && (
           <button
             onClick={onRenew}
-            className="w-full px-3 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg text-sm hover:from-blue-600 hover:to-cyan-600 transition-all"
+            className="w-full px-3 py-2 bg-soft-primary text-white rounded-lg text-sm hover:bg-soft-primary-deep transition-all"
           >
             Renew Access
           </button>
@@ -1311,9 +1311,9 @@ function AccessTermsInline({ tokenId }: { tokenId: string }) {
       } catch {}
     })();
   }, [tokenId]);
-  if (!terms) return <p className="text-gray-500 text-xs">No access terms</p>;
+  if (!terms) return <p className="text-soft-ink-soft text-xs">No access terms</p>;
   return (
-    <p className="text-gray-400 text-sm">Terms: <span className="text-white font-semibold">{Number(terms.price) / 1e18} CAMP</span> / <span className="text-white">{Number(terms.duration) / 86400} days</span></p>
+    <p className="text-soft-ink-muted text-sm">Terms: <span className="text-white font-semibold">{Number(terms.price) / 1e18} CAMP</span> / <span className="text-white">{Number(terms.duration) / 86400} days</span></p>
   );
 }
 
@@ -1378,9 +1378,9 @@ function AuctionCardWithPreview({
   };
 
   return (
-    <div className="bg-black/40 border border-gray-700 rounded-xl overflow-hidden hover:border-gray-600 transition-all">
+    <div className="bg-white border border-soft-line rounded-xl overflow-hidden hover:border-soft-line transition-all">
       {/* NFT Image */}
-      <div className="aspect-square bg-black/60 relative">
+      <div className="aspect-square bg-soft-surface-sunken relative">
         {loading ? (
           <div className="w-full h-full flex items-center justify-center">
             <div className="text-gray-500">Loading...</div>
@@ -1392,31 +1392,31 @@ function AuctionCardWithPreview({
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-600">
+          <div className="w-full h-full flex items-center justify-center text-soft-ink-soft">
             <span className="text-4xl">🖼️</span>
           </div>
         )}
         
         {/* Auction ID Badge */}
-        <div className="absolute top-2 left-2 px-2 py-1 bg-black/80 rounded text-xs text-white font-semibold">
+        <div className="absolute top-2 left-2 px-2 py-1 bg-black/80 rounded text-xs text-soft-ink font-semibold">
           Auction #{auction.auctionId}
         </div>
       </div>
       
       {/* Card Content */}
       <div className="p-3 sm:p-4">
-        <h4 className="text-white font-semibold text-lg mb-1">
+        <h4 className="text-soft-ink font-semibold text-lg mb-1">
           {nftData?.name || `Token #${auction.tokenId}`}
         </h4>
         
         {/* Token ID with copy */}
         <div className="flex items-center gap-2 mb-3">
-          <span className="text-gray-400 text-sm">
+          <span className="text-soft-ink-muted text-sm">
             ID: {auction.tokenId.toString().slice(0, 8)}...{auction.tokenId.toString().slice(-6)}
           </span>
           <button
             onClick={handleCopyTokenId}
-            className="text-gray-400 hover:text-white transition-colors text-sm"
+            className="text-soft-ink-muted hover:text-soft-ink transition-colors text-sm"
             title="Copy full token ID"
           >
             {copied ? '✓' : '📋'}
@@ -1446,10 +1446,10 @@ function AuctionCardWithPreview({
           <button 
             onClick={onFinalize} 
             disabled={isFinalizing} 
-            className={`flex-1 px-3 py-2 text-white rounded-lg disabled:opacity-50 transition-colors ${
+            className={`flex-1 px-3 py-2 text-soft-ink rounded-lg disabled:opacity-50 transition-colors ${
               auction.highestBid >= auction.reservePrice
-                ? 'bg-green-600 hover:bg-green-700'
-                : 'bg-orange-600 hover:bg-orange-700'
+                ? 'bg-[#0b9a51] hover:bg-[#08803f]'
+                : 'bg-soft-primary hover:bg-soft-primary-deep'
             }`}
             title={auction.highestBid < auction.reservePrice ? 
               `Reserve price (${formatEther(auction.reservePrice)} CAMP) not met. Will return funds to bidder.` : 
@@ -1463,7 +1463,7 @@ function AuctionCardWithPreview({
           <button 
             onClick={onCancel} 
             disabled={isCancelling || auction.highestBid > 0n} 
-            className="flex-1 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+            className="flex-1 px-3 py-2 bg-[#a32020] text-white rounded-lg hover:bg-[#8a1a1a] disabled:opacity-50 transition-colors"
             title={auction.highestBid > 0n ? "Cannot cancel auction with bids" : ""}
           >
             {isCancelling ? 'Processing...' : 'Cancel'}
@@ -1525,13 +1525,13 @@ function ListingCardWithPreview({ listing, onCancel, isCancelling }: { listing: 
   }, [listing.tokenId, listing.nftContract]);
 
   return (
-    <div className="bg-black/40 border border-gray-700 rounded-xl p-4 sm:p-6">
+    <div className="bg-white border border-soft-line rounded-xl p-4 sm:p-6">
       <div className="flex flex-col sm:flex-row gap-4">
         {/* NFT Preview */}
-        <div className="w-full sm:w-20 h-40 sm:h-20 rounded-lg overflow-hidden border border-gray-600 flex-shrink-0">
+        <div className="w-full sm:w-20 h-40 sm:h-20 rounded-lg overflow-hidden border border-soft-line flex-shrink-0">
           {loading ? (
-            <div className="w-full h-full bg-gray-800 animate-pulse flex items-center justify-center">
-              <div className="text-xs text-gray-500">⏳</div>
+            <div className="w-full h-full bg-white animate-pulse flex items-center justify-center">
+              <div className="text-xs text-soft-ink-soft">⏳</div>
             </div>
           ) : nftData?.image ? (
             <img
@@ -1540,8 +1540,8 @@ function ListingCardWithPreview({ listing, onCancel, isCancelling }: { listing: 
               className="w-full h-full object-cover"
             />
           ) : (
-            <div className="w-full h-full bg-gradient-to-br from-zinc-800 to-zinc-900 flex items-center justify-center">
-              <div className="text-xs text-gray-500">
+            <div className="w-full h-full bg-soft-surface-sunken flex items-center justify-center">
+              <div className="text-xs text-soft-ink-soft">
                 {nftData?.type === 'audio' ? '🎵' : 
                  nftData?.type === 'video' ? '🎥' : 
                  nftData?.type === 'text' ? '📄' : '📷'}
@@ -1552,7 +1552,7 @@ function ListingCardWithPreview({ listing, onCancel, isCancelling }: { listing: 
 
         {/* Listing Info */}
         <div className="flex-1 min-w-0">
-          <h4 className="text-white font-semibold text-base sm:text-lg mb-2 truncate">
+          <h4 className="text-soft-ink font-semibold text-base sm:text-lg mb-2 truncate">
             {nftData?.name || `Listing #${listing.listingId}`}
           </h4>
           <div className="space-y-1 text-sm">
@@ -1570,7 +1570,7 @@ function ListingCardWithPreview({ listing, onCancel, isCancelling }: { listing: 
                   setCopied(true);
                   setTimeout(() => setCopied(false), 2000);
                 }}
-                className="text-gray-400 hover:text-white transition-colors text-xs"
+                className="text-soft-ink-muted hover:text-soft-ink transition-colors text-xs"
                 title="Copy full token ID"
               >
                 {copied ? '✓' : '📋'}
@@ -1603,7 +1603,7 @@ function ListingCardWithPreview({ listing, onCancel, isCancelling }: { listing: 
           <button
             onClick={() => onCancel(listing.listingId)}
             disabled={isCancelling}
-            className="px-4 py-2 bg-red-500/80 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50"
+            className="px-4 py-2 bg-red-500/80 text-white rounded-lg hover:bg-[#a32020] transition-colors disabled:opacity-50"
           >
             {isCancelling ? 'Cancelling...' : 'Cancel Listing'}
           </button>
@@ -1612,7 +1612,7 @@ function ListingCardWithPreview({ listing, onCancel, isCancelling }: { listing: 
                             href={`https://camp.cloud.blockscout.com/token/${listing.nftContract}/instance/${listing.tokenId}`}
             target="_blank"
             rel="noreferrer"
-            className="px-4 py-2 bg-gray-600 text-white text-center rounded-lg hover:bg-gray-700 transition-colors text-xs"
+            className="px-4 py-2 bg-soft-surface-sunken text-soft-ink text-center rounded-lg hover:bg-soft-line transition-colors text-xs"
           >
             View NFT
           </a>
@@ -1681,13 +1681,13 @@ function BidCardWithNFTPreview({
   }, [auction]);
 
   return (
-    <div className={`bg-black/40 border rounded-xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 ${
-      isWinning ? 'border-green-500 ring-2 ring-green-500/20' : 'border-gray-700'
+    <div className={`bg-white border rounded-xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 ${
+      isWinning ? 'border-transparent ring-2 ring-green-500/20' : 'border-gray-700'
     }`}>
       {/* NFT Image */}
-      <div className="w-full sm:w-16 h-32 sm:h-16 bg-black/60 rounded-lg overflow-hidden flex-shrink-0">
+      <div className="w-full sm:w-16 h-32 sm:h-16 bg-soft-surface-sunken rounded-lg overflow-hidden flex-shrink-0">
         {loading ? (
-          <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs">
+          <div className="w-full h-full flex items-center justify-center text-soft-ink-soft text-xs">
             Loading...
           </div>
         ) : nftData?.image ? (
@@ -1697,7 +1697,7 @@ function BidCardWithNFTPreview({
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-600">
+          <div className="w-full h-full flex items-center justify-center text-soft-ink-soft">
             <span className="text-2xl">🖼️</span>
           </div>
         )}
@@ -1709,31 +1709,31 @@ function BidCardWithNFTPreview({
           <span className="text-white font-semibold">
             {nftData?.name || `Token #${auction.tokenId.toString().slice(0, 8)}...`}
           </span>
-          <span className="text-gray-400 text-sm">
+          <span className="text-soft-ink-muted text-sm">
             Auction #{auction.auctionId}
           </span>
           {isWinning && (
             <span className={`px-2 py-0.5 rounded text-xs font-bold ${
-              auctionEnded ? 'bg-green-600 text-white' : 'bg-green-500/20 text-green-400 border border-green-500'
+              auctionEnded ? 'bg-[#0b9a51] text-white' : 'bg-[#edfff4] border border-[#9de7bb] text-[#0b9a51] border border-transparent'
             }`}>
               {auctionEnded ? '🏆 WON!' : '✅ WINNING'}
             </span>
           )}
           {!isWinning && auction.highestBidder && (
-            <span className="px-2 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500 text-xs font-bold">
+            <span className="px-2 py-0.5 rounded bg-[#ffefef] border border-[#f3b4b4] text-[#a32020] border border-transparent text-xs font-bold">
               ❌ OUTBID
             </span>
           )}
         </div>
         
-        <div className="text-gray-400 text-sm">
+        <div className="text-soft-ink-muted text-sm">
           Min: {formatEther(auction.minPrice)} CAMP • 
           Highest: <span className={isWinning ? 'text-green-400 font-semibold' : ''}>{formatEther(auction.highestBid)} CAMP</span> • 
           Time left: <span className={auctionEnded ? 'text-red-400' : ''}>{formatTimeLeft(auction.endTime)}</span>
         </div>
         
         {auction.highestBidder && (
-          <div className="text-gray-400 text-sm">
+          <div className="text-soft-ink-muted text-sm">
             Top bidder: <span className={`${isWinning ? 'text-green-400' : 'text-white'}`}>
               {isWinning ? 'You' : `${auction.highestBidder.slice(0,6)}...${auction.highestBidder.slice(-4)}`}
             </span>
@@ -1747,14 +1747,14 @@ function BidCardWithNFTPreview({
           <button
             onClick={onClaimNFT}
             disabled={isFinalizing}
-            className="px-4 py-2 bg-green-600 text-white rounded font-semibold hover:bg-green-700 disabled:opacity-50"
+            className="px-4 py-2 bg-[#0b9a51] text-white rounded font-semibold hover:bg-[#08803f] disabled:opacity-50"
           >
             {isFinalizing ? 'Processing...' : 'Claim NFT'}
           </button>
         ) : !auctionEnded && (
           <button
             onClick={onIncreaseBid}
-            className="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700"
+            className="px-4 py-2 bg-soft-primary text-white rounded hover:bg-soft-primary-deep"
           >
             {isWinning ? 'Increase Bid' : 'Bid Higher'}
           </button>
@@ -1810,21 +1810,21 @@ function RenewAccessModal({ tokenId, terms, onClose }: { tokenId: string; terms:
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
-      <div className="bg-gray-900 border border-gray-700 rounded-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white border border-soft-line rounded-[26px] max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold text-white">Renew Access</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">✕</button>
+          <h2 className="text-xl font-bold text-soft-ink">Renew Access</h2>
+          <button onClick={onClose} className="text-soft-ink-muted hover:text-soft-ink">✕</button>
         </div>
 
         <div className="space-y-4">
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <p className="text-gray-300 text-sm">Token ID:</p>
+              <p className="text-soft-ink-muted text-sm">Token ID:</p>
               <div className="flex items-center gap-1">
-                <span className="text-white text-sm font-mono">#{tokenId.slice(0, 8)}...{tokenId.slice(-8)}</span>
+                <span className="text-soft-ink text-sm font-mono">#{tokenId.slice(0, 8)}...{tokenId.slice(-8)}</span>
                 <button
                   onClick={() => navigator.clipboard.writeText(tokenId)}
-                  className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs rounded transition-colors"
+                  className="px-2 py-1 bg-soft-surface-sunken hover:bg-soft-surface-sunken text-soft-ink-muted text-xs rounded transition-colors"
                   title="Copy full Token ID"
                 >
                   📋
@@ -1832,7 +1832,7 @@ function RenewAccessModal({ tokenId, terms, onClose }: { tokenId: string; terms:
               </div>
             </div>
             {terms && (
-              <div className="bg-gray-800 rounded-lg p-3 text-sm">
+              <div className="bg-white rounded-lg p-3 text-sm">
                 <p className="text-gray-400">Price per period: <span className="text-white font-semibold">{(Number(terms.price) / 1e18).toFixed(4)} CAMP</span></p>
                 <p className="text-gray-400">Duration per period: <span className="text-white">{durationDays} days</span></p>
               </div>
@@ -1840,7 +1840,7 @@ function RenewAccessModal({ tokenId, terms, onClose }: { tokenId: string; terms:
           </div>
 
           <div>
-            <label className="block text-gray-300 text-sm font-medium mb-2">
+            <label className="block text-soft-ink-muted text-sm font-medium mb-2">
               Number of periods to renew
             </label>
             <input
@@ -1849,16 +1849,16 @@ function RenewAccessModal({ tokenId, terms, onClose }: { tokenId: string; terms:
               max="365"
               value={periods}
               onChange={(e) => setPeriods(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-cyan-500"
+              className="w-full px-3 py-2 bg-white border border-soft-line rounded-lg text-soft-ink focus:outline-none focus:border-cyan-500"
               placeholder="1"
             />
           </div>
 
           <div className="bg-cyan-900/30 border border-cyan-500/30 rounded-lg p-3">
-            <p className="text-cyan-300 text-sm">
+            <p className="text-soft-info text-sm">
               <span className="font-medium">Total cost:</span> {totalPrice.toFixed(4)} CAMP
             </p>
-            <p className="text-cyan-400 text-xs mt-1">
+            <p className="text-soft-info text-xs mt-1">
               This will extend your access by {parseInt(periods || '1') * durationDays} days
             </p>
           </div>
@@ -1866,7 +1866,7 @@ function RenewAccessModal({ tokenId, terms, onClose }: { tokenId: string; terms:
           <button
             onClick={handleRenewAccess}
             disabled={loading || isLoading || !periods || parseInt(periods) < 1}
-            className="w-full px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg font-medium hover:from-blue-600 hover:to-cyan-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            className="w-full px-4 py-3 bg-soft-primary text-white rounded-lg font-medium hover:bg-soft-primary-deep disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
             {loading || isLoading ? 'Renewing...' : `Renew Access (${totalPrice.toFixed(4)} CAMP)`}
           </button>

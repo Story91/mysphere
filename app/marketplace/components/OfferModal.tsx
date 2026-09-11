@@ -63,22 +63,22 @@ export default function OfferModal({ nft, onClose }: OfferModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
-      <div className="bg-gray-900 border border-gray-700 rounded-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white border border-soft-line rounded-[26px] max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-between items-start mb-6">
-          <h2 className="text-xl font-bold text-white">Make Offer</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">✕</button>
+          <h2 className="text-xl font-bold text-soft-ink">Make Offer</h2>
+          <button onClick={onClose} className="text-soft-ink-muted hover:text-soft-ink transition-colors">✕</button>
         </div>
 
         <div className="space-y-4">
           {/* NFT Preview */}
-          <div className="flex items-center gap-3 p-3 bg-black/40 rounded-lg">
+          <div className="flex items-center gap-3 p-3 bg-white rounded-lg">
             {nft.image && (
               <img src={nft.image} alt={nft.metadata?.name} className="w-12 h-12 rounded object-cover" />
             )}
             <div>
               <div className="text-white font-medium">{nft.metadata?.name || `#${nft.tokenId}`}</div>
               <div 
-                className="text-xs text-gray-400 cursor-pointer hover:text-orange-400" 
+                className="text-xs text-soft-ink-muted cursor-pointer hover:text-soft-accent-deep" 
                 onClick={() => {
                   navigator.clipboard.writeText(nft.tokenId);
                   toast.success('Token ID copied!');
@@ -91,21 +91,21 @@ export default function OfferModal({ nft, onClose }: OfferModalProps) {
           </div>
 
           {/* Current Listing Price */}
-          <div className="bg-black/40 border border-gray-700 rounded-lg p-4">
-            <h3 className="text-sm font-semibold text-white mb-2">Current Price</h3>
-            <div className="text-lg font-bold text-orange-400">{nft.price} $CAMP</div>
+          <div className="bg-white border border-soft-line rounded-lg p-4">
+            <h3 className="text-sm font-semibold text-soft-ink mb-2">Current Price</h3>
+            <div className="text-lg font-bold text-soft-accent-deep">{nft.price} $CAMP</div>
           </div>
 
           {/* Offer Amount */}
           <div>
-            <label className="text-sm text-gray-400 block mb-2">Your Offer (CAMP)</label>
+            <label className="text-sm text-soft-ink-muted block mb-2">Your Offer (CAMP)</label>
             <input
               type="number"
               step="0.01"
               value={offerAmount}
               onChange={(e) => setOfferAmount(e.target.value)}
               placeholder="0.00"
-              className="w-full bg-black/50 border border-gray-700 rounded-lg px-3 py-2 text-white focus:border-orange-500 focus:outline-none"
+              className="w-full bg-soft-surface-sunken border border-soft-line rounded-lg px-3 py-2 text-soft-ink focus:border-soft-accent focus:outline-none"
             />
             {offerValue > 0 && listingPrice > 0 && (
               <div className="text-xs mt-1">
@@ -118,10 +118,10 @@ export default function OfferModal({ nft, onClose }: OfferModalProps) {
 
           {/* Offer Summary */}
           {offerValue > 0 && (
-            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
-              <div className="text-sm text-gray-300">Your Offer</div>
-              <div className="text-lg font-bold text-blue-400">{offerValue.toFixed(2)} $CAMP</div>
-              <div className="text-xs text-gray-400 mt-1">
+            <div className="bg-soft-info-soft border border-soft-info/30 rounded-lg p-3">
+              <div className="text-sm text-soft-ink-muted">Your Offer</div>
+              <div className="text-lg font-bold text-soft-info">{offerValue.toFixed(2)} $CAMP</div>
+              <div className="text-xs text-soft-ink-muted mt-1">
                 Funds will be held in escrow until accepted or you cancel
               </div>
             </div>
@@ -131,12 +131,12 @@ export default function OfferModal({ nft, onClose }: OfferModalProps) {
           <button
             onClick={handleMakeOffer}
             disabled={loading || isPending || isConfirming || !address || !offerAmount || offerValue <= 0}
-            className="w-full py-3 px-4 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold rounded-lg hover:from-blue-600 hover:to-purple-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-3 px-4 bg-soft-primary text-white font-bold rounded-lg hover:bg-soft-primary-deep transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading || isPending || isConfirming ? 'Processing...' : `Make Offer (${offerValue.toFixed(2)} $CAMP)`}
           </button>
 
-          <div className="text-xs text-gray-500 text-center">
+          <div className="text-xs text-soft-ink-soft text-center">
             Note: Offers can be cancelled anytime before acceptance
           </div>
         </div>
