@@ -26,6 +26,9 @@ import { join } from "path";
  *   PRICE      cena startowa w USD, domyslnie "1"
  *   BOND       kaucja w USDC, domyslnie "100" (minimum kontraktu)
  *   LIQUIDITY  glebokosc vAMM w USD, domyslnie "1000" (minimum kontraktu)
+ *   FEED       adres feedu AggregatorV3 jako cena INDEKSU (np. PythAggregatorAdapter
+ *              z deployments/pythAdapters.<chainId>.json); domyslnie zero = indeks
+ *              z rejestru. Pole w rynku jest immutable - to jedyny moment, by je ustawic.
  *   CONFIRM    musi byc "tak" na sieci innej niz lokalna
  */
 async function main() {
@@ -54,6 +57,7 @@ async function main() {
   const price = ethers.parseUnits(process.env.PRICE ?? "1", 18);
   const bond = ethers.parseUnits(process.env.BOND ?? "100", 6);
   const liquidity = ethers.parseUnits(process.env.LIQUIDITY ?? "1000", 18);
+  const feed = getAddress(process.env.FEED ?? "0x0000000000000000000000000000000000000000");
 
   console.log("siec       ", `${network.name} (chainId ${chainId})`);
   console.log("wdrazajacy ", deployer);
@@ -63,6 +67,7 @@ async function main() {
   console.log("cena start ", ethers.formatUnits(price, 18), "USD");
   console.log("kaucja     ", ethers.formatUnits(bond, 6), "USDC");
   console.log("glebokosc  ", ethers.formatUnits(liquidity, 18), "USD");
+  console.log("feed       ", feed === "0x0000000000000000000000000000000000000000" ? "brak (indeks z rejestru)" : feed);
   console.log("");
 
   const usdc = await ethers.getContractAt("IERC20", usdcAddress);
@@ -81,7 +86,7 @@ async function main() {
   console.log("id feedu   ", marketId.toString());
 
   console.log("stawiam vAMM...");
-  const createTx = await factory.createMarket(marketId, liquidity, "0x0000000000000000000000000000000000000000");
+  const createTx = await factory.createMarket(marketId, liquidity, feed);
   const receipt = await createTx.wait();
   const marketAddress = getAddress(await factory.marketOf(marketId));
 

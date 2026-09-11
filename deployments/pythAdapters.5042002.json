@@ -1,0 +1,13 @@
+{
+  "chainId": 5042002,
+  "pyth": "0x2880aB155794e7179c9eE2e38200202908C17B43",
+  "adapters": {
+    "BTC/USD": {
+      "address": "0x6531d59b211Dd341f1B95aFa97A2E4344EA12409",
+      "priceId": "0xe62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43",
+      "maxAge": 3600,
+      "deployer": "0xD4885A5aa53446843CABcDE1F35DE9b4E906030e",
+      "deployedAt": "2026-09-11T00:23:55.451Z"
+    }
+  }
+}

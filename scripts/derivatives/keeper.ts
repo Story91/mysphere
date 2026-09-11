@@ -27,7 +27,14 @@ import path from "path";
  *    Blockdaemon, patrz hardhat.config), sprawdza `getPosition().size != 0`
  *    i `marginRatioBps < MAINTENANCE_MARGIN_BPS`, i takie likwiduje.
  *    Nagroda keepera wraca na portfel podpisujacy.
- * 4. Drukuje raport JSON i, gdy saldo gazu spadnie ponizej progu, linie
+ * 4. PYTH. Dla kazdego adaptera z deployments/pythAdapters.<chainId>.json
+ *    czyta wiek ceny na lancuchu. Pyth to oracle PULL - jesli nikt nie
+ *    wypchnie aktualizacji, adapter po MAX_AGE oddaje 0 i rynek spada na
+ *    TWAP rejestru. Gdy cena ma wiecej niz PYTH_PUSH_AFTER sekund, keeper
+ *    pobiera podpisana aktualizacje z Hermesa i wola updatePriceFeeds,
+ *    placac getUpdateFee w USDC. Hermes od 08.2026 wymaga klucza
+ *    (PYTH_API_KEY); bez niego ten krok TYLKO raportuje wiek.
+ * 5. Drukuje raport JSON i, gdy saldo gazu spadnie ponizej progu, linie
  *    "GAZ NISKI" - keeper.ps1 zamienia ja w powiadomienie Windows.
  *
  * DOMYSLNIE DRY-RUN. Transakcje ida dopiero z KEEPER_CONFIRM=tak.
@@ -48,6 +55,9 @@ import path from "path";
  *   DERIV_FROM_BLOCK pierwszy blok skanu logow; domyslnie deployBlock z tego pliku
  *   GAS_ALERT_USDC  prog alarmu gazu, domyslnie "1"
  *   KEEPER_CONFIRM  "tak" = wysylaj transakcje
+ *   PYTH_API_KEY    klucz Hermesa (https://docs.pyth.network); bez niego brak wypychania
+ *   PYTH_PUSH_AFTER po ilu sekundach wieku ceny wypychac, domyslnie "600"
+ *   HERMES_URL      domyslnie https://hermes.pyth.network
  */
 
 const CHAIN_ID = 5042002;
@@ -70,7 +80,35 @@ const MARKET_ABI = [
   "event PositionOpened(address indexed trader,bool isLong,uint256 marginUsdc,uint256 notional,uint256 size,uint256 entryPrice)",
 ];
 
+const PYTH_ABI = [
+  "function getPriceUnsafe(bytes32) view returns (tuple(int64 price,uint64 conf,int32 expo,uint256 publishTime))",
+  "function getUpdateFee(bytes[]) view returns (uint256)",
+  "function updatePriceFeeds(bytes[]) payable",
+];
+
 type Row = Record<string, string | number | boolean>;
+
+type AdapterEntry = { address: string; priceId: string; maxAge: number };
+
+function readPythAdapters(): { pyth?: string; adapters: Record<string, AdapterEntry> } {
+  const file = path.join(__dirname, "..", "..", "deployments", `pythAdapters.${CHAIN_ID}.json`);
+  if (!fs.existsSync(file)) return { adapters: {} };
+  const json = JSON.parse(fs.readFileSync(file, "utf8"));
+  return { pyth: json.pyth, adapters: json.adapters ?? {} };
+}
+
+/** Podpisana aktualizacja z Hermesa jako tablica bytes dla updatePriceFeeds. */
+async function fetchHermesUpdate(base: string, apiKey: string, priceIds: string[]): Promise<string[]> {
+  const params = priceIds.map((id) => `ids[]=${id}`).join("&");
+  const res = await fetch(`${base}/v2/updates/price/latest?${params}&encoding=hex`, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+  if (!res.ok) throw new Error(`Hermes ${res.status}: ${(await res.text()).slice(0, 120)}`);
+  const json = (await res.json()) as { binary?: { data?: string[] } };
+  const data = json.binary?.data ?? [];
+  if (!data.length) throw new Error("Hermes oddal pusta aktualizacje.");
+  return data.map((hex) => (hex.startsWith("0x") ? hex : `0x${hex}`));
+}
 
 function readDeployment(): { factory?: string; deployBlock?: number } {
   const file = path.join(__dirname, "..", "..", "deployments", `derivativeMarket.${CHAIN_ID}.json`);
@@ -178,9 +216,47 @@ async function main() {
     markets.push(row);
   }
 
+  // ---- PYTH: wiek cen i (z kluczem) wypychanie aktualizacji ----
+  const pythCfg = readPythAdapters();
+  const pushAfter = Number(process.env.PYTH_PUSH_AFTER || 600);
+  const hermesKey = process.env.PYTH_API_KEY;
+  const hermesUrl = process.env.HERMES_URL || "https://hermes.pyth.network";
+  const pyth: Row[] = [];
+  if (pythCfg.pyth) {
+    const pythContract = new ethers.Contract(pythCfg.pyth, PYTH_ABI, provider);
+    for (const [symbol, entry] of Object.entries(pythCfg.adapters)) {
+      const row: Row = { symbol, adapter: entry.address };
+      try {
+        const p = await pythContract.getPriceUnsafe(entry.priceId);
+        const age = now - Number(p.publishTime);
+        row.ageSec = age;
+        row.stale = age > entry.maxAge;
+        if (age <= pushAfter) {
+          pyth.push(row);
+          continue;
+        }
+        if (!hermesKey) {
+          row.pushSkipped = "brak PYTH_API_KEY - Hermes wymaga klucza, tylko raportuje";
+        } else if (!execute) {
+          row.pushSkipped = "dry-run";
+        } else {
+          const update = await fetchHermesUpdate(hermesUrl, hermesKey, [entry.priceId]);
+          const fee: bigint = await pythContract.getUpdateFee(update);
+          const tx = await pythContract.connect(signer).getFunction("updatePriceFeeds")(update, { value: fee });
+          await tx.wait();
+          row.pushTx = tx.hash;
+          row.feeUsdc = formatUnits(fee, 18);
+        }
+      } catch (error) {
+        row.error = firstLine(error);
+      }
+      pyth.push(row);
+    }
+  }
+
   console.log(
     JSON.stringify(
-      { network: "arc-testnet", factory: factoryAddress, keeper: signer.address, gasUsdc, latestBlock: latest, execute, markets },
+      { network: "arc-testnet", factory: factoryAddress, keeper: signer.address, gasUsdc, latestBlock: latest, execute, markets, pyth },
       null,
       2
     )
