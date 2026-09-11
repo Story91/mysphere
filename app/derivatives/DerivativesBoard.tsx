@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, LineChart, Plus, RefreshCw, ShieldCheck, Sprout, Timer } from 'lucide-react';
 import type { Address } from 'viem';
-import { usePublicClient } from 'wagmi';
+import { useAccount, usePublicClient } from 'wagmi';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -15,12 +15,16 @@ import {
   FACTORY_ADDRESS,
   ORACLE_ADDRESS,
   USDC_ADDRESS,
+  erc20Abi,
   factoryAbi,
   insuranceAbi,
   marketAbi,
   oracleAbi,
 } from './config';
-import { fmtAge, fmtPrice, fmtSignedWad, fmtUsdc, fmtWadCompact, oiPercent, shortAddress } from './format';
+import { fmtAge, fmtDuration, fmtPct, fmtPrice, fmtSignedWad, fmtUsdc, fmtWadCompact, oiPercent, shortAddress } from './format';
+import { Dot, UpDown } from './ui';
+import FaucetBanner from './FaucetBanner';
+import YourPositions from './YourPositions';
 import CreateMarketModal from './CreateMarketModal';
 import PerpsGuide, { premiumBps } from './PerpsGuide';
 
@@ -79,6 +83,9 @@ type Row = {
   slashed: boolean;
   priceUpdatedAt: number | null;
   feedActive: boolean | null;
+  /* zmiana indeksu z logow PriceSubmitted w oknie 40k blokow; null = < 2 punkty */
+  change: number | null;
+  changeSince: number | null;
 };
 
 /** Zdrowie funduszu - to samo pole, co decyduje o globalnej pauzie. */
@@ -134,7 +141,9 @@ function CellLabel({ children }: { children: string }) {
 
 export default function DerivativesBoard() {
   const client = usePublicClient({ chainId: DERIV_CHAIN.id });
+  const { address } = useAccount();
   const [rows, setRows] = useState<Row[]>([]);
+  const [usdcBalance, setUsdcBalance] = useState<bigint | null>(null);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [health, setHealth] = useState<Health>(null);
   const [loading, setLoading] = useState(true);
@@ -251,9 +260,58 @@ export default function DerivativesBoard() {
           slashed: stats ? Boolean(stats[5]) : false,
           priceUpdatedAt: meta ? Number(meta[4]) : null,
           feedActive: at(11) == null ? null : Boolean(at(11)),
+          change: null,
+          changeSince: null,
         };
       });
       setRows(collected);
+
+      // Saldo USDC podlaczonego portfela - dla banera kranu. Osobny odczyt,
+      // bo zalezy od adresu, a nie od listy rynkow.
+      if (address) {
+        try {
+          const bal = (await client.readContract({ address: USDC_ADDRESS, abi: erc20Abi, functionName: 'balanceOf', args: [address] })) as bigint;
+          setUsdcBalance(bal);
+        } catch {
+          setUsdcBalance(null);
+        }
+      } else {
+        setUsdcBalance(null);
+      }
+
+      // Zmiana ceny: JEDEN getLogs po calym rejestrze (bez filtra marketId),
+      // pogrupowany po rynku. Okno 40k blokow to ok. 5,5 h na Arcu - podpis
+      // pod liczba mowi, od kiedy, zamiast udawac "24h". Rynek bez dwoch
+      // punktow w oknie pokazuje kreske, nie zero.
+      try {
+        const head = await client.getBlockNumber();
+        const from = head > 40_000n ? head - 40_000n : 0n;
+        const logs = (await client.getContractEvents({
+          address: ORACLE_ADDRESS,
+          abi: oracleAbi,
+          eventName: 'PriceSubmitted',
+          fromBlock: from,
+          toBlock: head,
+        })) as unknown as { args: { marketId?: bigint; price?: bigint; timestamp?: bigint } }[];
+        const byMarket = new Map<number, { time: number; price: bigint }[]>();
+        for (const l of logs) {
+          if (l.args.marketId === undefined || l.args.price === undefined || l.args.timestamp === undefined) continue;
+          const id = Number(l.args.marketId);
+          const arr = byMarket.get(id) ?? [];
+          arr.push({ time: Number(l.args.timestamp), price: l.args.price });
+          byMarket.set(id, arr);
+        }
+        setRows((prev) =>
+          prev.map((row) => {
+            const pts = (byMarket.get(row.id) ?? []).sort((a, b) => a.time - b.time);
+            if (pts.length < 2 || pts[0].price === 0n) return row;
+            const change = Number(((pts[pts.length - 1].price - pts[0].price) * 1_000_000n) / pts[0].price) / 10_000;
+            return { ...row, change, changeSince: pts[0].time };
+          }),
+        );
+      } catch {
+        /* brak okna getLogs - kolumna zostaje z kreskami */
+      }
 
       // Aktywnosc ze WSZYSTKICH rynkow naraz - realne logi PositionOpened/
       // Closed/Liquidated, to samo okno co sparkline cen na stronie rynku.
@@ -323,7 +381,7 @@ export default function DerivativesBoard() {
     } finally {
       setLoading(false);
     }
-  }, [client]);
+  }, [client, address]);
 
   useEffect(() => {
     void load();
@@ -445,6 +503,9 @@ export default function DerivativesBoard() {
         </div>
       )}
 
+      {DEPLOYED && <FaucetBanner balance={usdcBalance} connected={Boolean(address)} />}
+      {DEPLOYED && <YourPositions address={address} markets={rows} />}
+
       {error && (
         <Card className="mb-6 rounded-[18px] border-destructive/40">
           <CardContent className="py-4 text-sm text-destructive">{error}</CardContent>
@@ -478,7 +539,7 @@ export default function DerivativesBoard() {
       )}
 
       {rows.length > 0 && (
-        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="mb-4 grid grid-cols-3 gap-3">
           <Stat label="Markets">{rows.length}</Stat>
           <Stat label="Total open interest">
             {oiRead.length === rows.length ? (
@@ -492,7 +553,6 @@ export default function DerivativesBoard() {
               </span>
             )}
           </Stat>
-          <Stat label="Mature markets">{rows.filter((r) => r.mature === true).length}</Stat>
           <Stat label="Fund coverage">
             {health?.balance != null && health.required != null ? (
               health.required === 0n ? (
@@ -511,15 +571,15 @@ export default function DerivativesBoard() {
 
       {rows.length > 0 && (
         <div className="overflow-hidden rounded-[18px] border border-sp-shade/10 bg-sp-surface">
-          {/* Naglowek kolumn - tylko od lg w gore, nizej kazda komorka podpisuje
-              sie sama. Siedem kolumn nie miesci sie uczciwie na telefonie. */}
-          <div className="hidden grid-cols-[1.7fr_1fr_1fr_0.8fr_0.9fr_1.4fr_1.2fr] gap-4 border-b border-sp-shade/10 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-sp-ink-soft lg:grid">
+          {/* Szesc kolumn dla tradera: cena, zmiana, funding, OI, feed. Kaucja,
+              challenge'e i tworca sa w tooltipie badge'a - to ryzyko protokolu,
+              nie decyzja przy zleceniu. Naglowek tylko od lg w gore. */}
+          <div className="hidden grid-cols-[1.6fr_1fr_0.9fr_1.1fr_1.3fr_0.9fr] gap-4 border-b border-sp-shade/10 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-sp-ink-soft lg:grid">
             <span>Market</span>
-            <span className="text-right">Mark</span>
-            <span className="text-right">Index</span>
-            <span className="text-right">Premium</span>
-            <span className="text-right">Funding</span>
-            <span>Open interest &amp; skew</span>
+            <span className="text-right">Price</span>
+            <span className="text-right">Change</span>
+            <span className="text-right">Funding / 1h</span>
+            <span>Open interest</span>
             <span>Feed</span>
           </div>
           <div>
@@ -530,102 +590,107 @@ export default function DerivativesBoard() {
                   : null;
               const prem = premiumBps(row.markPrice, row.indexPrice);
               const capped = prem != null && row.maxPremiumBps != null && Math.abs(prem) > row.maxPremiumBps;
+              // Stawka godzinowa z premii przycietej do sufitu: kontrakt nalicza
+              // `premia / index` na dobe, dashboard pokazuje to na godzine.
+              const effBps =
+                prem == null || row.maxPremiumBps == null ? prem : Math.max(-row.maxPremiumBps, Math.min(row.maxPremiumBps, prem));
+              const perHour = effBps == null ? null : effBps / 100 / 24;
               const dueIn =
                 row.lastFundingAt != null && row.fundingInterval != null
                   ? row.lastFundingAt + row.fundingInterval - now
                   : null;
-              // Przechyl w DOLARACH: |netSize| razy mark. Sam netSize jest w
-              // jednostkach bazowych i nikomu nic nie mowi.
-              const netNotional =
-                row.netSize != null && row.markPrice != null
-                  ? ((row.netSize < 0n ? -row.netSize : row.netSize) * row.markPrice) / 10n ** 18n
-                  : null;
-              const skewPct =
-                netNotional != null && row.openInterest != null && row.openInterest > 0n
-                  ? Math.min(100, Number((netNotional * 100n) / row.openInterest))
-                  : null;
-              const isLongSkew = row.netSize != null && row.netSize > 0n;
-              const feedStale = row.feedActive === false;
+              const feedAge = row.priceUpdatedAt != null ? now - row.priceUpdatedAt : null;
+              const feedTone: 'up' | 'warn' | 'down' | 'muted' =
+                row.slashed || row.frozen || row.feedActive === false
+                  ? 'down'
+                  : row.feedActive == null || feedAge == null
+                    ? 'muted'
+                    : row.fundingInterval != null && feedAge > row.fundingInterval
+                      ? 'warn'
+                      : 'up';
+              const feedTitle = [
+                row.bond != null ? `bond ${fmtUsdc(row.bond)}` : null,
+                row.updateCount != null ? `${row.updateCount} prices accepted` : null,
+                row.challengesOpened != null && row.challengesOpened > 0 ? `${row.challengesOpened} challenged` : null,
+                row.creator !== ZERO ? `creator ${shortAddress(row.creator)}` : null,
+              ]
+                .filter(Boolean)
+                .join(' - ');
 
               return (
                 <Link
                   key={row.address}
                   href={`/derivatives/${row.address}`}
-                  className="grid grid-cols-2 gap-x-4 gap-y-3 border-b border-sp-shade/10 px-4 py-3.5 transition-colors last:border-b-0 hover:bg-sp-hover lg:grid-cols-[1.7fr_1fr_1fr_0.8fr_0.9fr_1.4fr_1.2fr] lg:items-center lg:gap-y-0"
+                  className="grid grid-cols-2 gap-x-4 gap-y-3 border-b border-sp-shade/10 px-4 py-3.5 transition-colors last:border-b-0 hover:bg-sp-hover lg:grid-cols-[1.6fr_1fr_0.9fr_1.1fr_1.3fr_0.9fr] lg:items-center lg:gap-y-0"
                 >
                   <div className="col-span-2 lg:col-span-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-bold text-sp-ink">{row.symbol}</span>
+                      <span className="text-base font-bold text-sp-ink">{row.symbol}</span>
                       {row.slashed ? (
-                        <Badge variant="destructive" className="rounded-full">slashed</Badge>
+                        <Badge variant="destructive" className="rounded-full" title={feedTitle}>slashed</Badge>
                       ) : row.frozen ? (
-                        <Badge variant="destructive" className="rounded-full">frozen</Badge>
+                        <Badge variant="destructive" className="rounded-full" title={feedTitle}>frozen</Badge>
                       ) : row.mature === true ? (
-                        <Badge className="gap-1 rounded-full border-transparent bg-sp-brand-soft text-sp-brand-deep hover:bg-sp-brand-soft">
+                        <Badge className="gap-1 rounded-full border-transparent bg-sp-brand-soft text-sp-brand-deep hover:bg-sp-brand-soft" title={feedTitle}>
                           <ShieldCheck className="h-3 w-3" />
                           mature
                         </Badge>
                       ) : row.mature === false ? (
-                        <Badge variant="outline" className="gap-1 rounded-full border-sp-shade/15 text-sp-ink-soft">
+                        <Badge variant="outline" className="gap-1 rounded-full border-sp-shade/15 text-sp-ink-soft" title={feedTitle}>
                           <Sprout className="h-3 w-3" />
                           probation
                         </Badge>
                       ) : null}
-                      {feedStale && !row.slashed && !row.frozen && (
-                        <Badge variant="outline" className="rounded-full border-amber-500/40 text-amber-600">
-                          stale feed
-                        </Badge>
-                      )}
                     </div>
-                    <p className="mt-1 text-xs text-sp-ink-soft">
-                      {row.createdAt != null ? `${fmtAge(row.createdAt)} old` : 'age unknown'} &middot;{' '}
-                      {row.updateCount != null ? `${row.updateCount} prices` : 'price count unknown'} &middot; creator{' '}
-                      {row.creator === ZERO ? <Missing /> : shortAddress(row.creator)}
+                    <p className="mt-0.5 text-[11px] text-sp-ink-soft">
+                      {row.createdAt != null ? `${fmtAge(row.createdAt)} old` : 'age unknown'}
+                      {row.mature === false && row.maxOpenInterest != null ? ` - cap ${fmtWadCompact(row.maxOpenInterest)}` : ''}
                     </p>
                   </div>
 
                   <div className="lg:text-right">
-                    <CellLabel>Mark</CellLabel>
-                    <p className="font-semibold tabular-nums text-sp-ink">
+                    <CellLabel>Price</CellLabel>
+                    <p className="text-base font-bold tabular-nums text-sp-ink">
                       {row.markPrice != null ? fmtPrice(row.markPrice) : <Missing />}
                     </p>
-                  </div>
-                  <div className="lg:text-right">
-                    <CellLabel>Index</CellLabel>
-                    <p className="font-semibold tabular-nums text-sp-ink">
-                      {row.indexPrice != null ? fmtPrice(row.indexPrice) : <Missing />}
+                    <p className="text-[11px] tabular-nums text-sp-ink-soft">
+                      index {row.indexPrice != null ? fmtPrice(row.indexPrice) : <Missing />}
                     </p>
                   </div>
 
-                  {/* Premia to jedyna liczba, ktora mowi, w ktora strone poleci
-                      funding - dlatego stoi obok cen, a nie w szczegolach. */}
                   <div className="lg:text-right">
-                    <CellLabel>Premium</CellLabel>
-                    {prem == null ? (
-                      <Missing />
-                    ) : (
-                      <p
-                        className={`font-semibold tabular-nums ${prem > 0 ? 'text-emerald-600' : prem < 0 ? 'text-red-600' : 'text-sp-ink'}`}
-                        title={capped ? 'Beyond the funding premium cap, so funding uses the capped rate' : undefined}
-                      >
-                        {prem >= 0 ? '+' : '-'}
-                        {(Math.abs(prem) / 100).toFixed(2)}%{capped ? '*' : ''}
+                    <CellLabel>Change</CellLabel>
+                    {row.change == null ? (
+                      <p className="font-semibold text-sp-ink-soft">
+                        <Missing />
                       </p>
+                    ) : (
+                      <>
+                        <p className="font-semibold tabular-nums">
+                          <UpDown value={row.change}>{fmtPct(row.change)}</UpDown>
+                        </p>
+                        <p className="text-[11px] text-sp-ink-soft">
+                          {row.changeSince != null ? `since ${fmtDuration(Math.max(0, now - row.changeSince))} ago` : ''}
+                        </p>
+                      </>
                     )}
                   </div>
 
                   <div className="lg:text-right">
-                    <CellLabel>Funding</CellLabel>
-                    {dueIn == null ? (
+                    <CellLabel>Funding / 1h</CellLabel>
+                    {perHour == null ? (
                       <Missing />
                     ) : (
                       <>
-                        <p className="inline-flex items-center gap-1 font-semibold tabular-nums text-sp-ink lg:justify-end">
-                          <Timer className="h-3 w-3 text-sp-ink-soft" />
-                          {fmtCountdown(dueIn)}
+                        <p className="font-semibold tabular-nums" title={capped ? 'Beyond the premium cap - funding charges the capped rate' : undefined}>
+                          <UpDown value={perHour}>{fmtPct(perHour, 4)}</UpDown>
+                          <span className="ml-1 text-[10px] font-normal text-sp-ink-soft">
+                            {perHour > 0 ? 'longs pay' : perHour < 0 ? 'shorts pay' : 'flat'}
+                          </span>
                         </p>
-                        <p className="text-[11px] text-sp-ink-soft">
-                          {prem == null ? '' : prem > 0 ? 'longs pay' : prem < 0 ? 'shorts pay' : 'flat'}
+                        <p className="inline-flex items-center gap-1 text-[11px] tabular-nums text-sp-ink-soft lg:justify-end">
+                          <Timer className="h-3 w-3" />
+                          {dueIn == null ? <Missing /> : fmtCountdown(dueIn)}
                         </p>
                       </>
                     )}
@@ -633,56 +698,24 @@ export default function DerivativesBoard() {
 
                   <div className="col-span-2 lg:col-span-1">
                     <CellLabel>Open interest</CellLabel>
-                    <p className="text-[11px] text-sp-ink-soft">
-                      {row.openInterest != null ? fmtWadCompact(row.openInterest) : <Missing />} /{' '}
-                      {row.maxOpenInterest != null ? fmtWadCompact(row.maxOpenInterest) : <Missing />}
-                      {pct != null && <span className="ml-1 tabular-nums">({pct.toFixed(0)}%)</span>}
+                    <p className="font-semibold tabular-nums text-sp-ink">
+                      {row.openInterest != null ? fmtWadCompact(row.openInterest) : <Missing />}
+                      <span className="ml-1 text-[11px] font-normal text-sp-ink-soft">{pct != null ? `${pct.toFixed(0)}% of cap` : ''}</span>
                     </p>
                     <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-sp-shade/[0.07]">
                       {pct != null && (
-                        <div
-                          className={`h-full rounded-full ${pct > 85 ? 'bg-destructive' : 'bg-sp-brand'}`}
-                          style={{ width: `${pct}%` }}
-                        />
+                        <div className={`h-full rounded-full ${pct > 85 ? 'bg-destructive' : 'bg-sp-brand'}`} style={{ width: `${pct}%` }} />
                       )}
                     </div>
-                    <p className="mt-1 text-[11px] text-sp-ink-soft">
-                      {row.netSize == null ? (
-                        <>net skew <Missing /></>
-                      ) : row.netSize === 0n ? (
-                        <>net skew balanced</>
-                      ) : (
-                        <>
-                          net{' '}
-                          <span className={isLongSkew ? 'font-semibold text-emerald-600' : 'font-semibold text-red-600'}>
-                            {isLongSkew ? 'LONG' : 'SHORT'}
-                          </span>{' '}
-                          {netNotional != null ? fmtWadCompact(netNotional) : ''}
-                          {skewPct != null ? ` (${skewPct}% of OI)` : ''}
-                        </>
-                      )}
-                    </p>
                   </div>
 
-                  {/* Zdrowie feedu na liscie, a nie dopiero na stronie rynku:
-                      przy tym modelu oracle to jest ryzyko numer jeden. */}
-                  <div className="col-span-2 lg:col-span-1">
+                  <div>
                     <CellLabel>Feed</CellLabel>
-                    <p className="font-semibold tabular-nums text-sp-ink">
-                      {row.bond != null ? `${fmtUsdc(row.bond)} bond` : <Missing />}
+                    <p className="inline-flex items-center gap-1.5 font-semibold text-sp-ink" title={feedTitle}>
+                      <Dot tone={feedTone} />
+                      {feedTone === 'down' ? 'halted' : feedTone === 'warn' ? 'aging' : feedTone === 'up' ? 'live' : 'unknown'}
                     </p>
-                    <p className="text-[11px] text-sp-ink-soft">
-                      {row.priceUpdatedAt != null ? (
-                        <span className={feedStale ? 'text-amber-600' : undefined}>
-                          priced {fmtAge(row.priceUpdatedAt)} ago
-                        </span>
-                      ) : (
-                        <>priced <Missing /></>
-                      )}
-                      {row.challengesOpened != null && row.challengesOpened > 0 && (
-                        <span className="text-amber-600"> &middot; {row.challengesOpened} challenged</span>
-                      )}
-                    </p>
+                    <p className="text-[11px] text-sp-ink-soft">{feedAge != null ? `${fmtDuration(feedAge)} ago` : <Missing />}</p>
                   </div>
                 </Link>
               );
