@@ -247,12 +247,23 @@ export default function Navigation() {
     // strona, do ktorej nie prowadzi zaden link, z punktu widzenia
     // uzytkownika nie istnieje (ta sama zasada, co przy /startpad wyzej).
     { href: '/startpad/sphere', label: '$SPHERE' },
-    // CAMP - targ IP NFT na Camp Network (484). Jedyna pozycja w belce, ktora
-    // prowadzi poza Base i Arc, wiec ma wlasna obwodke w gradiencie (NavItem).
-    // Do 11.09.2026 trasa /marketplace stala w DISABLED_ROUTES i nie prowadzil
-    // do niej zaden link; po wdrozeniu IPMarketV4 na mainnet jest odwrotnie -
-    // to jedyne miejsce, gdzie da sie wybic wlasne IP i nim obracac.
-    { href: '/marketplace', label: 'CAMP' },
+    // "CAMP" jest CHWILOWO UKRYTE w belce - ta sama zasada co przy B20 nizej.
+    // Trasa /marketplace DZIALA dalej pod adresem i NIE jest w DISABLED_ROUTES,
+    // wiec nic nie przekierowuje; jest tylko niepokazana.
+    //
+    // POWOD (ustalone 11.09.2026, szczegoly w docs/CAMP-MARKETPLACE.md sekcja 0):
+    // Camp Origin nie jest utrzymywany. Ich backend odmawia mintu - 403
+    // "account surpassing plan limits" i na wysylce pliku, i na podpisie, co
+    // sprawdzilismy mintem z linii polecen przy poprawnie wydanej sesji. Na
+    // lancuchu: kolekcja IP NFT ma 265 mintow lacznie, ostatni z 1 maja 2026,
+    // i ani jednej odsprzedazy w historii. Dzisiejszy ruch na Camp to
+    // aktualizacje cen mostu LayerZero, nie ludzie. Prowadzenie uzytkownikow
+    // z belki na strone, ktorej glowna akcja zawsze konczy sie bledem po
+    // stronie Campa, byloby wysylaniem ich w sciane.
+    //
+    // POWROT DO BELKI = odkomentowanie ponizszej linii. Kolor obwodki czeka
+    // w NAV_ACCENT, wiec nie trzeba ruszac niczego wiecej.
+    // { href: '/marketplace', label: 'CAMP' },
     // Perps zaraz za $SPHERE, bo to ten sam ruch co Startpad, tylko o stopien
     // dalej: tam tworca wystawia token na krzywej, tu wystawia FEED i rynek
     // lewarowany na Arc. Bez tego wpisu /derivatives bylo dokladnie tym, przed
