@@ -62,6 +62,8 @@ export type WalletErrorKind =
   | 'insufficient-funds'
   /** portfel nie zna tej sieci (EIP-1193 4902) */
   | 'unknown-chain'
+  /** portfel ma zapisany wlasny, niedzialajacy adres RPC dla tej sieci */
+  | 'stale-rpc'
   /** nie rozpoznaliśmy - pokazujemy tresc oryginalna */
   | 'unknown';
 
@@ -78,6 +80,13 @@ export interface WalletErrorInfo {
 export interface WalletErrorContext {
   /** Nazwa sieci wstawiana w komunikat, np. "Celo" albo "Robinhood Chain". */
   network?: string;
+  /**
+   * Adres RPC, ktory aplikacja uwaza za poprawny dla tej sieci.
+   *
+   * Wstawiany do komunikatu przy 'stale-rpc': bez konkretnego adresu rada
+   * "popraw RPC w portfelu" jest bezuzyteczna, bo czlowiek nie ma go skad wziac.
+   */
+  rpcUrl?: string;
   /** Symbol tokena na gaz w tej sieci, np. "ETH" albo "CELO". */
   gasSymbol?: string;
 }
@@ -148,6 +157,38 @@ export function describeWalletError(error: unknown, context: WalletErrorContext 
     return {
       kind: 'unknown-chain',
       message: `${network} is not added to your wallet yet. Add the network in your wallet, then try again.`,
+      isFailure: true,
+      rawMessage: raw,
+    };
+  }
+
+  /**
+   * Portfel ma WLASNY adres RPC dla tej sieci i ten adres nie odpowiada.
+   *
+   * ZGLOSZENIE Z PRODUKCJI (2026-09-11): postowanie na Camp konczylo sie
+   * "Requested resource not available", a w szczegolach siedzialo
+   * "RPC 0x1e4 Custom eth_getBlockByNumber: RPC endpoint returned too many
+   * errors". Nasze oba RPC dla 484 byly wtedy zdrowe - 50 rownoleglych zadan,
+   * zero bledow. Odczyty w aplikacji dzialaly, bo ida naszym wlasnym klientem;
+   * padala wylacznie transakcja, ktora idzie przez portfel.
+   *
+   * PRZYCZYNA: portfel dodany raz zapamietuje adres RPC, ktory dostal ZA
+   * PIERWSZYM razem. Kto dodal Camp, gdy wskazywalismy na bramke Gelato (dzis
+   * NXDOMAIN), ma ten martwy adres zapisany do dzis. `wallet_addEthereumChain`
+   * nie nadpisuje istniejacego wpisu, a wagmi wola je tylko dla sieci, ktorej
+   * portfel NIE zna - wiec z naszej strony nie da sie tego naprawic zdalnie.
+   * Zostaje powiedziec czlowiekowi, co ma wpisac.
+   */
+  if (/returned too many errors|rpc endpoint returned|could not coalesce error/.test(text)) {
+    const where = context.rpcUrl
+      ? `Set it to ${context.rpcUrl}`
+      : 'Replace it with the endpoint this app uses';
+    return {
+      kind: 'stale-rpc',
+      message:
+        `Your wallet is using its own RPC endpoint for ${network}, and that endpoint is not responding. ` +
+        `This is a wallet setting, not the post. ${where}: in MetaMask open Settings → Networks → ` +
+        `${network} → RPC URL, then try again.`,
       isFailure: true,
       rawMessage: raw,
     };
