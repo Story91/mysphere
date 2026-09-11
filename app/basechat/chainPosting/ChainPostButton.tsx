@@ -100,6 +100,7 @@ export default function ChainPostButton({
         const info = describeWalletError(switchError, {
           network: config.networkLabel,
           gasSymbol: config.chain.nativeCurrency.symbol,
+          rpcUrl: config.chain.rpcUrls.default.http[0],
         });
         // Odmowa w portfelu to nie awaria - nie straszymy czerwonym toastem.
         if (info.isFailure) {
@@ -163,6 +164,7 @@ export default function ChainPostButton({
       const info = describeWalletError(error, {
         network: config.networkLabel,
         gasSymbol: config.chain.nativeCurrency.symbol,
+          rpcUrl: config.chain.rpcUrls.default.http[0],
       });
       if (info.isFailure) {
         toast.error(`Transaction failed: ${info.message}`);

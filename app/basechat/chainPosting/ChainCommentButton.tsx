@@ -97,6 +97,7 @@ export default function ChainCommentButton({
           const switchInfo = describeWalletError(switchError, {
             network: config.networkLabel,
             gasSymbol: config.chain.nativeCurrency.symbol,
+          rpcUrl: config.chain.rpcUrls.default.http[0],
           });
           if (switchInfo.isFailure) {
             toast.error(`Please switch to ${config.networkLabel} manually`);
@@ -153,6 +154,7 @@ export default function ChainCommentButton({
       const info = describeWalletError(error, {
         network: config.networkLabel,
         gasSymbol: config.chain.nativeCurrency.symbol,
+          rpcUrl: config.chain.rpcUrls.default.http[0],
       });
 
       if (info.kind === 'rejected') {
