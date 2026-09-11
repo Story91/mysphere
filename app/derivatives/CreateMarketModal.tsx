@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { maxUint256, type Address } from 'viem';
+import { formatEther, maxUint256, type Address } from 'viem';
 import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
 import { Button } from '@/components/ui/button';
 import {
@@ -25,7 +25,8 @@ import {
   marketAbi,
   oracleAbi,
 } from './config';
-import { fmtBps, fmtUsdc, fmtWadCompact, usdc, wad } from './format';
+import { fmtAge, fmtBps, fmtUsdc, fmtWadCompact, usdc, wad } from './format';
+import { INDEX_FEEDS, PYTH_ADDRESS, ZERO_FEED, adapterAbi, feedByAddress, pythAbi } from './indexFeeds';
 
 /**
  * ZALOZENIE RYNKU - trzy transakcje, w tej kolejnosci i nie inaczej.
@@ -110,12 +111,17 @@ export default function CreateMarketModal({
   onOpenChange,
   onCreated,
   referenceMarket,
+  initialFeed,
+  initialSymbol,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated: () => void;
   /** Dowolny zywy rynek - stad czytamy mnozniki OI i progi dojrzalosci. */
   referenceMarket?: Address;
+  /** Podpowiedz z zewnatrz (np. z kreatora tokenu na Startpadzie): adres adaptera indeksu. */
+  initialFeed?: Address | null;
+  initialSymbol?: string | null;
 }) {
   const { address, chainId } = useAccount();
   const client = usePublicClient({ chainId: DERIV_CHAIN.id });
@@ -128,6 +134,55 @@ export default function CreateMarketModal({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [limits, setLimits] = useState<Limits>(EMPTY);
+  /* ---- ZRODLO INDEKSU. Zero = wlasny feed w rejestrze (tworca publikuje
+     ceny). Adres = PythAggregatorAdapter; rynek czyta go jako indeks, a
+     rejestr zostaje TYLKO zapasem na czas, gdy Pyth oddaje 0. Pole w rynku
+     jest immutable - to jedyny moment na te decyzje. ---- */
+  const [feed, setFeed] = useState<Address>(ZERO_FEED);
+  const [feedState, setFeedState] = useState<{ price: bigint; ageSec: number; publishTime: number } | 'missing' | null>(null);
+
+  // Podpowiedzi z zewnatrz wchodza PRZY OTWARCIU i tylko do pustych pol.
+  useEffect(() => {
+    if (!open) return;
+    if (initialFeed && feedByAddress(initialFeed)) setFeed(initialFeed);
+    if (initialSymbol) setSymbol((current) => (current.trim() === '' ? initialSymbol : current));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  // Wiek i cena wybranego feedu - prosto z Pytha, zeby powiedziec "15 dni",
+  // a nie tylko "0". Cena startowa podpowiada sie ze swiezego feedu.
+  useEffect(() => {
+    const f = feedByAddress(feed);
+    if (!client || !f) {
+      setFeedState(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const [raw, round] = await Promise.all([
+          client.readContract({ address: PYTH_ADDRESS, abi: pythAbi, functionName: 'getPriceUnsafe', args: [f.priceId] }),
+          client.readContract({ address: f.address, abi: adapterAbi, functionName: 'latestRoundData' }),
+        ]);
+        if (cancelled) return;
+        const publishTime = Number(raw.publishTime);
+        const ageSec = Math.max(0, Math.floor(Date.now() / 1000) - publishTime);
+        // Cena w 18 miejscach z surowej odpowiedzi Pytha (adapter oddaje 0 po maxAge).
+        const shift = 18 + Number(raw.expo);
+        const price18 = shift >= 0 ? BigInt(raw.price) * 10n ** BigInt(shift) : BigInt(raw.price) / 10n ** BigInt(-shift);
+        setFeedState({ price: price18, ageSec, publishTime });
+        if (round[1] > 0n) setPrice((current) => (current.trim() === '' ? formatEther(round[1]) : current));
+      } catch {
+        if (!cancelled) setFeedState('missing');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [client, feed]);
+  const selectedFeed = feedByAddress(feed);
+  const feedStale =
+    feedState !== null && feedState !== 'missing' && selectedFeed != null && feedState.ageSec > selectedFeed.maxAge;
 
   const loadLimits = useCallback(async () => {
     if (!client) return;
@@ -269,7 +324,7 @@ export default function CreateMarketModal({
         address: FACTORY_ADDRESS,
         abi: factoryAbi,
         functionName: 'createMarket',
-        args: [marketId, vliq, '0x0000000000000000000000000000000000000000'],
+        args: [marketId, vliq, feed],
         chain: DERIV_CHAIN,
         account: address!,
       });
@@ -304,6 +359,44 @@ export default function CreateMarketModal({
               onChange={(e) => setSymbol(e.target.value)}
               maxLength={24}
             />
+          </div>
+
+          <div className="grid gap-1.5">
+            <Label htmlFor="deriv-feed">Index price source</Label>
+            <select
+              id="deriv-feed"
+              value={feed}
+              onChange={(e) => setFeed(e.target.value as Address)}
+              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+            >
+              <option value={ZERO_FEED}>Your own feed in the registry (you publish prices)</option>
+              {INDEX_FEEDS.map((f) => (
+                <option key={f.address} value={f.address}>
+                  {f.symbol} via Pyth
+                </option>
+              ))}
+            </select>
+            {selectedFeed == null ? (
+              <p className="text-xs text-muted-foreground">
+                Traders are funded against the price you submit. The bond is what keeps you honest.
+              </p>
+            ) : feedState === null ? (
+              <p className="text-xs text-muted-foreground">Reading {selectedFeed.symbol} from Pyth on Arc...</p>
+            ) : feedState === 'missing' ? (
+              <p className="text-xs text-destructive">Pyth on Arc has no {selectedFeed.symbol} feed on chain. Pick another source.</p>
+            ) : feedStale ? (
+              <p className="text-xs text-destructive">
+                {selectedFeed.symbol} on Arc was last updated {fmtAge(feedState.publishTime)} ago at {fmtWadCompact(feedState.price)}.
+                Older than {Math.round(selectedFeed.maxAge / 3600)}h, so the adapter returns 0 and this market would run on YOUR
+                registry price until Pyth refreshes. Pyth&apos;s Arc contract currently rejects new Hermes signatures, so
+                nobody can refresh it from here. Label it that way or wait.
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                {selectedFeed.symbol} via Pyth: {fmtWadCompact(feedState.price)}, updated {fmtAge(feedState.publishTime)} ago.
+                Funding follows this price; your registry feed is only the fallback when Pyth goes stale.
+              </p>
+            )}
           </div>
 
           <div className="grid gap-1.5">

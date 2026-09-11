@@ -149,6 +149,18 @@ export default function DerivativesBoard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  /* ---- WEJSCIE Z KREATORA TOKENU. Startpad na Arc podaje w URL adres
+     adaptera i symbol (/derivatives?new=1&feed=0x..&symbol=..), zeby tworca
+     sparowanego tokenu nie przepisywal nic recznie. Czytamy z window, nie z
+     useSearchParams - ten drugi wymaga Suspense przy statycznym renderze. ---- */
+  const [prefill, setPrefill] = useState<{ feed: Address | null; symbol: string | null }>({ feed: null, symbol: null });
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('new') !== '1') return;
+    const feed = params.get('feed');
+    setPrefill({ feed: feed && /^0x[0-9a-fA-F]{40}$/.test(feed) ? (feed as Address) : null, symbol: params.get('symbol') });
+    setCreateOpen(true);
+  }, []);
   const [guideOpen, setGuideOpen] = useState(false);
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
   const guideRef = useRef<HTMLDivElement | null>(null);
@@ -826,6 +838,8 @@ export default function DerivativesBoard() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         referenceMarket={guideMarket?.address}
+        initialFeed={prefill.feed}
+        initialSymbol={prefill.symbol}
         onCreated={() => {
           setCreateOpen(false);
           void load();

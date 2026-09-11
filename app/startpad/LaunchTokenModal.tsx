@@ -55,6 +55,8 @@ import {
 import { formatUsd, useEthUsd } from './useEthUsd';
 import { browserStorage, clearPendingProfile, postProfileWithRetry, savePendingProfile, sendTokenProfile } from './profileSync';
 import { resolveMediaUrl } from './metadata';
+import { arcTestnet } from './arcChain';
+import { INDEX_FEEDS, feedByAddress, pairedMarketSymbol } from '../derivatives/indexFeeds';
 import { resizeImageFile } from './logoUpload';
 import { expectedAttempts, HEX_SUBSTITUTES, isMineable } from '../utils/b20/addressing';
 import { mineLaunchpadVanity, predictLaunchpadVanity, type LaunchpadVanityContext } from '../utils/b20/launchpadVanity';
@@ -152,6 +154,14 @@ function buildMetadataUri(
   description: string,
   image: string,
   links: Record<string, string>,
+  /**
+   * SPAROWANY INDEKS (tylko Arc). Adres adaptera Pytha i jego symbol ida w
+   * NIEZMIENNE metadane tokena - to deklaracja tworcy "ten token zyje obok
+   * rynku perp na AAPL", ktorej nie da sie potem cicho zmienic. Sam rynek
+   * powstaje osobno, w /derivatives, za kaucje tworcy; metadane go nie
+   * tworza i nie gwarantuja.
+   */
+  pairedIndex: { symbol: string; feed: string } | null = null,
 ) {
   const trimmed = explicit.trim();
   if (trimmed) return trimmed;
@@ -160,11 +170,12 @@ function buildMetadataUri(
   const linkEntries = Object.entries(links)
     .map(([key, value]) => [key, value.trim()] as const)
     .filter(([, value]) => value !== '');
-  if (!desc && !img && linkEntries.length === 0) return '';
+  if (!desc && !img && linkEntries.length === 0 && !pairedIndex) return '';
   const payload: Record<string, unknown> = { name: name.trim() };
   if (desc) payload.description = desc;
   if (img) payload.image = img;
   if (linkEntries.length > 0) payload.links = Object.fromEntries(linkEntries);
+  if (pairedIndex) payload.pairedIndex = pairedIndex;
   return `data:application/json;base64,${toBase64(JSON.stringify(payload))}`;
 }
 
@@ -360,6 +371,12 @@ export default function LaunchTokenModal({
   const [launchMetadataUri, setLaunchMetadataUri] = useState('');
   const [links, setLinks] = useState<LinkFields>({ website: '', x: '', telegram: '' });
   const [linksOpen, setLinksOpen] = useState(false);
+  /* ---- SPAROWANY INDEKS. Adres adaptera Pytha albo '' = brak. Widoczne
+     tylko na Arc: tam stoja adaptery i rynki perp; na Base ten wybor nie
+     mialby czego uruchomic. ---- */
+  const [pairedFeed, setPairedFeed] = useState<string>('');
+  const pairedIndex = feedByAddress(pairedFeed);
+  const pairingAvailable = LAUNCHPAD_CHAIN.id === arcTestnet.id && INDEX_FEEDS.length > 0;
   const [launchFeePct, setLaunchFeePct] = useState('1');
   // Start od sufitu z fallbacku, nie od zaszytej liczby - odczyt z lancucha i
   // tak nadpisze te wartosc, a stary hardkod '60' klamal po podniesieniu limitu.
@@ -829,6 +846,7 @@ export default function LaunchTokenModal({
           launchDescription,
           urlStatus === 'valid' ? launchImage : '',
           links,
+          pairingAvailable && pairedIndex ? { symbol: pairedIndex.symbol, feed: pairedIndex.address } : null,
         ),
         preBuyWei,
       },
@@ -1450,6 +1468,18 @@ export default function LaunchTokenModal({
                   {profileNotice}
                 </p>
               )}
+              {pairingAvailable && pairedIndex && (
+                <Link
+                  href={`/derivatives?new=1&feed=${pairedIndex.address}&symbol=${encodeURIComponent(pairedMarketSymbol(pairedIndex.base, launched.symbol))}`}
+                  className="mt-4 block w-full rounded-2xl border border-soft-primary/25 bg-soft-primary/[0.05] p-4 text-left hover:border-soft-primary"
+                >
+                  <p className="text-[13px] font-extrabold text-sp-ink">Open the {pairedIndex.symbol} perp market for {launched.symbol}</p>
+                  <p className="mt-1 text-[12px] leading-[1.45] text-sp-shade/60">
+                    A USDC vAMM funded against Pyth&apos;s {pairedIndex.symbol} price. You post the registry bond; the form
+                    comes prefilled with this feed and the market name.
+                  </p>
+                </Link>
+              )}
               <div className="mt-6 flex w-full flex-col gap-2 sm:flex-row">
                 <Link
                   href={`/startpad/${launched.address}`}
@@ -1652,6 +1682,32 @@ export default function LaunchTokenModal({
                         </div>
                       )}
                     </div>
+
+                    {/* SPAROWANY INDEKS - tylko Arc. Wybor idzie do niezmiennych
+                        metadanych; rynek perp tworca stawia osobno, za kaucje. */}
+                    {pairingAvailable && (
+                      <div className="rounded-2xl border border-sp-shade/10 bg-sp-surface p-3.5">
+                        <label className="block">
+                          <span className={LABEL}>
+                            Pair with a market index{' '}
+                            <span className="text-[10.5px] font-bold text-sp-shade/35">optional · Arc only</span>
+                          </span>
+                          <select value={pairedFeed} onChange={(event) => setPairedFeed(event.target.value)} className={FIELD}>
+                            <option value="">No pairing</option>
+                            {INDEX_FEEDS.map((f) => (
+                              <option key={f.address} value={f.address}>
+                                {f.symbol} via Pyth
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <p className={HINT}>
+                          {pairedIndex
+                            ? `Your token's metadata will say it is paired with ${pairedIndex.symbol}. After launch you can open a USDC perp market funded against that price - it takes a separate bond in the registry.`
+                            : 'A token can launch next to a perpetual market on a stock, ETF or crypto index priced by Pyth. The pairing is recorded in the onchain metadata.'}
+                        </p>
+                      </div>
+                    )}
 
                     {/* Pre-buy jako osobny KROK, nie pole schowane w siatce -
                         to jedyna decyzja o pieniadzach na szybkiej sciezce. */}
