@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { parseEther, createPublicClient, http } from 'viem';
+import { parseEther } from 'viem';
 import { toast } from 'react-hot-toast';
 import { MARKETPLACE_ADDRESS, MARKETPLACE_ABI, DEFAULT_IP_NFT_CONTRACT } from '../config/simpleMarketplace';
-import { baseCampChain } from '@/app/contracts/BaseCampPostContract';
+import { createCampPublicClient } from '../config/campClient';
 import { fetchIpNftsFor } from '@/app/mycamp/api/fetchIpNfts';
 
 export default function CreateAuctionModal({ nftContract: initialNftContract, tokenId: initialTokenId, onClose }: { nftContract?: `0x${string}`; tokenId?: bigint; onClose: () => void }) {
@@ -35,10 +35,7 @@ export default function CreateAuctionModal({ nftContract: initialNftContract, to
         const nfts = await fetchIpNftsFor(address);
         
         // Check which NFTs are already listed
-        const client = createPublicClient({
-          chain: baseCampChain,
-          transport: http()
-        });
+        const client = createCampPublicClient();
         
         const listingCount = await client.readContract({
           address: MARKETPLACE_ADDRESS as `0x${string}`,
@@ -119,10 +116,7 @@ export default function CreateAuctionModal({ nftContract: initialNftContract, to
           setSelectedNftDetails(nft);
         } else {
           // Otherwise fetch metadata
-          const client = createPublicClient({
-            chain: baseCampChain,
-            transport: http()
-          });
+          const client = createCampPublicClient();
           
           // Get tokenURI from the NFT contract
           const ipNftAbi = [

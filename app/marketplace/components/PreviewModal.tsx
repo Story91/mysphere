@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { createPublicClient, http, parseEther } from 'viem';
+import { parseEther } from 'viem';
 import { toast } from 'react-hot-toast';
-import { MARKETPLACE_ADDRESS, MARKETPLACE_ABI } from '../config/simpleMarketplace';
+import { MARKETPLACE_ADDRESS, MARKETPLACE_ABI, DEFAULT_IP_NFT_CONTRACT } from '../config/simpleMarketplace';
+import { createCampPublicClient } from '../config/campClient';
 
 interface PreviewModalProps {
   nft: any;
@@ -62,7 +63,7 @@ export default function PreviewModal({ nft: item, onClose }: PreviewModalProps) 
     (async () => {
       try {
         if (!item?.tokenId) return;
-        const client = createPublicClient({ transport: http('https://rpc.basecamp.t.raas.gelato.cloud') });
+        const client = createCampPublicClient();
         const t = await client.readContract({ address: MARKETPLACE_ADDRESS as `0x${string}`, abi: MARKETPLACE_ABI, functionName: 'getTerms', args: [BigInt(item.tokenId)] }) as any;
         if (t && (t.price ?? 0n) > 0n && (t.duration ?? 0n) > 0n) {
           setTerms({ price: t.price as bigint, duration: t.duration as bigint, paymentToken: t.paymentToken as string });
@@ -155,7 +156,7 @@ export default function PreviewModal({ nft: item, onClose }: PreviewModalProps) 
             className="underline hover:text-white" 
             target="_blank" 
             rel="noreferrer" 
-                            href={`https://camp.cloud.blockscout.com/token/${item.contract || '0xF90733b9eCDa3b49C250B2C3E3E42c96fC93324E'}/instance/${item.tokenId || item.id}`}
+                            href={`https://camp.cloud.blockscout.com/token/${item.contract || DEFAULT_IP_NFT_CONTRACT}/instance/${item.tokenId || item.id}`}
           >
             Explorer
           </a>

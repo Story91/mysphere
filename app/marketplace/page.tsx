@@ -6,9 +6,8 @@ import { useAccount } from 'wagmi';
 import { motion } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { createPublicClient, http } from 'viem';
-import { baseCampChain } from '@/app/contracts/BaseCampPostContract';
 import { MARKETPLACE_ADDRESS, MARKETPLACE_ABI, DEFAULT_IP_NFT_CONTRACT } from './config/simpleMarketplace';
+import { createCampPublicClient } from './config/campClient';
 
 // Dynamicznie importuj komponenty które używają wagmi hooks
 const MarketplaceGrid = dynamic(() => import('./components/MarketplaceGrid'), {
@@ -63,7 +62,7 @@ export default function MarketplacePage() {
   useEffect(() => {
     (async () => {
       try {
-        const client = createPublicClient({ chain: baseCampChain, transport: http(baseCampChain.rpcUrls.default.http[0]) });
+        const client = createCampPublicClient();
         // Active listings count
         let listed = 0;
         try {
@@ -93,7 +92,7 @@ export default function MarketplacePage() {
         // Unique holders for main IP contract
         let creators = 0;
         try {
-          const IP_MAIN = '0xF90733b9eCDa3b49C250B2C3E3E42c96fC93324E';
+          const IP_MAIN = DEFAULT_IP_NFT_CONTRACT;
           // Try Blockscout v2 token endpoint first
           let got = false;
           try {
@@ -113,18 +112,8 @@ export default function MarketplacePage() {
               if (total2 && total2 > 0) { creators = total2; got = true; }
             } catch {}
           }
-          if (!got) {
-            // Last resort: scrape holders page
-            try {
-              const page = await fetch(`https://camp.cloud.blockscout.com/token/${IP_MAIN}`);
-              const html = await page.text();
-              const m = html.match(/Holders[^\d]*([\d,]+)/i);
-              if (m && m[1]) {
-                creators = Number(m[1].replace(/,/g, ''));
-                got = true;
-              }
-            } catch {}
-          }
+          // Bez trzeciego fallbacku (scrape HTML /token/...): Blockscout nie daje
+          // CORS na strony HTML, wiec to zawsze konczylo sie bledem w konsoli.
           if (!got) creators = 0;
         } catch {}
 
@@ -282,18 +271,6 @@ export default function MarketplacePage() {
         {activeView === 'live' && (
           <div className="animate-fadeIn">
             <MarketplaceGrid mode="live" onOpenListModal={(nft) => { setPrefillTokenId(nft?.tokenId); setShowCreateModal(true); }} />
-            {/* Stalo tu "IP Live source: 0xF90733b9...", czyli obietnica, ze widok
-                czyta zywe dane spod tego adresu. eth_getCode na Camp Network (484)
-                zwraca 0x - ani dla kolekcji IP-NFT (0xF90733b9...), ani dla targu
-                (0xf528f920...), sprawdzone przez scripts/verifyOnchainInventory.js.
-                Pod obydwoma NIE MA kontraktu, wiec zaden odczyt stamtad nie moze sie
-                udac i siatka zawsze wyjdzie pusta. Sam adres pod pusta siatka czytalo
-                sie jako "zrodlo dziala, po prostu nikt nic nie wystawil" - a to nie
-                to samo. Podpis mowi teraz, ze polaczenia nie ma. */}
-            <div className="text-center text-xs text-gray-500 mt-2">
-              IP Live is not connected: no contract is deployed at the configured
-              Camp Network addresses, so nothing can load here.
-            </div>
           </div>
         )}
         {activeView === 'activity' && (

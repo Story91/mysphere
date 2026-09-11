@@ -29,8 +29,10 @@ export async function fetchIpNftsFor(address: string) {
   const json = await res.json();
   const result = (json?.result || []) as NftTx[];
 
-  // IP NFT contract address from Origin SDK
-  const IP_NFT_CONTRACT = '0xF90733b9eCDa3b49C250B2C3E3E42c96fC93324E';
+  // IP NFT Origin na Camp mainnet (484). Stary 0xF907...324E to Basecamp
+  // testnet - na 484 nie ma kodu. Adres z DATANFT_CONTRACT_ADDRESS w
+  // @campnetwork/origin 1.3.2, potwierdzony eth_getCode + Blockscout (ERC-721 'IP NFT').
+  const IP_NFT_CONTRACT = '0x39EeE1C3989f0dD543Dee60f8582F7F81F522C38';
   
   const ipNftTransfers = result.filter((tx) =>
     tx.contractAddress.toLowerCase() === IP_NFT_CONTRACT.toLowerCase() ||
@@ -110,7 +112,7 @@ export async function fetchIpNftsFor(address: string) {
 }
 
 export async function fetchRecentIpNfts(limit: number = 50) {
-  const IP_NFT_CONTRACT = '0xF90733b9eCDa3b49C250B2C3E3E42c96fC93324E';
+  const IP_NFT_CONTRACT = '0x39EeE1C3989f0dD543Dee60f8582F7F81F522C38';
   const res = await fetch(`${BLOCKSCOUT}?module=account&action=tokennfttx&contractaddress=${IP_NFT_CONTRACT}`);
   const json = await res.json();
   const result = (json?.result || []) as NftTx[];

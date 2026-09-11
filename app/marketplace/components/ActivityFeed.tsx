@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { createPublicClient, http } from 'viem';
-import { baseCampChain } from '@/app/contracts/BaseCampPostContract';
+
 import { MARKETPLACE_ADDRESS, MARKETPLACE_ABI } from '../config/simpleMarketplace';
+import { createCampPublicClient } from '../config/campClient';
 
 interface ActivityEvent {
   type: 'listing' | 'sale' | 'offer' | 'cancel' | 'auction' | 'bid' | 'access';
@@ -26,10 +26,7 @@ export default function ActivityFeed() {
     const fetchMarketplaceActivity = async () => {
       console.log('🔍 Fetching marketplace activity using contract reads...');
       try {
-        const client = createPublicClient({
-          chain: baseCampChain,
-          transport: http('https://rpc.basecamp.t.raas.gelato.cloud')
-        });
+        const client = createCampPublicClient();
 
         const activityEvents: ActivityEvent[] = [];
 

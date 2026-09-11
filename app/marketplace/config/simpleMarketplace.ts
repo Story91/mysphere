@@ -1,16 +1,11 @@
 // Simple IP NFT Marketplace configuration for Camp Network
 // This is the main marketplace contract with all required functions
 //
-// UWAGA: OBA adresy w tym pliku nie maja bajtkodu na Camp Network (484) -
-// eth_getCode zwraca 0x, sprawdzone przez scripts/verifyOnchainInventory.js
-// i opisane w app/utils/ops/registry.ts. Konfiguracja wskazuje na nic, wiec
-// kazdy readContract stad odpada. Trasa /marketplace jest dzis zaparkowana w
-// config/routeStatus.js. Komentarze mowily "deployed on Camp Network" - to
-// bylo nieprawda i dlatego znikly; jesli kontrakty kiedys wstana, zamien tu
-// adresy, a nie same zdania.
-
-// Adres targu wg konfiguracji. NIE POTWIERDZONY lancuchowo - brak kodu na 484.
-export const MARKETPLACE_ADDRESS = '0xf528f920d0ce1d1ea230b0ec10f0f64b8f43cbac';
+// IPMarketV4 wdrozony na Camp mainnet (484) 2026-09-11 z contracts/IPmarketV4.sol
+// przez scripts/deployIPmarket.js (deployer 0xD488...030e). ABI ponizej zgadza
+// sie z kompilatem 1:1. ipNftContract ustawiony na kolekcje Origin (nizej).
+// Poprzedni 0xf528...cbac byl z Basecamp testnetu i na 484 nie mial kodu.
+export const MARKETPLACE_ADDRESS = '0xd02A166A186bcc5C537FeCD5103E9c1A94Bb49D6';
 
 // Full ABI from deployed contract V3
 export const MARKETPLACE_ABI = [
@@ -1658,9 +1653,11 @@ export const MARKETPLACE_ABI = [
   }
 ] as const;
 
-// Default IP NFT contract used for listing (main IP collection).
-// NIE POTWIERDZONY lancuchowo - brak kodu na 484, patrz naglowek pliku.
-export const DEFAULT_IP_NFT_CONTRACT = '0xF90733b9eCDa3b49C250B2C3E3E42c96fC93324E';
+// Kolekcja IP NFT Camp Origin na mainnecie 484 (ERC-721 "IP NFT", symbol IP).
+// Adres z DATANFT_CONTRACT_ADDRESS w @campnetwork/origin 1.3.2, potwierdzony
+// eth_getCode i Blockscoutem 2026-09-11. Poprzedni 0xF907...324E byl z Basecamp
+// testnetu i na 484 nie mial kodu.
+export const DEFAULT_IP_NFT_CONTRACT = '0x39EeE1C3989f0dD543Dee60f8582F7F81F522C38';
 
 // License presets for quick selection
 export const LICENSE_PRESETS = [
