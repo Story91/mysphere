@@ -16,6 +16,7 @@ import {
   oracleAbi,
 } from '../config';
 import { shortAddress } from '../format';
+import { ZERO_FEED, feedByAddress, pythAbi, pythEventsAbi, pythToWad } from '../indexFeeds';
 import type { ActivityItem, Position, PricePoint, R, Snapshot } from './types';
 
 /**
@@ -45,11 +46,15 @@ export function useMarketData(market: Address) {
     try {
       // Adresy/identyfikatory, bez ktorych nie da sie ulozyc reszty zapytan.
       // Wszystkie trzy w JEDNYM multicallu - to nadal jedna podroz do RPC.
-      const [idRes, insRes, feesRes] = await client.multicall({
+      // Wszystkie cztery w JEDNYM multicallu - to nadal jedna podroz do RPC.
+      // `CHAINLINK_FEED` jest tu, a nie w drugim multicallu, bo od niego
+      // zalezy, czy do drugiego dolozyc `getPriceUnsafe` (expo feedu Pytha).
+      const [idRes, insRes, feesRes, feedRes] = await client.multicall({
         contracts: [
           { address: market, abi: marketAbi, functionName: 'ORACLE_MARKET_ID' },
           { address: FACTORY_ADDRESS, abi: factoryAbi, functionName: 'INSURANCE' },
           { address: FACTORY_ADDRESS, abi: factoryAbi, functionName: 'FEES' },
+          { address: market, abi: marketAbi, functionName: 'CHAINLINK_FEED' },
         ],
         allowFailure: true,
       });
@@ -57,6 +62,10 @@ export function useMarketData(market: Address) {
       const id = idRes.result as bigint;
       const insurance = insRes.status === 'success' ? (insRes.result as Address) : null;
       const feesAddress = feesRes.status === 'success' ? (feesRes.result as Address) : null;
+      const indexFeed = feedRes.status === 'success' ? (feedRes.result as Address) : null;
+      // Znany adapter Pytha z deployments/pythAdapters.*.json - tylko wtedy
+      // wiemy, z ktorego kontraktu i pod jakim priceId szukac logow.
+      const feed = indexFeed && indexFeed !== ZERO_FEED ? feedByAddress(indexFeed) : null;
 
       // Jeden multicall na CALA strone. Arc limituje liczbe zapytan i okno
       // getLogs, wiec dwadziescia kilka osobnych `eth_call` to prosta droga
@@ -100,6 +109,11 @@ export function useMarketData(market: Address) {
           { key: 'feeLockDays', address: feesAddress, abi: feesAbi, functionName: 'LOCK_DAYS' },
           { key: 'treasury', address: feesAddress, abi: feesAbi, functionName: 'TREASURY' },
         );
+      }
+      if (feed) {
+        // Expo feedu - potrzebne do przeliczenia int64 z logow na 18 miejsc
+        // dokladnie tak, jak robi to adapter. Bez niego historia zostaje pusta.
+        calls.push({ key: 'pythPrice', address: feed.pyth, abi: pythAbi, functionName: 'getPriceUnsafe', args: [feed.priceId] });
       }
       if (address) {
         calls.push(
@@ -182,6 +196,7 @@ export function useMarketData(market: Address) {
         insuranceShareBps: N('insuranceShareBps'),
         feeLockDays: N('feeLockDays'),
         treasury: (v.treasury as Address) ?? null,
+        indexFeed,
       });
 
       const pos = tuple('getPosition');
@@ -200,7 +215,8 @@ export function useMarketData(market: Address) {
         setPosition(null);
       }
 
-      // Historia cen z logow feedu.
+      // Historia cen z logow feedu - rejestru albo (rynek z CHAINLINK_FEED)
+      // kontraktu Pytha/PythReceivera, patrz nizej.
       //
       // Blockdaemon przyjmuje okno 50k blokow na jedno `eth_getLogs`, a Arc
       // robi blok co 0,51 s - jedno okno to ok. 5,5 h. Wykres z zakresem
@@ -218,24 +234,52 @@ export function useMarketData(market: Address) {
           const lo = to > CHUNK ? to - CHUNK + 1n : 0n;
           return { fromBlock: i === 0 ? (head > CHUNK ? head - CHUNK : 0n) : lo, toBlock: i === 0 ? head : to };
         }).filter((w) => w.toBlock > 0n);
-        const chunks = await Promise.all(
-          windows.map((w) =>
-            client.getContractEvents({
-              address: ORACLE_ADDRESS,
-              abi: oracleAbi,
-              eventName: 'PriceSubmitted',
-              args: { marketId: id },
-              fromBlock: w.fromBlock,
-              toBlock: w.toBlock,
-            }),
-          ),
-        );
-        const logs = chunks.flat();
         const points: PricePoint[] = [];
-        for (const l of logs) {
-          const a = (l as unknown as { args: { price?: bigint; timestamp?: bigint } }).args;
-          if (a.price === undefined || a.timestamp === undefined) continue;
-          points.push({ time: Number(a.timestamp), price: a.price });
+        if (feed) {
+          // Rynek z zewnetrznym feedem: rejestr nie dostaje dla niego
+          // `PriceSubmitted`, wiec historia to `PriceFeedUpdate` z kontraktu,
+          // z ktorego adapter czyta (nasz PythReceiver albo kontrakt Pytha
+          // dla BTC), filtrowane po priceId. Cena w logu to int64 * 10^expo.
+          const pythPrice = v.pythPrice as { expo?: number } | null;
+          if (typeof pythPrice?.expo !== 'number') throw new Error('expo unknown');
+          const expo = pythPrice.expo;
+          const chunks = await Promise.all(
+            windows.map((w) =>
+              client.getContractEvents({
+                address: feed.pyth,
+                abi: pythEventsAbi,
+                eventName: 'PriceFeedUpdate',
+                args: { id: feed.priceId },
+                fromBlock: w.fromBlock,
+                toBlock: w.toBlock,
+              }),
+            ),
+          );
+          for (const l of chunks.flat()) {
+            const a = (l as unknown as { args: { price?: bigint; publishTime?: bigint } }).args;
+            if (a.price === undefined || a.publishTime === undefined || a.price <= 0n) continue;
+            const wad = pythToWad(a.price, expo);
+            if (wad === null) continue;
+            points.push({ time: Number(a.publishTime), price: wad });
+          }
+        } else {
+          const chunks = await Promise.all(
+            windows.map((w) =>
+              client.getContractEvents({
+                address: ORACLE_ADDRESS,
+                abi: oracleAbi,
+                eventName: 'PriceSubmitted',
+                args: { marketId: id },
+                fromBlock: w.fromBlock,
+                toBlock: w.toBlock,
+              }),
+            ),
+          );
+          for (const l of chunks.flat()) {
+            const a = (l as unknown as { args: { price?: bigint; timestamp?: bigint } }).args;
+            if (a.price === undefined || a.timestamp === undefined) continue;
+            points.push({ time: Number(a.timestamp), price: a.price });
+          }
         }
         // Zdarzenia przychodza w kolejnosci blokow, ale wykres potrzebuje
         // rosnacego czasu z argumentu - sortujemy po nim, nie po bloku.

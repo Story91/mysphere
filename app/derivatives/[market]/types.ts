@@ -62,6 +62,11 @@ export type Snapshot = {
   insuranceShareBps: R<number>;
   feeLockDays: R<number>;
   treasury: R<Address>;
+  /**
+   * `CHAINLINK_FEED` rynku: adres adaptera Pytha albo zero, gdy indeks idzie z
+   * rejestru. `null` = nie udalo sie odczytac, wiec NIE wiemy, skad brac historie.
+   */
+  indexFeed: R<Address>;
 };
 
 export type Position = {

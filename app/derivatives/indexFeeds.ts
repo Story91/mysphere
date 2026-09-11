@@ -110,6 +110,39 @@ export const pythAbi = [
   },
 ] as const;
 
+/**
+ * Zdarzenie, ktore emituje KAZDE wypchniecie ceny - ten sam podpis w naszym
+ * PythReceiver i w kontrakcie Pytha (IPythEvents), wiec jeden ABI starcza
+ * dla BTC (kontrakt Pytha) i reszty (nasz odbiornik). Wykres rynku z
+ * zewnetrznym feedem czyta historie wlasnie stad, bo rejestr
+ * PriceOracleRegistry nie dostaje dla takich rynkow zadnych `PriceSubmitted`.
+ */
+export const pythEventsAbi = [
+  {
+    type: 'event',
+    name: 'PriceFeedUpdate',
+    inputs: [
+      { name: 'id', type: 'bytes32', indexed: true },
+      { name: 'publishTime', type: 'uint64', indexed: false },
+      { name: 'price', type: 'int64', indexed: false },
+      { name: 'conf', type: 'uint64', indexed: false },
+    ],
+  },
+] as const;
+
+/**
+ * Ta sama arytmetyka co `PythAggregatorAdapter._toWad`: Pyth podaje
+ * `price * 10^expo`, adapter oddaje 18 miejsc. Poza zakresem adaptera
+ * (shift < -18 lub > 36) zwracamy `null` - adapter w tym miejscu rewertuje,
+ * wiec i my nie mamy prawa pokazac zadnej liczby.
+ */
+export function pythToWad(price: bigint, expo: number): bigint | null {
+  const shift = 18 + expo;
+  if (shift < -18 || shift > 36) return null;
+  if (shift >= 0) return price * 10n ** BigInt(shift);
+  return price / 10n ** BigInt(-shift);
+}
+
 /** Symbol rynku dla tokena sparowanego z indeksem, w limicie 24 znakow rejestru. */
 export function pairedMarketSymbol(base: string, tokenSymbol: string): string {
   const clean = tokenSymbol.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
