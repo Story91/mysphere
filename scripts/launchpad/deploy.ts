@@ -82,6 +82,15 @@ async function main() {
    * Prog to zawsze czterokrotnosc R_VIRT, a kapitalizacja po graduacji jest
    * szesc i cwierc raza wieksza od zebranej kwoty. Stad wypis nizej - skali nie
    * wdraza sie w ciemno, bo nie ma settera.
+   *
+   * DECYZJA WLASCICIELA (12.09.2026) dla Arc MAINNET: R_VIRT=1250, czyli prog
+   * zbiorki 5000 USDC i kapitalizacja 31 250 USDC po graduacji. Rozwazane byly
+   * 3000 (mcap 18 750 - szybsze graduacje, ale projekt po nich wyglada drobno)
+   * i 10 000 (mcap 62 500 - mniej wiecej jak pump.fun, ale pierwszego dnia na
+   * nowej sieci malo kto by dobil). Wartosc jest WPISANA w `npm run
+   * launchpad:deploy:arc:mainnet`, zeby nie zostala domyslna przez zapomnienie -
+   * domyslne 0.75 dalo na Arc prog 3 USDC i to zabilo nasze pierwsze wdrozenie
+   * na testnecie w sierpniu.
    */
   const rVirt = ethers.parseEther(process.env.R_VIRT ?? "0.75");
   if (rVirt < 75n) throw new Error(`R_VIRT=${process.env.R_VIRT} jest ponizej progu kontraktu (75 wei).`);
