@@ -42,6 +42,7 @@
     "db:setup": "ts-node app/basemorning/scripts/setup-mongodb-indexes.ts",
     "db:indexes": "ts-node app/basemorning/scripts/setup-mongodb-indexes.ts",
     "launchpad:deploy:arc": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run scripts/launchpad/deploy.ts --network arcTestnet",
+    "launchpad:deploy:arc:mainnet": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run scripts/launchpad/deploy.ts --network arcMainnet",
     "launchpad:flow:arc": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json FLOW_CONFIRM=tak LAUNCHPAD=0xe984986f4F1E067f697b548D5fe942813d03Da37 FLOW_BUY_ETH=4 hardhat run scripts/launchpad/sepoliaFlow.ts --network arcTestnet --no-compile",
     "launchpad:seed:arc": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json SEED_CONFIRM=tak LAUNCHPAD=0xe984986f4F1E067f697b548D5fe942813d03Da37 hardhat run scripts/launchpad/arcSeed.ts --network arcTestnet --no-compile",
     "launchpad:crowd:arc": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json CROWD_CONFIRM=tak LAUNCHPAD=0xe984986f4F1E067f697b548D5fe942813d03Da37 CROWD_TOKENS=0xC81E6ea08124DaF5D568bC403B74ee26cAB84A29,0xe3674a6C2982Bb66B255c816d557C1e76F213caa,0xEd0fc070769610F787092520dd821D1d8085D6F9,0x3b91e4E925323BC0d7Fb39FeCf5A2Eaa842355C7,0x47c01EEc2B18bF1E3092E5B692de7F826760Daeb,0x54eB27bbe3E574a8389f300fD45017395e7b19b0 hardhat run scripts/launchpad/arcCrowd.ts --network arcTestnet --no-compile"

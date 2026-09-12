@@ -89,6 +89,21 @@ export const KNOWN_POOL_MANAGERS: Record<number, string> = {
    * Pomiary sieci i uzasadnienie: docs/LAUNCHPAD-STAN.md, sekcja Arc.
    */
   5042002: "0xd02A166A186bcc5C537FeCD5103E9c1A94Bb49D6",
+  /**
+   * Arc MAINNET (chainId 5042). W odroznieniu od testnetu tego NIE stawialismy
+   * my - byl juz na lancuchu, gdy 11.09.2026 pierwszy raz tam zajrzelismy.
+   *
+   * Dlaczego mu ufamy: 24 009 bajtow i hash kodu `0xbd38811...` IDENTYCZNY z
+   * PoolManagerem na Robinhood Chain pod TYM SAMYM adresem - czyli z tym, na
+   * ktorym nasz launchpad juz graduuje tokeny w produkcji. To nie jest "inny
+   * v4 o podobnym rozmiarze", tylko ten sam bajtkod. Sprawdzone `eth_getCode`
+   * na obu sieciach naraz 12.09.2026; `extsload` odpowiada, wiec singleton
+   * dziala. (Wdrozenie Uniswapa na Base ma inny hash - tam metadane sa inne,
+   * bo kompilowal je Foundry z wylaczonym `bytecode_hash`.)
+   *
+   * Skutek praktyczny: na mainnecie NIE powtarzamy `deployPoolManager.ts`.
+   */
+  5042: "0x8366a39CC670B4001A1121B8F6A443A643e40951",
 };
 
 export type PlanInput = {

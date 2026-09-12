@@ -148,6 +148,16 @@ const config = {
       accounts: deployerAccounts(),
       chainId: 5042002,
     },
+    arcMainnet: {
+      // Circle do 12.09.2026 nie opublikowal endpointow mainnetu, a chainlist
+      // ma 5042 z pusta lista RPC. `rpc.arc-scan.org` nalezy do zewnetrznego
+      // eksploratora i jest JEDYNYM dzialajacym, jaki znalazlem - do czasu
+      // publicznego startu (16.09.2026), kiedy pojawia sie oficjalne adresy.
+      // Wtedy podmienic przez ARC_MAINNET_RPC_URL na dostawce z kluczem.
+      url: process.env.ARC_MAINNET_RPC_URL || "https://rpc.arc-scan.org",
+      accounts: deployerAccounts(),
+      chainId: 5042,
+    },
     linea: {
       url: process.env.LINEA_RPC_URL || "https://linea-rpc.publicnode.com",
       accounts: deployerAccounts(),

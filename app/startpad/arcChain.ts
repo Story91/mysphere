@@ -64,3 +64,64 @@ export const arcTestnet = defineChain({
     multicall3: { address: '0xcA11bde05977b3631167028862bE2a173976CA11' },
   },
 });
+
+/**
+ * Arc MAINNET (chainId 5042).
+ *
+ * ===========================================================================
+ * CO JEST SPRAWDZONE ODCZYTEM Z LANCUCHA (11-12.09.2026), A CO NIE
+ * ===========================================================================
+ * Sprawdzone: siec produkuje bloki co 0,50 s (20,5 mln blokow), gasPrice
+ * ~21,5 gwei, USDC pod tym samym `0x3600...0000` (6 miejsc w ERC-20, podaz
+ * 4,4 mln), Multicall3 i Permit2 pod adresami kanonicznymi, CREATE2 factory
+ * jest. Stoi tam GOTOWY Uniswap v4 PoolManager `0x8366a39C...0951` - prawdziwy
+ * singleton (`extsload` odpowiada), wiec w odroznieniu od testnetu NIE musimy
+ * stawiac wlasnego.
+ *
+ * NIE sprawdzone i wazne: czy walidator przyjmie nasza transakcje. `eth_estimateGas`
+ * na wdrozenie kontraktu z naszego adresu przechodzi (56 036 gas), ale to tylko
+ * symulacja - portfel ma 0 USDC, wiec zadnej transakcji jeszcze nie wyslalismy.
+ *
+ * ===========================================================================
+ * RPC: DLACZEGO TEN ADRES I DLACZEGO TO JEST TYMCZASOWE
+ * ===========================================================================
+ * Circle do 12.09.2026 nie opublikowal endpointow mainnetu ("Mainnet endpoints
+ * and parameters are published separately when available"), a chainlist ma 5042
+ * z PUSTA lista RPC. Jedyny dzialajacy, jaki znalazlem, to `rpc.arc-scan.org`
+ * - nalezy do zewnetrznego eksploratora, nie do Circle, i tnie `eth_getLogs`
+ * powyzej 10 000 blokow. Przy 0,5 s na blok to 83 minuty historii na zapytanie,
+ * czyli za malo dla tablicy tokenow.
+ *
+ * PUBLICZNY MAINNET RUSZA 16.09.2026 (komunikat Circle). Wtedy pojawia sie
+ * oficjalne endpointy i CCTP - i wtedy ten adres trzeba podmienic, najlepiej
+ * na dostawce z kluczem (NEXT_PUBLIC_ARC_MAINNET_RPC_URL).
+ *
+ * Oficjalny eksplorator `explorer.arc.io` stoi dzis za logowaniem Cloudflare
+ * Access Circle, wiec jako publiczny wpisany jest `arc-scan.org`.
+ */
+export const arcMainnet = defineChain({
+  id: 5042,
+  name: 'Arc',
+  nativeCurrency: {
+    name: 'USDC',
+    symbol: 'USDC',
+    // Jak na testnecie: natywny zapis ma 18 miejsc, ERC-20 sześć.
+    decimals: 18,
+  },
+  rpcUrls: {
+    default: {
+      http: [process.env.NEXT_PUBLIC_ARC_MAINNET_RPC_URL || 'https://rpc.arc-scan.org'],
+    },
+  },
+  blockExplorers: {
+    default: {
+      name: 'Arcscan',
+      url: 'https://arc-scan.org',
+      apiUrl: 'https://arc-scan.org/api',
+    },
+  },
+  testnet: false,
+  contracts: {
+    multicall3: { address: '0xcA11bde05977b3631167028862bE2a173976CA11' },
+  },
+});

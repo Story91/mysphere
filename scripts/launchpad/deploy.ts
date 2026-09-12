@@ -118,7 +118,11 @@ async function main() {
   // Jednostka natywna SIECI. Wypisywanie "ETH" na Arc bylo drobiazgiem tylko z
   // pozoru: caly powod tej zmiany to fakt, ze te same liczby znacza tam dolary,
   // wiec podpisanie ich zla waluta myli dokladnie tam, gdzie boli najbardziej.
-  const unit = chainId === 5042002 ? "USDC" : "ETH";
+  // Jednostka natywna. Na obu sieciach Arc `msg.value` to USDC, nie ETH -
+  // i to jest DOKLADNIE ta liczba, na ktora patrzy czlowiek tuz przed
+  // CONFIRM=tak. "prog 1000 ETH" zamiast "1000 USDC" to pomylka o cztery
+  // rzedy wielkosci w cenie, a na mainnecie juz za prawdziwe pieniadze.
+  const unit = chainId === 5042002 || chainId === 5042 ? "USDC" : "ETH";
 
   console.log("siec              ", `${network.name} (chainId ${chainId})`);
   console.log("wdrazajacy        ", deployer);
