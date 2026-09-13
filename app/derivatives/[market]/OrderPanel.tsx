@@ -1,5 +1,8 @@
 'use client';
 
+import { useState } from 'react';
+import { useSwitchChain } from 'wagmi';
+import ConnectModal from '@/app/components/wallet/ConnectModal';
 import { AlertTriangle, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -66,6 +69,8 @@ export default function OrderPanel({
   error: string | null;
   onOpen: () => void;
 }) {
+  const [connectOpen, setConnectOpen] = useState(false);
+  const { switchChain, isPending: switching, error: switchError } = useSwitchChain();
   const balance = snap.usdcBalance;
   const spendable = spendableMargin(balance, GAS_RESERVE_USDC);
   const maxLev = snap.maxLeverage ?? 1;
@@ -92,9 +97,9 @@ export default function OrderPanel({
 
   let cta: string;
   let disabled = true;
-  if (busy) cta = busy;
-  else if (!address) cta = 'Connect wallet';
-  else if (wrongChain) cta = `Switch to ${DERIV_CHAIN.name}`;
+  if (busy || switching) cta = busy || 'Switching network...';
+  else if (!address) { cta = 'Connect wallet'; disabled = false; }
+  else if (wrongChain) { cta = `Switch to ${DERIV_CHAIN.name}`; disabled = false; }
   else if (position) cta = 'Close your position first';
   else if (halted) cta = 'Trading halted';
   else if (spendable === null) cta = 'Balance unavailable';
@@ -236,7 +241,7 @@ export default function OrderPanel({
       )}
 
       <Button
-        onClick={onOpen}
+        onClick={() => !address ? setConnectOpen(true) : wrongChain ? switchChain({ chainId: DERIV_CHAIN.id }) : onOpen()}
         disabled={disabled}
         className={`mt-3 h-11 w-full rounded-full text-base font-bold text-white ${
           isLong ? 'bg-sp-up hover:bg-sp-up/90' : 'bg-sp-down hover:bg-sp-down-deep'
@@ -245,6 +250,8 @@ export default function OrderPanel({
         {cta}
       </Button>
       {error && <p className="mt-2 text-xs text-sp-danger">{error}</p>}
+      {switchError && <p className="mt-2 text-xs text-sp-danger">Could not switch networks. Choose {DERIV_CHAIN.name} in your wallet and try again.</p>}
+      <ConnectModal isOpen={connectOpen} onClose={() => setConnectOpen(false)} />
 
       {/* Szczegoly - cala dawna tabelka, zwinieta */}
       <details className="mt-3 text-xs">
