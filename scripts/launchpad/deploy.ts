@@ -3,6 +3,7 @@ import { getAddress } from "ethers";
 import { mkdirSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { buildPlan, readCommonEnv, resolvePoolManager, HOOK_ALL_MASK, HOOK_REQUIRED_FLAGS } from "./plan";
+import { verifyPoolManagerCode } from "./verifyPoolManager";
 
 /**
  * WDROZENIE LAUNCHPADA - jedna transakcja, cztery kontrakty, zero setterow.
@@ -45,6 +46,7 @@ import { buildPlan, readCommonEnv, resolvePoolManager, HOOK_ALL_MASK, HOOK_REQUI
  *   TOKEN_FACTORY       adres istniejacej fabryki; bez tego wdrazamy nowa
  *   FACTORY_KIND        `b20` (domyslnie na Base) albo `plain` (poza Base)
  *   POOL_MANAGER        adres v4 PoolManager; wymagany poza sprawdzonymi sieciami
+ *   POOL_MANAGER_CODE_HASH hash runtime po weryfikacji; wymagany na Arc mainnet
  *   CONFIRM             musi byc `tak` przy wdrozeniu na siec inna niz lokalna
  */
 
@@ -124,6 +126,8 @@ async function main() {
     );
   }
 
+  const pmCodeHash = verifyPoolManagerCode(chainId, pmCode);
+
   // Jednostka natywna SIECI. Wypisywanie "ETH" na Arc bylo drobiazgiem tylko z
   // pozoru: caly powod tej zmiany to fakt, ze te same liczby znacza tam dolary,
   // wiec podpisanie ich zla waluta myli dokladnie tam, gdzie boli najbardziej.
@@ -137,6 +141,7 @@ async function main() {
   console.log("wdrazajacy        ", deployer);
   console.log("saldo             ", ethers.formatEther(await ethers.provider.getBalance(deployer)), unit);
   console.log("PoolManager       ", poolManager, `[${pmSource}, ${(pmCode.length - 2) / 2} B kodu]`);
+  console.log("PoolManager hash  ", pmCodeHash);
   console.log("feeRecipient      ", feeRecipient);
   console.log("feeBps            ", feeBps.toString());
   console.log("creatorFeeBps     ", creatorFeeBps.toString());
@@ -317,6 +322,7 @@ async function main() {
         network: network.name,
         deployer,
         poolManager,
+        poolManagerCodeHash: pmCodeHash,
         tokenFactory,
         launchpad: launchpadAddress,
         vault: vaultAddress,
