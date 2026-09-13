@@ -67,6 +67,8 @@ export type Snapshot = {
    * rejestru. `null` = nie udalo sie odczytac, wiec NIE wiemy, skad brac historie.
    */
   indexFeed: R<Address>;
+  indexSource?: 'external' | 'registry' | 'fallback' | 'unknown';
+  indexUpdatedAt?: R<number>;
 };
 
 export type Position = {

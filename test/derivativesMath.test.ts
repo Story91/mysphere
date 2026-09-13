@@ -6,6 +6,29 @@ export {};
 // potwierdza test kontraktu i raport z 10 wrzesnia).
 const { expect } = require('chai');
 const { previewOpen, filterRange, priceChangePct, WAD } = require('../app/derivatives/[market]/math');
+const { resolvePriceSource, spendableMargin, requireSuccessfulReceipt } = require('../app/derivatives/priceSource');
+
+describe('perps price provenance and transaction safety', () => {
+  const feed = '0x1111111111111111111111111111111111111111';
+  it('uses the external timestamp rather than a newer registry timestamp', () => {
+    expect(resolvePriceSource(feed, [0n, 100n, 0n, 123n, 0n], 999)).to.deep.equal({ source: 'external', updatedAt: 123 });
+  });
+  it('distinguishes explicit fallback from failed RPC reads', () => {
+    expect(resolvePriceSource(feed, [0n, 0n, 0n, 0n, 0n], 999)).to.deep.equal({ source: 'fallback', updatedAt: 999 });
+    expect(resolvePriceSource(feed, null, 999)).to.deep.equal({ source: 'unknown', updatedAt: null });
+    expect(resolvePriceSource(null, null, 999).source).to.equal('unknown');
+    expect(resolvePriceSource('0x' + '0'.repeat(40), null, 999).source).to.equal('registry');
+  });
+  it('preserves gas without inventing a balance or producing negative margin', () => {
+    expect(spendableMargin(1_000_000n, 50_000n)).to.equal(950_000n);
+    expect(spendableMargin(49_999n, 50_000n)).to.equal(0n);
+    expect(spendableMargin(null, 50_000n)).to.equal(null);
+  });
+  it('never reports a reverted receipt as success', () => {
+    expect(() => requireSuccessfulReceipt({ status: 'reverted' })).to.throw('reverted');
+    expect(() => requireSuccessfulReceipt({ status: 'success' })).not.to.throw();
+  });
+});
 
 const base = {
   quoteReserve: 1000n * WAD,

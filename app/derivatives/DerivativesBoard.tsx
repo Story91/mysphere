@@ -599,7 +599,7 @@ export default function DerivativesBoard() {
             <span className="text-right">Change</span>
             <span className="text-right">Funding / 1h</span>
             <span>Open interest</span>
-            <span>Feed</span>
+            <span>Registry feed</span>
           </div>
           <div>
             {rows.map((row) => {
@@ -667,7 +667,7 @@ export default function DerivativesBoard() {
                       {/* Nazwa instrumentu + skad indeks. "Tesla · Pyth" mowi traderowi
                           wiecej niz wiek rynku; wiek i cap zostaja w tooltipie badge'a. */}
                       {instrumentName(feedByAddress(row.indexFeed)?.base ?? instrumentBase(row.symbol))}
-                      {row.indexFeed && row.indexFeed !== ZERO ? ' · index via Pyth' : row.indexFeed === ZERO ? ' · index from registry' : ''}
+                      {row.indexFeed && row.indexFeed !== ZERO ? ' · external oracle configured' : row.indexFeed === ZERO ? ' · index from registry' : ''}
                       {row.mature === false && row.maxOpenInterest != null ? ` · cap ${fmtWadCompact(row.maxOpenInterest)}` : ''}
                     </p>
                     </div>
@@ -735,7 +735,7 @@ export default function DerivativesBoard() {
                   </div>
 
                   <div>
-                    <CellLabel>Feed</CellLabel>
+                    <CellLabel>Registry feed</CellLabel>
                     <p className="inline-flex items-center gap-1.5 font-semibold text-sp-ink" title={feedTitle}>
                       <Dot tone={feedTone} />
                       {feedTone === 'down' ? 'halted' : feedTone === 'warn' ? 'aging' : feedTone === 'up' ? 'live' : 'unknown'}

@@ -16,8 +16,9 @@ import {
   oracleAbi,
 } from '../config';
 import { shortAddress } from '../format';
-import { ZERO_FEED, feedByAddress, pythAbi, pythEventsAbi, pythToWad } from '../indexFeeds';
+import { ZERO_FEED, adapterAbi, feedByAddress, pythAbi, pythEventsAbi, pythToWad } from '../indexFeeds';
 import type { ActivityItem, Position, PricePoint, R, Snapshot } from './types';
+import { resolvePriceSource } from '../priceSource';
 
 /**
  * Wszystkie ODCZYTY jednego rynku. Wyniesione z MarketDetail.tsx bez zmian
@@ -44,12 +45,15 @@ export function useMarketData(market: Address) {
     setLoading(true);
     setError(null);
     try {
+      // Keep the effective index and adapter provenance at the same block.
+      const blockNumber = await client.getBlockNumber();
       // Adresy/identyfikatory, bez ktorych nie da sie ulozyc reszty zapytan.
       // Wszystkie trzy w JEDNYM multicallu - to nadal jedna podroz do RPC.
       // Wszystkie cztery w JEDNYM multicallu - to nadal jedna podroz do RPC.
       // `CHAINLINK_FEED` jest tu, a nie w drugim multicallu, bo od niego
       // zalezy, czy do drugiego dolozyc `getPriceUnsafe` (expo feedu Pytha).
       const [idRes, insRes, feesRes, feedRes] = await client.multicall({
+        blockNumber,
         contracts: [
           { address: market, abi: marketAbi, functionName: 'ORACLE_MARKET_ID' },
           { address: FACTORY_ADDRESS, abi: factoryAbi, functionName: 'INSURANCE' },
@@ -115,6 +119,9 @@ export function useMarketData(market: Address) {
         // dokladnie tak, jak robi to adapter. Bez niego historia zostaje pusta.
         calls.push({ key: 'pythPrice', address: feed.pyth, abi: pythAbi, functionName: 'getPriceUnsafe', args: [feed.priceId] });
       }
+      if (indexFeed && indexFeed !== ZERO_FEED) {
+        calls.push({ key: 'indexRound', address: indexFeed, abi: adapterAbi, functionName: 'latestRoundData' });
+      }
       if (address) {
         calls.push(
           { key: 'usdcBalance', address: USDC_ADDRESS, abi: erc20Abi, functionName: 'balanceOf', args: [address] },
@@ -126,6 +133,7 @@ export function useMarketData(market: Address) {
       }
 
       const results = (await client.multicall({
+        blockNumber,
         contracts: calls.map(({ key, ...rest }) => rest) as any,
         allowFailure: true,
       })) as readonly { status: 'success' | 'failure'; result?: unknown }[];
@@ -143,6 +151,8 @@ export function useMarketData(market: Address) {
       const meta = tuple('getMarket');
       const stats = tuple('marketStats');
       const price = tuple('getPrice');
+      const round = tuple('indexRound');
+      const resolvedIndex = resolvePriceSource(indexFeed, round, price ? Number(price[1]) : null);
 
       setSnap({
         id,
@@ -197,6 +207,8 @@ export function useMarketData(market: Address) {
         feeLockDays: N('feeLockDays'),
         treasury: (v.treasury as Address) ?? null,
         indexFeed,
+        indexSource: resolvedIndex.source,
+        indexUpdatedAt: resolvedIndex.updatedAt,
       });
 
       const pos = tuple('getPosition');

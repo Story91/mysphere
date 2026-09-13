@@ -4,11 +4,12 @@ import { AlertTriangle, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { DERIV_CHAIN } from '../config';
+import { DERIV_CHAIN, GAS_RESERVE_USDC } from '../config';
 import { fmtBps, fmtPrice, fmtSize, fmtUsdc, fmtWadCompact, fromUsdc, pctDelta } from '../format';
 import { Row, Unknown, Val, fmtUsdcFine } from '../ui';
 import type { Preview } from './math';
 import type { Position, Snapshot } from './types';
+import { spendableMargin } from '../priceSource';
 
 export type FeeSplit = {
   creatorBps: number;
@@ -66,6 +67,7 @@ export default function OrderPanel({
   onOpen: () => void;
 }) {
   const balance = snap.usdcBalance;
+  const spendable = spendableMargin(balance, GAS_RESERVE_USDC);
   const maxLev = snap.maxLeverage ?? 1;
   const levPresets = Array.from(new Set([...LEV_PRESETS.filter((l) => l < maxLev), maxLev]));
   const isLong = side === 'long';
@@ -95,6 +97,8 @@ export default function OrderPanel({
   else if (wrongChain) cta = `Switch to ${DERIV_CHAIN.name}`;
   else if (position) cta = 'Close your position first';
   else if (halted) cta = 'Trading halted';
+  else if (spendable === null) cta = 'Balance unavailable';
+  else if (marginAmount !== null && marginAmount > spendable) cta = 'Leave USDC for network fees';
   else if (preview === null) cta = marginAmount === null ? 'Enter a margin amount' : 'Reserves unavailable';
   else if (preview.reason) cta = isLong ? 'Open long' : 'Open short';
   else {
@@ -156,8 +160,8 @@ export default function OrderPanel({
             <button
               key={p}
               type="button"
-              disabled={balance === null || balance === 0n}
-              onClick={() => balance !== null && setMargin(fromUsdc((balance * BigInt(p)) / 100n))}
+              disabled={spendable === null || spendable === 0n}
+              onClick={() => spendable !== null && setMargin(fromUsdc((spendable * BigInt(p)) / 100n))}
               className="rounded-full border border-sp-shade/15 py-1 text-[11px] font-semibold text-sp-ink-soft hover:bg-sp-hover hover:text-sp-ink disabled:opacity-40"
             >
               {p === 100 ? 'Max' : `${p}%`}

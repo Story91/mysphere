@@ -6,6 +6,7 @@ import { isAddress, maxUint256, type Address } from 'viem';
 import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
 import { DERIV_CHAIN, ORACLE_ADDRESS, USDC_ADDRESS, erc20Abi, marketAbi, oracleAbi } from '../config';
 import type { R, Snapshot } from './types';
+import { requireSuccessfulReceipt } from '../priceSource';
 
 /** Cudza pozycja sprawdzona pod katem likwidacji (panel keepera). */
 export type Probe = { address: Address; size: bigint; notional: bigint; ratioBps: R<bigint> } | 'empty' | null;
@@ -72,7 +73,7 @@ export function useMarketActions({ market, snap, reload }: { market: Address; sn
           chain: DERIV_CHAIN,
           account: address,
         });
-        await client.waitForTransactionReceipt({ hash: approveHash });
+        requireSuccessfulReceipt(await client.waitForTransactionReceipt({ hash: approveHash }));
       }
       const hash = await wallet.writeContract({
         address: market,
@@ -82,7 +83,7 @@ export function useMarketActions({ market, snap, reload }: { market: Address; sn
         chain: DERIV_CHAIN,
         account: address,
       });
-      await client.waitForTransactionReceipt({ hash });
+      requireSuccessfulReceipt(await client.waitForTransactionReceipt({ hash }));
       return hash;
     });
   }
@@ -97,7 +98,7 @@ export function useMarketActions({ market, snap, reload }: { market: Address; sn
         chain: DERIV_CHAIN,
         account: address,
       });
-      await client.waitForTransactionReceipt({ hash });
+      requireSuccessfulReceipt(await client.waitForTransactionReceipt({ hash }));
       return hash;
     });
   }
@@ -112,7 +113,7 @@ export function useMarketActions({ market, snap, reload }: { market: Address; sn
         chain: DERIV_CHAIN,
         account: address,
       });
-      await client.waitForTransactionReceipt({ hash });
+      requireSuccessfulReceipt(await client.waitForTransactionReceipt({ hash }));
       return hash;
     });
   }
@@ -152,7 +153,7 @@ export function useMarketActions({ market, snap, reload }: { market: Address; sn
         chain: DERIV_CHAIN,
         account: address,
       });
-      await client.waitForTransactionReceipt({ hash });
+      requireSuccessfulReceipt(await client.waitForTransactionReceipt({ hash }));
       setProbe(null);
       return hash;
     });
@@ -169,7 +170,7 @@ export function useMarketActions({ market, snap, reload }: { market: Address; sn
         chain: DERIV_CHAIN,
         account: address,
       });
-      await client.waitForTransactionReceipt({ hash });
+      requireSuccessfulReceipt(await client.waitForTransactionReceipt({ hash }));
       return hash;
     });
   }

@@ -36,7 +36,9 @@ export default function MarketHeader({
   now: number;
 }) {
   const router = useRouter();
-  const feedAge = snap.oracleUpdatedAt !== null && now > 0 ? now - snap.oracleUpdatedAt : null;
+  const updatedAt = snap.indexUpdatedAt ?? null;
+  const feedAge = updatedAt !== null && now > 0 ? Math.max(0, now - updatedAt) : null;
+  const sourceLabel = snap.indexSource === 'external' ? 'external oracle' : snap.indexSource === 'registry' ? 'registry TWAP' : snap.indexSource === 'fallback' ? 'registry fallback' : 'source unavailable';
   const pct = snap.oi !== null && snap.cap !== null ? oiPercent(snap.oi, snap.cap) : null;
 
   // Kropka feedu: zielona = aktywny i swiezszy niz interwal fundingu,
@@ -47,7 +49,7 @@ export default function MarketHeader({
       ? 'down'
       : snap.feedActive === null || feedAge === null
         ? 'muted'
-        : snap.fundingInterval !== null && feedAge > snap.fundingInterval
+        : snap.indexSource === 'fallback' || (snap.fundingInterval !== null && feedAge > snap.fundingInterval)
           ? 'warn'
           : 'up';
   const feedLabel =
@@ -58,7 +60,7 @@ export default function MarketHeader({
           ? 'Feed frozen by a challenge - new positions are rejected'
           : 'Feed inactive - new positions are rejected'
       : feedTone === 'warn'
-        ? 'Feed is older than the funding interval'
+        ? snap.indexSource === 'fallback' ? 'External price unavailable. Index uses the market publisher’s registry TWAP.' : 'Feed is older than the funding interval'
         : feedTone === 'up'
           ? 'Feed is fresh'
           : 'Feed state unknown';
@@ -124,7 +126,7 @@ export default function MarketHeader({
           </p>
         </div>
 
-        <Cell label="Index" hint="feed TWAP">
+        <Cell label="Index" hint={sourceLabel}>
           <Val v={snap.index} fmt={fmtPrice} />
         </Cell>
 
@@ -157,7 +159,7 @@ export default function MarketHeader({
         <Cell label="Feed" hint={feedAge === null ? undefined : `${fmtDuration(feedAge)} ago`}>
           <span className="inline-flex items-center gap-1.5" title={feedLabel}>
             <Dot tone={feedTone} title={feedLabel} />
-            {feedTone === 'down' ? 'halted' : feedTone === 'warn' ? 'aging' : feedTone === 'up' ? 'live' : 'unknown'}
+            {feedTone === 'down' ? 'halted' : feedTone === 'warn' ? snap.indexSource === 'fallback' ? 'fallback' : 'aging' : feedTone === 'up' ? 'live' : 'unknown'}
           </span>
         </Cell>
       </div>
