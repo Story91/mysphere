@@ -33,7 +33,12 @@
  * Brama IPFS. Zmienna srodowiskowa, bo bramy padaja i limituja ruch, a przy
  * takim zdarzeniu chcemy zmienic jedna wartosc, a nie deployowac kod.
  */
-const IPFS_GATEWAY = process.env.NEXT_PUBLIC_IPFS_GATEWAY ?? 'https://ipfs.io/ipfs/';
+// Domyslna brama: pinata. ipfs.io i dweb.link odpowiadaja 429 na kazdy fetch
+// z JavaScriptu ("switching to a service worker gateway only") - sprawdzone
+// 13.09.2026, ipfs.io oddaje 429, pinata 200. Dotyczy tokenow, ktorych tworca
+// wpisal w metadanych adres ipfs:// zamiast wgrac plik u nas; logo z naszego
+// uploadu ida przez Vercel Blob i tej sciezki nie uzywaja.
+const IPFS_GATEWAY = process.env.NEXT_PUBLIC_IPFS_GATEWAY ?? 'https://gateway.pinata.cloud/ipfs/';
 
 /**
  * Zamienia `ipfs://` na adres przez brame. Wszystko inne przepuszcza tylko
