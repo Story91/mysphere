@@ -29,6 +29,7 @@
     "launchpad:sphere:base": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run scripts/launchpad/deploySphere.ts --network base",
     "launchpad:sphere:1b": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run scripts/launchpad/deploySphere1B.ts --network base",
     "sphere:epoch": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run scripts/sphere/publishEpoch.ts --network base",
+    "arc:rpc-proxy": "node scripts/arc/rpc-proxy.js",
     "arc:bridge": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run scripts/arc/bridge-usdc-to-arc.ts --network base",
     "perps:keeper": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run scripts/derivatives/keeper.ts --network arcTestnet",
     "sphere:keeper": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run scripts/sphere/sphereKeeper.ts --network base",
