@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CandlestickChart, LineChart as LineChartIcon, RefreshCw } from 'lucide-react';
 import type { IChartApi, ISeriesApi, Time } from 'lightweight-charts';
-import { ACTIVE_LAUNCHPAD_NETWORK, NATIVE_SYMBOL } from '../config';
+import { usePublicClient } from 'wagmi';
+import { ACTIVE_LAUNCHPAD_NETWORK, LAUNCHPAD_CHAIN, NATIVE_SYMBOL, STATE_VIEW_ADDRESS } from '../config';
 import { formatUsd } from '../useEthUsd';
 import {
   buildCandles,
@@ -32,6 +33,29 @@ const INTERVALS: Array<{ value: IntervalSec; label: string }> = [
   { value: 300, label: '5m' },
   { value: 3600, label: '1h' },
 ];
+
+/** Dwie funkcje StateView, wylacznie do odczytu glebokosci puli. */
+const STATE_VIEW_ABI = [
+  {
+    type: 'function',
+    name: 'getSlot0',
+    stateMutability: 'view',
+    inputs: [{ name: 'poolId', type: 'bytes32' }],
+    outputs: [
+      { name: 'sqrtPriceX96', type: 'uint160' },
+      { name: 'tick', type: 'int24' },
+      { name: 'protocolFee', type: 'uint24' },
+      { name: 'lpFee', type: 'uint24' },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'getLiquidity',
+    stateMutability: 'view',
+    inputs: [{ name: 'poolId', type: 'bytes32' }],
+    outputs: [{ name: 'liquidity', type: 'uint128' }],
+  },
+] as const;
 
 /**
  * Kolory wykresu ida JavaScriptem, bo lightweight-charts rysuje na canvasie i
@@ -181,6 +205,61 @@ export default function PriceChart({
   const currentValue = priceToNumber(headWei) * scale;
   const multiple = Number(headWei) / Number(START_PRICE_WEI);
   const poolLive = state === 'Graduated' && (hasPoolPoints || lastPriceWei > 0n);
+
+  /**
+   * GLEBOKOSC PULI - obok ceny, nie w osobnej karcie.
+   *
+   * Po co: 13.09.2026 wlasciciel zauwazyl, ze kapitalizacja "duzo skacze",
+   * a keeper "malo zbiera" - i to byly DWA prawdziwe zdania naraz. Kapitalizacja
+   * to cena razy stala podaz, a cena rusza sie tyle, ile pozwoli plynnosc w
+   * aktywnym zakresie (Uniswap v4 koncentruje kapital wokol biezacej ceny -
+   * "liquidity" ze `StateView.getLiquidity` NIE jest rezerwa calej puli).
+   * Bez tej liczby obok ceny wyglada to na duzy ruch; z nia widac, ze to maly
+   * ruch przy waskiej plynnosci.
+   *
+   * Przyblizenie, nie ksiegowosc: rezerwy licza sie z L i sqrtP zakladajac
+   * pelny zakres (x = L/sqrtP, y = L*sqrtP), co przy koncentracji w waskim
+   * przedziale zawyza obie strony - ale rzad wielkosci i tak mowi to, co ma
+   * powiedziec: "tu jest N ETH plynnosci", nie "token ma iles USD kapitalizacji".
+   */
+  const readClient = usePublicClient({ chainId: LAUNCHPAD_CHAIN.id });
+  const [depthWei, setDepthWei] = useState<bigint | null>(null);
+  useEffect(() => {
+    setDepthWei(null);
+    if (!poolLive || !poolId || !STATE_VIEW_ADDRESS || !readClient) return;
+    const stateView = STATE_VIEW_ADDRESS as `0x${string}`;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const [[sqrtPriceX96], liquidity] = await Promise.all([
+          readClient.readContract({
+            address: stateView,
+            abi: STATE_VIEW_ABI,
+            functionName: 'getSlot0',
+            args: [poolId as `0x${string}`],
+          }) as Promise<readonly [bigint, number, number, number]>,
+          readClient.readContract({
+            address: stateView,
+            abi: STATE_VIEW_ABI,
+            functionName: 'getLiquidity',
+            args: [poolId as `0x${string}`],
+          }) as Promise<bigint>,
+        ]);
+        if (cancelled || sqrtPriceX96 === 0n) return;
+        // x = L * 2^96 / sqrtP (ETH, currency0); przyblizenie zakresu pelnego.
+        const Q96 = 1n << 96n;
+        setDepthWei((liquidity * Q96) / sqrtPriceX96);
+      } catch {
+        // Brak wskaznika jest uczciwszy niz zgadnieta liczba.
+      }
+    };
+    void load();
+    const t = setInterval(load, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [poolLive, poolId, readClient]);
 
   useEffect(() => {
     const element = containerRef.current;
@@ -359,6 +438,12 @@ export default function PriceChart({
               <span className="text-sp-up">{multiple.toFixed(multiple >= 10 ? 1 : 2)}x since launch</span>
             ) : (
               <span className="text-sp-down-deep">{multiple.toFixed(2)}x since launch</span>
+            )}
+            {poolLive && depthWei !== null && (
+              <span className="ml-2 text-sp-shade/45">
+                · pool depth ~{fmtPrice(Number(depthWei) / 1e18)} {NATIVE_SYMBOL}
+                {ethUsd !== null && <> ({formatUsd((Number(depthWei) / 1e18) * ethUsd)})</>}
+              </span>
             )}
           </p>
         </div>
