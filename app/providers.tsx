@@ -2,7 +2,7 @@
 'use client';
 
 import { base, baseSepolia } from 'viem/chains';
-import { arcTestnet } from './startpad/arcChain';
+import { arcMainnet, arcTestnet } from './startpad/arcChain';
 import { createContext, useContext, useState, useMemo } from 'react';
 import { createConfig, http, fallback, webSocket, cookieStorage, createStorage } from 'wagmi';
 import { WagmiConfig } from 'wagmi';
@@ -66,7 +66,7 @@ const queryClient = new QueryClient({
  * Wagmi Configuration (bez Base Sepolia)
  * PL: Przygotowane dwie gałęzie konfiguracji, aby uniknąć błędu typów dla 484
  */
-const CHAINS_BASE = [base, baseSepolia, baseCampChain, lineaChain, celoChain, ethereumChain, worldChain, robinhoodChain, arcTestnet] as const;
+const CHAINS_BASE = [base, baseSepolia, baseCampChain, lineaChain, celoChain, ethereumChain, worldChain, robinhoodChain, arcTestnet, arcMainnet] as const;
 const TRANSPORTS_BASE = {
   // Base MAINNET: publiczny mainnet.base.org jest rate-limited (429/-32016) i
   // tnie getLogs na 2000 blokach, a startpad odpala do 90 okien getLogs na load.
@@ -119,6 +119,12 @@ const TRANSPORTS_BASE = {
    * Uzasadnienie i pelny pomiar: app/startpad/arcChain.ts.
    */
   [arcTestnet.id]: http(process.env.NEXT_PUBLIC_ARC_TESTNET_RPC_URL || 'https://rpc.blockdaemon.testnet.arc.io'),
+  /**
+   * Arc MAINNET (5042). Jedyny publiczny RPC 15.09.2026 to arc-scan.org - co
+   * drugie zapytanie 503, wiec viem ponawia (retryCount). Podmienic przez
+   * NEXT_PUBLIC_ARC_MAINNET_RPC_URL, gdy Circle opublikuje oficjalne endpointy.
+   */
+  [arcMainnet.id]: http(process.env.NEXT_PUBLIC_ARC_MAINNET_RPC_URL || 'https://rpc.arc-scan.org', { retryCount: 5, retryDelay: 1500 }),
 } as const;
 
 const CHAINS_WITH_CAMP_MAINNET = [

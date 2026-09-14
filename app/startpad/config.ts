@@ -1,7 +1,7 @@
 import { base, baseSepolia } from 'viem/chains';
 import type { Chain } from 'viem';
 import { robinhoodChain } from '../basechat/Robinhood/config/RobinhoodNetworkConfig';
-import { arcTestnet } from './arcChain';
+import { arcMainnet, arcTestnet } from './arcChain';
 // Import TYLKO typu - `networkTheme` czyta z tego pliku LAUNCHPAD_NETWORKS, wiec
 // import wartosci zrobilby cykl. Typ znika przy kompilacji i cyklu nie ma.
 import type { NetworkTheme } from './networkTheme';
@@ -482,6 +482,44 @@ export const LAUNCHPAD_NETWORKS: Record<number, LaunchpadNetwork> = {
       },
     },
   },
+};
+
+/**
+ * ARC MAINNET (5042) - wpis budowany z testnetowego, bo motyw, standard tokena
+ * i parametry skanowania sa te same; rozni sie lancuch, adresy i skala krzywej.
+ *
+ * ADRESY: z env NEXT_PUBLIC_*_ARC_MAINNET_ADDRESS, a domyslnie ZERO. Zero to
+ * uczciwy stan "jeszcze nie wdrozone" - tablica pokaze pusta siec, nie cudze
+ * tokeny. Po wdrozeniu (scripts/launchpad/deploy.ts --network arcMainnet)
+ * wpisac adresy tutaj jako domysly, jak przy testnecie, zeby brak env na
+ * Vercelu nie wylaczal sieci.
+ *
+ * SKALA: R_VIRT = 1250 USDC (decyzja wlasciciela 12.09.2026) -> prog zbiorki
+ * 5000 USDC, mcap 31 250 po graduacji. Musi zgadzac sie z R_VIRT w
+ * `npm run launchpad:deploy:arc:mainnet` - i po wdrozeniu z odczytem
+ * `R_VIRT()` z kontraktu.
+ *
+ * POOL MANAGER: na mainnecie stoi GOTOWY Uniswap v4, nie stawiamy wlasnego.
+ * Adres do potwierdzenia przy wdrozeniu (deploy.ts sprawdza hash kodu).
+ *
+ * RPC arc-scan.org tnie eth_getLogs na 10 000 blokow, blok co 0,50 s -
+ * scanWindow 9 500 jak na testnecie.
+ */
+const ARC_MAINNET_ZERO = '0x0000000000000000000000000000000000000000' as const;
+LAUNCHPAD_NETWORKS[arcMainnet.id] = {
+  ...LAUNCHPAD_NETWORKS[arcTestnet.id],
+  chain: arcMainnet,
+  label: 'Arc',
+  testnet: false,
+  launchpad: (process.env.NEXT_PUBLIC_LAUNCHPAD_ARC_MAINNET_ADDRESS as `0x${string}` | undefined) ?? ARC_MAINNET_ZERO,
+  vault: (process.env.NEXT_PUBLIC_LIQUIDITY_VAULT_ARC_MAINNET_ADDRESS as `0x${string}` | undefined) ?? ARC_MAINNET_ZERO,
+  hook: (process.env.NEXT_PUBLIC_LAUNCH_HOOK_ARC_MAINNET_ADDRESS as `0x${string}` | undefined) ?? ARC_MAINNET_ZERO,
+  tokenFactory: (process.env.NEXT_PUBLIC_TOKEN_FACTORY_ARC_MAINNET_ADDRESS as `0x${string}` | undefined) ?? ARC_MAINNET_ZERO,
+  poolManager: (process.env.NEXT_PUBLIC_POOL_MANAGER_ARC_MAINNET_ADDRESS as `0x${string}` | undefined) ?? ARC_MAINNET_ZERO,
+  deployBlock: BigInt(process.env.NEXT_PUBLIC_LAUNCHPAD_ARC_MAINNET_DEPLOY_BLOCK ?? '0'),
+  rVirt: 1250,
+  explorerUrl: 'https://arc-scan.org',
+  secondsPerBlock: 0.5,
 };
 
 // Po wdrozeniu mainnetu (env ustawione) domyslna sieca staje sie Base mainnet;
@@ -1172,6 +1210,7 @@ const OWN_RPC_URL: Record<number, string | undefined> = {
   [baseSepolia.id]: process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL,
   [robinhoodChain.id]: process.env.NEXT_PUBLIC_ROBINHOOD_RPC_URL,
   [arcTestnet.id]: process.env.NEXT_PUBLIC_ARC_TESTNET_RPC_URL,
+  [arcMainnet.id]: process.env.NEXT_PUBLIC_ARC_MAINNET_RPC_URL,
 };
 
 /** WebSocket jest opcjonalny i dotyczy dzis wylacznie Base. */
