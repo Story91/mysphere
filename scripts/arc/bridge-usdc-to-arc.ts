@@ -22,10 +22,19 @@ import { JsonRpcProvider, Wallet, Contract, formatUnits, parseUnits, getAddress,
  * Czyli domena Arc to 26 takze na mainnecie, a standardowy transfer jest
  * DARMOWY - placi sie tylko gaz po obu stronach.
  *
- * Czego NIE bylo 15.09: zadnego publicznego RPC Arc mainnet (sprawdzone szesc)
- * ani kontraktow CCTP pod adresami testnetowymi. Dlatego skrypt NIE zaklada
- * zadnego adresu na Arc - odczytuje go i sprawdza, czy ma kod. Jesli nie ma,
- * mowi to wprost zamiast wysylac pieniadze w prozne miejsce.
+ * POPRAWKA Z TEGO SAMEGO DNIA: kontrakty CCTP na Arc mainnet STOJA - tylko
+ * nie pod adresami testnetowymi (0x8FE6B9..., 0xE737e5...), ktorych szukalem
+ * najpierw, lecz pod kanonicznymi adresami CCTP v2 mainnet, tymi samymi co
+ * na Base i kazdej innej sieci (Circle stawia je przez CREATE2):
+ *     TokenMessengerV2     0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d
+ *     MessageTransmitterV2 0x81D40F21F12A8F0E3252Bccb954D722d4c464B64
+ *     TokenMinterV2        0xfd78EE919681417d192449715b2594ab58f5D002
+ * Sprawdzone odczytem: `localDomain()` na Arc oddaje 26, a
+ * `remoteTokenMessengers(6)` wskazuje Base. Trasa dziala w obie strony.
+ * Skrypt i tak sprawdza `getCode` przed odbiorem - gdyby Circle cos przestawil.
+ *
+ * RPC Arc: `rpc.arc-scan.org` dziala, ale co drugie zapytanie oddaje 503 -
+ * stad ponawianie w `withRetry`.
  *
  * ===========================================================================
  * TRZY KROKI, KAZDY ODWRACALNY DO MOMENTU SPALENIA
@@ -57,13 +66,24 @@ const BASE_USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 const BASE_TOKEN_MESSENGER = "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d";
 const IRIS = "https://iris-api.circle.com";
 
-/**
- * MessageTransmitterV2 na Arc. Adres z tabel TESTNETOWYCH docs.arc.io - na
- * mainnecie Circle uzywa zwykle tych samych, ale to NIE jest potwierdzone,
- * dlatego skrypt sprawdza `getCode` przed uzyciem i pozwala nadpisac.
- */
+/** MessageTransmitterV2 na Arc mainnet - kanoniczny adres CCTP v2 (patrz naglowek). */
 const ARC_MESSAGE_TRANSMITTER =
-  process.env.ARC_MESSAGE_TRANSMITTER || "0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275";
+  process.env.ARC_MESSAGE_TRANSMITTER || "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64";
+const ARC_RPC_DEFAULT = "https://rpc.arc-scan.org";
+
+/** RPC Arc bywa niestabilne (503 co drugie zapytanie) - ponawiamy, nie poddajemy sie. */
+async function withRetry<T>(fn: () => Promise<T>, tries = 10): Promise<T> {
+  let last: unknown;
+  for (let i = 0; i < tries; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      last = e;
+      await new Promise((r) => setTimeout(r, 2500));
+    }
+  }
+  throw last;
+}
 
 const ERC20 = [
   "function balanceOf(address) view returns (uint256)",
@@ -147,15 +167,9 @@ async function main() {
   }
   console.log("attestation gotowe.");
 
-  const arcRpc = process.env.ARC_RPC;
-  if (!arcRpc) {
-    console.log("\nBrak ARC_RPC - zatrzymuje sie przed odbiorem. Gdy bedziesz mial RPC Arc, uruchom:");
-    console.log(`  ARC_RPC=<url> MESSAGE=${att.message} ATTESTATION=${att.attestation} npm run arc:receive`);
-    return;
-  }
-
+  const arcRpc = process.env.ARC_RPC || ARC_RPC_DEFAULT;
   const arc = new JsonRpcProvider(arcRpc);
-  const code = await arc.getCode(ARC_MESSAGE_TRANSMITTER);
+  const code = await withRetry(() => arc.getCode(ARC_MESSAGE_TRANSMITTER));
   if (code === "0x") {
     throw new Error(
       `Pod ${ARC_MESSAGE_TRANSMITTER} na Arc NIE MA KODU. USDC jest spalone i czeka - ` +
@@ -167,10 +181,10 @@ async function main() {
   const arcSigner = new Wallet(key, arc);
   const mt = new Contract(ARC_MESSAGE_TRANSMITTER, MESSAGE_TRANSMITTER, arcSigner);
   console.log("odbieram na Arc (receiveMessage)...");
-  const recv = await mt.receiveMessage(att.message, att.attestation);
-  await recv.wait();
+  const recv = await withRetry(() => mt.receiveMessage(att!.message, att!.attestation));
+  await withRetry(() => recv.wait());
   console.log(`GOTOWE. tx na Arc: ${recv.hash}`);
-  console.log(`saldo Arc: ${formatUnits(await arc.getBalance(recipient), 18)} USDC`);
+  console.log(`saldo Arc: ${formatUnits(await withRetry(() => arc.getBalance(recipient)), 18)} USDC`);
 }
 
 main().catch((e) => {
