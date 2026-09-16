@@ -215,3 +215,7 @@ describe('Arc mainnet fork: perps od odbiornika Pytha do pozycji', function () {
     console.log(`      saldo alice po cyklu: ${ethers.formatUnits(await usdc.balanceOf(alice.address), 6)} USDC`);
   });
 });
+
+// Modul, nie skrypt - pliki testow dziela globalna przestrzen i bez tego tsc
+// zglasza TS2451 na hre/ethers/expect.
+export {};
