@@ -1,419 +1,72 @@
 import { ethers, network } from "hardhat";
-import { formatUnits } from "ethers";
 import fs from "fs";
 import path from "path";
+import { runPerpsKeeper, type DeploymentFile, type PythAdaptersFile } from "../../lib/keeper/perpsKeeperCore";
 
 /**
- * KEEPER PERPOW NA ARC TESTNET - funding i likwidacje, ktorych nikt nie klika.
+ * KEEPER PERPOW NA ARC - reczne uruchomienie przez hardhat.
  *
- * ===========================================================================
- * PO CO
- * ===========================================================================
- * `DerivativeMarket.settleFunding()` i `liquidate(trader)` sa publiczne, ale
- * do 11 wrzesnia 2026 wolal je wylacznie przycisk w przegladarce. Pozycja pod
- * woda zyla tak dlugo, az ktos wszedl na strone rynku - a zly dlug z takiej
- * pozycji pokrywa fundusz ubezpieczeniowy, czyli wszyscy. Arc ma bloki co
- * sekunde i finalnosc natychmiastowa (docs "deterministic finality"), wiec
- * keeper jest tani: jeden przebieg to kilka odczytow i zero albo kilka
- * transakcji po ~0,001 USD (docs "stable fee").
+ * Od 16.09.2026 cala logika (funding, likwidacje, wypychanie Pytha, heartbeat
+ * rejestru) mieszka w lib/keeper/perpsKeeperCore.ts i jest wspolna z trasa
+ * app/api/keeper/perps (cron na Vercelu). Ten plik tylko: czyta pliki
+ * deployments/*.json, bierze provider i signer z hardhata, drukuje raport JSON
+ * i linie "GAZ NISKI" (umowa z keeper.ps1 - nie zmieniac slow).
  *
- * ===========================================================================
- * CO ROBI W JEDNYM PRZEBIEGU
- * ===========================================================================
- * 1. Bierze liste rynkow z fabryki (`allMarkets`).
- * 2. Dla kazdego rynku: jesli minal FUNDING_INTERVAL od `lastFundingAt`,
- *    wola `settleFunding`. Kontrakt sam przycina dluga przerwe do doby.
- * 3. Zbiera adresy z logow `PositionOpened` (okno 50 000 blokow - tyle daje
- *    Blockdaemon, patrz hardhat.config), sprawdza `getPosition().size != 0`
- *    i `marginRatioBps < MAINTENANCE_MARGIN_BPS`, i takie likwiduje.
- *    Nagroda keepera wraca na portfel podpisujacy.
- * 4. PYTH. Dla kazdego adaptera z deployments/pythAdapters.<chainId>.json
- *    czyta wiek ceny na lancuchu. Pyth to oracle PULL - jesli nikt nie
- *    wypchnie aktualizacji, adapter po MAX_AGE oddaje 0 i rynek spada na
- *    TWAP rejestru. Gdy cena ma wiecej niz PYTH_PUSH_AFTER sekund, keeper
- *    pobiera podpisana aktualizacje z Hermesa i wola updatePriceFeeds,
- *    placac getUpdateFee w USDC. Hermes od 08.2026 wymaga klucza
- *    (PYTH_API_KEY); bez niego ten krok TYLKO raportuje wiek.
- * 5. HEARTBEAT REJESTRU. `DerivativeMarket.openPosition` rewertuje
- *    `OracleInactive`, gdy cena w PriceOracleRegistry ma wiecej niz
- *    MAX_PRICE_AGE (1 h) - NIEZALEZNIE od tego, czy rynek czyta indeks z
- *    adaptera Pytha. 11.09.2026 oba rynki stanely dokladnie tak: ARC-USD po
- *    10 h ciszy, BTC-USD po 68 min, mimo swiezego Pytha. Keeper wysyla wiec
- *    `submitPrice` dla kazdego rynku, ktorego cena w rejestrze ma wiecej niz
- *    REGISTRY_HEARTBEAT_AFTER sekund. Zrodlo ceny: adapter (CHAINLINK_FEED),
- *    jesli oddaje swieza liczbe; inaczej ostatnia cena rejestru (czysty
- *    heartbeat - TWAP sie nie rusza, ale feed zyje). Skok przycinany do
- *    MAX_DEVIATION_BPS, bo wiekszy rejestr odrzuca. Wysylac moze tylko
- *    wystawca lub tworca feedu - keeper sprawdza to przed transakcja.
- * 6. Drukuje raport JSON i, gdy saldo gazu spadnie ponizej progu, linie
- *    "GAZ NISKI" - keeper.ps1 zamienia ja w powiadomienie Windows.
- *
- * DOMYSLNIE DRY-RUN. Transakcje ida dopiero z KEEPER_CONFIRM=tak.
- *
- * ===========================================================================
- * GAZ TO USDC. TEN SAM, KTORY JEST KOLATERALEM.
- * ===========================================================================
- * Na Arc natywna jednostka to USDC z 18 miejscami, a ERC-20 pod 0x3600... to
- * to samo saldo z 6 miejscami (docs "EVM differences"). Prog alarmu jest
- * wiec w USDC, nie w ETH, i czyta sie go z `getBalance` (18 miejsc).
+ * DLACZEGO TAK: keeper z Harmonogramu na laptopie stanal dwa razy po cichu
+ * (zepsute cudzyslowy w zadaniu; 12 h bez gazu = 47 przebiegow "GAZ NISKI"),
+ * a przez ten czas wszystkie rynki na testnecie byly "halted". Cron w chmurze
+ * z osobnym kluczem nie zalezy od tego, czy laptop jest wlaczony.
  *
  * UZYCIE
- *   npm run perps:keeper                       (dry-run)
- *   KEEPER_CONFIRM=tak npm run perps:keeper    (na zywo)
+ *   npm run perps:keeper                       (testnet, dry-run)
+ *   KEEPER_CONFIRM=tak npm run perps:keeper    (testnet, na zywo)
+ *   npm run perps:keeper:mainnet               (5042; wymaga wdrozonego modulu)
  *
  * Zmienne:
- *   DERIV_FACTORY   adres fabryki; domyslnie z deployments/derivativeMarket.5042002.json
- *   DERIV_FROM_BLOCK pierwszy blok skanu logow; domyslnie deployBlock z tego pliku
- *   GAS_ALERT_USDC  prog alarmu gazu, domyslnie "1"
+ *   DERIV_FACTORY   nadpisanie adresu fabryki
  *   KEEPER_CONFIRM  "tak" = wysylaj transakcje
- *   PYTH_API_KEY    klucz Hermesa (https://docs.pyth.network); bez niego brak wypychania
+ *   GAS_ALERT_USDC  prog alarmu gazu, domyslnie "1"
+ *   PYTH_API_KEY    klucz Hermesa; bez niego krok Pytha tylko raportuje
  *   PYTH_PUSH_AFTER po ilu sekundach wieku ceny wypychac, domyslnie "600"
  *   HERMES_URL      domyslnie https://hermes.pyth.network
- *   REGISTRY_HEARTBEAT_AFTER  po ilu sekundach wieku ceny w rejestrze wyslac
- *                   submitPrice, domyslnie "2400" (40 min; limit to 60 min,
- *                   a keeper.ps1 chodzi co 15 min - zostaje zapas na jeden
- *                   nieudany przebieg)
+ *   REGISTRY_HEARTBEAT_AFTER  po ilu sekundach wysylac submitPrice, domyslnie "2400"
+ *   KEEPER_SCAN_BLOCKS  ile blokow wstecz skanowac pozycje, domyslnie 200000
  */
 
-/** Oba lancuchy Arc; pliki deployments/*.<chainId>.json po prawdziwym chainId. */
-const ARC_CHAIN_IDS = new Set([5042002, 5042]);
-const NETWORK_LABEL: Record<number, string> = { 5042002: "arc-testnet", 5042: "arc-mainnet" };
-// Blockdaemon daje 50 000 blokow na eth_getLogs (hardhat.config). Przy jednym
-// bloku na sekunde to niecale 14 godzin na zapytanie.
-const WINDOW = 50_000;
-
-const FACTORY_ABI = [
-  "function marketCount() view returns (uint256)",
-  "function allMarkets(uint256) view returns (address)",
-];
-const MARKET_ABI = [
-  "function FUNDING_INTERVAL() view returns (uint32)",
-  "function MAINTENANCE_MARGIN_BPS() view returns (uint16)",
-  "function lastFundingAt() view returns (uint64)",
-  "function getPosition(address) view returns (int256 size,uint256 margin,uint256 openNotional,uint256 entryPrice,int256 funding)",
-  "function marginRatioBps(address) view returns (int256)",
-  "function settleFunding() external",
-  "function liquidate(address) external returns (uint256)",
-  "function ORACLE() view returns (address)",
-  "function ORACLE_MARKET_ID() view returns (uint256)",
-  "function CHAINLINK_FEED() view returns (address)",
-  "event PositionOpened(address indexed trader,bool isLong,uint256 marginUsdc,uint256 notional,uint256 size,uint256 entryPrice)",
-];
-
-const REGISTRY_ABI = [
-  "function getMarket(uint256) view returns (address creator,address publisher,string symbol,uint256 price,uint64 updatedAt,uint256 bond,bool slashed)",
-  "function MAX_PRICE_AGE() view returns (uint32)",
-  "function MAX_DEVIATION_BPS() view returns (uint16)",
-  "function MIN_UPDATE_INTERVAL() view returns (uint32)",
-  "function submitPrice(uint256 marketId,uint256 price,uint64 observedAt) external",
-];
-const FEED_ABI = [
-  "function latestRoundData() view returns (uint80,int256,uint256,uint256,uint80)",
-  "function decimals() view returns (uint8)",
-];
-
-const PYTH_ABI = [
-  "function getPriceUnsafe(bytes32) view returns (tuple(int64 price,uint64 conf,int32 expo,uint256 publishTime))",
-  "function getUpdateFee(bytes[]) view returns (uint256)",
-  "function updatePriceFeeds(bytes[]) payable",
-];
-
-type Row = Record<string, string | number | boolean>;
-
-type AdapterEntry = { address: string; priceId: string; maxAge: number; pyth?: string };
-
-function readPythAdapters(chainId: number): { pyth?: string; adapters: Record<string, AdapterEntry> } {
-  const file = path.join(__dirname, "..", "..", "deployments", `pythAdapters.${chainId}.json`);
-  if (!fs.existsSync(file)) return { adapters: {} };
-  const json = JSON.parse(fs.readFileSync(file, "utf8"));
-  return { pyth: json.pyth, adapters: json.adapters ?? {} };
-}
-
-/** Podpisana aktualizacja z Hermesa jako tablica bytes dla updatePriceFeeds. */
-async function fetchHermesUpdate(base: string, apiKey: string, priceIds: string[]): Promise<string[]> {
-  const params = priceIds.map((id) => `ids[]=${id}`).join("&");
-  const res = await fetch(`${base}/v2/updates/price/latest?${params}&encoding=hex`, {
-    headers: { Authorization: `Bearer ${apiKey}` },
-  });
-  if (!res.ok) throw new Error(`Hermes ${res.status}: ${(await res.text()).slice(0, 120)}`);
-  const json = (await res.json()) as { binary?: { data?: string[] } };
-  const data = json.binary?.data ?? [];
-  if (!data.length) throw new Error("Hermes oddal pusta aktualizacje.");
-  return data.map((hex) => (hex.startsWith("0x") ? hex : `0x${hex}`));
-}
-
-function readDeployment(chainId: number): { factory?: string; deployBlock?: number } {
-  const file = path.join(__dirname, "..", "..", "deployments", `derivativeMarket.${chainId}.json`);
-  if (!fs.existsSync(file)) return {};
-  const json = JSON.parse(fs.readFileSync(file, "utf8"));
-  return { factory: json.factory, deployBlock: json.deployBlock };
-}
-
-function firstLine(error: unknown): string {
-  return error instanceof Error ? error.message.split("\n")[0] : String(error);
+function readJson<T>(name: string): T | null {
+  const file = path.join(__dirname, "..", "..", "deployments", name);
+  if (!fs.existsSync(file)) return null;
+  return JSON.parse(fs.readFileSync(file, "utf8")) as T;
 }
 
 async function main() {
   const provider = ethers.provider;
-  const net = await provider.getNetwork();
-  const chainId = Number(net.chainId);
-  if (!ARC_CHAIN_IDS.has(chainId)) {
-    throw new Error(`Oczekiwalem Arc (5042002 albo 5042), dostalem ${chainId} (network ${network.name}).`);
-  }
-  const deployment = readDeployment(chainId);
-  const factoryAddress = process.env.DERIV_FACTORY || deployment.factory;
-  if (!factoryAddress || /^0x0+$/.test(factoryAddress)) {
-    throw new Error(`Brak adresu fabryki: ustaw DERIV_FACTORY albo deployments/derivativeMarket.${chainId}.json.`);
-  }
-  const fromBlock = Number(process.env.DERIV_FROM_BLOCK || deployment.deployBlock || 0);
-  const execute = process.env.KEEPER_CONFIRM === "tak";
-  const gasAlert = ethers.parseEther(process.env.GAS_ALERT_USDC || "1");
-
+  const chainId = Number((await provider.getNetwork()).chainId);
   const [signer] = await ethers.getSigners();
-  const gasBalance = await provider.getBalance(signer.address);
-  const gasUsdc = formatUnits(gasBalance, 18);
+  const deployment = readJson<DeploymentFile>(`derivativeMarket.${chainId}.json`) ?? {};
+  const pythAdapters = readJson<PythAdaptersFile>(`pythAdapters.${chainId}.json`) ?? { adapters: {} };
+  const execute = process.env.KEEPER_CONFIRM === "tak";
 
-  const factory = new ethers.Contract(factoryAddress, FACTORY_ABI, provider);
-  const count = Number(await factory.marketCount());
-  const latest = await provider.getBlockNumber();
-  const now = (await provider.getBlock(latest))!.timestamp;
+  const report = await runPerpsKeeper({
+    provider,
+    signer,
+    chainId,
+    execute,
+    deployment,
+    pythAdapters,
+    factoryAddress: process.env.DERIV_FACTORY,
+    scanBlocks: process.env.KEEPER_SCAN_BLOCKS ? Number(process.env.KEEPER_SCAN_BLOCKS) : undefined,
+    pythApiKey: process.env.PYTH_API_KEY,
+    hermesUrl: process.env.HERMES_URL,
+    pushAfter: process.env.PYTH_PUSH_AFTER ? Number(process.env.PYTH_PUSH_AFTER) : undefined,
+    heartbeatAfter: process.env.REGISTRY_HEARTBEAT_AFTER ? Number(process.env.REGISTRY_HEARTBEAT_AFTER) : undefined,
+    gasAlertUsdc: process.env.GAS_ALERT_USDC,
+  });
 
-  const markets: Row[] = [];
-  for (let i = 0; i < count; i++) {
-    const marketAddress: string = await factory.allMarkets(i);
-    const market = new ethers.Contract(marketAddress, MARKET_ABI, provider);
-    const row: Row = { market: marketAddress };
-    try {
-      const [interval, mmBps, lastFundingAt] = await Promise.all([
-        market.FUNDING_INTERVAL(),
-        market.MAINTENANCE_MARGIN_BPS(),
-        market.lastFundingAt(),
-      ]);
-      const dueAt = Number(lastFundingAt) + Number(interval);
-      row.fundingDueInSec = dueAt - now;
-      if (now >= dueAt) {
-        row.fundingDue = true;
-        if (execute) {
-          try {
-            const tx = await market.connect(signer).getFunction("settleFunding")();
-            await tx.wait();
-            row.settleTx = tx.hash;
-          } catch (error) {
-            row.settleError = firstLine(error);
-          }
-        }
-      }
-
-      // Kandydaci do likwidacji: kazdy, kto KIEDYKOLWIEK otworzyl pozycje.
-      // Jeden adres = jedna pozycja (kontrakt), wiec zbior wystarczy.
-      const topic = market.interface.getEvent("PositionOpened")!.topicHash;
-      const traders = new Set<string>();
-      for (let from = fromBlock; from <= latest; from += WINDOW) {
-        const to = Math.min(latest, from + WINDOW - 1);
-        const logs = await provider.getLogs({ address: marketAddress, topics: [topic], fromBlock: from, toBlock: to });
-        for (const log of logs) {
-          const parsed = market.interface.parseLog(log);
-          if (parsed) traders.add(parsed.args.trader);
-        }
-      }
-
-      let open = 0;
-      let liquidatable = 0;
-      const liquidations: string[] = [];
-      for (const trader of traders) {
-        const pos = await market.getPosition(trader);
-        if (pos.size === 0n) continue;
-        open++;
-        const ratio: bigint = await market.marginRatioBps(trader);
-        if (ratio >= BigInt(mmBps)) continue;
-        liquidatable++;
-        if (!execute) {
-          liquidations.push(`${trader} ratio=${ratio}bps (dry-run)`);
-          continue;
-        }
-        try {
-          const tx = await market.connect(signer).getFunction("liquidate")(trader);
-          const receipt = await tx.wait();
-          liquidations.push(`${trader} tx=${tx.hash} block=${receipt?.blockNumber}`);
-        } catch (error) {
-          // Ktos mogl nas uprzedzic (PositionHealthy / NoPosition) - to nie
-          // jest blad keepera, tylko powod, zeby isc dalej.
-          liquidations.push(`${trader} error=${firstLine(error)}`);
-        }
-      }
-      row.tradersSeen = traders.size;
-      row.openPositions = open;
-      row.liquidatable = liquidatable;
-      if (liquidations.length) row.liquidations = liquidations.join(" | ");
-    } catch (error) {
-      row.error = firstLine(error);
-    }
-    markets.push(row);
-  }
-
-  // ---- PYTH: wiek cen i (z kluczem) wypychanie aktualizacji ----
-  const pythCfg = readPythAdapters(chainId);
-  const pushAfter = Number(process.env.PYTH_PUSH_AFTER || 600);
-  const hermesKey = process.env.PYTH_API_KEY;
-  const hermesUrl = process.env.HERMES_URL || "https://hermes.pyth.network";
-  const pyth: Row[] = [];
-  if (pythCfg.pyth) {
-    for (const [symbol, entry] of Object.entries(pythCfg.adapters)) {
-      // Kazdy adapter czyta z WLASNEGO zrodla: nasz PythReceiver (przyjmuje
-      // Hermesa) albo kontrakt Pytha (BTC, odswiezany przez kogos innego).
-      const pythContract = new ethers.Contract(entry.pyth ?? pythCfg.pyth, PYTH_ABI, provider);
-      const row: Row = { symbol, adapter: entry.address, source: entry.pyth ?? pythCfg.pyth };
-      try {
-        const p = await pythContract.getPriceUnsafe(entry.priceId);
-        const age = now - Number(p.publishTime);
-        row.ageSec = age;
-        row.stale = age > entry.maxAge;
-        if (age <= pushAfter) {
-          pyth.push(row);
-          continue;
-        }
-        if (!hermesKey) {
-          row.pushSkipped = "brak PYTH_API_KEY - Hermes wymaga klucza, tylko raportuje";
-        } else if (!execute) {
-          row.pushSkipped = "dry-run";
-        } else {
-          const update = await fetchHermesUpdate(hermesUrl, hermesKey, [entry.priceId]);
-          const fee: bigint = await pythContract.getUpdateFee(update);
-          const tx = await pythContract.connect(signer).getFunction("updatePriceFeeds")(update, { value: fee });
-          await tx.wait();
-          row.pushTx = tx.hash;
-          row.feeUsdc = formatUnits(fee, 18);
-        }
-      } catch (error) {
-        // 0x2acbe915 = InvalidWormholeVaa. Stan z 11.09.2026: kontrakt Pytha na
-        // Arc testnet (wersja 1.4.5-alpha.1) nie przeszedl upgrade'u z 26.08,
-        // a Hermes od tego dnia podpisuje aktualizacje nowym zestawem
-        // (guardian set 1, 3 podpisy). Kontrakt przyjmuje tylko zestaw 7
-        // Wormhole (13 podpisow). Kazdy endpoint Hermesa (v2, v1, beta,
-        // po timestampie) oddaje nowy format - nie da sie tego obejsc po naszej
-        // stronie. Do czasu upgrade'u przez Pyth cene BTC/USD na Arc
-        // odswiezaja inne aplikacje ze starym formatem, a adapter po MAX_AGE
-        // oddaje 0 i rynek spada na TWAP rejestru.
-        const msg = firstLine(error);
-        const data = (error as { data?: string }).data;
-        row.error =
-          data === "0x2acbe915"
-            ? "InvalidWormholeVaa: kontrakt Pytha na Arc nie przyjmuje podpisow Hermesa po upgrade 08.2026 (czeka na upgrade kontraktu przez Pyth)"
-            : msg;
-      }
-      pyth.push(row);
-    }
-  }
-
-  // ---- HEARTBEAT REJESTRU: rynek bez swiezej ceny w rejestrze nie przyjmuje pozycji ----
-  const heartbeatAfter = Number(process.env.REGISTRY_HEARTBEAT_AFTER || 2400);
-  const registry: Row[] = [];
-  for (let i = 0; i < count; i++) {
-    const marketAddress: string = await factory.allMarkets(i);
-    const market = new ethers.Contract(marketAddress, MARKET_ABI, provider);
-    const row: Row = { market: marketAddress };
-    try {
-      const [oracleAddress, marketId, feedAddress] = await Promise.all([
-        market.ORACLE(),
-        market.ORACLE_MARKET_ID(),
-        market.CHAINLINK_FEED(),
-      ]);
-      const oracle = new ethers.Contract(oracleAddress, REGISTRY_ABI, provider);
-      const [m, maxAge, maxDevBps, minInterval] = await Promise.all([
-        oracle.getMarket(marketId),
-        oracle.MAX_PRICE_AGE(),
-        oracle.MAX_DEVIATION_BPS(),
-        oracle.MIN_UPDATE_INTERVAL(),
-      ]);
-      const age = now - Number(m.updatedAt);
-      row.symbol = m.symbol;
-      row.ageSec = age;
-      row.active = !m.slashed && age <= Number(maxAge);
-      if (m.slashed) {
-        row.skipped = "feed ukarany (slashed) - submitPrice rewertuje";
-        registry.push(row);
-        continue;
-      }
-      if (age < heartbeatAfter) {
-        registry.push(row);
-        continue;
-      }
-      if (age < Number(minInterval)) {
-        row.skipped = "MIN_UPDATE_INTERVAL";
-        registry.push(row);
-        continue;
-      }
-      const me = signer.address.toLowerCase();
-      if (me !== String(m.publisher).toLowerCase() && me !== String(m.creator).toLowerCase()) {
-        row.skipped = `keeper ${signer.address} nie jest wystawca ani tworca (publisher ${m.publisher})`;
-        registry.push(row);
-        continue;
-      }
-
-      // Zrodlo ceny: adapter, jesli oddaje dodatnia i swieza liczbe. Inaczej
-      // ostatnia cena rejestru - feed zyje, TWAP stoi w miejscu.
-      const prev: bigint = m.price;
-      let price = prev;
-      let source = "registry (heartbeat, ta sama cena)";
-      if (feedAddress !== ethers.ZeroAddress) {
-        try {
-          const feed = new ethers.Contract(feedAddress, FEED_ABI, provider);
-          const [, answer, , updatedAt] = await feed.latestRoundData();
-          const decimals = Number(await feed.decimals());
-          if (answer > 0n && now - Number(updatedAt) <= Number(maxAge)) {
-            price = decimals === 18 ? answer : decimals < 18 ? answer * 10n ** BigInt(18 - decimals) : answer / 10n ** BigInt(decimals - 18);
-            source = `adapter ${feedAddress}`;
-          } else {
-            source = `registry (adapter ${feedAddress} oddal ${answer > 0n ? "stara" : "zerowa"} cene)`;
-          }
-        } catch (error) {
-          source = `registry (adapter nie odpowiada: ${firstLine(error)})`;
-        }
-      }
-      // Rejestr odrzuca skok wiekszy niz MAX_DEVIATION_BPS od poprzedniej ceny.
-      // Przycinamy zamiast rewertowac - nastepny przebieg dojdzie do reszty.
-      if (prev > 0n) {
-        const cap = (prev * BigInt(maxDevBps)) / 10_000n;
-        if (price > prev + cap) {
-          price = prev + cap;
-          source += " (przyciete do +MAX_DEVIATION_BPS)";
-        } else if (price + cap < prev) {
-          price = prev - cap;
-          source += " (przyciete do -MAX_DEVIATION_BPS)";
-        }
-      }
-      row.source = source;
-      row.price = formatUnits(price, 18);
-      if (!execute) {
-        row.skipped = "dry-run";
-        registry.push(row);
-        continue;
-      }
-      try {
-        // observedAt = czas ostatniego bloku: nie z przyszlosci, nie starszy
-        // niz MAX_PRICE_AGE i pozniejszy niz poprzedni wpis.
-        const tx = await oracle.connect(signer).getFunction("submitPrice")(marketId, price, BigInt(now));
-        await tx.wait();
-        row.submitTx = tx.hash;
-      } catch (error) {
-        row.submitError = firstLine(error);
-      }
-    } catch (error) {
-      row.error = firstLine(error);
-    }
-    registry.push(row);
-  }
-
-  console.log(
-    JSON.stringify(
-      { network: NETWORK_LABEL[chainId], factory: factoryAddress, keeper: signer.address, gasUsdc, latestBlock: latest, execute, markets, pyth, registry },
-      null,
-      2
-    )
-  );
-  if (gasBalance < gasAlert) {
+  console.log(JSON.stringify({ hardhatNetwork: network.name, ...report }, null, 2));
+  if (report.gasLow) {
     // Ta linia jest umowa z keeper.ps1 - nie zmieniac slow "GAZ NISKI".
-    console.log(`GAZ NISKI: keeper ${signer.address} ma ${gasUsdc} USDC na Arc, prog ${formatUnits(gasAlert, 18)} USDC.`);
+    console.log(`GAZ NISKI: keeper ${report.keeper} ma ${report.gasUsdc} USDC na Arc, prog ${process.env.GAS_ALERT_USDC || "1"} USDC.`);
   }
   if (!execute) console.log("Dry-run: ustaw KEEPER_CONFIRM=tak dopiero po sprawdzeniu raportu.");
 }

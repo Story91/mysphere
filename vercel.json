@@ -4,6 +4,10 @@
     {
       "path": "/api/curator-watch",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/keeper/perps",
+      "schedule": "*/15 * * * *"
     }
   ]
 }
