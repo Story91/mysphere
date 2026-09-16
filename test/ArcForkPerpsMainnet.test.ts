@@ -216,6 +216,8 @@ describe('Arc mainnet fork: perps od odbiornika Pytha do pozycji', function () {
   });
 });
 
-// Modul, nie skrypt - pliki testow dziela globalna przestrzen i bez tego tsc
-// zglasza TS2451 na hre/ethers/expect.
-export {};
+// UWAGA: bez `export {}`. Pod Node 24 + ts-node (CJS) `export` robi z pliku
+// ESM i `require` przestaje istniec ("require is not defined in ES module
+// scope") - test w ogole sie nie laduje. Kolizje TS2451 miedzy plikami
+// testow to sprawa `tsc` na calym repo, nie hardhata; hardhat mocha laduje
+// kazdy plik osobno i dziala.
