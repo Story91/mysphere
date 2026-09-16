@@ -184,17 +184,41 @@ callbacków"). Do decyzji właściciela, bo każda opcja ma cenę:
 | chainId w ciasteczku + prop z Server Component | **refaktor rdzenia** | poprawne SSR per-użytkownik, SEO zostaje, linki bez zmian |
 | chainId zawsze w URL (`?chain=5042`) | średni | brzydsze linki, ale SSR działa |
 
-**Uwaga do opcji z ciasteczkiem, bo zmienia jej wycenę.** Blokadą nie jest to,
-że serwer nie zna wyboru — samo dopisanie ciasteczka nic nie da. `cookies()`
-nie da się zawołać na poziomie modułu, a moduł komponentu klienckiego ewaluuje
-się na serwerze **raz na proces, nie raz na żądanie**. Żeby ciasteczko
-zadziałało, Server Component musi przekazać `chainId` w dół — a stałe modułu
-konsumuje ponad 200 miejsc w 20 plikach. To jest prawdziwy koszt tej opcji.
+**DECYZJA WŁAŚCICIELA 16.09: zostawiamy, wraca jako osobne zadanie.**
+Defekt jest kosmetyczny — miga i loguje błąd w konsoli, ale żadne pieniądze nie
+są zagrożone, a wszystko funduszowe jest naprawione. Poniżej prawdziwe koszty,
+zmierzone, żeby następna sesja nie zaczynała od zera.
 
-Rekomendacja obu sesji pracujących nad Arc: **ciasteczko**, mimo kosztu —
-bo jako jedyna opcja nie oddaje SEO i nie psuje linków. Ale to decyzja
-właściciela: „dzień roboty i utrata SEO startpadu" kontra „refaktor rdzenia
-i SEO zostaje".
+**Zmierzony koszt (`grep` po `app/`).** Kluczowe rozróżnienie: `ACTIVE_LAUNCHPAD_NETWORK`
+to OBIEKT, więc dałoby się go objąć `Proxy` i te użycia zostałyby bez zmian.
+Reszta to PRYMITYWY (string/bigint/number) złapane przy ładowaniu modułu —
+na stringu proxy nie postawisz, więc każde z nich musi stać się wywołaniem
+funkcji albo odczytem z kontekstu Reacta.
+
+| stała | użyć | objęte proxy? |
+|---|---|---|
+| `NATIVE_SYMBOL` | 106 | nie |
+| `LAUNCHPAD_CHAIN` | 82 | nie |
+| `ACTIVE_LAUNCHPAD_NETWORK` | 80 | **tak** |
+| `LAUNCHPAD_ADDRESS` | 74 | nie |
+| `LAUNCH_HOOK_ADDRESS` | 37 | nie |
+| `LIQUIDITY_VAULT_ADDRESS` | 31 | nie |
+| `CURVE_TARGET_ETH` | 22 | nie |
+| pozostałe | ~17 | nie |
+
+Czyli ~290 miejsc do przerobienia, nie „dzień roboty". `cookies()` nie da się
+zawołać na poziomie modułu, a moduł komponentu klienckiego ewaluuje się na
+serwerze **raz na proces, nie raz na żądanie** — dlatego samo ciasteczko nic
+nie da bez przekazania `chainId` w dół z Server Component.
+
+**Czego NIE próbować (sprawdzone i odrzucone 16.09).** Parametr `?c=<chainId>`
+w adresie **już istnieje** — `setLaunchpadChain` (`config.ts` ~573) go dopisuje
+i robi `location.assign`, a `pickChainId` daje adresowi pierwszeństwo przed
+`localStorage`. Kusi, żeby na tym oprzeć tanią naprawę, ale to nie działa:
+`resolveActiveNetwork()` na serwerze zawsze zwraca `DEFAULT_LAUNCHPAD_CHAIN_ID`
+(bo `typeof window === 'undefined'`), a `app/startpad/page.tsx` nie czyta
+`searchParams`. HTML z serwera jest z Base **niezależnie od adresu**. Parametr
+w URL służy do przenoszenia wyboru między urządzeniami, nie do hydracji.
 
 ### 6.2 Sprzedaż na Arc daje nieograniczoną zgodę routerowi o nieznanej proweniencji
 
