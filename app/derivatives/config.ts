@@ -1,5 +1,7 @@
 import type { Address } from 'viem';
-import { arcTestnet } from '../startpad/arcChain';
+import { arcMainnet, arcTestnet } from '../startpad/arcChain';
+import deployedTestnet from '../../deployments/derivativeMarket.5042002.json';
+import deployedMainnet from '../../deployments/derivativeMarket.5042.json';
 
 /**
  * KONFIGURACJA MODULU DERYWATOW.
@@ -14,12 +16,25 @@ import { arcTestnet } from '../startpad/arcChain';
  * depozytu. Ceny, notional i PnL przychodza z kontraktow w WAD (18 miejsc) -
  * te formatujemy `formatEther`, i to jest jedyne ich zastosowanie tutaj.
  *
- * Adresy: po wdrozeniu wpisz je do `deployments/derivativeMarket.5042002.json`
- * i tutaj (albo podaj przez NEXT_PUBLIC_*). Dopoki sa zerowe, tablica pokazuje
- * jawny komunikat zamiast udawac pusty rynek.
+ * Adresy: domyslnie z `deployments/derivativeMarket.<chainId>.json` (pisze je
+ * skrypt wdrozeniowy), NEXT_PUBLIC_* nadpisuje. Dopoki sa zerowe, tablica
+ * pokazuje jawny komunikat zamiast udawac pusty rynek.
+ *
+ * ===========================================================================
+ * KTORY ARC
+ * ===========================================================================
+ * NEXT_PUBLIC_DERIV_CHAIN_ID=5042 przelacza modul na Arc MAINNET; wszystko
+ * inne (w tym brak zmiennej) to testnet 5042002. Jeden lancuch na build -
+ * rynki, adaptery Pytha i keeper sa per lancuch, a mieszanie ich w jednym
+ * widoku to prosta droga do pokazania ceny z testnetu przy pozycji z mainnetu.
  */
 
-export const DERIV_CHAIN = arcTestnet;
+export const DERIV_CHAIN = (process.env.NEXT_PUBLIC_DERIV_CHAIN_ID || '').trim() === '5042' ? arcMainnet : arcTestnet;
+export const DERIV_IS_MAINNET = DERIV_CHAIN.id === arcMainnet.id;
+
+type DeploymentFile = { oracle?: string; factory?: string; usdc?: string; deployBlock?: number };
+const deployment: DeploymentFile = (DERIV_IS_MAINNET ? deployedMainnet : deployedTestnet) as DeploymentFile;
+const ZERO = '0x0000000000000000000000000000000000000000';
 
 /**
  * STATYCZNE odwolania do process.env.NEXT_PUBLIC_* - to jedyna forma, ktora
@@ -28,14 +43,15 @@ export const DERIV_CHAIN = arcTestnet;
  * (tam `process.env` po prostu nie istnieje), wiec zawsze spadala na adres
  * zerowy bez wzgledu na to, co ustawiono w Vercelu czy `.env.local`.
  */
-export const ORACLE_ADDRESS = ((process.env.NEXT_PUBLIC_DERIV_ORACLE || '').trim() ||
-  '0x0000000000000000000000000000000000000000') as Address;
-export const FACTORY_ADDRESS = ((process.env.NEXT_PUBLIC_DERIV_FACTORY || '').trim() ||
-  '0x0000000000000000000000000000000000000000') as Address;
+export const ORACLE_ADDRESS = ((process.env.NEXT_PUBLIC_DERIV_ORACLE || '').trim() || deployment.oracle || ZERO) as Address;
+export const FACTORY_ADDRESS = ((process.env.NEXT_PUBLIC_DERIV_FACTORY || '').trim() || deployment.factory || ZERO) as Address;
 export const USDC_ADDRESS = ((process.env.NEXT_PUBLIC_DERIV_USDC || '').trim() ||
+  deployment.usdc ||
   '0x3600000000000000000000000000000000000000') as Address;
+/** Blok wdrozenia fabryki - od niego skanuje sie zdarzenia; 0 = nie wdrozono. */
+export const DERIV_DEPLOY_BLOCK = BigInt(deployment.deployBlock ?? 0);
 
-export const DEPLOYED = FACTORY_ADDRESS !== '0x0000000000000000000000000000000000000000';
+export const DEPLOYED = FACTORY_ADDRESS !== ZERO;
 
 /** Kolateral ma SZESC miejsc. Nie osiemnascie. */
 export const USDC_DECIMALS = 6;

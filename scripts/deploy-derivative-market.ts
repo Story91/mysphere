@@ -57,6 +57,8 @@ import { dirname, join } from "path";
 /** ERC-20 USDC na znanych sieciach. Arc: kanoniczny adres z docs.arc.io. */
 const KNOWN_USDC: Record<number, string> = {
   5042002: "0x3600000000000000000000000000000000000000",
+  // Arc mainnet: ten sam kanoniczny adres (sprawdzone eth_call 16.09.2026, 6 miejsc).
+  5042: "0x3600000000000000000000000000000000000000",
   8453: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
   84532: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
 };
@@ -89,7 +91,7 @@ async function main() {
 
   // Jednostka natywna SIECI - na Arc te same liczby znacza dolary, wiec
   // podpisanie ich "ETH" myli dokladnie tam, gdzie boli najbardziej.
-  const unit = chainId === 5042002 ? "USDC" : "ETH";
+  const unit = chainId === 5042002 || chainId === 5042 ? "USDC" : "ETH";
 
   console.log("siec              ", `${network.name} (chainId ${chainId})`);
   console.log("wdrazajacy        ", deployer);

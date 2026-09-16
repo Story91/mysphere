@@ -18,17 +18,23 @@ Set-Location (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
 $env:KEEPER_CONFIRM = 'tak'
 if (-not $env:GAS_ALERT_USDC) { $env:GAS_ALERT_USDC = '1' }
 
+# PERPS_NETWORK=mainnet -> Arc mainnet (5042), osobny log i znacznik alarmu.
+# Domyslnie testnet, zeby istniejace zadanie Task Schedulera nie zmienilo sensu.
+$mainnet = $env:PERPS_NETWORK -eq 'mainnet'
+$npmScript = if ($mainnet) { 'perps:keeper:mainnet' } else { 'perps:keeper' }
+$suffix = if ($mainnet) { '-mainnet' } else { '' }
+
 $stamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-$log = Join-Path $PWD 'scripts\output\perps-keeper.log'
+$log = Join-Path $PWD "scripts\output\perps-keeper$suffix.log"
 "=== $stamp ===" | Out-File -FilePath $log -Append -Encoding utf8
-$out = npm run perps:keeper 2>&1 | ForEach-Object { "$_" }
+$out = npm run $npmScript 2>&1 | ForEach-Object { "$_" }
 $out | Out-File -FilePath $log -Append -Encoding utf8
 $out
 
 # Alarm gazu jak w scripts\sphere\keeper.ps1: znacznik + toast najwyzej raz na 12 h.
 $alertLine = $out | Where-Object { $_ -match 'GAZ NISKI|insufficient funds|INSUFFICIENT_FUNDS' } | Select-Object -First 1
 if ($alertLine) {
-  $marker = Join-Path $PWD 'scripts\output\PERPS-GAZ-NISKI.txt'
+  $marker = Join-Path $PWD "scripts\output\PERPS-GAZ-NISKI$suffix.txt"
   $recent = (Test-Path $marker) -and ((Get-Date) - (Get-Item $marker).LastWriteTime).TotalHours -lt 12
   "$stamp $alertLine" | Out-File -FilePath $marker -Append -Encoding utf8
   if (-not $recent) {

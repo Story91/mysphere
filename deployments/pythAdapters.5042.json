@@ -1,0 +1,6 @@
+{
+  "chainId": 5042,
+  "pyth": "0x0000000000000000000000000000000000000000",
+  "adapters": {},
+  "_note": "PLACEHOLDER - Pyth nie ma kontraktu na Arc mainnet; `pyth` dostanie adres naszego PythReceiver przy pierwszym adapterze (deploy-pyth-adapter.ts)."
+}

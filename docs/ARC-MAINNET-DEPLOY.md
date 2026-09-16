@@ -65,3 +65,47 @@ Uwagi:
 - Zastrzezenie z 11.09 stoi: syntetyczna ekspozycja na akcje (TSLA) to instrument finansowy (MiCA/SEC).
   Bez opinii prawnej perps zostaja na testnecie; paired tokens na mainnecie moga miec tylko
   rynki krypto (BTC/ETH), jesli w ogole.
+
+## Perps i paired tokens na Arc mainnet - runbook (kod gotowy 16.09.2026)
+
+Kod: skrypty perpsow przyjmuja oba Arc (5042002 i 5042), pliki `deployments/*.<chainId>.json`
+biora nazwe z prawdziwego chainId, frontend derywatow przelacza sie zmienna
+`NEXT_PUBLIC_DERIV_CHAIN_ID=5042` (bez niej: testnet). Parowanie tokena z indeksem w Startpadzie
+dziala na tym Arc, na ktorym stoi modul derywatow.
+
+### Budzet (realne USDC na 0xD488 na Arc)
+
+| Krok | Koszt |
+|---|---|
+| PythReceiver + adaptery (BTC, ETH; TSLA/XAU/EUR wg decyzji prawnej) | ~0,3 USDC gazu |
+| rejestr + fabryka + fundusz + dystrybutor (deploy-derivative-market.ts) | ~0,5 USDC gazu |
+| zasilenie funduszu ubezpieczen `SEED_USDC` (6 miejsc) | wg decyzji, testnet mial 5 USDC |
+| **kaucja rejestracji feedu: `MIN_BOND_AMOUNT = 100 USDC` NA KAZDY RYNEK** (stala w kontrakcie) | 100 USDC / rynek |
+| gaz keepera (funding, likwidacje, wypychanie Pytha co 15 min) | ~0,1 USDC / dzien |
+
+Wniosek: dwa rynki (BTC, ETH) = ~205 USDC + fundusz. Saldo 16.09: ~12,9 USDC. Trzeba domostowac
+(`npm run arc:bridge` z Base, tryb standard dochodzi w ~75 min przez publiczny relayer).
+
+### Kolejnosc (wlasciciel odpala, CONFIRM=tak dopiero po sprawdzeniu wypisu)
+
+1. Odbiornik Pytha (owner = deployer; potem `transferOwnership` na multisig):
+   `CONFIRM=tak npm run perps:pyth:receiver:mainnet` -> `deployments/pythReceiver.5042.json`
+2. Adaptery (priceId z `deployments/pythAdapters.5042002.json`, te same feedy Hermesa):
+   `PRICE_ID=0xe62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43 SYMBOL="BTC/USD" CONFIRM=tak npm run perps:pyth:adapter:mainnet`
+   `PRICE_ID=0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace SYMBOL="ETH/USD" CONFIRM=tak npm run perps:pyth:adapter:mainnet`
+   (skrypt sam celuje w odbiornik z kroku 1; bez pliku odbiornika odmawia - Pytha na mainnecie nie ma)
+3. Stack perpsow: `SEED_USDC=5000000 CONFIRM=tak npm run perps:deploy:arc:mainnet`
+   -> nadpisuje placeholder `deployments/derivativeMarket.5042.json`
+4. Pierwsze wypchniecie cen: `PERPS_NETWORK=mainnet powershell -File scripts\derivatives\keeper.ps1`
+   (adaptery oddaja 0 do pierwszej aktualizacji; keeper wypycha, gdy `PYTH_API_KEY` jest w .env.local)
+5. Rynek: w UI "New market" z feedem BTC (kaucja 100 USDC + approve), albo `scripts/create-sample-derivative-market.ts`.
+6. Keeper na stale: drugie zadanie Task Schedulera z `PERPS_NETWORK=mainnet`
+   (`schtasks /Create /TN "Perps keeper Arc mainnet" /SC MINUTE /MO 15 /TR "powershell -ExecutionPolicy Bypass -Command \"$env:PERPS_NETWORK='mainnet'; & '<repo>\scripts\derivatives\keeper.ps1'\"" /F`)
+7. Frontend: `NEXT_PUBLIC_DERIV_CHAIN_ID=5042` w Vercelu; adresy ida z commitowanego
+   `deployments/derivativeMarket.5042.json`, wiec po deployu ten plik trzeba scommitowac.
+
+### Otwarte decyzje wlasciciela
+- Ktore feedy na mainnecie: BTC/ETH (krypto) bez zastrzezen; TSLA/XAU/EUR = syntetyczna ekspozycja
+  na instrumenty finansowe - zastrzezenie prawne z 11.09 nadal stoi.
+- Owner PythReceivera i GOVERNANCE/TREASURY stacku: deployer na start, multisig docelowo.
+- Testnetowy keeper: portfel 0xD488 na Arc TESTNET ma 0 USDC gazu (odczyt 16.09) - faucet.circle.com.

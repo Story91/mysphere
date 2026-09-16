@@ -31,7 +31,8 @@ import path from "path";
  * zero od pierwszej sekundy - lepiej to wiedziec przed wdrozeniem.
  */
 
-const CHAIN_ID = 5042002;
+/** Oba lancuchy Arc; pliki deployments/*.<chainId>.json bierze z prawdziwego chainId. */
+const ARC_CHAIN_IDS = new Set([5042002, 5042]);
 const PYTH_ARC_TESTNET = "0x2880aB155794e7179c9eE2e38200202908C17B43";
 
 /**
@@ -39,9 +40,15 @@ const PYTH_ARC_TESTNET = "0x2880aB155794e7179c9eE2e38200202908C17B43";
  * bo kontrakt Pytha na Arc odrzuca aktualizacje Hermesa po 26.08.2026 i tylko
  * BTC/USD ktos tam jeszcze odswieza. PYTH=... nadpisuje (np. dla BTC).
  */
-function defaultPyth(): string {
-  const file = path.join(__dirname, "..", "..", "deployments", `pythReceiver.${CHAIN_ID}.json`);
+function defaultPyth(chainId: number): string {
+  const file = path.join(__dirname, "..", "..", "deployments", `pythReceiver.${chainId}.json`);
   if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, "utf8")).receiver;
+  // Na mainnecie Pytha NIE MA (docs Pytha: tylko Arc testnet; pod 0x2880 na
+  // 5042 stoi 1 kB czegos innego, co rewertuje). Bez odbiornika nie ma z czego
+  // czytac - lepiej odpasc tu niz wdrozyc adapter na martwy adres.
+  if (chainId === 5042) {
+    throw new Error("Brak deployments/pythReceiver.5042.json - najpierw wdroz PythReceiver (deploy-pyth-receiver.ts --network arcMainnet).");
+  }
   return PYTH_ARC_TESTNET;
 }
 const PYTH_ABI = [
@@ -52,7 +59,7 @@ async function main() {
   const provider = ethers.provider;
   const chainId = Number((await provider.getNetwork()).chainId);
   const isLocal = network.name === "hardhat" || network.name === "localhost";
-  if (!isLocal && chainId !== CHAIN_ID) throw new Error(`Oczekiwalem Arc Testnet (${CHAIN_ID}), dostalem ${chainId}.`);
+  if (!isLocal && !ARC_CHAIN_IDS.has(chainId)) throw new Error(`Oczekiwalem Arc (5042002 albo 5042), dostalem ${chainId}.`);
   if (!isLocal && process.env.CONFIRM !== "tak") throw new Error("To wdraza kontrakt. Powtorz z CONFIRM=tak.");
 
   const priceId = process.env.PRICE_ID;
@@ -60,7 +67,7 @@ async function main() {
   if (!priceId || !/^0x[0-9a-fA-F]{64}$/.test(priceId)) throw new Error("PRICE_ID musi byc bytes32 (0x + 64 hex).");
   if (!symbol) throw new Error("SYMBOL jest wymagane, np. BTC/USD.");
   const maxAge = Number(process.env.MAX_AGE || 3600);
-  const pythAddress = process.env.PYTH || defaultPyth();
+  const pythAddress = process.env.PYTH || defaultPyth(chainId);
 
   const pyth = new ethers.Contract(pythAddress, PYTH_ABI, provider);
   try {
@@ -90,8 +97,11 @@ async function main() {
   console.log(`PythAggregatorAdapter ${symbol}: ${address} (latestAnswer=${answer == null ? "brak feedu" : ethers.formatEther(answer) + " USD"})`);
 
   if (!isLocal) {
-    const file = path.join(__dirname, "..", "..", "deployments", `pythAdapters.${CHAIN_ID}.json`);
-    const json = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : { chainId: CHAIN_ID, pyth: pythAddress, adapters: {} };
+    const file = path.join(__dirname, "..", "..", "deployments", `pythAdapters.${chainId}.json`);
+    const json = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : { chainId, pyth: pythAddress, adapters: {} };
+    // Placeholder z zerowym `pyth` (frontend potrzebuje pliku, zeby sie zbudowac)
+    // dostaje prawdziwe zrodlo przy pierwszym adapterze.
+    if (!json.pyth || /^0x0+$/.test(json.pyth)) json.pyth = pythAddress;
     json.adapters[symbol] = { address, priceId, maxAge, pyth: pythAddress, deployer: deployer.address, deployedAt: new Date().toISOString() };
     fs.writeFileSync(file, JSON.stringify(json, null, 2) + "\n");
     console.log(`zapisano ${file}`);

@@ -55,7 +55,7 @@ import {
 import { formatUsd, useEthUsd } from './useEthUsd';
 import { browserStorage, clearPendingProfile, postProfileWithRetry, savePendingProfile, sendTokenProfile } from './profileSync';
 import { resolveMediaUrl } from './metadata';
-import { arcTestnet } from './arcChain';
+import { DERIV_CHAIN } from '../derivatives/config';
 import { INDEX_FEEDS, feedByAddress, pairedMarketSymbol } from '../derivatives/indexFeeds';
 import FeedIcon, { instrumentName } from '../derivatives/FeedIcon';
 import { resizeImageFile } from './logoUpload';
@@ -377,7 +377,9 @@ export default function LaunchTokenModal({
      mialby czego uruchomic. ---- */
   const [pairedFeed, setPairedFeed] = useState<string>('');
   const pairedIndex = feedByAddress(pairedFeed);
-  const pairingAvailable = LAUNCHPAD_CHAIN.id === arcTestnet.id && INDEX_FEEDS.length > 0;
+  // Parowanie tylko wtedy, gdy launchpad i modul derywatow stoja na TYM SAMYM
+  // Arc (testnet albo mainnet) i sa tam adaptery indeksu.
+  const pairingAvailable = LAUNCHPAD_CHAIN.id === DERIV_CHAIN.id && INDEX_FEEDS.length > 0;
   const [launchFeePct, setLaunchFeePct] = useState('1');
   // Start od sufitu z fallbacku, nie od zaszytej liczby - odczyt z lancucha i
   // tak nadpisze te wartosc, a stary hardkod '60' klamal po podniesieniu limitu.

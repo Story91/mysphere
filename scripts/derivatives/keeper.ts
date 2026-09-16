@@ -75,7 +75,9 @@ import path from "path";
  *                   nieudany przebieg)
  */
 
-const CHAIN_ID = 5042002;
+/** Oba lancuchy Arc; pliki deployments/*.<chainId>.json po prawdziwym chainId. */
+const ARC_CHAIN_IDS = new Set([5042002, 5042]);
+const NETWORK_LABEL: Record<number, string> = { 5042002: "arc-testnet", 5042: "arc-mainnet" };
 // Blockdaemon daje 50 000 blokow na eth_getLogs (hardhat.config). Przy jednym
 // bloku na sekunde to niecale 14 godzin na zapytanie.
 const WINDOW = 50_000;
@@ -120,8 +122,8 @@ type Row = Record<string, string | number | boolean>;
 
 type AdapterEntry = { address: string; priceId: string; maxAge: number; pyth?: string };
 
-function readPythAdapters(): { pyth?: string; adapters: Record<string, AdapterEntry> } {
-  const file = path.join(__dirname, "..", "..", "deployments", `pythAdapters.${CHAIN_ID}.json`);
+function readPythAdapters(chainId: number): { pyth?: string; adapters: Record<string, AdapterEntry> } {
+  const file = path.join(__dirname, "..", "..", "deployments", `pythAdapters.${chainId}.json`);
   if (!fs.existsSync(file)) return { adapters: {} };
   const json = JSON.parse(fs.readFileSync(file, "utf8"));
   return { pyth: json.pyth, adapters: json.adapters ?? {} };
@@ -140,8 +142,8 @@ async function fetchHermesUpdate(base: string, apiKey: string, priceIds: string[
   return data.map((hex) => (hex.startsWith("0x") ? hex : `0x${hex}`));
 }
 
-function readDeployment(): { factory?: string; deployBlock?: number } {
-  const file = path.join(__dirname, "..", "..", "deployments", `derivativeMarket.${CHAIN_ID}.json`);
+function readDeployment(chainId: number): { factory?: string; deployBlock?: number } {
+  const file = path.join(__dirname, "..", "..", "deployments", `derivativeMarket.${chainId}.json`);
   if (!fs.existsSync(file)) return {};
   const json = JSON.parse(fs.readFileSync(file, "utf8"));
   return { factory: json.factory, deployBlock: json.deployBlock };
@@ -154,12 +156,15 @@ function firstLine(error: unknown): string {
 async function main() {
   const provider = ethers.provider;
   const net = await provider.getNetwork();
-  if (Number(net.chainId) !== CHAIN_ID) {
-    throw new Error(`Oczekiwalem Arc Testnet (${CHAIN_ID}), dostalem ${net.chainId} (network ${network.name}).`);
+  const chainId = Number(net.chainId);
+  if (!ARC_CHAIN_IDS.has(chainId)) {
+    throw new Error(`Oczekiwalem Arc (5042002 albo 5042), dostalem ${chainId} (network ${network.name}).`);
   }
-  const deployment = readDeployment();
+  const deployment = readDeployment(chainId);
   const factoryAddress = process.env.DERIV_FACTORY || deployment.factory;
-  if (!factoryAddress) throw new Error("Brak adresu fabryki: ustaw DERIV_FACTORY albo deployments/derivativeMarket.5042002.json.");
+  if (!factoryAddress || /^0x0+$/.test(factoryAddress)) {
+    throw new Error(`Brak adresu fabryki: ustaw DERIV_FACTORY albo deployments/derivativeMarket.${chainId}.json.`);
+  }
   const fromBlock = Number(process.env.DERIV_FROM_BLOCK || deployment.deployBlock || 0);
   const execute = process.env.KEEPER_CONFIRM === "tak";
   const gasAlert = ethers.parseEther(process.env.GAS_ALERT_USDC || "1");
@@ -247,7 +252,7 @@ async function main() {
   }
 
   // ---- PYTH: wiek cen i (z kluczem) wypychanie aktualizacji ----
-  const pythCfg = readPythAdapters();
+  const pythCfg = readPythAdapters(chainId);
   const pushAfter = Number(process.env.PYTH_PUSH_AFTER || 600);
   const hermesKey = process.env.PYTH_API_KEY;
   const hermesUrl = process.env.HERMES_URL || "https://hermes.pyth.network";
@@ -401,7 +406,7 @@ async function main() {
 
   console.log(
     JSON.stringify(
-      { network: "arc-testnet", factory: factoryAddress, keeper: signer.address, gasUsdc, latestBlock: latest, execute, markets, pyth, registry },
+      { network: NETWORK_LABEL[chainId], factory: factoryAddress, keeper: signer.address, gasUsdc, latestBlock: latest, execute, markets, pyth, registry },
       null,
       2
     )

@@ -1,5 +1,7 @@
 import type { Address } from 'viem';
-import adapters from '../../deployments/pythAdapters.5042002.json';
+import adaptersTestnet from '../../deployments/pythAdapters.5042002.json';
+import adaptersMainnet from '../../deployments/pythAdapters.5042.json';
+import { DERIV_IS_MAINNET } from './config';
 
 /**
  * ZEWNETRZNE FEEDY INDEKSU - adaptery Pytha wdrozone na Arc testnet.
@@ -47,7 +49,10 @@ type AdapterFile = {
   adapters: Record<string, { address: string; priceId: string; maxAge: number; pyth?: string }>;
 };
 
-const file = adapters as AdapterFile;
+// Ten sam lancuch, co reszta modulu (config.ts). Na mainnecie plik jest
+// placeholderem z pusta lista, dopoki wlasciciel nie wdrozy odbiornika i
+// adapterow - wtedy UI po prostu nie oferuje parowania z indeksem.
+const file = (DERIV_IS_MAINNET ? adaptersMainnet : adaptersTestnet) as AdapterFile;
 
 export const PYTH_ADDRESS = file.pyth as Address;
 

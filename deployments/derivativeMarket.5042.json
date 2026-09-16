@@ -1,0 +1,16 @@
+{
+  "chainId": 5042,
+  "network": "arcMainnet",
+  "deployer": "0x0000000000000000000000000000000000000000",
+  "governance": "0x0000000000000000000000000000000000000000",
+  "treasury": "0x0000000000000000000000000000000000000000",
+  "usdc": "0x3600000000000000000000000000000000000000",
+  "oracle": "0x0000000000000000000000000000000000000000",
+  "factory": "0x0000000000000000000000000000000000000000",
+  "insuranceFund": "0x0000000000000000000000000000000000000000",
+  "feeDistributor": "0x0000000000000000000000000000000000000000",
+  "deployBlock": 0,
+  "insuranceSeedUsdc": "0",
+  "deployedAt": null,
+  "_note": "PLACEHOLDER - zera znacza 'nie wdrozone'. Nadpisuje scripts/deploy-derivative-market.ts --network arcMainnet."
+}

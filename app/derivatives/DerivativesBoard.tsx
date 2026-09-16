@@ -421,7 +421,7 @@ export default function DerivativesBoard() {
         <div>
           <span className="inline-flex items-center gap-1.5 rounded-full bg-sp-brand-soft px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-sp-brand-deep">
             <span className="h-1.5 w-1.5 rounded-full bg-sp-brand" />
-            Arc testnet
+            {DERIV_CHAIN.name}
           </span>
           <h1 className="mt-2.5 text-[28px] font-extrabold tracking-tight text-sp-ink">Arc Derivatives</h1>
           <p className="mt-1 text-[13px] text-sp-ink-soft">
@@ -522,7 +522,7 @@ export default function DerivativesBoard() {
         </div>
       )}
 
-      {DEPLOYED && <FaucetBanner balance={usdcBalance} connected={Boolean(address)} />}
+      {DEPLOYED && DERIV_CHAIN.testnet && <FaucetBanner balance={usdcBalance} connected={Boolean(address)} />}
       {DEPLOYED && <YourPositions address={address} markets={rows} />}
 
       {error && (
@@ -825,7 +825,7 @@ export default function DerivativesBoard() {
 
       {DEPLOYED && (
         <details className="mt-4 rounded-[16px] border border-sp-shade/10 bg-sp-surface px-4 py-3 text-xs">
-          <summary className="cursor-pointer font-semibold text-sp-ink-soft">Deployed contracts (Arc testnet)</summary>
+          <summary className="cursor-pointer font-semibold text-sp-ink-soft">Deployed contracts ({DERIV_CHAIN.name})</summary>
           <dl className="mt-3 grid gap-2">
             {[
               { name: 'PriceOracleRegistry', address: ORACLE_ADDRESS },

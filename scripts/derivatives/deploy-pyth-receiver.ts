@@ -3,7 +3,11 @@ import fs from "fs";
 import path from "path";
 
 /**
- * WDROZENIE PythReceiver NA ARC TESTNET.
+ * WDROZENIE PythReceiver NA ARC (testnet 5042002 albo mainnet 5042).
+ *
+ * MAINNET: Pyth NIE ma kontraktu na Arc mainnet (docs Pytha listuja tylko
+ * testnet), wiec ten odbiornik jest tam JEDYNYM zrodlem indeksu. Owner =
+ * wdrazajacy tylko na start - na mainnecie przekazac na multisig.
  *
  * Straznicy i emiter z deployments/pythSigners.json (odzyskane z prawdziwych
  * podpisow Hermesa przez collect-pyth-signers.ts). Quorum 3 = tyle podpisow
@@ -14,12 +18,13 @@ import path from "path";
  *   CONFIRM=tak npx cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json \
  *     hardhat run scripts/derivatives/deploy-pyth-receiver.ts --network arcTestnet
  */
-const CHAIN_ID = 5042002;
+/** Oba lancuchy Arc; plik wyjsciowy bierze nazwe z PRAWDZIWEGO chainId. */
+const ARC_CHAIN_IDS = new Set([5042002, 5042]);
 
 async function main() {
   const chainId = Number((await ethers.provider.getNetwork()).chainId);
   const isLocal = network.name === "hardhat" || network.name === "localhost";
-  if (!isLocal && chainId !== CHAIN_ID) throw new Error(`Oczekiwalem Arc Testnet (${CHAIN_ID}), dostalem ${chainId}.`);
+  if (!isLocal && !ARC_CHAIN_IDS.has(chainId)) throw new Error(`Oczekiwalem Arc (5042002 albo 5042), dostalem ${chainId}.`);
   if (!isLocal && process.env.CONFIRM !== "tak") throw new Error("To wdraza kontrakt. Powtorz z CONFIRM=tak.");
 
   const signersFile = path.join(__dirname, "..", "..", "deployments", "pythSigners.json");
@@ -45,11 +50,11 @@ async function main() {
   console.log(`PythReceiver: ${address} (owner ${deployer.address})`);
 
   if (!isLocal) {
-    const file = path.join(__dirname, "..", "..", "deployments", `pythReceiver.${CHAIN_ID}.json`);
+    const file = path.join(__dirname, "..", "..", "deployments", `pythReceiver.${chainId}.json`);
     fs.writeFileSync(
       file,
       JSON.stringify(
-        { chainId: CHAIN_ID, receiver: address, owner: deployer.address, guardians, quorum, guardianSet: signers.guardianSet, sourceChain: Number(srcChain), sourceEmitter: srcEmitter, deployedAt: new Date().toISOString() },
+        { chainId, receiver: address, owner: deployer.address, guardians, quorum, guardianSet: signers.guardianSet, sourceChain: Number(srcChain), sourceEmitter: srcEmitter, deployedAt: new Date().toISOString() },
         null,
         2
       ) + "\n"
