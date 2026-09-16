@@ -219,10 +219,32 @@ w trzech miejscach**. Zmierzone `curl`em po SSR, nie oszacowane.
   mechanizm, który komentarz przy `NET` już opisuje jako wybrany, a którego
   w tych dwóch miejscach brakowało.
 
-**Wynik:** 349 komunikatów w konsoli, **zero o hydracji**. Strona pokazuje
-`runs on Arc`, próg 5 000 USDC, `real USDC`. SSR zostaje bazowy i **to jest
-poprawne** — serwer nie zna wyboru użytkownika, a crawler ma widzieć sieć
-domyślną. Refaktor rdzenia okazał się niepotrzebny.
+**Domknięcie** (`1f3d41e`) — bo pierwsze zgłoszenie „rozwiązane" było
+przedwczesne i oparte na **wadliwym teście**. Sprawdzałem przez nawigację
+w panelu przeglądarki, która robi przejście po stronie klienta — hydracji wtedy
+w ogóle nie ma, więc „zero błędów w konsoli" niczego nie dowodziło. Druga sesja
+sprawdziła to na czystym serwerze i czystej karcie i pokazała, że rozjazd został.
+
+**Poprawna reprodukcja**, do zapamiętania: pełne ładowanie dokumentu
+(`location.href`, nie nawigacja SPA) na `/startpad?c=5042` — czyli sytuacja,
+w której klient wybiera **inną** sieć niż serwer. Na gołym `/startpad` z pustym
+`localStorage` klient wybiera Base, tak samo jak serwer, i rozjazdu z definicji
+nie ma. Sygnał niezależny od bufora konsoli: obecność `<nextjs-portal>`.
+
+Zostały po nim dwie rzeczy, obie naprawione:
+
+- **`aria-label` ShareTokena**: „Share Base B20" z serwera, „Share Arc"
+  z klienta. `suppressHydrationWarning` tu nie pomaga — to **atrybut**, nie
+  węzeł tekstowy. `LaunchpadBoard` dostał stan sieci (domyślna przed montażem,
+  wybrana po) i label jedzie z niego.
+- **`BoardStats`**: „0.000 ETH" kontra „0.000 USDC". To jedyny komponent
+  z jednostką rysowany **zanim przyjdą dane** (pokazuje zera), więc jako jedyny
+  łapał się na SSR. `formatEth` przyjmuje teraz symbol jawnie.
+
+**Wynik po pełnym przeładowaniu z Arc:** brak `<nextjs-portal>`, zero
+komunikatów o hydracji, `aria-label="Share Arc"`, `CURVE RESERVE 13.45 USDC`
+z prawdziwych danych, próg 5 000 USDC, `runs on Arc`. SSR zostaje bazowy i to
+jest poprawne — serwer nie zna wyboru, crawler ma widzieć sieć domyślną.
 
 ### 6.2 Sprzedaż na Arc daje nieograniczoną zgodę routerowi o nieznanej proweniencji
 
