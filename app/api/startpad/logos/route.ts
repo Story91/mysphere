@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { list } from '@vercel/blob';
+import { LAUNCHPAD_NETWORKS } from '../../../startpad/config';
 
 /**
  * LOGO TOKENOW Z VERCEL BLOB - z pominieciem Firestore.
@@ -16,10 +17,19 @@ import { list } from '@vercel/blob';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// Lista zamknieta, bo `chainId` idzie prosto do sciezki w Blobie - bez niej
-// dowolny ciag z adresu listowalby dowolny prefiks kubelka.
-// 5042002 = Arc testnet (wdrozenie 2026-08-13).
-const ALLOWED_CHAINS = new Set(['84532', '4663', '8453', '5042002']);
+/**
+ * Lista zamknieta, bo `chainId` idzie prosto do sciezki w Blobie - bez niej
+ * dowolny ciag z adresu listowalby dowolny prefiks kubelka.
+ *
+ * LICZY SIE Z `LAUNCHPAD_NETWORKS`, NIE Z RECZNEJ LISTY. Recznie wpisane id
+ * rozjechaly sie z aplikacja: Arc mainnet (5042) dostal wpis w konfiguracji i
+ * wlasny kubelek `startpad/logos/5042/`, POST wgrywal tam obrazki poprawnie,
+ * ale ten route odpowiadal 400 i pusta mapa - wiec KAZDE logo na Arc mainnet
+ * bylo niewidoczne (token ARPE, 16.09.2026). Klucze `LAUNCHPAD_NETWORKS` sa
+ * nasze i zawsze liczbowe, wiec gwarancja "zaden obcy prefiks" zostaje, a
+ * nowa siec dziala od razu po dodaniu do konfiguracji.
+ */
+const ALLOWED_CHAINS = new Set(Object.keys(LAUNCHPAD_NETWORKS));
 const TOKEN_RE = /^0x[0-9a-f]{40}$/;
 
 export async function GET(request: NextRequest) {

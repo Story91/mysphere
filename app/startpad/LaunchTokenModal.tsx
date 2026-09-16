@@ -59,6 +59,7 @@ import { DERIV_CHAIN } from '../derivatives/config';
 import { INDEX_FEEDS, feedByAddress, pairedMarketSymbol } from '../derivatives/indexFeeds';
 import FeedIcon, { instrumentName } from '../derivatives/FeedIcon';
 import { resizeImageFile } from './logoUpload';
+import useSiweAuth from '../utils/auth/useSiweAuth';
 import { expectedAttempts, HEX_SUBSTITUTES, isMineable } from '../utils/b20/addressing';
 import { mineLaunchpadVanity, predictLaunchpadVanity, type LaunchpadVanityContext } from '../utils/b20/launchpadVanity';
 
@@ -415,6 +416,13 @@ export default function LaunchTokenModal({
   // Logo jest WYMAGANE: albo plik z uploadu (data URL po zmniejszeniu), albo
   // URL, ktory realnie zaladowal sie jako obrazek. Data URL nigdy nie idzie
   // na lancuch - zyje tylko w profilu Firestore.
+  // Zapis profilu (logo, opis) wymaga sesji SIWE - serwer sprawdza tworce z
+  // lancucha. Edytor na stronie tokena podpisuje sam, a start DO 16.09.2026
+  // tego nie robil: bez sesji POST wracal 401, logo szlo do kolejki w
+  // localStorage i token stal na tablicy z samym inicjalem, a tworca widzial
+  // tylko jedna linijke pod ekranem sukcesu. Tak zniknely logo ACOLL i
+  // NOAHSARC na Arc mainnet.
+  const { isAuthenticated: hasSession, signIn } = useSiweAuth();
   const [logoDataUrl, setLogoDataUrl] = useState<string | null>(null);
   const [logoFileError, setLogoFileError] = useState<string | null>(null);
   const [logoBusy, setLogoBusy] = useState(false);
@@ -1288,7 +1296,14 @@ export default function LaunchTokenModal({
           description: launchDescription.trim(),
         };
         savePendingProfile(browserStorage(), { ...payload, savedAt: Date.now() });
-        void postProfileWithRetry(() => sendTokenProfile(payload), { expectLogo: payload.logoUrl !== null }).then(
+        // Sesja SIWE PRZED wysylka - to podpis wiadomosci, nie transakcja, wiec
+        // nie kosztuje gazu i dziala na kazdej sieci. Portfel jest w tej chwili
+        // otwarty po podpisaniu startu, wiec prompt trafia w najlepszy moment.
+        // Odmowa niczego nie cofa: zostaje kolejka i dotychczasowy komunikat.
+        const withSession = hasSession ? Promise.resolve(true) : signIn().catch(() => false);
+        void withSession
+          .then(() => postProfileWithRetry(() => sendTokenProfile(payload), { expectLogo: payload.logoUrl !== null }))
+          .then(
           (outcome) => {
             if (outcome === 'saved') {
               clearPendingProfile(browserStorage(), payload.chainId, payload.address);
