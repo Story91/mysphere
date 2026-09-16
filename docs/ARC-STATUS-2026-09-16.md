@@ -315,38 +315,41 @@ Na Base w tym miejscu stoi Safe `0x83E2DE97…`. Opłaty protokołu na Arc będ�
 więc lądować na kluczu, którym podpisuje się wdrożenia. **Settera nie ma** —
 zmiana wymaga nowego wdrożenia pada.
 
-### 6.4 Salda holderów: naprawione po stronie przeglądarki, zostaje zasięg skanu
+### 6.4 Historia tokena na Arc — ROZWIĄZANE
 
-**Objaw.** Strona tokena ARPE pokazywała w wierszu `BONDING CURVE` 999,7M
-(99,96%), a łańcuch dawał równo 1 000,0M (100,0000%) — zgodnie w
-`balanceOf(launchpad)` i w `tokenReserve`. Różnica ~300 tys. tokenów.
+**Objaw.** Strona tokena ARPE pokazywała „No trades yet" przy jedenastu
+transakcjach na łańcuchu, z przypisem o uciętej historii. `/api/launchpad/history`
+oddawał `tradeCount: 0, highBlock: 0, complete: true` — **ciszę podaną jako
+komplet**: każde okno padało, `scannedFrom` zostawał nad głową, a `complete`
+i tak się ustawiał.
 
-**Jak wykluczyliśmy zewnętrzny indeks.** Pierwszym podejrzanym był `arc-scan.org`,
-bo `pickHolderRows` spada na niego przy niekompletnym skanie. W trakcie
-sprawdzania arc-scan **przestał odpowiadać całkowicie**, a strona dalej
-pokazywała 999,7M — skoro indeksu nie było, liczba była nasza własna.
+**Przyczyna.** Rozmiar okna i tempo to **dwa różne limity**, a mieliśmy tylko
+pierwszy. Okno 9 500 bloków przechodzi bez problemu (oddaje 27 logów). Ale skan
+robi **dwa** `getLogs` na okno, a trasa historii szła z `concurrency: 6` — czyli
+12 zapytań w locie. Zmierzone na `rpc.mainnet.arc.io`: przy 12 w locie 9–10
+błędów `-32005 rate limit exceeded`; przy odstępie 250 ms jeden na osiem, przy
+1200 ms zero. Arc znosi mniej więcej **jedno `getLogs` na 1,2 s**.
 
-**Przyczyna.** `historyScan` składa salda **z różnic** od zera. To działa tylko,
-gdy skan zobaczył każde zdarzenie danego adresu; jeden log poza oknem przesuwa
-saldo na zawsze. Komentarz przy `holdersAreExact` obiecywał, że „salda czyta
-`balanceOf`" — i to była prawda **tylko po stronie serwera**, który ma
-`app/api/launchpad/holderBalances.ts`. Ścieżka przeglądarkowa
-(`useTokenHistory`, używana gdy cache jest niedostępny) omijała serwer.
+Same ponowienia tego nie ratują — odpalają się dla wszystkich okien partii
+równocześnie i każda runda bije w ten sam sufit. Sprawdzone empirycznie:
+z samym backoffem strona przeszła z „No trades yet" na „Trades (1)" i dalej
+meldowała uciętą historię.
 
-**Zrobione.** `settleBalancesOnchain` w `historyScan` + opcja `settleBalances`,
-włączana **tylko przez przeglądarkę** — serwer zostaje przy swoim module, żeby
-nie czytać dwa razy. Nieudany pojedynczy odczyt zostawia przy tym adresie liczbę
-z różnic; padnięty multicall nie wywala skanu. Osobno `pickHolderRows` bierze
-teraz **pokrycie** z indeksu, ale **kwoty** z naszej mapy. 5 nowych testów.
+**Naprawione** (`047f96d`): `scanConcurrency` i `scanPaceMs` w konfiguracji
+sieci, obok `scanWindow` — bo to własność RPC tej sieci dokładnie tak samo.
+Base i Robinhood: 6 okien bez przerwy. Arc: jedno okno co 1200 ms. Czyta to
+i przeglądarka, i serwer. Druga warstwa: ponowienia z narastającą przerwą
+(3 próby, 400/800/1600 ms) zamiast jednej po 400 ms.
 
-**Co zostaje — zasięg skanu na Arc.** Strona tokena sama to komunikuje:
-*„The public RPC limits how far back one page can scan, so the oldest part of
-this history is not shown."* Arc robi ~169 tys. bloków na dobę, a okno to 9 500
-przy suficie okien na wizytę — przeglądarka nie dosięga bloku startu tokena.
-Dlatego na Arc historia i tak powinna iść **serwerem** (`/api/launchpad/history`,
-z cache i własnymi kandydatami RPC), a ścieżka przeglądarkowa zostaje awaryjna
-i jawnie oznaczona jako ucięta. Do rozważenia: większe okno dla Arc u dostawcy
-z wyższym limitem albo wyższy sufit okien, gdy serwer jest niedostępny.
+**Wynik na żywym Arc:** `tradeCount` 11 zamiast 0, `launchBlock` 21 113 706
+znaleziony, `complete` naprawdę, salda sumują się do pełnej podaży (998,14M
+krzywa + 0,83M + 1,03M). Strona: `Trades (11)`, `Holders (3)`, bez przypisu.
+
+> **Przy okazji rozwiązała się zagadka „brakujących 300 tys. tokenów".** To nie
+> był dryf rekonstrukcji — to byli **realni holderzy**, których skan nie
+> dosięgał. Gdy skan dociera, salda się zgadzają. Domknięcie `balanceOf`
+> (`197f376`) zostaje jako druga warstwa, chroniąca przed dryfem tam, gdzie skan
+> jest ucięty, ale przyczyną było tempo, nie arytmetyka.
 
 ### 6.5 Czego brakuje w ekosystemie
 
