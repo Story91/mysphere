@@ -1,9 +1,10 @@
 # Arc mainnet — stan na 16 września 2026
 
 Jeden aktualny dokument zamiast dwóch sprzed wdrożenia
-([ARC-NEXT-2026-09-13](ARC-NEXT-2026-09-13.md), [ARC-REPORT-REVIEW-2026-09-14](ARC-REPORT-REVIEW-2026-09-14.md)).
-Tamte opisują świat, w którym launchpad na Arc jeszcze nie stał i nie było
-oficjalnego RPC — oba te zdania są już nieprawdziwe.
+(`ARC-NEXT-2026-09-13.md`, `ARC-REPORT-REVIEW-2026-09-14.md` — usunięte
+16.09, treść w historii git). Tamte opisują świat, w którym launchpad na Arc
+jeszcze nie stał i nie było oficjalnego RPC — oba te zdania są już nieprawdziwe.
+Runbook wdrożenia zostaje osobno: `ARC-MAINNET-DEPLOY.md`.
 
 Wszystkie liczby i adresy poniżej pochodzą z odczytu łańcucha albo z przebiegu
 testu, nie z dokumentacji. Gdzie czegoś nie sprawdziliśmy, jest to napisane wprost.
@@ -128,6 +129,18 @@ Bloker „nie ma jak dostać USDC na Arc" stał od 11.09. Rozwiązanie:
   Circle przepodpisuje z `expirationBlock: 0`. USDC nie przepada.
   Spalenia STANDARD (threshold 2000) nie wygasają.
 
+- **Bezpośrednie spalenia też bywają dowożone, ale wybiórczo.** W próbce 40
+  dostaw z Base z ~2 h (16.09 rano): 29 spaleń przez kontrakty aplikacji, każde
+  dowiezione przez relayer aplikacji z opóźnieniem ~1 h; 11 spaleń bezpośrednich
+  jak nasz `arc:bridge`, z czego 8 odebrali sami nadawcy, a 3 dowiózł obcy adres.
+  Publiczny relayer Circle (`0x54eAe1fe…`, 2 608 dostaw w 2 h do 1 391 odbiorców)
+  obsługuje głównie ruch aplikacji. Wniosek: pierwszy gaz przez Jumpera, potem
+  `arc:bridge` + własny `arc:receive`.
+- Sprawdzone i odpadające 16.09: LiFi API `/v1/quote` (brak trasy dla USDC
+  bezpośrednio), most thirdweb (Arc nie na liście sieci), Bridge Kit Circle
+  1.14.1 (zna tylko `Arc_Testnet`), Pimlico (chain 5042 nieobsługiwany),
+  publiczny paymaster (brak).
+
 Portfel `0xD4885A5a…` to na Base **EOA z delegacją EIP-7702**
 (`0xef0100` → `0x63c0c19a…`), na Arc zwykły EOA — klucz działa po obu stronach.
 
@@ -171,14 +184,47 @@ callbacków"). Do decyzji właściciela, bo każda opcja ma cenę:
 | chainId w ciasteczku + prop z Server Component | refaktor rdzenia | poprawne SSR per-użytkownik |
 | chainId zawsze w URL (`?chain=5042`) | średni | brzydsze linki, ale SSR działa |
 
-### 6.2 `FEE_RECIPIENT` to gorący portfel, nie Safe
+### 6.2 Sprzedaż na Arc daje nieograniczoną zgodę routerowi o nieznanej proweniencji
+
+**To jest najpoważniejsza rzecz w tym dokumencie i wymaga świadomej decyzji
+właściciela przed ogłoszeniem Arc użytkownikom.**
+
+Ścieżka sprzedaży w `PoolTradeBox` robi dwa zatwierdzenia:
+
+1. `token.approve(Permit2, maxUint256)` — nieograniczone,
+2. `Permit2.approve(token, router, max, 30 dni)`.
+
+Na Base `router` to kanoniczny, audytowany UniversalRouter Uniswapa — ten sam,
+przez który idą swapy z app.uniswap.org. **Na Arc to kontrakt
+`0x4fca4a51…`, który znaleźliśmy sami, przeszukując zdarzenia PoolManagera.**
+Nie ma go w dokumentacji Uniswapa ani Arc, ma **inny build** niż wersja z Base
+(24 546 B vs 19 499 B), a jego operator to `0x33F26c5d…51E8` — nie Uniswap.
+
+Konsekwencja: użytkownik sprzedający token na Arc daje temu kontraktowi prawo
+pobrania swoich tokenów przez 30 dni. Kupno jest bezpieczniejsze (idzie
+`msg.value`, bez zgód), ale sprzedaż nie.
+
+Nasz test dowodzi, że router **działa poprawnie dziś** — nie dowodzi, że jest
+bezpieczny jutro ani kto go kontroluje. Opcje:
+
+| opcja | koszt | skutek |
+|---|---|---|
+| zostawić jak jest | zero | użytkownik nieświadomie ufa obcemu kontraktowi |
+| dopisać ostrzeżenie w UI przy pierwszej sprzedaży | mały | uczciwie, ale straszy |
+| zgoda na dokładną kwotę zamiast `maxUint256` | mały | ogranicza szkodę do jednej transakcji |
+| własny minimalny router v4 | średni | pełna kontrola, nowa powierzchnia audytu |
+
+Rekomendacja: **zgoda na dokładną kwotę** — najtańsza zmiana, która realnie
+ogranicza szkodę, bez straszenia copy i bez pisania nowego kontraktu.
+
+### 6.3 `FEE_RECIPIENT` to gorący portfel, nie Safe
 
 Wdrożony pad ma `FEE_RECIPIENT` = `0xD4885A5a…`, czyli EOA wdrażającego.
 Na Base w tym miejscu stoi Safe `0x83E2DE97…`. Opłaty protokołu na Arc będą
 więc lądować na kluczu, którym podpisuje się wdrożenia. **Settera nie ma** —
 zmiana wymaga nowego wdrożenia pada.
 
-### 6.3 Czego brakuje w ekosystemie
+### 6.4 Czego brakuje w ekosystemie
 
 - Uniswap nie listuje Arc, więc żaden agregator ani portfel nie poprowadzi
   swapa po naszej puli „sam z siebie" — działa tylko nasza ścieżka przez
@@ -191,11 +237,39 @@ zmiana wymaga nowego wdrożenia pada.
 
 ---
 
+### 6.5 Keeper perpsów zależał od laptopa
+
+Do 16.09 keeper (funding, likwidacje, wypychanie Pytha, heartbeat rejestru)
+chodził wyłącznie z Harmonogramu zadań Windows na komputerze właściciela.
+Stanął dwa razy po cichu: raz przez zepsute cudzysłowy w zadaniu, raz przez
+**12 h bez gazu na testnecie** (47 przebiegów „GAZ NISKI"), przez co wszystkie
+trzy rynki testnetowe były `halted` — bez wpisu w rejestrze co godzinę
+`openPosition` rewertuje `OracleInactive`.
+
+Zrobione 16.09: rdzeń keepera wyniesiony do `lib/keeper/perpsKeeperCore.ts`
+(czysty ethers, bez hardhata), `scripts/derivatives/keeper.ts` jest cienkim
+wrapperem, a nowa trasa `app/api/keeper/perps` uruchamia ten sam rdzeń z
+cronem Vercela (`vercel.json`, co 15 min). Wymaga w Vercelu: `CRON_SECRET`,
+`KEEPER_PRIVATE_KEY` (osobny portfel z kilkoma USDC na gaz), `KEEPER_CHAIN_ID`,
+opcjonalnie `PYTH_API_KEY`. Plan Hobby Vercela pozwala na jeden bieg dziennie —
+wtedy zewnętrzny cron (cron-job.org) z tym samym sekretem. Heartbeat rejestru
+wysyła tylko `publisher`/`creator` feedu: nowy klucz keepera trzeba ustawić
+jako wystawcę (`PriceOracleRegistry.setPublisher`) albo zostawić klucz
+deployera (gorący, patrz 6.3). Skan pozycji idzie od `max(deployBlock,
+head − 200 000)`, bo publiczne RPC tną starą historię.
+
+Co NIE jest zrobione: sam heartbeat jest wymogiem kontraktu. Rynki z indeksem z
+adaptera Pytha mogłyby nie wymagać wpisu w rejestrze (`openPosition` sprawdza
+`ORACLE.isActive` niezależnie od feedu) — to zmiana w `DerivativeMarket`,
+czyli nowe wdrożenie rynków; do rozważenia przed mainnetem perpsów.
+
 ## 7. Co dalej
 
 1. Rozstrzygnąć 6.1 — to jedyna rzecz, którą widzi użytkownik.
 2. Rozstrzygnąć 6.2 — decyzja o odbiorcy opłat, ewentualnie ponowne wdrożenie.
 3. Pierwsza prawdziwa graduacja na mainnecie (nie na forku) — jedyny sposób
    sprawdzenia arcowej semantyki natywnego USDC.
-4. Indexer dla 5042 w granicach limitów z 6.3.
-5. Nie ogłaszać mainnetu, dopóki 1–3 nie są zamknięte.
+4. Indexer dla 5042 w granicach limitów z 6.4.
+5. Ustawić env keepera w Vercelu (6.5) i wyłączyć zadanie w Harmonogramie,
+   gdy cron przejdzie pierwszy bieg.
+6. Nie ogłaszać mainnetu, dopóki 1–3 nie są zamknięte.
