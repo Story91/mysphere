@@ -38,6 +38,8 @@ import {
   LAUNCHPAD_CHAIN,
   LAUNCHPAD_DEPLOY_BLOCK,
   LAUNCHPAD_NETWORKS,
+  DEFAULT_LAUNCHPAD_CHAIN_ID,
+  type LaunchpadNetwork,
   LAUNCH_STATE,
   LIQUIDITY_VAULT_ADDRESS,
   launchpadAbi,
@@ -290,8 +292,14 @@ function curvePercent(token: LaunchpadToken) {
   return Math.min(100, Math.round((token.raised / token.target) * 100));
 }
 
-function formatEth(value: number) {
-  return `${value.toFixed(value >= 1 ? 2 : 3)} ${NATIVE_SYMBOL}`;
+/**
+ * Kwota z jednostka. `symbol` podaje sie JAWNIE wszedzie, co renderuje sie
+ * w SSR - bo `NATIVE_SYMBOL` jest policzony przy imporcie i na kliencie jest
+ * juz inny niz na serwerze. Domysl zostaje dla miejsc, ktore i tak pojawiaja
+ * sie dopiero po zaladowaniu danych, czyli po montazu.
+ */
+function formatEth(value: number, symbol: string = NATIVE_SYMBOL) {
+  return `${value.toFixed(value >= 1 ? 2 : 3)} ${symbol}`;
 }
 
 /**
@@ -807,10 +815,10 @@ function ActivityTicker({ events }: { events: ActivityItem[] }) {
  * Jedna zwarta karta zamiast dwoch duzych kafli - te same liczby, mniej
  * pikseli. Zadna informacja z poprzedniego naglowka nie znika.
  */
-function BoardStats({ totalRaised, totalVolume, totalTrades, liveCount, ethUsd }: { totalRaised: number; totalVolume: number; totalTrades: number; liveCount: number; ethUsd: number | null }) {
+function BoardStats({ totalRaised, totalVolume, totalTrades, liveCount, ethUsd, symbol }: { totalRaised: number; totalVolume: number; totalTrades: number; liveCount: number; ethUsd: number | null; symbol: string }) {
   const rows = [
-    { icon: <CircleDollarSign className="h-4 w-4 text-sp-brand-strong" aria-hidden="true" />, label: 'Curve reserve', value: formatEth(totalRaised), sub: usdNote(totalRaised, ethUsd) },
-    { icon: <TrendingUp className="h-4 w-4 text-sp-info" aria-hidden="true" />, label: 'Indexed volume', value: formatEth(totalVolume), sub: usdNote(totalVolume, ethUsd) },
+    { icon: <CircleDollarSign className="h-4 w-4 text-sp-brand-strong" aria-hidden="true" />, label: 'Curve reserve', value: formatEth(totalRaised, symbol), sub: usdNote(totalRaised, ethUsd) },
+    { icon: <TrendingUp className="h-4 w-4 text-sp-info" aria-hidden="true" />, label: 'Indexed volume', value: formatEth(totalVolume, symbol), sub: usdNote(totalVolume, ethUsd) },
     { icon: <BarChart3 className="h-4 w-4 text-sp-up-vivid" aria-hidden="true" />, label: 'Trades', value: totalTrades.toLocaleString('en-US'), sub: null },
     { icon: <Zap className="h-4 w-4 text-soft-primary" aria-hidden="true" />, label: 'Active curves', value: String(liveCount), sub: null },
   ];
@@ -1442,6 +1450,23 @@ function formatAge(startedAt: number) {
 const HOT_TRADE_WINDOW_MS = 90_000;
 
 export default function LaunchpadBoard() {
+  /*
+   * SIEC JAKO STAN, NIE STALA MODULU - dla wszystkiego, co trafia do HTML.
+   *
+   * `ACTIVE_LAUNCHPAD_NETWORK` liczy sie przy imporcie, wiec na serwerze jest
+   * bazowa, a na kliencie juz wybrana. Dla WEZLOW TEKSTOWYCH ratuje to
+   * `suppressHydrationWarning`, ale dla ATRYBUTOW nie ma takiego ratunku:
+   * `aria-label` ShareTokena szedl jako "Share Base B20" z serwera i
+   * "Share Arc" z klienta, i React zglaszal to przy kazdym wejsciu.
+   *
+   * Ten sam wzorzec, co w `StartpadFooter` i `LifecycleGuide`: przed montazem
+   * siec domyslna (zgodnie z SSR), po montazu wybrana.
+   */
+  const [netState, setNetState] = useState<LaunchpadNetwork>(
+    () => LAUNCHPAD_NETWORKS[DEFAULT_LAUNCHPAD_CHAIN_ID]
+  );
+  useEffect(() => setNetState(ACTIVE_LAUNCHPAD_NETWORK), []);
+
   const router = useRouter();
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
@@ -3472,7 +3497,7 @@ export default function LaunchpadBoard() {
                   target={0}
                   state="Curve"
                   board={{
-                    label: ACTIVE_LAUNCHPAD_NETWORK.label,
+                    label: netState.label,
                     tokens: tokens.filter((token) => token.live).length,
                   }}
                   // Wewnetrzny przycisk ma wlasny, maly padding - bez tego
@@ -3602,7 +3627,7 @@ export default function LaunchpadBoard() {
         )}
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <BoardStats totalRaised={totalRaised} totalVolume={totalVolume} totalTrades={totalTrades} liveCount={liveCount} ethUsd={ethUsd} />
+          <BoardStats symbol={netState.chain.nativeCurrency.symbol} totalRaised={totalRaised} totalVolume={totalVolume} totalTrades={totalTrades} liveCount={liveCount} ethUsd={ethUsd} />
           <TopLaunches sample={showingPreview} tokens={tokens} onOpen={(token) => token.address && router.push(`/startpad/${token.address}`)} />
           <VolumePanel sample={showingPreview} tokens={tokens} onOpen={(token) => token.address && router.push(`/startpad/${token.address}`)} />
           <TopEarnings rows={topEarners} ethUsd={ethUsd} />
