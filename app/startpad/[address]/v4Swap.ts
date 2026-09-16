@@ -47,6 +47,36 @@ export const V4_BY_CHAIN: Record<
     permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
     quoter: '0x0d5e0f971ed27fbff6c2837bf31316121532048d',
   },
+  /**
+   * ARC MAINNET (5042). Wyjatek od reguly "tylko z oficjalnej listy Uniswapa":
+   * Uniswap NIE listuje Arc (odczyt 16.09.2026). Dlatego kazdy z tych trzech
+   * adresow ma wlasny, osobny dowod - i zaden nie pochodzi z dokumentacji.
+   *
+   *   quoter   V4Quoter, 6118 B. Adres z docs.o1.exchange (sekcja Arc Mainnet),
+   *            potwierdzony `eth_getCode`. Ten sam adres co V4Quoter na
+   *            Robinhood Chain (4663), ktore Uniswap listuje OFICJALNIE - czyli
+   *            to samo wdrozenie tego samego operatora na dwoch sieciach.
+   *   permit2  kanoniczny, 9152 B, `eth_getCode` na 5042.
+   *   universalRouter  ZNALEZIONY ODCZYTEM Z LANCUCHA, nie z dokumentacji:
+   *            przeszukanie zdarzen `Swap` PoolManagera wskazalo go jako
+   *            najaktywniejszego wolajacego (2889 swapow v4 w probce ~1800
+   *            blokow). 24 546 B, ma selektor `execute(bytes,bytes[],uint256)`
+   *            (0x3593564c), a w runtime ma ZASZYTE adresy naszego PoolManagera
+   *            0x8366a39c... i Permit2 - czyli routuje dokladnie te pule,
+   *            ktorych uzywamy.
+   *
+   * UWAGA: to INNY build niz Universal Router na Base (24 546 B vs 19 499 B),
+   * wiec rownosc bajtkodu nie jest tu argumentem. Dowodem jest PRZEBIEG:
+   * test/ArcForkMainnet.test.ts wykonuje przez ten router prawdziwy swap na
+   * forku Arc, tym samym `encodeV4ExactInSingle`, ktorego uzywa to UI.
+   * Gdyby router przestal dzialac, ten test spada - i to jest cala gwarancja,
+   * jaka mamy. Zadna z tych trzech pozycji nie jest potwierdzona przez Uniswapa.
+   */
+  5042: {
+    universalRouter: '0x4fca4a51ab4f23a7447b3284fbd7d73289a89fb1',
+    permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
+    quoter: '0x8Dc178eFB8111BB0973Dd9d722ebeFF267c98F94',
+  },
 };
 
 /** Parametry puli kanonicznej - stale CurveLaunchpad (POOL_FEE, POOL_TICK_SPACING). */
