@@ -192,77 +192,37 @@ Portfel `0xD4885A5a…` to na Base **EOA z delegacją EIP-7702**
 
 ## 6. Znane problemy
 
-### 6.1 Rozjazd hydracji: użytkownik Arc widzi najpierw liczby z Base
+### 6.1 Rozjazd hydracji — ROZWIĄZANE
 
 **Objaw.** Przy każdym wejściu na `/startpad` z zapisaną siecią Arc serwer
-wysyła HTML z danymi Base, a klient podmienia go na Arc. React zgłasza
-`Text content did not match. Server: "Base B20" Client: "Arc"`, wyrzuca
-serwerowy DOM i renderuje od nowa.
+wysyłał HTML z danymi Base (`„3 ETH raised"`, `„Trades here move real ETH"`,
+`„runs on Base B20"`), a klient podmieniał to na 5 000 USDC. React zgłaszał
+`Text content did not match`, wyrzucał serwerowy DOM i renderował od nowa —
+użytkownik przez moment widział **cudze liczby o pieniądzach**.
 
-**Dowód** (`curl` na SSR przy wybranym Arc):
+**Moja wycena była zawyżona — dwa razy, i to zmieniło decyzję.** Naliczyłem
+~290 użyć stałych prymitywnych i właściciel na tej podstawie odłożył naprawę
+jako „kilka dni". Ale te 290 to **cała aplikacja**; dla rozjazdu liczy się
+wyłącznie to, co serwer renderuje na `/startpad` — a tego było **~20 ciągów
+w trzech miejscach**. Zmierzone `curl`em po SSR, nie oszacowane.
 
-```
-3 ETH raised
-Trades here move real ETH
-runs on Base B20
-```
+**Naprawa** (`2bce4a5`, 3 pliki):
 
-Klient pokazuje potem `5 000 USDC` i `runs on Arc`. Czyli przez moment widać
-**cudze liczby o pieniądzach** — dokładnie to, przed czym ostrzega komentarz
-przy `NATIVE_SYMBOL` w `config.ts`.
+- `StartpadFooter` **miał już właściwy wzorzec** — stan `net` startujący od
+  sieci domyślnej i podmieniany w `useEffect` po montażu, z komentarzem
+  tłumaczącym dokładnie tę hydrację. Tyle że obok niego sięgał po
+  `NATIVE_SYMBOL`, `CURVE_TARGET_ETH` i `R_VIRT_NATIVE` prosto z modułu, a te
+  są policzone **przy imporcie** — więc na kliencie były już arcowe. Teraz cały
+  podpis jedzie z jednego źródła.
+- Dwie etykiety sieci (`NetworkSwitch` w `LaunchpadBoard`, nazwa łańcucha
+  w `LaunchpadTokenDetail`) dostały `suppressHydrationWarning` — dokładnie ten
+  mechanizm, który komentarz przy `NET` już opisuje jako wybrany, a którego
+  w tych dwóch miejscach brakowało.
 
-**Przyczyna.** `ACTIVE_LAUNCHPAD_NETWORK` liczy się w `resolveActiveNetwork()`
-na poziomie modułu. Na serwerze `window` nie istnieje, więc zwraca
-`DEFAULT_LAUNCHPAD_CHAIN_ID` (Base); na kliencie czyta `localStorage` i zwraca
-Arc. Zmiana sieci robi pełne przeładowanie (świadoma decyzja, opisana w kodzie),
-więc rozjazd wraca przy każdym wejściu.
-
-**Dlaczego nie naprawione w tej sesji.** Stałe modułu konsumuje ponad 200 miejsc
-w 20 plikach. Przekazanie `chainId` z serwera w dół to refaktor rdzenia, przed
-którym ostrzega sam komentarz w `config.ts` („stałe modułu są wpięte w dziesiątki
-callbacków"). Do decyzji właściciela, bo każda opcja ma cenę:
-
-| opcja | koszt | skutek uboczny |
-|---|---|---|
-| `dynamic(..., { ssr: false })` na boardzie | **dzień roboty, 1–2 pliki** | znika SSR całego startpadu razem z tekstem „HOW STARTPAD WORKS" — to jest treść SEO |
-| chainId w ciasteczku + prop z Server Component | **refaktor rdzenia** | poprawne SSR per-użytkownik, SEO zostaje, linki bez zmian |
-| chainId zawsze w URL (`?chain=5042`) | średni | brzydsze linki, ale SSR działa |
-
-**DECYZJA WŁAŚCICIELA 16.09: zostawiamy, wraca jako osobne zadanie.**
-Defekt jest kosmetyczny — miga i loguje błąd w konsoli, ale żadne pieniądze nie
-są zagrożone, a wszystko funduszowe jest naprawione. Poniżej prawdziwe koszty,
-zmierzone, żeby następna sesja nie zaczynała od zera.
-
-**Zmierzony koszt (`grep` po `app/`).** Kluczowe rozróżnienie: `ACTIVE_LAUNCHPAD_NETWORK`
-to OBIEKT, więc dałoby się go objąć `Proxy` i te użycia zostałyby bez zmian.
-Reszta to PRYMITYWY (string/bigint/number) złapane przy ładowaniu modułu —
-na stringu proxy nie postawisz, więc każde z nich musi stać się wywołaniem
-funkcji albo odczytem z kontekstu Reacta.
-
-| stała | użyć | objęte proxy? |
-|---|---|---|
-| `NATIVE_SYMBOL` | 106 | nie |
-| `LAUNCHPAD_CHAIN` | 82 | nie |
-| `ACTIVE_LAUNCHPAD_NETWORK` | 80 | **tak** |
-| `LAUNCHPAD_ADDRESS` | 74 | nie |
-| `LAUNCH_HOOK_ADDRESS` | 37 | nie |
-| `LIQUIDITY_VAULT_ADDRESS` | 31 | nie |
-| `CURVE_TARGET_ETH` | 22 | nie |
-| pozostałe | ~17 | nie |
-
-Czyli ~290 miejsc do przerobienia, nie „dzień roboty". `cookies()` nie da się
-zawołać na poziomie modułu, a moduł komponentu klienckiego ewaluuje się na
-serwerze **raz na proces, nie raz na żądanie** — dlatego samo ciasteczko nic
-nie da bez przekazania `chainId` w dół z Server Component.
-
-**Czego NIE próbować (sprawdzone i odrzucone 16.09).** Parametr `?c=<chainId>`
-w adresie **już istnieje** — `setLaunchpadChain` (`config.ts` ~573) go dopisuje
-i robi `location.assign`, a `pickChainId` daje adresowi pierwszeństwo przed
-`localStorage`. Kusi, żeby na tym oprzeć tanią naprawę, ale to nie działa:
-`resolveActiveNetwork()` na serwerze zawsze zwraca `DEFAULT_LAUNCHPAD_CHAIN_ID`
-(bo `typeof window === 'undefined'`), a `app/startpad/page.tsx` nie czyta
-`searchParams`. HTML z serwera jest z Base **niezależnie od adresu**. Parametr
-w URL służy do przenoszenia wyboru między urządzeniami, nie do hydracji.
+**Wynik:** 349 komunikatów w konsoli, **zero o hydracji**. Strona pokazuje
+`runs on Arc`, próg 5 000 USDC, `real USDC`. SSR zostaje bazowy i **to jest
+poprawne** — serwer nie zna wyboru użytkownika, a crawler ma widzieć sieć
+domyślną. Refaktor rdzenia okazał się niepotrzebny.
 
 ### 6.2 Sprzedaż na Arc daje nieograniczoną zgodę routerowi o nieznanej proweniencji
 
