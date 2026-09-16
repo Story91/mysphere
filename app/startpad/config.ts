@@ -82,6 +82,28 @@ export type LaunchpadNetwork = {
   scanWindow: bigint;
   maxScanWindows: number;
   /**
+   * TEMPO SKANU - wlasnosc RPC tej sieci dokladnie tak samo jak `scanWindow`.
+   *
+   * Rozmiar okna mowi, ILE blokow wolno wziac na raz. To mowi, JAK SZYBKO wolno
+   * pytac - a to dwa rozne limity i Arc pokazal, ze mylenie ich boli. Zmierzone
+   * 16.09.2026 na `rpc.mainnet.arc.io`: okno 9 500 przechodzi bez problemu
+   * (oddaje 27 logow), ale 12 zapytan w locie daje 9-10 bledow `-32005 rate
+   * limit exceeded`, przy odstepie 250 ms - 1 na 8, a przy 1200 ms - zero.
+   * Czyli Arc znosi mniej wiecej JEDNO `getLogs` na ~1,2 s.
+   *
+   * Skutek dla uzytkownika, zanim to powstalo: strona tokena ARPE pokazywala
+   * "No trades yet" przy szesciu transakcjach na lancuchu, a `/api/launchpad/
+   * history` oddawal `tradeCount: 0, complete: true` - bo KAZDE okno padlo, a
+   * `complete` i tak sie ustawilo.
+   *
+   * `scanConcurrency` to liczba okien naraz (skan robi DWA `getLogs` na okno,
+   * wiec zapytan w locie jest dwa razy tyle). `scanPaceMs` to przerwa miedzy
+   * partiami. Base ma szybkie wezly i zostaje bez przerwy; Arc idzie okno po
+   * oknie z odstepem.
+   */
+  scanConcurrency: number;
+  scanPaceMs: number;
+  /**
    * Ile sekund trwa jeden blok tej sieci.
    *
    * NIE jest to ciekawostka: strona szczegolow tokena estymuje z tego BLOK
@@ -155,6 +177,9 @@ const baseMainnetEntry: LaunchpadNetwork = {
   // grubo wiecej, niz ma najstarszy launch, a sufit i tak zwykle nie dziala:
   // petla urywa sie na zdarzeniu Launched.
   maxScanWindows: 90,
+  // Wezel Coinbase Developer wytrzymuje seria - bez przerwy.
+  scanConcurrency: 6,
+  scanPaceMs: 0,
   secondsPerBlock: 2,
   // Barwy marki Base: #0052FF na bieli.
   logo: '/logotypy/Base_square_blue.png',
@@ -192,6 +217,8 @@ export const LAUNCHPAD_NETWORKS: Record<number, LaunchpadNetwork> = {
     // skan. 9 500 z zapasem pod krancowy blok.
     scanWindow: 9_500n,
     maxScanWindows: 64,
+    scanConcurrency: 6,
+    scanPaceMs: 0,
     secondsPerBlock: 2,
     pillClass: 'border-[#0052FF]/25 bg-[#eef3ff] text-[#0052FF]',
     accentTextClass: 'text-soft-primary-deep',
@@ -234,6 +261,8 @@ export const LAUNCHPAD_NETWORKS: Record<number, LaunchpadNetwork> = {
      */
     scanWindow: 1_000_000n,
     maxScanWindows: 60,
+    scanConcurrency: 6,
+    scanPaceMs: 0,
     // Zmierzone: ~0,1 s/blok (~864 tys. blokow na dobe).
     secondsPerBlock: 0.1,
     // Barwy marki Robinhooda: jaskrawa zielen #00C805 na czerni - te same,
@@ -404,6 +433,11 @@ export const LAUNCHPAD_NETWORKS: Record<number, LaunchpadNetwork> = {
     // przemiecie (2,9 mln blokow); od tego jest wspolny agregat na serwerze,
     // ktory nadrabia porcjami i zapisuje postep.
     maxScanWindows: 60,
+    // ARC: zmierzone 16.09 - 12 zapytan w locie to 9-10 bledow
+    // "rate limit exceeded", odstep 1200 ms to zero bledow. Okno po
+    // oknie z sekunda przerwy. Dziedziczy to Arc MAINNET (wpis nizej).
+    scanConcurrency: 1,
+    scanPaceMs: 1_200,
     // Zmierzone: 0,51 s (100 tys. blokow roznicy timestampow / 100 tys.).
     secondsPerBlock: 0.51,
     // Blekit USDC - Arc jest lancuchem tego jednego pieniadza i to jest jego

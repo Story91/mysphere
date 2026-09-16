@@ -78,6 +78,13 @@ const MAX_WINDOWS_PER_REQUEST = 40;
  * Przegladarka zostaje na jednym oknie naraz: tam skan jest awaryjny i idzie
  * przez publiczny RPC, ktory przy serii odpowiada "over rate limit".
  */
+/**
+ * Wspolbieznosc skanu - DOMYSLNA. Sieci, ktore maja wlasne tempo (Arc), podaja
+ * je w `LAUNCHPAD_NETWORKS[chainId].scanConcurrency` / `.scanPaceMs`; ta stala
+ * jest tylko zapasem dla sieci bez wpisu. Powod jest zmierzony, nie teoretyczny:
+ * skan robi DWA `getLogs` na okno, wiec 6 okien to 12 zapytan w locie, a
+ * `rpc.mainnet.arc.io` przy 12 w locie oddaje 9-10 bledow "rate limit exceeded".
+ */
 const SCAN_CONCURRENCY = 6;
 
 /**
@@ -193,7 +200,15 @@ export async function GET(request: NextRequest) {
           window: net.scanWindow,
           maxWindows: Math.min(windows, MAX_WINDOWS_PER_REQUEST),
           estTs,
-          concurrency: SCAN_CONCURRENCY,
+          /*
+           * Tempo bierze sie z SIECI, nie ze stalej. Arc znosi mniej wiecej
+           * jedno `getLogs` na 1,2 s: przy 12 zapytaniach w locie (6 okien
+           * razy dwa) oddaje 9-10 bledow "rate limit exceeded" - i wtedy KAZDE
+           * okno pada, `scannedFrom` zostaje nad glowa, a odpowiedz wychodzi
+           * jako `tradeCount: 0, complete: true`. Czyli cisza podana jako komplet.
+           */
+          concurrency: net.scanConcurrency ?? SCAN_CONCURRENCY,
+          paceMs: net.scanPaceMs ?? 0,
         });
 
         trades = mergeTrades(trades, result.trades);

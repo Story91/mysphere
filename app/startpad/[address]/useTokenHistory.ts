@@ -204,6 +204,10 @@ export function useTokenHistory(
       window: LOG_WINDOW,
       maxWindows: MAX_LOG_WINDOWS,
       estTs,
+      // Tempo RPC tej sieci. Na Arc bez tego skan gubil okna na "rate limit
+      // exceeded" i historia wychodzila ucieta mimo poprawnych okien.
+      concurrency: ACTIVE_LAUNCHPAD_NETWORK.scanConcurrency,
+      paceMs: ACTIVE_LAUNCHPAD_NETWORK.scanPaceMs,
       /*
        * Salda z `balanceOf`, nie z sumowania roznic. Tu, w przegladarce, jest
        * to JEDYNE miejsce, ktore moze je domknac: serwer ma do tego wlasny

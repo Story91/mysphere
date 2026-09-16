@@ -834,3 +834,70 @@ describe('settleBalancesOnchain', () => {
     expect(balances.get('0xa')).to.equal(1n);
   });
 });
+
+/**
+ * PONOWIENIA OKNA PRZY "RATE LIMIT".
+ *
+ * Do 16.09 bylo jedno ponowienie po 400 ms - wystarczalo na Base, nie
+ * wystarczalo na Arc. Zmierzone na rpc.mainnet.arc.io: okno pierwsze
+ * przechodzi, od drugiego leci "rate limit exceeded" i trzyma dluzej.
+ * Strona tokena ARPE pokazywala przez to "No trades yet" przy szesciu
+ * transakcjach na lancuchu.
+ */
+describe('scanBackward - ponowienia okna', () => {
+  const { scanBackward } = require('../app/startpad/[address]/historyScan');
+  const base = {
+    launchpad: '0xpad',
+    token: '0xtoken',
+    head: 100n,
+    floor: 100n,
+    window: 10n,
+    maxWindows: 1,
+    estTs: () => 0,
+    retryDelayMs: 0,
+  };
+
+  it('przechodzi, gdy limit puszcza przy trzeciej probie', async () => {
+    let calls = 0;
+    const client = {
+      getLogs: async () => {
+        calls += 1;
+        // Dwa pierwsze podejscia (po 2 wywolania na okno) odbijaja sie o limit.
+        if (calls <= 4) throw new Error('rate limit exceeded');
+        return [];
+      },
+    };
+
+    const result = await scanBackward(client, base);
+
+    expect(result.complete, 'okno w koncu przeszlo, wiec skan domkniety').to.equal(true);
+    expect(calls, 'trzecia proba to wywolania 5 i 6').to.equal(6);
+  });
+
+  it('po wyczerpaniu prob okno pada, ale skan nie wybucha', async () => {
+    const client = {
+      getLogs: async () => {
+        throw new Error('rate limit exceeded');
+      },
+    };
+
+    const result = await scanBackward(client, base);
+
+    expect(result.complete, 'nieprzeczytanego okna nie meldujemy jako pokryte').to.equal(false);
+    expect(result.trades).to.deep.equal([]);
+  });
+
+  it('retryAttempts=1 znaczy zadnego ponowienia', async () => {
+    let calls = 0;
+    const client = {
+      getLogs: async () => {
+        calls += 1;
+        throw new Error('rate limit exceeded');
+      },
+    };
+
+    await scanBackward(client, { ...base, retryAttempts: 1 });
+
+    expect(calls, 'dwa getLogs jednego okna, bez powtorek').to.equal(2);
+  });
+});

@@ -400,8 +400,18 @@ export type ScanOptions = {
   window: bigint;
   maxWindows: number;
   estTs: (block: bigint) => number;
-  /** Przerwa przed jedyna ponowna proba okna. Testy podaja 0. */
+  /** Przerwa przed PIERWSZYM ponowieniem okna; kolejne podwajaja. Testy podaja 0. */
   retryDelayMs?: number;
+  /**
+   * Ile prob na okno lacznie (z pierwsza). Domyslnie 3 - tyle wystarcza, by
+   * przejsc przez chwilowy "rate limit exceeded" oficjalnego RPC Arc.
+   */
+  retryAttempts?: number;
+  /**
+   * Przerwa miedzy PARTIAMI okien. Tempo RPC tej sieci - patrz `scanPaceMs`
+   * w config.ts. Domyslnie 0, czyli bez przerwy (Base).
+   */
+  paceMs?: number;
   /**
    * Czy po skanie domknac salda odczytem `balanceOf` (patrz
    * `settleBalancesOnchain`). Wlacza to PRZEGLADARKA, bo tam nie ma nic
@@ -466,6 +476,14 @@ export async function scanBackward(client: ScanClient, opts: ScanOptions): Promi
 
   const windows = planWindows(opts);
   const batchSize = Math.max(1, Math.floor(opts.concurrency ?? 1));
+  /*
+   * PRZERWA MIEDZY PARTIAMI. Rozmiar okna mowi, ILE blokow wolno wziac na raz;
+   * to mowi, JAK SZYBKO wolno pytac - dwa rozne limity. Na Arc zmierzone:
+   * 12 zapytan w locie daje 9-10 bledow "rate limit exceeded", a odstep
+   * 1200 ms zero. Bez tego same ponowienia nie pomagaja, bo odpalaja sie dla
+   * wszystkich okien partii ROWNOCZESNIE i kazda runda znowu bije w sufit.
+   */
+  const paceMs = Math.max(0, opts.paceMs ?? 0);
 
   /** Jedno okno, z jedna ponowna proba. `null` = okno nie przeszlo. */
   const fetchWindow = async (window: Window): Promise<[ScanLog[], ScanLog[]] | null> => {
@@ -484,23 +502,38 @@ export async function scanBackward(client: ScanClient, opts: ScanOptions): Promi
           toBlock: window.toBlock,
         }),
       ]);
-    try {
-      return await once();
-    } catch {
-      // Publiczne RPC Base odmawia przy szybkiej serii `getLogs` ("over rate
-      // limit"). To zwykle chwilowe, wiec jedna proba wiecej po krotkiej
-      // przerwie - bez niej cale wejscie uzytkownika konczyloby sie bez
-      // najmniejszego postepu.
+    /*
+     * PONOWIENIA Z NARASTAJACA PRZERWA - poprawka z 16 wrzesnia 2026.
+     *
+     * Publiczne RPC odmawiaja przy szybkiej serii `getLogs`. Do dzis byla tu
+     * JEDNA proba wiecej po 400 ms i to wystarczalo na Base. Na Arc nie
+     * wystarcza: zmierzone na `rpc.mainnet.arc.io` - okno pierwsze przechodzi,
+     * a od drugiego leci "rate limit exceeded" i trzyma dluzej niz 400 ms.
+     * Skutek byl taki, ze strona tokena ARPE pokazywala "No trades yet" przy
+     * szesciu transakcjach na lancuchu, z przypisem o ucietej historii.
+     *
+     * Trzy proby z przerwa 400/800/1600 ms kosztuja w najgorszym razie ~2,8 s
+     * na okno, ktorego i tak nie da sie przeczytac - a ratuja skan tam, gdzie
+     * limit jest chwilowy. Liczbe prob i przerwe da sie podac z zewnatrz;
+     * testy podaja 0, zeby nie czekac.
+     */
+    const attempts = Math.max(1, opts.retryAttempts ?? 3);
+    const baseDelay = opts.retryDelayMs ?? 400;
+    for (let attempt = 1; attempt <= attempts; attempt++) {
       try {
-        await wait(opts.retryDelayMs ?? 400);
         return await once();
       } catch {
-        return null;
+        if (attempt === attempts) return null;
+        await wait(baseDelay * 2 ** (attempt - 1));
       }
     }
+    return null;
   };
 
   outer: for (let start = 0; start < windows.length; start += batchSize) {
+    // Przerwa PRZED kolejna partia, nie przed pierwsza - pierwsze zapytanie ma
+    // isc od razu, inaczej kazde wejscie na strone zaczynaloby od czekania.
+    if (start > 0 && paceMs > 0) await wait(paceMs);
     const batch = windows.slice(start, start + batchSize);
     const fetched = await Promise.all(batch.map(fetchWindow));
 
