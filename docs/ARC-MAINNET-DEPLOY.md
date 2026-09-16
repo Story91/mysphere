@@ -123,7 +123,9 @@ Budzet na testnecie: ~1 USDC gazu + `SEED_USDC` + 100 USDC kaucji NA RYNEK. Sald
 testnecie 16.09 ok. 03:00 UTC: 2,97 USDC -> faucet.circle.com (Arc Testnet) przed krokiem 2.
 
 1. `SEED_USDC=5000000 CONFIRM=tak npm run perps:deploy:arc` -> nadpisuje `deployments/derivativeMarket.5042002.json`
-2. `SYMBOL=BTC-USD PRICE=<cena z adaptera> FEED=0x6531d59b211Dd341f1B95aFa97A2E4344EA12409 CONFIRM=tak npm run perps:market:arc`
+2. `SYMBOL=ARC-USD PRICE=1 CONFIRM=tak npm run perps:market:arc` (bez feedu - indeks z rejestru, jak dotad)
+2b. `SYMBOL=BTC-USD PRICE=<cena z adaptera> FEED=0x6531d59b211Dd341f1B95aFa97A2E4344EA12409 CONFIRM=tak npm run perps:market:arc`
+   (createMarket z feedem wymaga GOVERNANCE = deployer; `FeedNeedsGovernance` z innego konta)
 3. `SYMBOL=TSLA-USD PRICE=<cena z adaptera> FEED=0xb1D75f26a08A576269FB96843b0A1e74DB815153 CONFIRM=tak npm run perps:market:arc`
 4. commit `deployments/derivativeMarket.5042002.json` (frontend i cron keepera czytaja z niego), push.
 5. Keeper: cron Vercela (`app/api/keeper/perps`) bierze fabryke z tego pliku po deployu; keeper.ps1 tak samo.
