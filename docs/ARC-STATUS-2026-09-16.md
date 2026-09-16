@@ -112,6 +112,50 @@ launch 888 752 ≈ 0,018 USDC, swap 168–316 tys., settle 125 tys.
 
 ---
 
+## 4a. Pierwszy prawdziwy token na Arc — i co z niego wynika
+
+**Launchpad ma pierwszy launch od OBCEGO adresu.** Token `Arpe (ARPE)`
+`0x2b5b0ffcD0BFb92ba34e4d10d6360A0364CFE9F2`, twórca
+`0xa66dE81A3Ea3fe97cb6c9671C3fDC93D16c89998` (nie nasz `0xD488…`), blok
+21 113 706. Pięć transakcji kupna, 10 zdarzeń `FeeAccrued`. Rezerwa: **1 wei** —
+czyli ktoś przetestował launch pyłowymi kwotami, nie zbudował rynku.
+
+Board pokazuje go poprawnie (`ACTIVE CURVES 1`, rezerwa 0.000 USDC, atrapy
+zniknęły). Skan po stronie klienta potrzebuje na to kilkunastu sekund — Arc robi
+~169 tys. bloków na dobę, więc okno 9 500 bloków to sporo przebiegów.
+
+### Konsekwencja dla 6.3 (`FEE_RECIPIENT`)
+
+Do 16.09 rano zmiana odbiorcy opłat była **darmowa**: pad stał pusty, więc
+ponowne wdrożenie kosztowałoby 0,19 USDC i nie porzucało niczego. **To okno się
+zamknęło.** Na obecnym padzie stoi już token obcego twórcy z historią transakcji.
+Redeploy znaczy teraz: nowy adres pada, a ARPE i jego twórca zostają przy starym,
+o którym UI przestanie wiedzieć. To nie jest już decyzja techniczna, tylko
+decyzja o porzuceniu cudzego launchu.
+
+### Konsekwencja dla „pierwszej prawdziwej graduacji"
+
+To NIE jest zadanie do zaplanowania — to zobowiązanie kapitałowe:
+
+| pozycja | kwota |
+|---|---|
+| próg zbiórki (4 × R_VIRT) | **5 000 USDC** |
+| opłata graduation (3%) | 150 USDC (połowa wołającemu, połowa protokołowi) |
+| trafia do puli jako LP | **4 850 USDC** |
+| saldo `0xD488` na Arc | 12,89 USDC |
+
+LP jest **zamknięte na zawsze** — `LiquidityVault` nie ma ścieżki wykonania,
+która poda `liquidityDelta < 0` (komentarz w kodzie, linia 49). Kupujący trzyma
+tokeny, które może sprzedać z powrotem do tej puli, więc nie jest to czysta
+strata — ale 4 850 USDC zostaje unieruchomione, a odzysk zależy od wpływu na cenę.
+
+**Wniosek: na mainnecie nie da się tanio sprawdzić graduacji.** Fork jest jedynym
+przystępnym dowodem i dlatego `test/ArcForkMainnet.test.ts` przechodzi pełny cykl
+dwa razy — na świeżym stacku i na wdrożonym. Czego fork nie obejmuje, stoi
+w ramce w sekcji 4.
+
+---
+
 ## 5. Most i gaz — rozwiązane
 
 Bloker „nie ma jak dostać USDC na Arc" stał od 11.09. Rozwiązanie:
