@@ -281,10 +281,21 @@ jako wystawcę (`PriceOracleRegistry.setPublisher`) albo zostawić klucz
 deployera (gorący, patrz 6.3). Skan pozycji idzie od `max(deployBlock,
 head − 200 000)`, bo publiczne RPC tną starą historię.
 
-Co NIE jest zrobione: sam heartbeat jest wymogiem kontraktu. Rynki z indeksem z
-adaptera Pytha mogłyby nie wymagać wpisu w rejestrze (`openPosition` sprawdza
-`ORACLE.isActive` niezależnie od feedu) — to zmiana w `DerivativeMarket`,
-czyli nowe wdrożenie rynków; do rozważenia przed mainnetem perpsów.
+**Zrobione w kodzie (16.09, po południu):** `DerivativeMarket.oracleActive()` —
+rynek z feedem (adapter Pytha / Chainlink) jest aktywny, gdy feed jest dodatni
+i nie starszy niż `MAX_FEED_AGE` (1 h), niezależnie od heartbeatu rejestru;
+rejestr decyduje już tylko o ścięciu wystawcy (`slashed`). Rynek bez feedu
+działa jak dotąd. `openPosition` używa `oracleActive()`, `indexPrice()`
+odrzuca stary feed i wraca do TWAP-a rejestru. Tablica i przewodnik czytają
+`oracleActive` z rynku, a na starych rynkach (brak funkcji) wracają do
+`isActive` rejestru. Testy: 4 nowe w `test/DerivativeMarket.test.ts`, 40/40.
+
+**Co NIE jest zrobione:** wdrożone rynki są niezmienne — zmiana działa dopiero
+dla rynków utworzonych przez nową fabrykę. Potrzebne ponowne wdrożenie modułu
+perpsów na testnecie (skrypty w `scripts/derivatives`, sesja „Arc mainnet CCTP
+bridge") i odtworzenie BTC-USD / TSLA-USD z adapterami. Do tego czasu keeper
+(6.5, trasa `/api/keeper/perps`) nadal jest potrzebny do heartbeatu; po
+wdrożeniu zostaje mu funding, likwidacje i wypychanie Pytha.
 
 ## 7. Co dalej
 

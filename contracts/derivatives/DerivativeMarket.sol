@@ -144,6 +144,8 @@ contract DerivativeMarket is ReentrancyGuard {
     address public immutable CREATOR;
     /** address(0) = brak feedu, index bierze sie z TWAP-a rejestru. */
     address public immutable CHAINLINK_FEED;
+    /** Feed starszy niz to jest traktowany jak jego brak (patrz oracleActive). */
+    uint256 public constant MAX_FEED_AGE = 1 hours;
 
     /* ====================================================================== */
     /*  STAN                                                                   */
@@ -247,18 +249,43 @@ contract DerivativeMarket is ReentrancyGuard {
     }
 
     /**
-     * Cena referencyjna. Chainlink, gdy feed istnieje (i oddaje dodatnia,
-     * kompletna runde); inaczej TWAP rejestru. Feedu na Arc dzis nie ma -
-     * ta galaz czeka na adresy z Chainlink Scale.
+     * Cena referencyjna. Feed (Chainlink albo adapter Pytha), gdy istnieje i
+     * jest swiezy; inaczej TWAP rejestru. Adapter Pytha sam oddaje zera po
+     * swoim MAX_AGE, ale prawdziwy Chainlink oddaje ostatnia runde bez konca,
+     * wiec wiek sprawdzamy tu jeszcze raz, nie ufajac feedowi.
      */
     function indexPrice() public view returns (uint256) {
-        if (CHAINLINK_FEED != address(0)) {
-            (, int256 answer,, uint256 updatedAt,) = IAggregatorV3(CHAINLINK_FEED).latestRoundData();
-            if (answer > 0 && updatedAt != 0) {
-                return DerivMath.scalePriceToWad(answer, IAggregatorV3(CHAINLINK_FEED).decimals());
-            }
-        }
+        (uint256 price, bool fresh) = _feedPrice();
+        if (fresh) return price;
         return ORACLE.getTwap(ORACLE_MARKET_ID);
+    }
+
+    /**
+     * Czy rynek przyjmuje nowe pozycje.
+     *
+     * DLACZEGO NIE SAMO `ORACLE.isActive`: rejestr wymaga wpisu wystawcy co
+     * MAX_PRICE_AGE (heartbeat z keepera). Rynek z feedem ma cene z zewnatrz -
+     * heartbeat rejestru nic mu nie dodaje, a jego brak (laptop keepera
+     * wylaczony - 16.09.2026 12 h "halted" na testnecie) zatrzymywal handel
+     * bez powodu. Wiec: feed swiezy = rynek aktywny, o ile rejestr nie scial
+     * wystawcy (slashed - to jest sygnal o oszustwie, nie o wieku ceny).
+     * Rynek bez feedu zachowuje sie jak dotad.
+     */
+    function oracleActive() public view returns (bool) {
+        (, bool fresh) = _feedPrice();
+        if (fresh) {
+            (,,,,, bool slashed) = ORACLE.marketStats(ORACLE_MARKET_ID);
+            return !slashed;
+        }
+        return ORACLE.isActive(ORACLE_MARKET_ID);
+    }
+
+    /** (cena WAD, czy feed istnieje i jest dodatni oraz nie starszy niz MAX_FEED_AGE). */
+    function _feedPrice() private view returns (uint256 price, bool fresh) {
+        if (CHAINLINK_FEED == address(0)) return (0, false);
+        (, int256 answer,, uint256 updatedAt,) = IAggregatorV3(CHAINLINK_FEED).latestRoundData();
+        if (answer <= 0 || updatedAt == 0 || updatedAt + MAX_FEED_AGE < block.timestamp) return (0, false);
+        return (DerivMath.scalePriceToWad(answer, IAggregatorV3(CHAINLINK_FEED).decimals()), true);
     }
 
     /* ====================================================================== */
@@ -349,7 +376,7 @@ contract DerivativeMarket is ReentrancyGuard {
         if (_positions[msg.sender].size != 0) revert PositionAlreadyOpen();
         if (leverage == 0 || leverage > MAX_LEVERAGE) revert BadLeverage();
         if (marginUsdc < MIN_MARGIN_USDC) revert MarginTooSmall();
-        if (!ORACLE.isActive(ORACLE_MARKET_ID)) revert OracleInactive();
+        if (!oracleActive()) revert OracleInactive();
         // Jedyna pauza w calym module: fundusz nie pokrywa juz OI systemu.
         if (INSURANCE.newPositionsPaused()) revert SystemPaused();
 

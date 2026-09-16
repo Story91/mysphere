@@ -369,6 +369,8 @@ export default function PerpsGuide({
         ...(market
           ? {
               chainlinkFeed: m('CHAINLINK_FEED'),
+              // Brak na rynkach sprzed 16.09.2026 -> null, wtedy liczy sie isActive rejestru.
+              marketActive: m('oracleActive'),
               marketCreator: m('CREATOR'),
               maxLeverage: m('MAX_LEVERAGE'),
               minMargin: m('MIN_MARGIN_USDC'),
@@ -455,7 +457,8 @@ export default function PerpsGuide({
         disputedPrice: challenge ? (challenge[3] as bigint) : null,
         challengeOpen: challenge ? Boolean(challenge[4]) : null,
         twap: big(second.twap),
-        feedActive: bool(second.feedActive),
+        // Rynek z feedem Pytha jest aktywny bez heartbeatu rejestru.
+        feedActive: bool(second.marketActive) ?? bool(second.feedActive),
         feedBond: stats ? (stats[0] as bigint) : null,
         feedUpdatedAt: price ? Number(price[1]) : null,
         feedUpdateCount: stats ? Number(stats[2]) : null,

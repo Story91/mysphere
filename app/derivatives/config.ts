@@ -214,6 +214,10 @@ export const marketAbi = [
   { type: 'function', name: 'CREATOR', stateMutability: 'view', inputs: [], outputs: [{ type: 'address' }] },
   /** Adres feedu Chainlink, gdy rynek go ma; adres zerowy znaczy "tylko rejestr". */
   { type: 'function', name: 'CHAINLINK_FEED', stateMutability: 'view', inputs: [], outputs: [{ type: 'address' }] },
+  // Rynki wdrozone po 16.09.2026: aktywnosc liczona z feedu (Pyth) albo z
+  // rejestru. Starsze rynki nie maja tej funkcji - wywolanie pada, UI wraca
+  // do oracle.isActive.
+  { type: 'function', name: 'oracleActive', stateMutability: 'view', inputs: [], outputs: [{ type: 'bool' }] },
   { type: 'function', name: 'markPrice', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'indexPrice', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'openInterestNotional', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },

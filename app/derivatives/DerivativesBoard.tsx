@@ -84,6 +84,8 @@ type Row = {
   slashed: boolean;
   priceUpdatedAt: number | null;
   feedActive: boolean | null;
+  /** true = feedActive pochodzi z market.oracleActive(), nie z rejestru. */
+  feedFromMarket: boolean;
   /** Adres zewnetrznego feedu indeksu (adapter Pytha) albo zero = rejestr. null = odczyt padl. */
   indexFeed: Address | null;
   /* zmiana indeksu z logow PriceSubmitted w oknie 40k blokow; null = < 2 punkty */
@@ -232,6 +234,8 @@ export default function DerivativesBoard() {
         { address: ORACLE_ADDRESS, abi: oracleAbi, functionName: 'isActive', args: [BigInt(id)] },
         // NA KONCU, zeby nie przesuwac indeksow at(0..11) powyzej.
         { address, abi: marketAbi, functionName: 'CHAINLINK_FEED' },
+        // Brak na starych rynkach -> null (allowFailure) -> bierzemy isActive rejestru.
+        { address, abi: marketAbi, functionName: 'oracleActive' },
       ]);
       const res = await client.multicall({
         contracts: [
@@ -276,7 +280,10 @@ export default function DerivativesBoard() {
           frozen: stats ? Boolean(stats[4]) : false,
           slashed: stats ? Boolean(stats[5]) : false,
           priceUpdatedAt: meta ? Number(meta[4]) : null,
-          feedActive: at(11) == null ? null : Boolean(at(11)),
+          // Rynek z feedem Pytha jest aktywny bez heartbeatu rejestru (oracleActive);
+          // stary rynek albo rynek bez feedu - jak dotad, z rejestru.
+          feedActive: at(13) != null ? Boolean(at(13)) : at(11) == null ? null : Boolean(at(11)),
+          feedFromMarket: at(13) != null,
           indexFeed: (at(12) as Address | null) ?? null,
           change: null,
           changeSince: null,
@@ -623,7 +630,10 @@ export default function DerivativesBoard() {
                   ? 'down'
                   : row.feedActive == null || feedAge == null
                     ? 'muted'
-                    : row.fundingInterval != null && feedAge > row.fundingInterval
+                    // Wiek wpisu w rejestrze nie mowi nic o rynku, ktory zyje na feedzie Pytha.
+                    : !(row.feedFromMarket && row.indexFeed && row.indexFeed !== ZERO) &&
+                        row.fundingInterval != null &&
+                        feedAge > row.fundingInterval
                       ? 'warn'
                       : 'up';
               const feedTitle = [

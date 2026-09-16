@@ -503,4 +503,60 @@ describe('DerivativeMarket (Arc)', function () {
       expect(await fees.lockedTotal(creator.address)).to.be.gt(0);
     });
   });
+  /* ==================================================================== */
+  /*  RYNEK Z FEEDEM: AKTYWNOSC BEZ HEARTBEATU REJESTRU                    */
+  /* ==================================================================== */
+
+  describe('rynek z adapterem Pytha nie wymaga heartbeatu rejestru', function () {
+    const ID = ethers.id('BTC/USD');
+    let pyth: any, adapter: any, feedMarket: any;
+
+    async function setPyth(price: number, at?: number) {
+      await pyth.setPrice(ID, BigInt(Math.round(price * 1e8)), -8, at ?? (await now()));
+    }
+
+    beforeEach(async function () {
+      pyth = await (await ethers.getContractFactory('MockPyth')).deploy();
+      adapter = await (await ethers.getContractFactory('PythAggregatorAdapter')).deploy(
+        await pyth.getAddress(), ID, 3600, 'BTC/USD (Pyth)',
+      );
+      await setPyth(100);
+      await oracle.connect(creator).registerMarket('BTC-USD', START_PRICE, BOND);
+      await factory.connect(governance).createMarket(2, VLIQ, await adapter.getAddress());
+      feedMarket = await ethers.getContractAt('DerivativeMarket', await factory.marketOf(2));
+      await usdc.connect(alice).approve(await feedMarket.getAddress(), ethers.MaxUint256);
+    });
+
+    it('rejestr martwy, feed swiezy: rynek aktywny i przyjmuje pozycje', async function () {
+      await warp(2 * 3600);
+      expect(await oracle.isActive(2)).to.equal(false);
+      await setPyth(101);
+      expect(await feedMarket.oracleActive()).to.equal(true);
+      expect(await feedMarket.indexPrice()).to.equal(WAD(101));
+      await feedMarket.connect(alice).openPosition(true, USDC(2_000), 5);
+      expect((await feedMarket.getPosition(alice.address))[0]).to.be.gt(0);
+    });
+
+    it('feed i rejestr martwe: OracleInactive, index spada na TWAP rejestru', async function () {
+      await warp(2 * 3600);
+      expect(await feedMarket.oracleActive()).to.equal(false);
+      expect(await feedMarket.indexPrice()).to.equal(await oracle.getTwap(2));
+      await expect(feedMarket.connect(alice).openPosition(true, USDC(2_000), 5))
+        .to.be.revertedWithCustomError(feedMarket, 'OracleInactive');
+    });
+
+    it('feed martwy, rejestr zywy: rynek zyje na rejestrze jak dotad', async function () {
+      await warp(2 * 3600);
+      await oracle.connect(creator).submitPrice(2, WAD(100), await now());
+      expect(await feedMarket.oracleActive()).to.equal(true);
+      await feedMarket.connect(alice).openPosition(false, USDC(2_000), 5);
+    });
+
+    it('rynek bez feedu nadal wymaga heartbeatu rejestru', async function () {
+      await warp(2 * 3600);
+      expect(await market.oracleActive()).to.equal(false);
+      await expect(market.connect(alice).openPosition(true, USDC(2_000), 5))
+        .to.be.revertedWithCustomError(market, 'OracleInactive');
+    });
+  });
 });
