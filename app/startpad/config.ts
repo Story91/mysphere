@@ -505,7 +505,6 @@ export const LAUNCHPAD_NETWORKS: Record<number, LaunchpadNetwork> = {
  * RPC arc-scan.org tnie eth_getLogs na 10 000 blokow, blok co 0,50 s -
  * scanWindow 9 500 jak na testnecie.
  */
-const ARC_MAINNET_ZERO = '0x0000000000000000000000000000000000000000' as const;
 LAUNCHPAD_NETWORKS[arcMainnet.id] = {
   ...LAUNCHPAD_NETWORKS[arcTestnet.id],
   chain: arcMainnet,
