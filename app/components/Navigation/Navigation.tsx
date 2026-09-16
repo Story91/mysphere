@@ -44,8 +44,9 @@ const LINK_THEME: Record<string, { suffix: string }> = {
 /**
  * "My" zostaje neutralne, sufiks bierze kolor swojej trasy.
  *
- * Na pigulce aktywnej caly napis jest bialy: fiolet marki pod spodem zjada
- * kazdy z kolorow tras, a emerald czy cyan na fiolecie to juz nie jest zaden
+ * Na pigulce aktywnej caly napis ma kolor --soft-on-primary (bialy na jasnym
+ * motywie, ciemny na Arc i Robinhoodzie): kolor marki pod spodem zjada kazdy
+ * z kolorow tras, a emerald czy cyan na fiolecie to juz nie jest zaden
  * kontrast.
  */
 function NavLinkLabel({ label, isActive }: { label: string; isActive: boolean }) {
@@ -53,8 +54,8 @@ function NavLinkLabel({ label, isActive }: { label: string; isActive: boolean })
   const suffix = label.slice(2);
   return (
     <span className="inline-flex items-center gap-0.5">
-      <span className={isActive ? 'text-white' : 'text-soft-ink'}>My</span>
-      <span className={isActive ? 'text-white' : LINK_THEME[label]?.suffix ?? 'text-soft-ink-muted'}>
+      <span className={isActive ? 'text-soft-on-primary' : 'text-soft-ink'}>My</span>
+      <span className={isActive ? 'text-soft-on-primary' : LINK_THEME[label]?.suffix ?? 'text-soft-ink-muted'}>
         {suffix}
       </span>
     </span>
@@ -74,13 +75,24 @@ function NavLinkLabel({ label, isActive }: { label: string; isActive: boolean })
  * Dlatego siedem pigulek obok siebie czyta sie jako jeden pasek, a nie jako
  * siedem osobnych komponentow.
  *
- * WYPELNIENIE ZOSTAJE WSPOLNE: biale w spoczynku, fioletowe na trasie
- * aktywnej. Kolor trasy siedzi w obwodce i nigdzie indziej - wypelnianie
- * pigulki pomaranczem czy zielenia zabiloby kontrast bialego napisu
+ * WYPELNIENIE ZOSTAJE WSPOLNE: powierzchnia motywu w spoczynku, kolor marki
+ * motywu na trasie aktywnej. Kolor trasy siedzi w obwodce i nigdzie indziej -
+ * wypelnianie pigulki pomaranczem czy zielenia zabiloby kontrast napisu
  * (na #f5a73b bialy tekst ma 1,9:1, czyli jest nieczytelny).
  *
- * Odcienie sa dobrane tak, zeby kreska byla widoczna na bialym tle - kazdy
- * ma wzgledem bieli co najmniej 2:1.
+ * DLACZEGO ZMIENNE MOTYWU, A NIE "BIALE" I "FIOLETOWE" (16.09.2026): do tego
+ * dnia wypelnienie bylo wpisane na sztywno jako rgb(255,255,255) i
+ * rgb(124,107,218), a napis bral kolor z motywu. Na ciemnych motywach sieci
+ * (Arc: granat, Robinhood: czern) --soft-ink jest prawie bialy, wiec jasny
+ * napis ladowal na bialej pigulce i belka na Startpadzie Arc byla siedmioma
+ * bialymi plamami bez tekstu. Teraz wypelnienie i napis pochodza z tego samego
+ * motywu, wiec para (tlo, tekst) jest zawsze ta, ktora motyw juz sprawdzil
+ * pod katem kontrastu: --soft-surface z --soft-ink, --soft-primary z
+ * --soft-on-primary.
+ *
+ * Odcienie obwodek sa dobrane tak, zeby kreska byla widoczna na bialym tle -
+ * kazdy ma wzgledem bieli co najmniej 2:1; na ciemnym tle sa jasniejsze od
+ * niego z definicji.
  */
 const NAV_ACCENT: Record<string, string> = {
   MySphere: '#a21caf',   // fuksja, ta sama co sufiks etykiety
@@ -96,8 +108,13 @@ const NAV_ACCENT: Record<string, string> = {
   How: '#64748b',        // najciszsza pozycja w belce i tak ma wygladac
 };
 
-/** Oba konce gradientu. Atrament z palety, nie czern absolutna. */
-const NAV_ACCENT_INK = '#16141b';
+/**
+ * Oba konce gradientu obwodki: atrament motywu. Na jasnym motywie to
+ * ciemny fiolet palety (#2e2a44), na ciemnym - jasny napis, czyli w obu
+ * przypadkach kolor, ktorym motyw pisze tekst. Wczesniej stala #16141b
+ * znikala na ciemnym tle i obwodka gubila oba konce.
+ */
+const NAV_ACCENT_INK = 'rgb(var(--soft-ink))';
 
 const MOBILE_MENU_ID = 'mobile-nav-menu';
 
@@ -147,7 +164,7 @@ function NavItem({
    * uczy sie omijac, a przy `prefers-reduced-motion` nie wolno jej ruszac.
    */
   const accent = NAV_ACCENT[link.label];
-  const fill = isActive ? 'rgb(124,107,218)' : 'rgb(255,255,255)';
+  const fill = isActive ? 'rgb(var(--soft-primary))' : 'rgb(var(--soft-surface))';
   const accentStyle = accent
     ? {
         border: '2px solid transparent',
