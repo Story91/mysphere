@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import Image from 'next/image';
 import { useAccount, useSwitchChain, useChainId } from 'wagmi';
-import { base, baseSepolia } from 'viem/chains';
+import { base } from 'viem/chains';
 import { baseCampChain } from '@/app/contracts/BaseCampPostContract';
 import { campMainnetChain } from '@/app/contracts/CampMainnet';
 import { ENABLE_CAMP_MAINNET } from '@/config/camp';
@@ -25,14 +25,6 @@ const baseEntry = {
   bgWhite: false,
 } as const;
 
-const baseSepoliaEntry = {
-  id: baseSepolia.id,
-  name: 'Base Sepolia',
-  shortName: 'SEP',
-  iconUrl: '/logotypy/Base_basemark_blue.png',
-  color: '#0052FF',
-  bgWhite: false,
-} as const;
 
 const campMainnetEntry = {
   id: campMainnetChain.id,
@@ -114,8 +106,24 @@ const arcEntry = {
   bgWhite: false,
 } as const;
 
-// Kolejność: Base, Camp Mainnet, Linea, Celo, Ethereum, World Chain, Robinhood Chain, Arc
-const networks = [baseEntry, baseSepoliaEntry, campMainnetEntry, lineaEntry, celoEntry, ethereumEntry, worldChainEntry, robinhoodEntry, arcEntry] as const;
+/**
+ * Kolejnosc: Base, Arc, Camp, Linea, Celo, Ethereum, World Chain, Robinhood.
+ *
+ * BASE SEPOLIA WYPADLA STAD 16.09.2026, a Arc wszedl na jej miejsce. Powod:
+ * to jedyna siec TESTOWA w glownej nawigacji produkcyjnej - stala tam z
+ * czasow, gdy launchpad dzialal wylacznie na testnecie. Dzis Arc ma mainnet
+ * z prawdziwymi tokenami, wiec drugie miejsce nalezy do niego, a wysylanie
+ * gosci na siec zabawkowa tylko myli.
+ *
+ * Sepolia NIE znika z aplikacji: zostaje w rejestrze wagmi i w przelaczniku
+ * sieci na startpadzie, wiec portfel nadal sie na nia laczy i deweloper ma
+ * gdzie testowac. Znika wylacznie z tej listy.
+ *
+ * Skutek uboczny, swiadomy: portfel podlaczony do Sepolii nie ma juz tu
+ * swojego wpisu, wiec pastylka pokaze pierwsza siec z listy (patrz
+ * `networks[0]` nizej). Tak samo zachowuje sie kazda inna siec spoza listy.
+ */
+const networks = [baseEntry, arcEntry, campMainnetEntry, lineaEntry, celoEntry, ethereumEntry, worldChainEntry, robinhoodEntry] as const;
 type Network = (typeof networks)[number];
 
 /** Adres pliku znaku sieci albo null, gdy wpis go nie ma (patrz `arcEntry`). */
