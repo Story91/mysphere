@@ -127,6 +127,11 @@ testnecie 16.09 ok. 03:00 UTC: 2,97 USDC -> faucet.circle.com (Arc Testnet) prze
 2b. `SYMBOL=BTC-USD PRICE=<cena z adaptera> FEED=0x6531d59b211Dd341f1B95aFa97A2E4344EA12409 CONFIRM=tak npm run perps:market:arc`
    (createMarket z feedem wymaga GOVERNANCE = deployer; `FeedNeedsGovernance` z innego konta)
 3. `SYMBOL=TSLA-USD PRICE=<cena z adaptera> FEED=0xb1D75f26a08A576269FB96843b0A1e74DB815153 CONFIRM=tak npm run perps:market:arc`
+3b. ARC-USD (bez feedu) zyje z heartbeatu rejestru: jesli cron keepera (app/api/keeper/perps) podpisuje
+   INNYM kluczem niz deployer, po registerMarket wykonac `oracle.setPublisher(marketId, <adres klucza crona>)`
+   z konta GOVERNANCE. BTC/TSLA z adapterami tego nie potrzebuja (oracleActive), ale keeper dalej robi
+   funding, likwidacje i push do PythReceivera.
+   Adaptery i odbiornik NIE zmieniaja adresow - metadane juz wystartowanych tokenow trzymaja adres feedu.
 4. commit `deployments/derivativeMarket.5042002.json` (frontend i cron keepera czytaja z niego), push.
 5. Keeper: cron Vercela (`app/api/keeper/perps`) bierze fabryke z tego pliku po deployu; keeper.ps1 tak samo.
 
