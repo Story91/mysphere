@@ -1,0 +1,67 @@
+# Arc mainnet (5042) - wdrozenie launchpadu
+
+Stan zweryfikowany odczytem z lancucha 2026-09-16 (nie z ogloszen).
+
+## Co jest sprawdzone
+
+| Rzecz | Wynik |
+|---|---|
+| RPC `https://rpc.mainnet.arc.io` | odpowiada, chainId 5042, blok co 0,5 s, baseFee 20 gwei, gasLimit bloku 30 mln |
+| Portfel deployera `0xD4885A5aa53446843CABcDE1F35DE9b4E906030e` | 13,08 USDC (natywnie; gaz na Arc to USDC) |
+| Uniswap v4 PoolManager `0x8366a39CC670B4001A1121B8F6A443A643e40951` | 24 009 B, keccak runtime `0xbd3881180b547f5fe817545743cfb4343e96b1bc6640dcd70c106b0066e95626` = oficjalny build (Base `0x4985...` poza `address(this)`) |
+| Koszt wdrozenia (z artefaktow po `hardhat compile`) | ~8,4 mln gazu = ~0,17 USDC przy 20 gwei; z zapasem x3 nadal < 1 USDC |
+| Pyth na Arc mainnet | BRAK. Docs Pytha listuja tylko Arc TESTNET. Pod `0x2880...` na 5042 stoi 1067 B nie-Pytha (rewertuje) |
+
+Skrypt `scripts/launchpad/deploy.ts` na 5042 WYMAGA `POOL_MANAGER` i `POOL_MANAGER_CODE_HASH`
+(mapa sprawdzonych celowo nie ma domyslu dla mainnetu) oraz `CONFIRM=tak`.
+
+## Parametry (te same co na testnecie, poza skala)
+
+- `FEE_RECIPIENT` - na testnecie deployer `0xD488...030e` (odczyt `FEE_RECIPIENT()` z `0xe984...Da37`).
+  Na Base to Safe `0x83E2...142F`, ale na Arc tego Safe'a nie ma. Do decyzji: deployer albo nowy multisig.
+- `R_VIRT=1250` USDC (decyzja 12.09.2026): prog zbiorki 5000 USDC, mcap 31 250 USDC po graduacji.
+  Testnet ma 250. Frontend (`app/startpad/config.ts`, wpis 5042) juz zaklada 1250.
+- `FACTORY_KIND=plain` - deploy.ts sam to wybiera poza Base; B20 precompile na Arc nie ma.
+- `FEE_BPS=100`, `CREATOR_FEE_BPS=70`, `PROTOCOL_SHARE_BPS=3000` - domysly skryptu.
+
+## Komenda (odpala WLASCICIEL - klasyfikator auto-mode blokuje agentowi transakcje na mainnecie)
+
+Sucho, bez CONFIRM - skrypt wypisze plan adresow i skale w USDC, po czym sie zatrzyma:
+
+```bash
+FEE_RECIPIENT=0xD4885A5aa53446843CABcDE1F35DE9b4E906030e POOL_MANAGER=0x8366a39CC670B4001A1121B8F6A443A643e40951 POOL_MANAGER_CODE_HASH=0xbd3881180b547f5fe817545743cfb4343e96b1bc6640dcd70c106b0066e95626 npm run launchpad:deploy:arc:mainnet
+```
+
+Na ostro - to samo plus `CONFIRM=tak`:
+
+```bash
+CONFIRM=tak FEE_RECIPIENT=0xD4885A5aa53446843CABcDE1F35DE9b4E906030e POOL_MANAGER=0x8366a39CC670B4001A1121B8F6A443A643e40951 POOL_MANAGER_CODE_HASH=0xbd3881180b547f5fe817545743cfb4343e96b1bc6640dcd70c106b0066e95626 npm run launchpad:deploy:arc:mainnet
+```
+
+Uwagi:
+- Skrypt kopie salt hooka i wdraza w jednym przebiegu. NIE wysylac nic z `0xD488` w trakcie
+  (keeper SPHERE dziala na Base, wiec nie koliduje - inny lancuch, inny nonce).
+- Jesli `rpc.mainnet.arc.io` zacznie oddawac bledy pod seria transakcji: `npm run arc:rpc-proxy`
+  i `ARC_MAINNET_RPC_URL=http://127.0.0.1:8546`.
+
+## Po wdrozeniu
+
+1. `LAUNCHPAD=0x... npx cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run scripts/launchpad/recordDeployment.ts --network arcMainnet`
+   -> `scripts/output/launchpad-arcMainnet.json` (odczyt `R_VIRT()` musi dac 1250e18).
+2. Adresy do env (Vercel + .env.local) i jako domysly we wpisie 5042 w `app/startpad/config.ts`:
+   `NEXT_PUBLIC_LAUNCHPAD_ARC_MAINNET_ADDRESS`, `..._LIQUIDITY_VAULT_...`, `..._LAUNCH_HOOK_...`,
+   `..._TOKEN_FACTORY_...`, `NEXT_PUBLIC_POOL_MANAGER_ARC_MAINNET_ADDRESS=0x8366...`,
+   `NEXT_PUBLIC_LAUNCHPAD_ARC_MAINNET_DEPLOY_BLOCK=<blok z logu skryptu>`.
+3. Test zywy: jeden launch + jeden buy za 1 USDC z `0xD488`, sprawdzic w UI na `/startpad?chainId=5042`.
+4. Weryfikacja zrodel na arc-scan.org (Blockscout) - hardhat-verify nie ma wpisu dla 5042, dodac customChain.
+
+## Perps i paired tokens na mainnecie - co by trzeba
+
+- Pyth nie ma kontraktu na Arc mainnet, wiec indeks moze isc TYLKO z naszego `PythReceiver`
+  (5 kluczy Hermesa, quorum 3) - do wdrozenia od nowa na 5042 + adaptery + keeper z gazem w USDC.
+  Owner odbiornika = jeden klucz; na mainnecie powinien to byc multisig.
+- Rejestr `PriceOracleRegistry`, fabryka rynkow, InsuranceFund, FeeDistributor - to samo co na testnecie,
+  koszt gazu rzedu 1-2 USDC, ale kaucja rynku (100 USDC na testnecie) to realne pieniadze.
+- Zastrzezenie z 11.09 stoi: syntetyczna ekspozycja na akcje (TSLA) to instrument finansowy (MiCA/SEC).
+  Bez opinii prawnej perps zostaja na testnecie; paired tokens na mainnecie moga miec tylko
+  rynki krypto (BTC/ETH), jesli w ogole.
