@@ -516,7 +516,7 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
 
         {coreLoading && !core && (
           <div className="mt-5 flex items-center gap-2 rounded-[20px] border border-sp-shade/10 bg-sp-surface p-5 text-[12px] text-sp-shade/55">
-            <RefreshCw className="h-4 w-4 animate-spin text-soft-primary" aria-hidden="true" /> Reading token state from {LAUNCHPAD_CHAIN.name}...
+            <RefreshCw className="h-4 w-4 animate-spin text-soft-primary" aria-hidden="true" /> <span suppressHydrationWarning>Reading token state from {LAUNCHPAD_CHAIN.name}...</span>
           </div>
         )}
         {coreError && (

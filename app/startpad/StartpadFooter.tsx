@@ -3,10 +3,7 @@
 import { useEffect, useState } from 'react';
 import { ExternalLink } from 'lucide-react';
 import {
-  NATIVE_SYMBOL,
   ACTIVE_LAUNCHPAD_NETWORK,
-  CURVE_TARGET_ETH,
-  R_VIRT_NATIVE,
   B20_PRECOMPILE_ADDRESS,
   DEFAULT_LAUNCHPAD_CHAIN_ID,
   LAUNCHPAD_NETWORKS,
@@ -121,6 +118,26 @@ export default function StartpadFooter() {
   useEffect(() => setNet(ACTIVE_LAUNCHPAD_NETWORK), []);
   const isB20 = net.tokenStandard === 'b20';
 
+  /*
+   * LICZBY TEZ Z `net`, NIE ZE STALYCH MODULU - poprawka z 16 wrzesnia 2026.
+   *
+   * Powyzszy stan zalatwial ADRESY i etykiety, ale reszta tego pliku brala
+   * `NATIVE_SYMBOL`, `CURVE_TARGET_ETH` i `R_VIRT_NATIVE` prosto z modulu -
+   * a te sa policzone przy IMPORCIE, wiec na kliencie sa juz arcowe, podczas
+   * gdy serwer wyslal bazowe. Efekt: przy kazdym wejsciu z wybranym Arc
+   * serwer slal "3 ETH raised" i "Trades here move real ETH", a klient
+   * podmienial to na 5000 USDC - React wyrzucal serwerowy DOM i renderowal od
+   * nowa, a uzytkownik przez moment widzial CUDZE LICZBY O PIENIADZACH.
+   *
+   * Teraz caly ten podpis jedzie z jednego zrodla: przed montazem siec
+   * domyslna (to widzi te tresc crawler i to jest prawda dla goscia bez
+   * wyboru), po montazu wybrana. Zadnego rozjazdu, bo obie strony renderuja
+   * to samo w pierwszym podejsciu.
+   */
+  const symbol = net.chain.nativeCurrency.symbol;
+  const rVirt = net.rVirt;
+  const target = net.rVirt * 4;
+
   return (
     <footer className="mt-10 border-t border-sp-shade/10 pb-10 pt-8">
       {/* ===== CO TO JEST - jedno zdanie, zanim pojda szczegoly ===== */}
@@ -156,9 +173,9 @@ export default function StartpadFooter() {
             </>
           )}{' '}
           The launchpad sells it on a bonding curve, and at exactly{' '}
-          <strong className="text-sp-ink">{curveAmount(CURVE_TARGET_ETH)} {NATIVE_SYMBOL}</strong> raised the token graduates into a
+          <strong className="text-sp-ink">{curveAmount(target)} {symbol}</strong> raised the token graduates into a
           Uniswap v4 pool whose liquidity is locked forever. No admin keys, no upgrades: every rule
-          below is fixed in immutable contracts, and all payouts are claim-based, in {NATIVE_SYMBOL}.
+          below is fixed in immutable contracts, and all payouts are claim-based, in {symbol}.
           {isB20
             ? ` Startpad is among the first launchpads built on the B20 standard. Running live on ${net.label}.`
             : ` Running live on ${net.label}.`}
@@ -171,9 +188,9 @@ export default function StartpadFooter() {
         <Arrow />
         <Step title="2 · Curve" note="Buy and sell against the curve. Trading fee up to 1%, fixed by the creator at launch. Price rises with every buy along a constant-product curve." />
         <Arrow />
-        <Step title="3 · Locked" note={`Reserve hits ${curveAmount(CURVE_TARGET_ETH)} ${NATIVE_SYMBOL}. Buys revert, sells still work. The token waits for graduation.`} />
+        <Step title="3 · Locked" note={`Reserve hits ${curveAmount(target)} ${symbol}. Buys revert, sells still work. The token waits for graduation.`} />
         <Arrow />
-        <Step title="4 · Graduated" note={`Anyone may call graduate() and earns 1.5% of the reserve, ${curveAmount(CURVE_TARGET_ETH * 0.015)} ${NATIVE_SYMBOL} off a full curve. Liquidity moves to a Uniswap v4 pool at the exact closing price.`} />
+        <Step title="4 · Graduated" note={`Anyone may call graduate() and earns 1.5% of the reserve, ${curveAmount(target * 0.015)} ${symbol} off a full curve. Liquidity moves to a Uniswap v4 pool at the exact closing price.`} />
       </div>
 
       <div className="mt-6">
@@ -189,9 +206,9 @@ export default function StartpadFooter() {
                   // cenie zamkniecia - okolo 155M. Reszta z 200M idzie na 0x...dEaD.
                   // Stalo tu "200,000,000 (20%)" i to bylo po prostu nieprawda.
                   ['Moved to the pool at graduation', '~155,000,000 (~15.5%), the rest to 0x…dEaD'],
-                  ['Starting market cap', `${curveAmount(R_VIRT_NATIVE)} ${NATIVE_SYMBOL}`],
-                  ['Graduation trigger', `reserve = ${curveAmount(CURVE_TARGET_ETH)} ${NATIVE_SYMBOL} exactly`],
-                  ['Market cap at graduation', `${curveAmount(R_VIRT_NATIVE * 25)} ${NATIVE_SYMBOL} (25×)`],
+                  ['Starting market cap', `${curveAmount(rVirt)} ${symbol}`],
+                  ['Graduation trigger', `reserve = ${curveAmount(target)} ${symbol} exactly`],
+                  ['Market cap at graduation', `${curveAmount(rVirt * 25)} ${symbol} (25×)`],
                   ['Creator allocation', 'none (a pre-buy is a normal buy on the same curve)'],
                 ].map(([k, v]) => (
                   <tr key={k} className="border-t border-sp-shade/5 first:border-t-0">
@@ -203,8 +220,8 @@ export default function StartpadFooter() {
             </table>
           </div>
           <p className="mt-2 text-[11.5px] text-sp-shade/45">
-            Solvency invariant: selling every circulating token back returns exactly the {NATIVE_SYMBOL} reserve.
-            The virtual {curveAmount(R_VIRT_NATIVE)} {NATIVE_SYMBOL} is never paid out.
+            Solvency invariant: selling every circulating token back returns exactly the {symbol} reserve.
+            The virtual {curveAmount(rVirt)} {symbol} is never paid out.
           </p>
         </DocSection>
 
@@ -222,8 +239,8 @@ export default function StartpadFooter() {
               <p className="text-[12px] font-extrabold text-sp-ink">Graduation · 3% of reserve, once</p>
               <SplitBar creator={50} protocol={50} />
               <p className="mt-2 text-[11.5px] text-sp-shade/55">
-                {curveAmount(CURVE_TARGET_ETH * 0.03)} {NATIVE_SYMBOL} off a full curve: half to whoever calls graduate(), half to the
-                protocol. The remaining ~{curveAmount(CURVE_TARGET_ETH * 0.97)} {NATIVE_SYMBOL} and about 155M tokens become the
+                {curveAmount(target * 0.03)} {symbol} off a full curve: half to whoever calls graduate(), half to the
+                protocol. The remaining ~{curveAmount(target * 0.97)} {symbol} and about 155M tokens become the
                 locked pool. Sells during Locked lower the reserve, so the fee and the reward
                 scale down with it.
               </p>
@@ -235,7 +252,7 @@ export default function StartpadFooter() {
                 A swap pays 0.30% to the pool&apos;s own liquidity and 1% to the hook. Both streams
                 split the same way and the protocol always receives its full 30%. The creator&apos;s
                 70% of the hook fee is split by the creator&apos;s own launch-time choice between
-                “paid to me in {NATIVE_SYMBOL}” and the auto-buyback; the 0.30% accrues to the
+                “paid to me in {symbol}” and the auto-buyback; the 0.30% accrues to the
                 locked LP position and is collected with Harvest.
               </p>
             </div>
@@ -255,7 +272,7 @@ export default function StartpadFooter() {
             <li>Fee receivers: up to 8 addresses, shares summing to 100%.</li>
             <li>Auto-buyback slice of the creator&apos;s pool-fee share (0–100%, default 0%).</li>
             <li>Sniper cap: per-wallet buy limit for the first 5 minutes, chosen in Creator setup (for example 4M or 8M tokens). A Quick launch sets no cap, and the creator can disable protection entirely.</li>
-            <li>Pre-buy: any {NATIVE_SYMBOL} amount, on the same curve and fee as everyone else.</li>
+            <li>Pre-buy: any {symbol} amount, on the same curve and fee as everyone else.</li>
           </ul>
           <p className="mt-2 text-[11.5px] text-sp-shade/45">
             Nothing on this list has a setter. Changing any of it means launching a new token.
@@ -267,7 +284,7 @@ export default function StartpadFooter() {
             <li><strong className="text-sp-ink">The token cannot be inflated.</strong> It is born with supply cap = total supply and no MINT role held by anyone. The launchpad verifies this on-chain in the launch transaction and reverts if it is not true.</li>
             <li><strong className="text-sp-ink">No roles anywhere.</strong> No owner, no pauser, no upgrader on the token, the launchpad, the vault or the hook. The fee caps bind us too.</li>
             <li><strong className="text-sp-ink">LP is locked, not burned.</strong> The vault adds liquidity once, at graduation; its only other path to the pool passes a literal zero. It can harvest fees, never withdraw capital, and no function anywhere takes a negative liquidity change from anyone.</li>
-            <li><strong className="text-sp-ink">Pull payments only.</strong> You claim your {NATIVE_SYMBOL}; nothing is pushed. Anyone may pay gas to deliver your balance to you, never to themselves.</li>
+            <li><strong className="text-sp-ink">Pull payments only.</strong> You claim your {symbol}; nothing is pushed. Anyone may pay gas to deliver your balance to you, never to themselves.</li>
             <li><strong className="text-sp-ink">What this is not:</strong> most tokens here will never trade meaningfully, a curve token has no external chart until it graduates, and nothing on this page is a recommendation.</li>
           </ul>
         </DocSection>
@@ -307,7 +324,7 @@ export default function StartpadFooter() {
       <p className="mt-6 text-[11px] text-sp-shade/40">
         {net.testnet
           ? `Startpad runs on ${net.label} (testnet), so tokens here have no real value. Nothing on this page is financial advice.`
-          : `Startpad runs on ${net.label}. Trades here move real ${NATIVE_SYMBOL}. Nothing on this page is financial advice.`}
+          : `Startpad runs on ${net.label}. Trades here move real ${symbol}. Nothing on this page is financial advice.`}
       </p>
     </footer>
   );

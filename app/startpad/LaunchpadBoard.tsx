@@ -133,7 +133,7 @@ function NetworkSwitch() {
   useEffect(() => setMounted(true), []);
   const active = ACTIVE_LAUNCHPAD_NETWORK;
   if (!mounted) {
-    return <span className="py-2.5 pl-3.5 pr-2 text-[12px] font-bold text-sp-shade/40">{NET}</span>;
+    return <span suppressHydrationWarning className="py-2.5 pl-3.5 pr-2 text-[12px] font-bold text-sp-shade/40">{NET}</span>;
   }
   return (
     <span className={`inline-flex items-center gap-1.5 py-2.5 pl-3.5 pr-2 ${active.accentTextClass}`}>
@@ -177,7 +177,7 @@ function NetworkTag() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const net = mounted ? ACTIVE_LAUNCHPAD_NETWORK : null;
-  if (!net) return <span className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/35">{NET}</span>;
+  if (!net) return <span suppressHydrationWarning className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/35">{NET}</span>;
   return (
     <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] ${net.pillClass}`}>
       {net.label}
