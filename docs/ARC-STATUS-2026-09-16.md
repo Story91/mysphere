@@ -315,7 +315,30 @@ Na Base w tym miejscu stoi Safe `0x83E2DE97…`. Opłaty protokołu na Arc będ�
 więc lądować na kluczu, którym podpisuje się wdrożenia. **Settera nie ma** —
 zmiana wymaga nowego wdrożenia pada.
 
-### 6.4 Czego brakuje w ekosystemie
+### 6.4 Tabela holderów na Arc zaniża udział krzywej o ~0,03%
+
+Na stronie tokena ARPE wiersz `BONDING CURVE` pokazuje **999,7M (99,96%)**,
+podczas gdy łańcuch daje **1 000,0M (100,0000%)** — i w `balanceOf(launchpad)`,
+i w `tokenReserve` z `launchOf`. Różnica to ~300 tys. tokenów.
+
+Statystyki obok są poprawne (`HOLDERS 0` — bo realnych posiadaczy poza krzywą
+nie ma, cały supply wrócił na krzywą po odsprzedaży), plakietka `BONDING CURVE`
+też. Błędna jest wyłącznie liczba w wierszu tabeli.
+
+**Przyczyna.** `pickHolderRows` (`detailShared.ts` ~209) używa naszych sald
+z `balanceOf` tylko gdy `holdersAreExact` → wymaga `complete`, czyli historii
+sięgającej bloku startu tokena. Gdy skan nie jest kompletny, tabela spada na
+indeks zewnętrzny — na Arc jest nim `arc-scan.org`, społecznościowy i, jak widać,
+nieco spóźniony. Komentarz przy `holdersAreExact` wprost ostrzega, że ten indeks
+„bywa spóźniony o godziny".
+
+**Naprawa** (nie zrobiona): doprowadzić skan na Arc do `complete` w rozsądnym
+czasie — Arc robi ~169 tys. bloków na dobę przy oknie 9 500, więc limit okien
+na wizytę wyczerpuje się, zanim skan dojdzie do bloku startu. Albo podnieść
+limit dla Arc, albo przy niekompletnym skanie wolec odczyt `balanceOf` dla
+adresów, które już znamy, zamiast całych wierszy z cudzego indeksu.
+
+### 6.5 Czego brakuje w ekosystemie
 
 - Uniswap nie listuje Arc, więc żaden agregator ani portfel nie poprowadzi
   swapa po naszej puli „sam z siebie" — działa tylko nasza ścieżka przez
@@ -328,7 +351,7 @@ zmiana wymaga nowego wdrożenia pada.
 
 ---
 
-### 6.5 Keeper perpsów zależał od laptopa
+### 6.6 Keeper perpsów zależał od laptopa
 
 Do 16.09 keeper (funding, likwidacje, wypychanie Pytha, heartbeat rejestru)
 chodził wyłącznie z Harmonogramu zadań Windows na komputerze właściciela.
