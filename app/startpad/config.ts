@@ -1287,6 +1287,14 @@ export type LaunchpadToken = {
   logoUrl?: string;
 };
 
+/**
+ * PROBKI SKALUJA SIE Z PROGIEM SIECI. Do 16.09.2026 mialy wpisane na sztywno
+ * `raised: 2.42, target: 3` - liczby z czasow, gdy prog byl 3 ETH. Na Arc
+ * mainnet (prog 5000 USDC) probka "0.58 USDC to graduation" bylaby klamstwem
+ * o samej krzywej, na ktorej stoi. Teraz wszystko wynika z CURVE_TARGET_ETH:
+ * ulamek zebrany x prog aktywnej sieci.
+ */
+const T = CURVE_TARGET_ETH;
 export const previewTokens: LaunchpadToken[] = [
   {
     id: 'lumen',
@@ -1294,8 +1302,8 @@ export const previewTokens: LaunchpadToken[] = [
     symbol: 'LUMEN',
     creator: '0x93f...8b4',
     state: 'Curve',
-    raised: 2.42,
-    target: 3,
+    raised: T * 0.8067,
+    target: T,
     holders: 84,
     age: '18 min',
     accent: '#8b78e6',
@@ -1306,8 +1314,8 @@ export const previewTokens: LaunchpadToken[] = [
     symbol: 'MOSS',
     creator: '0x2ab...d19',
     state: 'Graduated',
-    raised: 3,
-    target: 3,
+    raised: T,
+    target: T,
     holders: 216,
     age: '1 h',
     accent: '#5fa78c',
@@ -1318,8 +1326,8 @@ export const previewTokens: LaunchpadToken[] = [
     symbol: 'NOOK',
     creator: '0x7cf...031',
     state: 'Locked',
-    raised: 3,
-    target: 3,
+    raised: T,
+    target: T,
     holders: 143,
     age: '2 h',
     accent: '#d78a55',
@@ -1330,8 +1338,8 @@ export const previewTokens: LaunchpadToken[] = [
     symbol: 'ORBT',
     creator: '0xd11...a62',
     state: 'Curve',
-    raised: 0.84,
-    target: 3,
+    raised: T * 0.28,
+    target: T,
     holders: 31,
     age: '4 h',
     accent: '#5b8bd9',
