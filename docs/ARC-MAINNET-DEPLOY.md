@@ -86,6 +86,14 @@ dziala na tym Arc, na ktorym stoi modul derywatow.
 Wniosek: dwa rynki (BTC, ETH) = ~205 USDC + fundusz. Saldo 16.09: ~12,9 USDC. Trzeba domostowac
 (`npm run arc:bridge` z Base, tryb standard dochodzi w ~75 min przez publiczny relayer).
 
+### Dowod na forku (16.09.2026)
+
+`npx hardhat test test/ArcForkPerpsMainnet.test.ts` - fork 5042: odbiornik + adaptery BTC/ETH
+z ZYWA aktualizacja Hermesa (BTC 75 495, ETH 2 392 USD), rejestr + fabryka + fundusz, kaucja 100 USDC,
+createMarket z adapterem jako feedem (2,22 mln gazu), `indexPrice()` == `latestAnswer()`,
+open/close pozycji. 6/6. Granica: widok ERC-20 nad natywnym USDC (0x3600 -> precompile 0x1800)
+nie dziala na zwyklym EVM, wiec stack na forku dostaje MockUSDC; na mainnecie idzie 0x3600.
+
 ### Kolejnosc (wlasciciel odpala, CONFIRM=tak dopiero po sprawdzeniu wypisu)
 
 1. Odbiornik Pytha (owner = deployer; potem `transferOwnership` na multisig):
