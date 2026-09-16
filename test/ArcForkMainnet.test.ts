@@ -533,6 +533,52 @@ describe('Arc mainnet fork: WDROZONY stack (0xD5f6...) awansuje', function () {
     const gained = (await asset.balanceOf(alice.address)) - before;
     expect(gained, 'Universal Router Arc dostarczyl tokeny do portfela').to.be.gte(minOut);
     expect(gained, 'ilosc zgodna z wycena quotera (tolerancja 5%)').to.be.lte((quotedOut * 105n) / 100n);
+
+    // --- SPRZEDAZ: sciezka zgod, ktora rozni sie miedzy Base a Arc ----------
+    // Na Arc `routerTrusted` jest false, wiec UI daje Permit2 zgode na DOKLADNA
+    // kwote tej sprzedazy zamiast bez limitu. Test przechodzi ta sama droga.
+    expect(arcV4.routerTrusted, 'router na Arc jest oznaczony jako niepotwierdzony').to.equal(false);
+
+    const sellAmount = gained / 2n;
+    const permit2 = await ethers.getContractAt(
+      [
+        'function approve(address token, address spender, uint160 amount, uint48 expiration)',
+        'function allowance(address owner, address token, address spender) view returns (uint160 amount, uint48 expiration, uint48 nonce)',
+      ],
+      arcV4.permit2
+    );
+    await (await asset.connect(alice).approve(arcV4.permit2, ethers.MaxUint256)).wait();
+    const expiration = (await now()) + 30 * 24 * 3600;
+    await (
+      await permit2.connect(alice).approve(token, arcV4.universalRouter, sellAmount, expiration)
+    ).wait();
+
+    const [allowed] = await permit2.allowance(alice.address, token, arcV4.universalRouter);
+    expect(allowed, 'zgoda Permit2 na dokladna kwote, nie bez limitu').to.equal(sellAmount);
+    expect(allowed, 'zdecydowanie ponizej uint160 max').to.be.lt((1n << 160n) - 1n);
+
+    const sell = encodeV4ExactInSingle({
+      poolKey,
+      zeroForOne: false, // token -> natywne USDC
+      amountIn: sellAmount,
+      minOut: 1n,
+    });
+    const nativeBefore: bigint = await ethers.provider.getBalance(alice.address);
+    const rcSell = await (
+      await router.connect(alice).execute(sell.commands, sell.inputs, (await now()) + 600)
+    ).wait();
+    // ABI podane stringiem, wiec ethers typuje paragon luzno - jawna konwersja.
+    const gasCost: bigint = BigInt(rcSell.gasUsed) * BigInt(rcSell.gasPrice);
+    const nativeAfter: bigint = await ethers.provider.getBalance(alice.address);
+
+    expect(nativeAfter + gasCost, 'sprzedaz zwrocila natywne USDC ponad koszt gazu').to.be.gt(nativeBefore);
+    expect(
+      await asset.balanceOf(alice.address),
+      'tokeny zeszly z portfela dokladnie o sprzedana ilosc'
+    ).to.equal(gained - sellAmount);
+    // Zgoda zostala skonsumowana - to jest cala roznica wobec zgody bez limitu.
+    const [allowedAfter] = await permit2.allowance(alice.address, token, arcV4.universalRouter);
+    expect(allowedAfter, 'po sprzedazy nie zostaje zadna zgoda dla routera').to.equal(0n);
   });
 });
 

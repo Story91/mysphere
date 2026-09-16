@@ -194,6 +194,20 @@ type BusyAction = 'buy' | 'approve' | 'sell' | 'graduate' | 'settle' | 'harvest'
  * widoku: `startedAt` do sortowania "New", historie cen do sparkline'a i stan
  * blysku po transakcji. `config.ts` jest nietykalny, wiec rozszerzenie stoi tu.
  */
+/**
+ * ATRAPY NIE LICZA SIE DO SUM SIECI.
+ *
+ * `previewTokens` zostaja na kazdej sieci az do pierwszego prawdziwego launchu
+ * - pusty board wygladalby jak zepsuta strona. Plakietka SAMPLE i zdanie pod
+ * siatka mowia wprost, ze nie da sie nimi handlowac.
+ *
+ * ALE ich liczby nie maja prawa wchodzic do `BoardStats`. 16.09.2026, w dniu
+ * wejscia na Arc, board pokazywal "CURVE RESERVE 15 433,50 USDC" i "ACTIVE
+ * CURVES 2" na sieci, gdzie nie bylo ANI JEDNEJ krzywej - bo sumy lecialy po
+ * calej tablicy `tokens`, nie po `live`. Plakietka przy wierszu nie ratuje
+ * liczby w naglowku: tam nie ma czego oznaczyc, wiec tam po prostu nie wolno
+ * tego dodawac. Stad `liveTokens` nizej.
+ */
 type BoardToken = LaunchpadToken & {
   /** Sekundy uniksowe z eventu `Launched` - podstawa sortowania "New". */
   startedAt?: number;
@@ -819,7 +833,7 @@ function BoardStats({ totalRaised, totalVolume, totalTrades, liveCount, ethUsd }
   );
 }
 
-function TopLaunches({ tokens, onOpen }: { tokens: BoardToken[]; onOpen: (token: BoardToken) => void }) {
+function TopLaunches({ tokens, onOpen, sample }: { tokens: BoardToken[]; onOpen: (token: BoardToken) => void; sample: boolean }) {
   const top = [...tokens].sort((a, b) => b.raised - a.raised).slice(0, 3);
   return (
     <section className="rounded-[20px] border border-sp-shade/10 bg-sp-surface p-5">
@@ -844,11 +858,16 @@ function TopLaunches({ tokens, onOpen }: { tokens: BoardToken[]; onOpen: (token:
           );
         })}
       </div>
+      {sample && (
+        <p className="mt-3 border-t border-sp-shade/10 pt-3 text-[11px] text-sp-shade/40">
+          Sample rows - they disappear with the first real launch.
+        </p>
+      )}
     </section>
   );
 }
 
-function VolumePanel({ tokens, onOpen }: { tokens: BoardToken[]; onOpen: (token: BoardToken) => void }) {
+function VolumePanel({ tokens, onOpen, sample }: { tokens: BoardToken[]; onOpen: (token: BoardToken) => void; sample: boolean }) {
   const top = [...tokens].sort((a, b) => volumeParts(b).eth - volumeParts(a).eth).slice(0, 3);
   const rowClass = 'grid w-full grid-cols-[1fr_auto_auto] items-center gap-x-3 py-2 text-left';
   return (
@@ -877,6 +896,11 @@ function VolumePanel({ tokens, onOpen }: { tokens: BoardToken[]; onOpen: (token:
           );
         })}
       </div>
+      {sample && (
+        <p className="mt-3 border-t border-sp-shade/10 pt-3 text-[11px] text-sp-shade/40">
+          Sample rows - they disappear with the first real launch.
+        </p>
+      )}
     </section>
   );
 }
@@ -2842,13 +2866,20 @@ export default function LaunchpadBoard() {
 
   const selected = tokens.find((token) => token.id === selectedId) ?? visibleTokens[0] ?? tokens[0];
   const onSepolia = chainId === LAUNCHPAD_CHAIN.id;
-  const liveCount = tokens.filter((token) => token.state === 'Curve').length;
-  const totalRaised = tokens.reduce((sum, token) => sum + token.raised, 0);
+  /*
+   * SUMY LICZA SIE TYLKO Z ZYWYCH WIERSZY - patrz komentarz przy imporcie
+   * `previewTokens`. Atrapa moze stac w siatce z plakietka SAMPLE, ale nie ma
+   * prawa dolozyc sie do liczby, ktora naglowek podaje jako stan calej sieci.
+   * Przy pustym boardzie daje to uczciwe zera zamiast zmyslonych 15 433 USDC.
+   */
+  const liveTokens = tokens.filter((token) => token.live);
+  const liveCount = liveTokens.filter((token) => token.state === 'Curve').length;
+  const totalRaised = liveTokens.reduce((sum, token) => sum + token.raised, 0);
   // Suma tego, co karty naprawde pokazuja: krzywa plus pula tam, gdzie pula
   // jest juz policzona. Sumowanie samych krzywych dawaloby naglowek nizszy niz
   // wiersze pod nim.
-  const totalVolume = tokens.reduce((sum, token) => sum + volumeParts(token).eth, 0);
-  const totalTrades = tokens.reduce((sum, token) => sum + (token.trades ?? 0), 0);
+  const totalVolume = liveTokens.reduce((sum, token) => sum + volumeParts(token).eth, 0);
+  const totalTrades = liveTokens.reduce((sum, token) => sum + (token.trades ?? 0), 0);
   const showingPreview = !tokens.some((token) => token.live);
 
   // Krol wzgorza istnieje tylko wsrod ZYWYCH krzywych - wiersz podgladowy na
@@ -3572,8 +3603,8 @@ export default function LaunchpadBoard() {
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <BoardStats totalRaised={totalRaised} totalVolume={totalVolume} totalTrades={totalTrades} liveCount={liveCount} ethUsd={ethUsd} />
-          <TopLaunches tokens={tokens} onOpen={(token) => token.address && router.push(`/startpad/${token.address}`)} />
-          <VolumePanel tokens={tokens} onOpen={(token) => token.address && router.push(`/startpad/${token.address}`)} />
+          <TopLaunches sample={showingPreview} tokens={tokens} onOpen={(token) => token.address && router.push(`/startpad/${token.address}`)} />
+          <VolumePanel sample={showingPreview} tokens={tokens} onOpen={(token) => token.address && router.push(`/startpad/${token.address}`)} />
           <TopEarnings rows={topEarners} ethUsd={ethUsd} />
         </div>
 

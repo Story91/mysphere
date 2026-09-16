@@ -239,11 +239,20 @@ export default function PoolTradeBox({ core, onAfterTx }: { core: CoreState; onA
     const now = Math.floor(Date.now() / 1000);
     if (p2Amount < amount || Number(p2Exp) <= now + 60) {
       setBusy('approve');
+      /*
+       * WIELKOSC ZGODY ZALEZY OD TEGO, KOMU JA DAJEMY - patrz `routerTrusted`
+       * w v4Swap.ts. Na Base router jest kanoniczny, wiec zgoda bez limitu na
+       * 30 dni oszczedza uzytkownikowi klikania. Na Arc routera nikt nie
+       * potwierdza, wiec zgoda idzie na DOKLADNA kwote tej jednej sprzedazy -
+       * ewentualna szkoda konczy sie na tym, co wlasnie sprzedajemy, zamiast
+       * obejmowac cale saldo tokena przez miesiac.
+       */
+      const allowance = v4.routerTrusted ? PERMIT2_MAX_AMOUNT : amount;
       const hash = await walletClient.writeContract({
         address: v4.permit2,
         abi: permit2Abi,
         functionName: 'approve',
-        args: [core.token, v4.universalRouter, PERMIT2_MAX_AMOUNT, permit2Expiration(now)],
+        args: [core.token, v4.universalRouter, allowance, permit2Expiration(now)],
         chain: LAUNCHPAD_CHAIN,
         account,
       });

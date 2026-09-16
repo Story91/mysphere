@@ -38,14 +38,39 @@ import { base } from 'viem/chains';
  * `amountOut` jest juz po oplacie. Nie liczymy jej recznie.
  */
 
+/**
+ * `routerTrusted` STERUJE WIELKOSCIA ZGODY, nie tym, czy handel dziala.
+ *
+ * Sprzedaz idzie przez dwie zgody: `token.approve(Permit2, max)` i
+ * `Permit2.approve(token, router, kwota, 30 dni)`. Pierwsza jest bezpieczna na
+ * kazdej sieci - Permit2 to jeden kanoniczny, audytowany kontrakt pod tym samym
+ * adresem wszedzie i SAM Z SIEBIE nie ruszy ani jednego tokena bez tej drugiej.
+ * Cale ryzyko siedzi w drugiej: to ona daje ROUTEROWI prawo pobrania tokenow.
+ *
+ * Na Base routerem jest kanoniczny UniversalRouter Uniswapa - ten sam, przez
+ * ktory ida swapy z app.uniswap.org. Zgoda bez limitu jest tam standardem
+ * i nie ma powodu meczyc uzytkownika zatwierdzaniem co sprzedaz.
+ *
+ * Na Arc routera NIKT nie potwierdza: znalezlismy go sami, przegladajac
+ * zdarzenia PoolManagera, ma inny build niz wersja z Base, a jego operator to
+ * `0x33F26c5d...51E8`, nie Uniswap. Nasz test dowodzi, ze DZIS dziala poprawnie
+ * - nie dowodzi, kto go kontroluje ani jak zachowa sie jutro. Dlatego tam zgoda
+ * jest na DOKLADNA KWOTE jednej sprzedazy: ewentualna szkoda jest ograniczona do
+ * tego, co uzytkownik wlasnie sprzedaje, zamiast do calego salda przez 30 dni.
+ *
+ * Cena: na Arc kazda sprzedaz wymaga zatwierdzenia. To swiadomy kompromis -
+ * jedno dodatkowe klikniecie za nieoddawanie calego salda obcemu kontraktowi.
+ */
 export const V4_BY_CHAIN: Record<
   number,
-  { universalRouter: Address; permit2: Address; quoter: Address } | undefined
+  { universalRouter: Address; permit2: Address; quoter: Address; routerTrusted: boolean } | undefined
 > = {
   [base.id]: {
     universalRouter: '0x6ff5693b99212da76ad316178a184ab56d299b43',
     permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
     quoter: '0x0d5e0f971ed27fbff6c2837bf31316121532048d',
+    // Kanoniczny router z oficjalnej listy wdrozen Uniswapa.
+    routerTrusted: true,
   },
   /**
    * ARC MAINNET (5042). Wyjatek od reguly "tylko z oficjalnej listy Uniswapa":
@@ -76,6 +101,8 @@ export const V4_BY_CHAIN: Record<
     universalRouter: '0x4fca4a51ab4f23a7447b3284fbd7d73289a89fb1',
     permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
     quoter: '0x8Dc178eFB8111BB0973Dd9d722ebeFF267c98F94',
+    // Router spoza jakiejkolwiek listy - zgoda tylko na kwote jednej sprzedazy.
+    routerTrusted: false,
   },
 };
 
