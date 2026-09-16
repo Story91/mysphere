@@ -180,9 +180,21 @@ callbacków"). Do decyzji właściciela, bo każda opcja ma cenę:
 
 | opcja | koszt | skutek uboczny |
 |---|---|---|
-| `dynamic(..., { ssr: false })` na boardzie | 1–2 pliki | znika SSR treści startpadu (SEO) |
-| chainId w ciasteczku + prop z Server Component | refaktor rdzenia | poprawne SSR per-użytkownik |
+| `dynamic(..., { ssr: false })` na boardzie | **dzień roboty, 1–2 pliki** | znika SSR całego startpadu razem z tekstem „HOW STARTPAD WORKS" — to jest treść SEO |
+| chainId w ciasteczku + prop z Server Component | **refaktor rdzenia** | poprawne SSR per-użytkownik, SEO zostaje, linki bez zmian |
 | chainId zawsze w URL (`?chain=5042`) | średni | brzydsze linki, ale SSR działa |
+
+**Uwaga do opcji z ciasteczkiem, bo zmienia jej wycenę.** Blokadą nie jest to,
+że serwer nie zna wyboru — samo dopisanie ciasteczka nic nie da. `cookies()`
+nie da się zawołać na poziomie modułu, a moduł komponentu klienckiego ewaluuje
+się na serwerze **raz na proces, nie raz na żądanie**. Żeby ciasteczko
+zadziałało, Server Component musi przekazać `chainId` w dół — a stałe modułu
+konsumuje ponad 200 miejsc w 20 plikach. To jest prawdziwy koszt tej opcji.
+
+Rekomendacja obu sesji pracujących nad Arc: **ciasteczko**, mimo kosztu —
+bo jako jedyna opcja nie oddaje SEO i nie psuje linków. Ale to decyzja
+właściciela: „dzień roboty i utrata SEO startpadu" kontra „refaktor rdzenia
+i SEO zostaje".
 
 ### 6.2 Sprzedaż na Arc daje nieograniczoną zgodę routerowi o nieznanej proweniencji
 
