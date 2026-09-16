@@ -511,12 +511,19 @@ LAUNCHPAD_NETWORKS[arcMainnet.id] = {
   chain: arcMainnet,
   label: 'Arc',
   testnet: false,
-  launchpad: (process.env.NEXT_PUBLIC_LAUNCHPAD_ARC_MAINNET_ADDRESS as `0x${string}` | undefined) ?? ARC_MAINNET_ZERO,
-  vault: (process.env.NEXT_PUBLIC_LIQUIDITY_VAULT_ARC_MAINNET_ADDRESS as `0x${string}` | undefined) ?? ARC_MAINNET_ZERO,
-  hook: (process.env.NEXT_PUBLIC_LAUNCH_HOOK_ARC_MAINNET_ADDRESS as `0x${string}` | undefined) ?? ARC_MAINNET_ZERO,
-  tokenFactory: (process.env.NEXT_PUBLIC_TOKEN_FACTORY_ARC_MAINNET_ADDRESS as `0x${string}` | undefined) ?? ARC_MAINNET_ZERO,
-  poolManager: (process.env.NEXT_PUBLIC_POOL_MANAGER_ARC_MAINNET_ADDRESS as `0x${string}` | undefined) ?? ARC_MAINNET_ZERO,
-  deployBlock: BigInt(process.env.NEXT_PUBLIC_LAUNCHPAD_ARC_MAINNET_DEPLOY_BLOCK ?? '0'),
+  /*
+   * WDROZENIE 2026-09-16 01:20 UTC, blok 21 078 146 (scripts/output/launchpad-arcMainnet.json).
+   * Sprawdzone odczytem po wdrozeniu: R_VIRT() = 1250 USDC, FEE_BPS() = 100,
+   * hook.hasValidHookAddress() = true, PoolManager = oficjalny build Uniswapa.
+   * Koszt: 0,19 USDC gazu. Adresy jako domysly, jak na testnecie - brak env na
+   * Vercelu nie ma prawa wylaczyc sieci.
+   */
+  launchpad: (process.env.NEXT_PUBLIC_LAUNCHPAD_ARC_MAINNET_ADDRESS as `0x${string}` | undefined) ?? '0xD5f65Cfbe6A1AA1B6f82CBE0A336DDFCD39a5340',
+  vault: (process.env.NEXT_PUBLIC_LIQUIDITY_VAULT_ARC_MAINNET_ADDRESS as `0x${string}` | undefined) ?? '0x49FD3A54b23A0ee1d6A7720F493618F5CCF4681D',
+  hook: (process.env.NEXT_PUBLIC_LAUNCH_HOOK_ARC_MAINNET_ADDRESS as `0x${string}` | undefined) ?? '0x9669d2809710aD8218793e0CD55317Ccd984E044',
+  tokenFactory: (process.env.NEXT_PUBLIC_TOKEN_FACTORY_ARC_MAINNET_ADDRESS as `0x${string}` | undefined) ?? '0x04bdaD462B66B152689076975db1197766A69568',
+  poolManager: (process.env.NEXT_PUBLIC_POOL_MANAGER_ARC_MAINNET_ADDRESS as `0x${string}` | undefined) ?? '0x8366a39CC670B4001A1121B8F6A443A643e40951',
+  deployBlock: BigInt(process.env.NEXT_PUBLIC_LAUNCHPAD_ARC_MAINNET_DEPLOY_BLOCK ?? '21078146'),
   rVirt: 1250,
   explorerUrl: 'https://arc-scan.org',
   secondsPerBlock: 0.5,
