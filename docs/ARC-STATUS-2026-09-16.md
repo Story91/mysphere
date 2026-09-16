@@ -325,18 +325,30 @@ Statystyki obok są poprawne (`HOLDERS 0` — bo realnych posiadaczy poza krzyw�
 nie ma, cały supply wrócił na krzywą po odsprzedaży), plakietka `BONDING CURVE`
 też. Błędna jest wyłącznie liczba w wierszu tabeli.
 
-**Przyczyna.** `pickHolderRows` (`detailShared.ts` ~209) używa naszych sald
-z `balanceOf` tylko gdy `holdersAreExact` → wymaga `complete`, czyli historii
-sięgającej bloku startu tokena. Gdy skan nie jest kompletny, tabela spada na
-indeks zewnętrzny — na Arc jest nim `arc-scan.org`, społecznościowy i, jak widać,
-nieco spóźniony. Komentarz przy `holdersAreExact` wprost ostrzega, że ten indeks
-„bywa spóźniony o godziny".
+**Przyczyna — ustalona eksperymentem, nie z lektury kodu.** Pierwsze podejrzenie
+padło na zewnętrzny indeks (`arc-scan.org`), bo `pickHolderRows` spada na niego
+przy niekompletnym skanie. **To było błędne.** W trakcie sprawdzania arc-scan
+przestał odpowiadać w ogóle — a strona dalej pokazywała 999,7M. Skoro indeksu
+nie było, liczba jest **nasza własna**.
 
-**Naprawa** (nie zrobiona): doprowadzić skan na Arc do `complete` w rozsądnym
-czasie — Arc robi ~169 tys. bloków na dobę przy oknie 9 500, więc limit okien
-na wizytę wyczerpuje się, zanim skan dojdzie do bloku startu. Albo podnieść
-limit dla Arc, albo przy niekompletnym skanie wolec odczyt `balanceOf` dla
-adresów, które już znamy, zamiast całych wierszy z cudzego indeksu.
+Właściwy trop: `historyScan.ts` składa salda **z różnic** (`applyBalanceDelta`,
+`applyTransferLogs`, `applyTradeToBalances`), zaczynając od zera. Tymczasem
+komentarz przy `holdersAreExact` w `detailShared.ts` twierdzi: *„Odkąd salda
+czyta `balanceOf`, przy kompletnej historii nasza mapa jest dokładna co do
+wei"*. **Kod i komentarz się rozjeżdżają** — nigdzie w ścieżce holderów nie ma
+odczytu `balanceOf`. Rekonstrukcja z różnic dryfuje, gdy choć jeden log wypadnie
+z okna albo gdy `applyTransferLogs` i `applyTradeToBalances` dotkną tego samego
+zdarzenia.
+
+**Naprawa** (nie zrobiona, wymaga zmiany w `historyScan`): domknąć mapę
+odczytem `balanceOf` dla znalezionych adresów — czyli zrobić to, co komentarz
+już obiecuje. Wtedy `holdersAreExact` przestaje być obietnicą bez pokrycia.
+
+**Zrobione w tej sesji** (commit w `pickHolderRows`): gdy skan jest niekompletny,
+indeks nadal daje **pokrycie** (zna adresy spoza naszego okna), ale **kwoty**
+biorą się z naszej mapy wszędzie, gdzie ją mamy, a adresy znane tylko nam już
+nie wypadają z tabeli. To nie naprawia dryfu powyżej — naprawia osobny błąd:
+wcześniej cudzy, spóźniony indeks nadpisywał nasze świeższe liczby w całości.
 
 ### 6.5 Czego brakuje w ekosystemie
 

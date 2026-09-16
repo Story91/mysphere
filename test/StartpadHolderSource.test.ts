@@ -52,24 +52,45 @@ describe('pickHolderCount', () => {
 });
 
 describe('pickHolderRows', () => {
-  const chain = [['0xa', 1n], ['0xb', 2n]];
-  const index = [['0xc', 3n], ['0xd', 4n], ['0xe', 5n]];
+  const chain: Array<[string, bigint]> = [['0xa', 1n], ['0xb', 2n]];
+  const index: Array<[string, bigint]> = [['0xc', 3n], ['0xd', 4n], ['0xe', 5n]];
 
   it('przy dokladnych saldach tabela idzie z lancucha, choćby indeks mial wiecej wierszy', () => {
     expect(pickHolderRows({ chain, index, exact: true })).to.equal(chain);
   });
 
-  it('bez dokladnych sald wygrywa zrodlo z wieksza liczba wierszy', () => {
-    expect(pickHolderRows({ chain, index, exact: false })).to.equal(index);
+  it('bez dokladnych sald pokrycie idzie z wiekszego zrodla', () => {
+    // Rozlaczne adresy: indeks daje pokrycie, nasze wiersze sa dopisane, bo
+    // wlasny swiezy odczyt nie ma prawa wypasc z tabeli tylko dlatego, ze
+    // cudzy indeks jeszcze o nim nie wie.
+    const out = pickHolderRows({ chain, index, exact: false });
+
+    expect(out.map((r: [string, bigint]) => r[0])).to.deep.equal(['0xc', '0xd', '0xe', '0xa', '0xb']);
+  });
+
+  it('KWOTY biora sie z lancucha, nawet gdy wiersze z indeksu', () => {
+    // To jest blad, ktory bylo widac na Arc: indeks mowil o krzywej 999,7M,
+    // a `balanceOf` dawal rowno 1000M. Pokrycie z indeksu, kwota nasza.
+    const staleIndex: Array<[string, bigint]> = [['0xa', 9997n], ['0xz', 5n]];
+    const fresh: Array<[string, bigint]> = [['0xa', 10000n]];
+
+    const out = pickHolderRows({ chain: fresh, index: staleIndex, exact: false });
+
+    expect(out.find((r: [string, bigint]) => r[0] === '0xa')?.[1], 'kwota z lancucha, nie z indeksu').to.equal(10000n);
+    expect(out.find((r: [string, bigint]) => r[0] === '0xz')?.[1], 'adres znany tylko indeksowi zostaje').to.equal(5n);
   });
 
   it('dokladne, ale puste, nie przebija indeksu - pusta tabela nie jest wynikiem', () => {
-    expect(pickHolderRows({ chain: [], index, exact: true })).to.equal(index);
+    // Porownanie PO WARTOSCI, nie po referencji: od 16.09 funkcja scala kwoty
+    // z lancucha z pokryciem indeksu, wiec zawsze oddaje nowa tablice.
+    expect(pickHolderRows({ chain: [], index, exact: true })).to.deep.equal(index);
   });
 
-  it('remis oddaje indeks, bo on siega dalej niz okno skanu', () => {
-    const sameSize = [['0xc', 3n], ['0xd', 4n]];
+  it('remis oddaje pokrycie indeksu, bo on siega dalej niz okno skanu', () => {
+    const sameSize: Array<[string, bigint]> = [['0xc', 3n], ['0xd', 4n]];
 
-    expect(pickHolderRows({ chain, index: sameSize, exact: false })).to.equal(sameSize);
+    const out = pickHolderRows({ chain, index: sameSize, exact: false });
+
+    expect(out.slice(0, 2).map((r: [string, bigint]) => r[0])).to.deep.equal(['0xc', '0xd']);
   });
 });

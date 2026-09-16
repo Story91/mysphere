@@ -206,9 +206,44 @@ export function pickHolderCount(input: { chain: number; index: number | null; ex
  * ktore widzi wiecej - liczone PO odsianiu sald niedodatnich, bo tylko one sa
  * wierszami.
  */
-export function pickHolderRows<T>(input: { chain: T[]; index: T[]; exact: boolean }): T[] {
+export function pickHolderRows(input: {
+  chain: Array<[string, bigint]>;
+  index: Array<[string, bigint]>;
+  exact: boolean;
+}): Array<[string, bigint]> {
   if (input.exact && input.chain.length > 0) return input.chain;
-  return input.index.length >= input.chain.length ? input.index : input.chain;
+
+  /*
+   * POKRYCIE Z INDEKSU, KWOTY Z LANCUCHA.
+   *
+   * Do 16 wrzesnia 2026 przy ucietym skanie oddawalismy CALE wiersze z cudzego
+   * indeksu - razem z jego kwotami. Na Arc bylo to widac goly okiem: strona
+   * tokena ARPE pokazywala w wierszu `BONDING CURVE` 999,7M (99,96%), podczas
+   * gdy lancuch dawal rowno 1 000,0M (100,0000%) i w `balanceOf(launchpad)`,
+   * i w `tokenReserve`. Indeksem na Arc jest arc-scan.org - spolecznosciowy
+   * i spozniony; komentarz przy `holdersAreExact` sam przed tym ostrzega.
+   *
+   * Indeks nadal wygrywa tam, gdzie jest lepszy: ZNA WIECEJ ADRESOW niz nasze
+   * okno skanu. Ale tam, gdzie mamy wlasny odczyt `balanceOf`, nie ma powodu
+   * ufac cudzej kopii - wiec bierzemy z niego pokrycie, a kwoty nadpisujemy
+   * swoimi. To jest scisle dokladniejsze od obu zrodel osobno i dziala tak
+   * samo na kazdej sieci, nie tylko na Arc.
+   */
+  const mine = new Map(input.chain);
+  const base = input.index.length >= input.chain.length ? input.index : input.chain;
+  const merged = base.map(([address, balance]): [string, bigint] => {
+    const own = mine.get(address);
+    return own === undefined ? [address, balance] : [address, own];
+  });
+
+  // Adresy, ktore znamy z lancucha, a ktorych w wybranym zrodle nie ma.
+  // Bez tego nasz wlasny, swiezy odczyt wypadlby z tabeli tylko dlatego, ze
+  // indeks jeszcze o nim nie wie.
+  const seen = new Set(merged.map(([address]) => address));
+  for (const row of input.chain) {
+    if (!seen.has(row[0])) merged.push(row);
+  }
+  return merged;
 }
 
 /**
