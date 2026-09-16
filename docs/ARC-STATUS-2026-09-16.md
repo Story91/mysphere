@@ -217,6 +217,17 @@ bezpieczny jutro ani kto go kontroluje. Opcje:
 Rekomendacja: **zgoda na dokładną kwotę** — najtańsza zmiana, która realnie
 ogranicza szkodę, bez straszenia copy i bez pisania nowego kontraktu.
 
+> **WDROŻONE** (commit `3ea1216`). `V4_BY_CHAIN` ma teraz pole `routerTrusted`:
+> na Base zostaje zgoda bez limitu na 30 dni (router kanoniczny, nie ma powodu
+> męczyć użytkownika), na Arc idzie zgoda na dokładną kwotę jednej sprzedaży.
+> Cena: jedno dodatkowe zatwierdzenie na sprzedaż na Arc.
+> `test/ArcForkMainnet.test.ts` sprawdza, że zgoda ma dokładną kwotę (nie
+> `uint160` max) i że po sprzedaży zostaje zero.
+>
+> To **ogranicza** szkodę, nie usuwa ryzyka: przez czas jednej transakcji router
+> nadal może pobrać sprzedawaną kwotę. Pytanie, kto kontroluje `0x33F26c5d…51E8`,
+> pozostaje otwarte.
+
 ### 6.3 `FEE_RECIPIENT` to gorący portfel, nie Safe
 
 Wdrożony pad ma `FEE_RECIPIENT` = `0xD4885A5a…`, czyli EOA wdrażającego.
