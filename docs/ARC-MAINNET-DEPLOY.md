@@ -112,6 +112,24 @@ nie dziala na zwyklym EVM, wiec stack na forku dostaje MockUSDC; na mainnecie id
 7. Frontend: `NEXT_PUBLIC_DERIV_CHAIN_ID=5042` w Vercelu; adresy ida z commitowanego
    `deployments/derivativeMarket.5042.json`, wiec po deployu ten plik trzeba scommitowac.
 
+### Redeploy TESTNETU (5042002) po zmianie kontraktu 63e2a29 (oracleActive)
+
+`DerivativeMarket` dostal `oracleActive()` i swiezosc feedu w `indexPrice` - stare rynki
+(BTC-USD `0x3A1E...`, TSLA-USD `0x5A5A...`) maja stary bajtkod, wiec fabryke trzeba postawic
+od nowa i odtworzyc rynki. Skrypt stawia tez NOWY rejestr (stary zostaje z dawnymi kaucjami).
+Adaptery Pytha i odbiornik NIE wymagaja redeployu - te same adresy z `pythAdapters.5042002.json`.
+
+Budzet na testnecie: ~1 USDC gazu + `SEED_USDC` + 100 USDC kaucji NA RYNEK. Saldo 0xD488 na
+testnecie 16.09 ok. 03:00 UTC: 2,97 USDC -> faucet.circle.com (Arc Testnet) przed krokiem 2.
+
+1. `SEED_USDC=5000000 CONFIRM=tak npm run perps:deploy:arc` -> nadpisuje `deployments/derivativeMarket.5042002.json`
+2. `SYMBOL=BTC-USD PRICE=<cena z adaptera> FEED=0x6531d59b211Dd341f1B95aFa97A2E4344EA12409 CONFIRM=tak npm run perps:market:arc`
+3. `SYMBOL=TSLA-USD PRICE=<cena z adaptera> FEED=0xb1D75f26a08A576269FB96843b0A1e74DB815153 CONFIRM=tak npm run perps:market:arc`
+4. commit `deployments/derivativeMarket.5042002.json` (frontend i cron keepera czytaja z niego), push.
+5. Keeper: cron Vercela (`app/api/keeper/perps`) bierze fabryke z tego pliku po deployu; keeper.ps1 tak samo.
+
+Na mainnecie ten sam skrypt tworzy rynek: `... npm run perps:market:arc:mainnet` z FEED z `pythAdapters.5042.json`.
+
 ### Otwarte decyzje wlasciciela
 - Ktore feedy na mainnecie: BTC/ETH (krypto) bez zastrzezen; TSLA/XAU/EUR = syntetyczna ekspozycja
   na instrumenty finansowe - zastrzezenie prawne z 11.09 nadal stoi.

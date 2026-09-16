@@ -19,7 +19,7 @@ import {
   factoryAbi,
   insuranceAbi,
   marketAbi,
-  oracleAbi, LOG_WINDOW } from './config';
+  oracleAbi, LOG_WINDOW, getLogsShrinking } from './config';
 import { fmtAge, fmtDuration, fmtPct, fmtPrice, fmtSignedWad, fmtUsdc, fmtWadCompact, oiPercent, shortAddress } from './format';
 import { Dot, UpDown } from './ui';
 import FaucetBanner from './FaucetBanner';
@@ -311,13 +311,15 @@ export default function DerivativesBoard() {
       try {
         const head = await client.getBlockNumber();
         const from = head > LOG_WINDOW ? head - LOG_WINDOW : 0n;
-        const logs = (await client.getContractEvents({
-          address: ORACLE_ADDRESS,
-          abi: oracleAbi,
-          eventName: 'PriceSubmitted',
-          fromBlock: from,
-          toBlock: head,
-        })) as unknown as { args: { marketId?: bigint; price?: bigint; timestamp?: bigint } }[];
+        const logs = (await getLogsShrinking(from, head, (fromBlock, toBlock) =>
+          client.getContractEvents({
+            address: ORACLE_ADDRESS,
+            abi: oracleAbi,
+            eventName: 'PriceSubmitted',
+            fromBlock,
+            toBlock,
+          }),
+        )) as unknown as { args: { marketId?: bigint; price?: bigint; timestamp?: bigint } }[];
         const byMarket = new Map<number, { time: number; price: bigint }[]>();
         for (const l of logs) {
           if (l.args.marketId === undefined || l.args.price === undefined || l.args.timestamp === undefined) continue;

@@ -7,6 +7,7 @@ import {
   DERIV_CHAIN,
   FACTORY_ADDRESS,
   LOG_WINDOW,
+  getLogsShrinking,
   ORACLE_ADDRESS,
   USDC_ADDRESS,
   erc20Abi,
@@ -260,14 +261,16 @@ export function useMarketData(market: Address) {
           const expo = pythPrice.expo;
           const chunks = await Promise.all(
             windows.map((w) =>
-              client.getContractEvents({
-                address: feed.pyth,
-                abi: pythEventsAbi,
-                eventName: 'PriceFeedUpdate',
-                args: { id: feed.priceId },
-                fromBlock: w.fromBlock,
-                toBlock: w.toBlock,
-              }),
+              getLogsShrinking(w.fromBlock, w.toBlock, (fromBlock, toBlock) =>
+                client.getContractEvents({
+                  address: feed.pyth,
+                  abi: pythEventsAbi,
+                  eventName: 'PriceFeedUpdate',
+                  args: { id: feed.priceId },
+                  fromBlock,
+                  toBlock,
+                }),
+              ),
             ),
           );
           for (const l of chunks.flat()) {
@@ -280,14 +283,16 @@ export function useMarketData(market: Address) {
         } else {
           const chunks = await Promise.all(
             windows.map((w) =>
-              client.getContractEvents({
-                address: ORACLE_ADDRESS,
-                abi: oracleAbi,
-                eventName: 'PriceSubmitted',
-                args: { marketId: id },
-                fromBlock: w.fromBlock,
-                toBlock: w.toBlock,
-              }),
+              getLogsShrinking(w.fromBlock, w.toBlock, (fromBlock, toBlock) =>
+                client.getContractEvents({
+                  address: ORACLE_ADDRESS,
+                  abi: oracleAbi,
+                  eventName: 'PriceSubmitted',
+                  args: { marketId: id },
+                  fromBlock,
+                  toBlock,
+                }),
+              ),
             ),
           );
           for (const l of chunks.flat()) {

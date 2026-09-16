@@ -60,6 +60,34 @@ export const DEPLOYED = FACTORY_ADDRESS !== ZERO;
  */
 export const LOG_WINDOW = DERIV_IS_MAINNET ? 9_500n : 40_000n;
 
+/**
+ * Odczyt logow z ZEJSCIEM na mniejsze okno. Mainnetowy RPC tnie tez LICZBE
+ * wynikow (2 000) - ruchliwy kontrakt potrafi odbic zapytanie mieszczace sie
+ * w zakresie blokow (-32614 / "too large"). Wtedy dzielimy okno na pol i
+ * probujemy raz jeszcze, do 4 razy; ostatni blad idzie dalej, zeby stan
+ * "pusty, bo nie udalo sie odczytac" zostal uczciwy, a nie zamienil sie w zero.
+ */
+export async function getLogsShrinking<T>(
+  from: bigint,
+  to: bigint,
+  read: (fromBlock: bigint, toBlock: bigint) => Promise<T[]>,
+  attempts = 4,
+): Promise<T[]> {
+  let span = to - from;
+  let lastError: unknown;
+  for (let i = 0; i < attempts; i++) {
+    const lo = to > span ? to - span : 0n;
+    try {
+      return await read(lo, to);
+    } catch (e) {
+      lastError = e;
+      span /= 2n;
+      if (span < 100n) break;
+    }
+  }
+  throw lastError;
+}
+
 /** Kolateral ma SZESC miejsc. Nie osiemnascie. */
 export const USDC_DECIMALS = 6;
 
