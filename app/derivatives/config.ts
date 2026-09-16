@@ -53,6 +53,13 @@ export const DERIV_DEPLOY_BLOCK = BigInt(deployment.deployBlock ?? 0);
 
 export const DEPLOYED = FACTORY_ADDRESS !== ZERO;
 
+/**
+ * OKNO eth_getLogs w blokach. Testnet (Blockdaemon) daje 50 000, mainnet
+ * (rpc.mainnet.arc.io) odrzuca zakres >= 10 000 i tnie do 2 000 wynikow -
+ * zmierzone 16.09.2026. Blok co 0,5 s, wiec 9 500 blokow to ok. 80 min.
+ */
+export const LOG_WINDOW = DERIV_IS_MAINNET ? 9_500n : 40_000n;
+
 /** Kolateral ma SZESC miejsc. Nie osiemnascie. */
 export const USDC_DECIMALS = 6;
 

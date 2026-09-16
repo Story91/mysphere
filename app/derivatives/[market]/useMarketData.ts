@@ -6,6 +6,7 @@ import { useAccount, usePublicClient } from 'wagmi';
 import {
   DERIV_CHAIN,
   FACTORY_ADDRESS,
+  LOG_WINDOW,
   ORACLE_ADDRESS,
   USDC_ADDRESS,
   erc20Abi,
@@ -236,10 +237,12 @@ export function useMarketData(market: Address) {
       // (ok. 23 h). Cztery zapytania, nie dwadziescia - rate-limit Arca liczy
       // zapytania, a nie bloki. Aktywnosc rynku (nizej) zostaje w ostatnim
       // oknie: to lista dwudziestu wpisow, nie wykres.
+      // Na mainnecie okno to 9 500 (limit RPC), wiec cztery okna daja ok.
+      // 5 h zamiast 23 - podpis pod wykresem i tak mowi, od kiedy sa dane.
       const head = await client.getBlockNumber();
-      const from = head > 40_000n ? head - 40_000n : 0n;
+      const from = head > LOG_WINDOW ? head - LOG_WINDOW : 0n;
       try {
-        const CHUNK = 40_000n;
+        const CHUNK = LOG_WINDOW;
         const CHUNKS = 4;
         const windows = Array.from({ length: CHUNKS }, (_, i) => {
           const to = head - CHUNK * BigInt(i);

@@ -19,8 +19,7 @@ import {
   factoryAbi,
   insuranceAbi,
   marketAbi,
-  oracleAbi,
-} from './config';
+  oracleAbi, LOG_WINDOW } from './config';
 import { fmtAge, fmtDuration, fmtPct, fmtPrice, fmtSignedWad, fmtUsdc, fmtWadCompact, oiPercent, shortAddress } from './format';
 import { Dot, UpDown } from './ui';
 import FaucetBanner from './FaucetBanner';
@@ -304,7 +303,7 @@ export default function DerivativesBoard() {
       // punktow w oknie pokazuje kreske, nie zero.
       try {
         const head = await client.getBlockNumber();
-        const from = head > 40_000n ? head - 40_000n : 0n;
+        const from = head > LOG_WINDOW ? head - LOG_WINDOW : 0n;
         const logs = (await client.getContractEvents({
           address: ORACLE_ADDRESS,
           abi: oracleAbi,
