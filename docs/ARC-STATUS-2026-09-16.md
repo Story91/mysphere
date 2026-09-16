@@ -277,7 +277,7 @@ czyli nowe wdrożenie rynków; do rozważenia przed mainnetem perpsów.
 ## 7. Co dalej
 
 1. Rozstrzygnąć 6.1 — to jedyna rzecz, którą widzi użytkownik.
-2. Rozstrzygnąć 6.2 — decyzja o odbiorcy opłat, ewentualnie ponowne wdrożenie.
+2. Rozstrzygnąć 6.3 — decyzja o odbiorcy opłat (EOA czy Safe), ewentualnie ponowne wdrożenie. 6.2 jest zamknięte po stronie kodu (3ea1216); otwarte zostaje tylko pytanie o operatora routera.
 3. Pierwsza prawdziwa graduacja na mainnecie (nie na forku) — jedyny sposób
    sprawdzenia arcowej semantyki natywnego USDC.
 4. Indexer dla 5042 w granicach limitów z 6.4.
