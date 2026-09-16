@@ -4,9 +4,10 @@
 
 import type { Abi } from 'viem';
 import type { ChainWithComposer } from '../../chainPosting/ChainCreatePost';
-import { arcTestnet } from '../../../startpad/arcChain';
 import {
+  ARC_CHAIN,
   ARC_CHAIN_ID,
+  ARC_NETWORK_LABEL,
   ARC_POST_CONTRACT_ABI,
   getArcContractAddress,
   isArcPostContractDeployed,
@@ -20,16 +21,19 @@ function ArcLogo({ className }: { className: string }) {
 }
 
 export const ARC_POSTING: ChainWithComposer = {
+  // Siec bierze sie z ArcPostContract: mainnet, gdy kontrakt tam stoi, inaczej
+  // testnet. Do 16.09.2026 bylo tu na sztywno arcTestnet i uzytkownik z Arc
+  // mainnet dostawal prosbe o przelaczenie na siec testowa.
   chainId: ARC_CHAIN_ID,
-  chain: arcTestnet,
+  chain: ARC_CHAIN,
   abi: ARC_POST_CONTRACT_ABI as unknown as Abi,
   getContractAddress: getArcContractAddress,
 
-  networkLabel: 'Arc Testnet',
+  networkLabel: ARC_NETWORK_LABEL,
   shortName: 'Arc',
 
   txHashStorageKey: 'lastArcTxHash',
-  explorerTxUrl: `${arcTestnet.blockExplorers.default.url}/tx/`,
+  explorerTxUrl: `${ARC_CHAIN.blockExplorers.default.url}/tx/`,
   explorerButtonLabel: 'View on Arcscan',
 
   // Kontrakt wdrozony 2026-09-11; isLive zostaje na wypadek pustego adresu po redeployu.
