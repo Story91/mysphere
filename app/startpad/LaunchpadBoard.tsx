@@ -153,11 +153,18 @@ function NetworkSwitch() {
         aria-label="Launchpad network"
         className="cursor-pointer bg-transparent text-[12px] font-extrabold outline-none [color:inherit] [&>option]:bg-sp-surface [&>option]:text-sp-ink"
       >
-        {Object.values(LAUNCHPAD_NETWORKS).map((net) => (
-          <option key={net.chain.id} value={net.chain.id}>
-            {net.label}
-          </option>
-        ))}
+        {/* Testnety schowane (decyzja wlasciciela 16.09.2026: Arc i Base maja
+            mainnet, sepolia/Arc testnet tylko mylily). Aktywny testnet zostaje
+            na liscie, zeby `value` selecta nie wskazywal na nieistniejaca opcje
+            u kogos, kto ma go zapamietanego w localStorage - wtedy moze
+            przelaczyc sie z niego na mainnet. */}
+        {Object.values(LAUNCHPAD_NETWORKS)
+          .filter((net) => !net.testnet || net.chain.id === active.chain.id)
+          .map((net) => (
+            <option key={net.chain.id} value={net.chain.id}>
+              {net.label}
+            </option>
+          ))}
         <option disabled>──────</option>
         <option value="sphere">✦ $SPHERE</option>
       </select>
@@ -3415,7 +3422,12 @@ export default function LaunchpadBoard() {
             <span className="ml-auto flex items-center gap-2">
               {/* Split-button: selektor sieci + Launch w JEDNYM pillu - spojna
                   kontrolka zamiast dwoch osobnych, ktore sie gryzly. */}
-              <div className="inline-flex items-stretch overflow-hidden rounded-full border border-sp-shade/10 bg-sp-surface shadow-[0_6px_16px_rgba(124,107,218,0.18)]">
+              {/* Swiecaca ramka z plynacym gradientem - ludzie nie widzieli, ze
+                  siec (Base B20 / RobinHood / Arc) da sie tu zmienic. Gradient
+                  siedzi w tle wrappera o 1,5 px paddingu, srodek zakrywa go
+                  wlasnym tlem; do tego miekka poswiata. */}
+              <div className="animate-border-flow rounded-full bg-[linear-gradient(90deg,#ff00a8,#7c3aed,#00ffd1,#ff00a8)] bg-[length:300%_100%] p-[1.5px] shadow-[0_0_18px_rgba(124,58,237,0.45)]">
+              <div className="inline-flex items-stretch overflow-hidden rounded-full bg-sp-surface">
                 <NetworkSwitch />
                 <span aria-hidden="true" className="my-1.5 w-px self-stretch bg-sp-shade/10" />
                 {/* Udostepnianie CALEGO rynku tej sieci. Ma sens dopiero odkad
@@ -3453,6 +3465,7 @@ export default function LaunchpadBoard() {
                   <Plus className="h-4 w-4" aria-hidden="true" />
                   <span className="hidden sm:inline">Launch</span>
                 </button>
+              </div>
               </div>
             </span>
           </div>

@@ -187,10 +187,18 @@ const config: Config = {
         glow: {
           '0%, 100%': { boxShadow: '0 0 15px rgba(255, 0, 168, 0.7), 0 0 30px rgba(0, 255, 209, 0.7)' },
           '50%': { boxShadow: '0 0 30px rgba(255, 0, 168, 0.9), 0 0 50px rgba(0, 255, 209, 0.9)' }
+        },
+        // Plynacy gradient ramki (przelacznik sieci w Startpadzie): przesuwa
+        // tlo o 300% szerokosci, wiec petla jest bez szwu, bo gradient konczy
+        // sie tym samym kolorem, ktorym zaczyna.
+        'border-flow': {
+          '0%': { backgroundPosition: '0% 50%' },
+          '100%': { backgroundPosition: '300% 50%' }
         }
       },
       animation: {
-        'glow': 'glow 1.5s ease-in-out infinite'
+        'glow': 'glow 1.5s ease-in-out infinite',
+        'border-flow': 'border-flow 4s linear infinite'
       }
     },
   },
