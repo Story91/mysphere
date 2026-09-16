@@ -215,10 +215,10 @@ export default function DerivativesBoard() {
         .map((id, i) => ({ id: Number(id), address: ok(addrRes[i]) as Address | null }))
         .filter((m): m is { id: number; address: Address } => m.address != null && m.address !== ZERO);
 
-      // Zapytanie 3: WSZYSTKO pozostale naraz - fundusz plus 12 odczytow na
+      // Zapytanie 3: WSZYSTKO pozostale naraz - fundusz plus 14 odczytow na
       // rynek. Kolejnosc jest tu kontraktem miedzy budowaniem a odczytem, wiec
       // liczba `PER_MARKET` i lista ponizej musza sie zgadzac co do jednego.
-      const PER_MARKET = 13;
+      const PER_MARKET = 14;
       const marketCalls = live.flatMap(({ id, address }) => [
         { address, abi: marketAbi, functionName: 'markPrice' },
         { address, abi: marketAbi, functionName: 'indexPrice' },
