@@ -315,40 +315,38 @@ Na Base w tym miejscu stoi Safe `0x83E2DE97…`. Opłaty protokołu na Arc będ�
 więc lądować na kluczu, którym podpisuje się wdrożenia. **Settera nie ma** —
 zmiana wymaga nowego wdrożenia pada.
 
-### 6.4 Tabela holderów na Arc zaniża udział krzywej o ~0,03%
+### 6.4 Salda holderów: naprawione po stronie przeglądarki, zostaje zasięg skanu
 
-Na stronie tokena ARPE wiersz `BONDING CURVE` pokazuje **999,7M (99,96%)**,
-podczas gdy łańcuch daje **1 000,0M (100,0000%)** — i w `balanceOf(launchpad)`,
-i w `tokenReserve` z `launchOf`. Różnica to ~300 tys. tokenów.
+**Objaw.** Strona tokena ARPE pokazywała w wierszu `BONDING CURVE` 999,7M
+(99,96%), a łańcuch dawał równo 1 000,0M (100,0000%) — zgodnie w
+`balanceOf(launchpad)` i w `tokenReserve`. Różnica ~300 tys. tokenów.
 
-Statystyki obok są poprawne (`HOLDERS 0` — bo realnych posiadaczy poza krzywą
-nie ma, cały supply wrócił na krzywą po odsprzedaży), plakietka `BONDING CURVE`
-też. Błędna jest wyłącznie liczba w wierszu tabeli.
+**Jak wykluczyliśmy zewnętrzny indeks.** Pierwszym podejrzanym był `arc-scan.org`,
+bo `pickHolderRows` spada na niego przy niekompletnym skanie. W trakcie
+sprawdzania arc-scan **przestał odpowiadać całkowicie**, a strona dalej
+pokazywała 999,7M — skoro indeksu nie było, liczba była nasza własna.
 
-**Przyczyna — ustalona eksperymentem, nie z lektury kodu.** Pierwsze podejrzenie
-padło na zewnętrzny indeks (`arc-scan.org`), bo `pickHolderRows` spada na niego
-przy niekompletnym skanie. **To było błędne.** W trakcie sprawdzania arc-scan
-przestał odpowiadać w ogóle — a strona dalej pokazywała 999,7M. Skoro indeksu
-nie było, liczba jest **nasza własna**.
+**Przyczyna.** `historyScan` składa salda **z różnic** od zera. To działa tylko,
+gdy skan zobaczył każde zdarzenie danego adresu; jeden log poza oknem przesuwa
+saldo na zawsze. Komentarz przy `holdersAreExact` obiecywał, że „salda czyta
+`balanceOf`" — i to była prawda **tylko po stronie serwera**, który ma
+`app/api/launchpad/holderBalances.ts`. Ścieżka przeglądarkowa
+(`useTokenHistory`, używana gdy cache jest niedostępny) omijała serwer.
 
-Właściwy trop: `historyScan.ts` składa salda **z różnic** (`applyBalanceDelta`,
-`applyTransferLogs`, `applyTradeToBalances`), zaczynając od zera. Tymczasem
-komentarz przy `holdersAreExact` w `detailShared.ts` twierdzi: *„Odkąd salda
-czyta `balanceOf`, przy kompletnej historii nasza mapa jest dokładna co do
-wei"*. **Kod i komentarz się rozjeżdżają** — nigdzie w ścieżce holderów nie ma
-odczytu `balanceOf`. Rekonstrukcja z różnic dryfuje, gdy choć jeden log wypadnie
-z okna albo gdy `applyTransferLogs` i `applyTradeToBalances` dotkną tego samego
-zdarzenia.
+**Zrobione.** `settleBalancesOnchain` w `historyScan` + opcja `settleBalances`,
+włączana **tylko przez przeglądarkę** — serwer zostaje przy swoim module, żeby
+nie czytać dwa razy. Nieudany pojedynczy odczyt zostawia przy tym adresie liczbę
+z różnic; padnięty multicall nie wywala skanu. Osobno `pickHolderRows` bierze
+teraz **pokrycie** z indeksu, ale **kwoty** z naszej mapy. 5 nowych testów.
 
-**Naprawa** (nie zrobiona, wymaga zmiany w `historyScan`): domknąć mapę
-odczytem `balanceOf` dla znalezionych adresów — czyli zrobić to, co komentarz
-już obiecuje. Wtedy `holdersAreExact` przestaje być obietnicą bez pokrycia.
-
-**Zrobione w tej sesji** (commit w `pickHolderRows`): gdy skan jest niekompletny,
-indeks nadal daje **pokrycie** (zna adresy spoza naszego okna), ale **kwoty**
-biorą się z naszej mapy wszędzie, gdzie ją mamy, a adresy znane tylko nam już
-nie wypadają z tabeli. To nie naprawia dryfu powyżej — naprawia osobny błąd:
-wcześniej cudzy, spóźniony indeks nadpisywał nasze świeższe liczby w całości.
+**Co zostaje — zasięg skanu na Arc.** Strona tokena sama to komunikuje:
+*„The public RPC limits how far back one page can scan, so the oldest part of
+this history is not shown."* Arc robi ~169 tys. bloków na dobę, a okno to 9 500
+przy suficie okien na wizytę — przeglądarka nie dosięga bloku startu tokena.
+Dlatego na Arc historia i tak powinna iść **serwerem** (`/api/launchpad/history`,
+z cache i własnymi kandydatami RPC), a ścieżka przeglądarkowa zostaje awaryjna
+i jawnie oznaczona jako ucięta. Do rozważenia: większe okno dla Arc u dostawcy
+z wyższym limitem albo wyższy sufit okien, gdy serwer jest niedostępny.
 
 ### 6.5 Czego brakuje w ekosystemie
 
