@@ -50,10 +50,82 @@ export type ScanLog = {
 export type ScanClient = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   getLogs: (args: any) => Promise<ScanLog[]>;
+  /**
+   * Opcjonalny - gdy jest, salda holderow DOMYKAMY odczytem `balanceOf`
+   * zamiast zostawiac je zsumowane z roznic. Patrz `settleBalancesOnchain`.
+   * Kliencie viem (serwerowy i przegladarkowy) maja go zawsze; testy podaja
+   * atrape albo nie podaja wcale.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  multicall?: (args: any) => Promise<any[]>;
 };
 
 export function tradeId(txHash: string | null | undefined, logIndex: number): string {
   return `${txHash ?? 'log'}-${logIndex}`;
+}
+
+/**
+ * DOMKNIECIE SALD ODCZYTEM `balanceOf` - poprawka z 16 wrzesnia 2026.
+ *
+ * ===========================================================================
+ * DLACZEGO SUMOWANIE ROZNIC NIE WYSTARCZA
+ * ===========================================================================
+ * Mapa sald powstaje z roznic (`applyTransferLogs`, `applyTradeToBalances`)
+ * startujac od zera. To dziala tylko wtedy, gdy zobaczylismy KAZDE zdarzenie
+ * dotyczace danego adresu - a skan chodzi oknami i ma sufit okien na wizyte.
+ * Wystarczy, ze jeden log wypadnie poza zakres, i saldo zostaje przesuniete
+ * NA ZAWSZE, bo nic go pozniej nie koryguje.
+ *
+ * Widac to bylo goly okiem na Arc: strona tokena ARPE pokazywala w wierszu
+ * `BONDING CURVE` 999,7M (99,96%), podczas gdy lancuch dawal rowno 1 000,0M
+ * (100,0000%) - zgodnie w `balanceOf(launchpad)` i w `tokenReserve`. Roznica
+ * ~300 tys. tokenow wzieta znikad. Co gorsza, komentarz przy `holdersAreExact`
+ * OBIECYWAL, ze "salda czyta `balanceOf`, wiec mapa jest dokladna co do wei" -
+ * kod tej obietnicy nie dotrzymywal.
+ *
+ * Teraz dotrzymuje: po skanie czytamy `balanceOf` dla KAZDEGO adresu, ktory
+ * skan znalazl, i nadpisujemy nim wynik sumowania. Rekonstrukcja z roznic
+ * zostaje wylacznie jako sposob na ZNALEZIENIE adresow - do czego nadaje sie
+ * dobrze - a nie jako zrodlo kwot.
+ *
+ * Gdy klient nie ma `multicall` albo odczyt padnie, zostaja liczby z roznic:
+ * przyblizenie jest lepsze niz pusta tabela. Zwracamy wtedy `false`.
+ */
+export async function settleBalancesOnchain(
+  client: ScanClient,
+  token: string,
+  balances: Map<string, bigint>,
+): Promise<boolean> {
+  if (typeof client.multicall !== 'function' || balances.size === 0) return false;
+  const holders = Array.from(balances.keys());
+  try {
+    const results = await client.multicall({
+      contracts: holders.map((holder) => ({
+        address: token as `0x${string}`,
+        abi: erc20Abi,
+        functionName: 'balanceOf',
+        args: [holder as `0x${string}`],
+      })),
+      allowFailure: true,
+    });
+    let any = false;
+    results.forEach((entry, i) => {
+      // `allowFailure` daje {status, result}; pojedyncza nieudana pozycja nie
+      // ma prawa wywalic calosci - zostaje przy niej liczba z roznic.
+      const value = entry && typeof entry === 'object' && 'status' in entry
+        ? (entry as { status: string; result?: unknown }).status === 'success'
+          ? (entry as { result?: unknown }).result
+          : undefined
+        : entry;
+      if (typeof value === 'bigint') {
+        balances.set(holders[i], value);
+        any = true;
+      }
+    });
+    return any;
+  } catch {
+    return false;
+  }
 }
 
 /** Salda trzymamy pod adresem malymi literami - inaczej ten sam holder ma dwa wiersze. */
@@ -303,6 +375,11 @@ export function chunk<T>(items: T[], size: number): T[][] {
 export type ScanResult = {
   trades: TradeEntry[];
   balances: Map<string, bigint>;
+  /**
+   * Czy kwoty w `balances` pochodza z `balanceOf`, czy tylko z sumowania
+   * roznic. `false` znaczy przyblizenie - patrz `settleBalancesOnchain`.
+   */
+  balancesSettled: boolean;
   graduatedTs: number | null;
   /** Blok zdarzenia Launched, jesli skan go dosiegnal. */
   launchBlock: bigint | null;
@@ -325,6 +402,13 @@ export type ScanOptions = {
   estTs: (block: bigint) => number;
   /** Przerwa przed jedyna ponowna proba okna. Testy podaja 0. */
   retryDelayMs?: number;
+  /**
+   * Czy po skanie domknac salda odczytem `balanceOf` (patrz
+   * `settleBalancesOnchain`). Wlacza to PRZEGLADARKA, bo tam nie ma nic
+   * innego, co by to robilo. Serwer zostawia `false`, bo ma wlasny
+   * `holderBalances.ts` - wlaczenie tutaj kazaloby mu czytac dwa razy.
+   */
+  settleBalances?: boolean;
   /**
    * Ile okien naraz. Domyslnie 1, czyli okno po oknie.
    *
@@ -456,9 +540,21 @@ export async function scanBackward(client: ScanClient, opts: ScanOptions): Promi
     }
   }
 
+  /*
+   * Domkniecie sald TYLKO NA ZYCZENIE - i to nie z ostroznosci, tylko zeby nie
+   * czytac dwa razy. Serwer (`/api/launchpad/history`) ma do tego wlasny,
+   * lepszy modul `holderBalances.ts`: batchuje po 250, ma sufit kont i wybiera
+   * kandydatow. Przegladarka (`useTokenHistory`) nie ma nic - i to ona
+   * pokazywala na Arc zdryfowane 999,7M zamiast 1000M.
+   */
+  const balancesSettled = opts.settleBalances === true
+    ? await settleBalancesOnchain(client, opts.token, balances)
+    : false;
+
   return {
     trades: mergeTrades([], trades),
     balances,
+    balancesSettled,
     graduatedTs,
     launchBlock,
     complete,

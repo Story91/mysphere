@@ -204,6 +204,14 @@ export function useTokenHistory(
       window: LOG_WINDOW,
       maxWindows: MAX_LOG_WINDOWS,
       estTs,
+      /*
+       * Salda z `balanceOf`, nie z sumowania roznic. Tu, w przegladarce, jest
+       * to JEDYNE miejsce, ktore moze je domknac: serwer ma do tego wlasny
+       * `holderBalances.ts`, ale sciezka awaryjna (gdy cache jest niedostepny)
+       * omija serwer i szla dotad z samymi roznicami. Na Arc bylo to widac:
+       * wiersz `BONDING CURVE` pokazywal 999,7M zamiast rownych 1000M.
+       */
+      settleBalances: true,
     });
 
     return { result, anchorBlock };

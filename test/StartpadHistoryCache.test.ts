@@ -738,3 +738,99 @@ describe('scanBackward', () => {
     expect(result.balances.get('0x1111111111111111111111111111111111111111')).to.equal(42n);
   });
 });
+
+/**
+ * DOMKNIECIE SALD ODCZYTEM `balanceOf`.
+ *
+ * Mapa sald powstaje z roznic, a skan chodzi oknami z sufitem na wizyte -
+ * wiec wystarczy, ze jeden log wypadnie poza zakres, i saldo zostaje
+ * przesuniete na zawsze. Na Arc bylo to widac: wiersz BONDING CURVE pokazywal
+ * 999,7M, a `balanceOf(launchpad)` dawal rowno 1000M.
+ *
+ * Od 16.09 rekonstrukcja z roznic sluzy do ZNALEZIENIA adresow, a kwoty
+ * przychodza z lancucha.
+ */
+describe('settleBalancesOnchain', () => {
+  const { settleBalancesOnchain } = require('../app/startpad/[address]/historyScan');
+  const TOKEN = '0xtoken';
+
+  it('nadpisuje zdryfowane salda kwotami z lancucha', async () => {
+    const balances = new Map<string, bigint>([['0xcurve', 999_700_000n], ['0xalice', 5n]]);
+    const client = {
+      getLogs: async () => [],
+      multicall: async () => [
+        { status: 'success', result: 1_000_000_000n },
+        { status: 'success', result: 7n },
+      ],
+    };
+
+    const settled = await settleBalancesOnchain(client, TOKEN, balances);
+
+    expect(settled).to.equal(true);
+    expect(balances.get('0xcurve'), 'kwota z lancucha, nie z roznic').to.equal(1_000_000_000n);
+    expect(balances.get('0xalice')).to.equal(7n);
+  });
+
+  it('pojedynczy nieudany odczyt nie psuje pozostalych', async () => {
+    const balances = new Map<string, bigint>([['0xa', 1n], ['0xb', 2n]]);
+    const client = {
+      getLogs: async () => [],
+      multicall: async () => [{ status: 'failure', error: new Error('rpc') }, { status: 'success', result: 42n }],
+    };
+
+    expect(await settleBalancesOnchain(client, TOKEN, balances)).to.equal(true);
+    expect(balances.get('0xa'), 'zostaje liczba z roznic').to.equal(1n);
+    expect(balances.get('0xb')).to.equal(42n);
+  });
+
+  it('serwer NIE domyka przez ten modul - ma wlasny holderBalances', async () => {
+    // Domkniecie jest na zyczenie (`settleBalances`), zeby serwer nie czytal
+    // dwa razy: on ma `app/api/launchpad/holderBalances.ts` z batchowaniem
+    // i sufitem kont. Przegladarka nie ma nic, wiec tam wlaczamy.
+    const { scanBackward } = require('../app/startpad/[address]/historyScan');
+    let multicalls = 0;
+    const client = {
+      getLogs: async () => [],
+      multicall: async () => {
+        multicalls += 1;
+        return [];
+      },
+    };
+    const base = {
+      launchpad: '0xpad',
+      token: '0xtoken',
+      head: 10n,
+      floor: 10n,
+      window: 10n,
+      maxWindows: 1,
+      estTs: () => 0,
+      retryDelayMs: 0,
+    };
+
+    const bez = await scanBackward(client, base);
+    expect(bez.balancesSettled, 'domyslnie nie domykamy').to.equal(false);
+    expect(multicalls, 'serwerowa sciezka nie wola multicalla').to.equal(0);
+  });
+
+  it('bez multicalla zostawia mape nietknieta i melduje false', async () => {
+    const balances = new Map<string, bigint>([['0xa', 1n]]);
+
+    const settled = await settleBalancesOnchain({ getLogs: async () => [] }, TOKEN, balances);
+
+    expect(settled).to.equal(false);
+    expect(balances.get('0xa')).to.equal(1n);
+  });
+
+  it('padniety multicall nie wywala skanu - przyblizenie lepsze niz pustka', async () => {
+    const balances = new Map<string, bigint>([['0xa', 1n]]);
+    const client = {
+      getLogs: async () => [],
+      multicall: async () => {
+        throw new Error('RPC 503');
+      },
+    };
+
+    expect(await settleBalancesOnchain(client, TOKEN, balances)).to.equal(false);
+    expect(balances.get('0xa')).to.equal(1n);
+  });
+});
