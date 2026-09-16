@@ -69,7 +69,7 @@ const IRIS = "https://iris-api.circle.com";
 /** MessageTransmitterV2 na Arc mainnet - kanoniczny adres CCTP v2 (patrz naglowek). */
 const ARC_MESSAGE_TRANSMITTER =
   process.env.ARC_MESSAGE_TRANSMITTER || "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64";
-const ARC_RPC_DEFAULT = "https://rpc.arc-scan.org";
+const ARC_RPC_DEFAULT = "https://rpc.mainnet.arc.io";
 
 /** RPC Arc bywa niestabilne (503 co drugie zapytanie) - ponawiamy, nie poddajemy sie. */
 async function withRetry<T>(fn: () => Promise<T>, tries = 10): Promise<T> {

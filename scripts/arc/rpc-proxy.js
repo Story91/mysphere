@@ -17,7 +17,7 @@
  */
 const http = require("http");
 
-const UPSTREAM = process.env.UPSTREAM || "https://rpc.arc-scan.org";
+const UPSTREAM = process.env.UPSTREAM || "https://rpc.mainnet.arc.io";
 const PORT = Number(process.env.PORT || 8546);
 const RETRIES = Number(process.env.RETRIES || 12);
 

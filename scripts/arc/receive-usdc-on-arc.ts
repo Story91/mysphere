@@ -34,7 +34,7 @@ dotenv.config({ path: ".env.local" });
 
 const IRIS = "https://iris-api.circle.com";
 const BASE_DOMAIN = 6;
-const ARC_RPC = process.env.ARC_RPC || "https://rpc.arc-scan.org";
+const ARC_RPC = process.env.ARC_RPC || "https://rpc.mainnet.arc.io";
 const ARC_MESSAGE_TRANSMITTER =
   process.env.ARC_MESSAGE_TRANSMITTER || "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64";
 

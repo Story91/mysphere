@@ -110,7 +110,9 @@ export const arcMainnet = defineChain({
   },
   rpcUrls: {
     default: {
-      http: [process.env.NEXT_PUBLIC_ARC_MAINNET_RPC_URL || 'https://rpc.arc-scan.org'],
+      // 16.09.2026 (dzien startu): oficjalny endpoint Circle odpowiada i przyjmuje
+      // eth_getLogs; arc-scan zostaje zapasem. Okno getLogs - patrz config.ts.
+      http: [process.env.NEXT_PUBLIC_ARC_MAINNET_RPC_URL || 'https://rpc.mainnet.arc.io', 'https://rpc.arc-scan.org'],
     },
   },
   blockExplorers: {

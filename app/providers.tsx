@@ -124,7 +124,7 @@ const TRANSPORTS_BASE = {
    * drugie zapytanie 503, wiec viem ponawia (retryCount). Podmienic przez
    * NEXT_PUBLIC_ARC_MAINNET_RPC_URL, gdy Circle opublikuje oficjalne endpointy.
    */
-  [arcMainnet.id]: http(process.env.NEXT_PUBLIC_ARC_MAINNET_RPC_URL || 'https://rpc.arc-scan.org', { retryCount: 5, retryDelay: 1500 }),
+  [arcMainnet.id]: http(process.env.NEXT_PUBLIC_ARC_MAINNET_RPC_URL || 'https://rpc.mainnet.arc.io', { retryCount: 3, retryDelay: 1000 }),
 } as const;
 
 const CHAINS_WITH_CAMP_MAINNET = [

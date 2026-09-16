@@ -154,7 +154,8 @@ const config = {
       // eksploratora i jest JEDYNYM dzialajacym, jaki znalazlem - do czasu
       // publicznego startu (16.09.2026), kiedy pojawia sie oficjalne adresy.
       // Wtedy podmienic przez ARC_MAINNET_RPC_URL na dostawce z kluczem.
-      url: process.env.ARC_MAINNET_RPC_URL || "https://rpc.arc-scan.org",
+      // 16.09.2026: oficjalny rpc.mainnet.arc.io dziala (blockNumber, getLogs).
+      url: process.env.ARC_MAINNET_RPC_URL || "https://rpc.mainnet.arc.io",
       accounts: deployerAccounts(),
       chainId: 5042,
     },
