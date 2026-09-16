@@ -12,7 +12,7 @@ import { celoChain } from '@/app/basechat/Celo/config/CeloNetworkConfig';
 import { ethereumChain } from '@/app/basechat/ETH/config/EthereumNetworkConfig';
 import { worldChain } from '@/app/basechat/World/config/WorldChainNetworkConfig';
 import { robinhoodChain } from '@/app/basechat/Robinhood/config/RobinhoodNetworkConfig';
-import { arcTestnet } from '@/app/startpad/arcChain';
+import { arcMainnet } from '@/app/startpad/arcChain';
 
 // Definicja sieci z polskimi komentarzami
 // Definition of networks with Polish comments
@@ -91,7 +91,11 @@ const robinhoodEntry = {
 } as const;
 
 /**
- * Arc (Circle) - testnet, mainnet rusza 16 wrzesnia 2026.
+ * Arc (Circle) - MAINNET. Publiczny start byl 16 wrzesnia 2026 i tego dnia
+ * wpis przeszedl z testnetu (5042002) na mainnet (5042): launchpad stoi pod
+ * 0xD5f65Cfb..., handel po graduacji dziala, wiec wysylanie ludzi z glownej
+ * nawigacji na testnet bylo juz tylko myleniem. Testnet zostaje osiagalny
+ * w przelaczniku startpada, nie tutaj.
  *
  * Znak jest prawdziwym plikiem od wlasciciela. Przez chwile stal tu monogram,
  * bo oficjalnego logo nie bylo pod zadnym ze standardowych adresow (favicon,
@@ -102,8 +106,8 @@ const robinhoodEntry = {
  * Barwa to blekit z motywu startpada dla tej sieci (app/startpad/config.ts).
  */
 const arcEntry = {
-  id: arcTestnet.id,
-  name: 'Arc Testnet',
+  id: arcMainnet.id,
+  name: 'Arc',
   shortName: 'ARC',
   iconUrl: '/arc.jpg', // Oficjalny znak Arc, dostarczony przez wlasciciela
   color: '#4D9AF0',
