@@ -128,6 +128,8 @@ type Terms = {
   challengeOpen: boolean | null;
   twap: bigint | null;
   feedActive: boolean | null;
+  /** true = rynek sam liczy aktywnosc z feedu (oracleActive, rynki po 16.09.2026). */
+  activeFromMarket: boolean;
   feedBond: bigint | null;
   feedUpdatedAt: number | null;
   feedUpdateCount: number | null;
@@ -168,6 +170,11 @@ const days = (n: number | null | undefined): string | null =>
 
 /** Adres zerowy w slocie feedu znaczy "nie skonfigurowano", a nie "blad odczytu". */
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+/** Adres feedu z multicalla moze byc null (odczyt padl) albo zerem (brak feedu). */
+function noChainlinkNow(value: unknown): boolean {
+  return typeof value !== 'string' || /^0x0{40}$/i.test(value);
+}
+
 const isZero = (a: Address | null): boolean | null =>
   a == null ? null : a.toLowerCase() === ZERO_ADDRESS;
 
@@ -459,6 +466,7 @@ export default function PerpsGuide({
         twap: big(second.twap),
         // Rynek z feedem Pytha jest aktywny bez heartbeatu rejestru.
         feedActive: bool(second.marketActive) ?? bool(second.feedActive),
+        activeFromMarket: second.marketActive != null && !noChainlinkNow(second.chainlinkFeed),
         feedBond: stats ? (stats[0] as bigint) : null,
         feedUpdatedAt: price ? Number(price[1]) : null,
         feedUpdateCount: stats ? Number(stats[2]) : null,
@@ -882,8 +890,18 @@ export default function PerpsGuide({
                     head: 'Staleness',
                     a: (
                       <>
-                        Once the last price is older than <Val>{fmtDuration(t.maxPriceAge)}</Val>, the registry
-                        reports the feed inactive and this market stops accepting new positions.
+                        {t.activeFromMarket ? (
+                          <>
+                            This market takes its index from an external feed, so it stays open as long as that feed
+                            is fresh (under 1 h old) and the registry has not slashed the publisher. The registry
+                            heartbeat is not a condition here.
+                          </>
+                        ) : (
+                          <>
+                            Once the last price is older than <Val>{fmtDuration(t.maxPriceAge)}</Val>, the registry
+                            reports the feed inactive and this market stops accepting new positions.
+                          </>
+                        )}
                       </>
                     ),
                     b: (
@@ -947,9 +965,13 @@ export default function PerpsGuide({
                   : t.feedFrozen === true
                     ? 'It is frozen by an open challenge: prices are not updating while trading continues.'
                     : t.feedActive === false
-                      ? 'The registry reports it inactive, which means the last price is too old to open against.'
+                      ? t.activeFromMarket
+                        ? 'Both the external feed and the registry price are too old to open against.'
+                        : 'The registry reports it inactive, which means the last price is too old to open against.'
                       : t.feedActive === true
-                        ? 'The registry reports it active and fresh enough to open against.'
+                        ? t.activeFromMarket
+                          ? 'The market reports itself open: the external feed is fresh.'
+                          : 'The registry reports it active and fresh enough to open against.'
                         : ''}{' '}
                 {t.challengeOpen === false
                   ? 'No challenge is open on it - that was checked, not assumed.'
