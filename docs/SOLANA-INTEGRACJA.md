@@ -1,6 +1,6 @@
 # Solana w basechacie
 
-Stan na 22 września 2026. Wdrożone, nieprzetestowane ręcznie przez właściciela.
+Stan na 23 września 2026. Wdrożone i potwierdzone na mainnecie.
 
 ## Co zostało zrobione i dlaczego akurat tak
 
@@ -142,9 +142,105 @@ Base — tak samo jak dziś komentuje posty z Celo.
 - `tsc --noEmit` — czysto (błędy w `test/` są sprzed tej zmiany, dotyczą
   Hardhata i nie wchodzą do `next build`).
 - `next build` — przechodzi.
-- **Nie przeklikane w przeglądarce.** `/basechat` stoi za bramką „Connect
-  wallet", a podpięcie portfela należy do właściciela.
+- **Potwierdzone na mainnecie 22–23 września 2026.** Post „GM from SOLANA"
+  przeszedł i wylądował w feedzie z odznaką Solany.
 
-Żeby zobaczyć to na żywo: Phantom przełączony na devnet
-(Settings → Developer Settings → Devnet), darmowy SOL z faucet.solana.com,
-`npm run dev`, portfel EVM jak zwykle, zakładka Solana.
+## Co się zepsuło przy pierwszym uruchomieniu na mainnecie
+
+Dwie awarie, obie naprawione, obie warte zapamiętania.
+
+**1. `api.mainnet-beta.solana.com` zwraca z przeglądarki 403.** Nie rate limit —
+odmowa. Ten endpoint jest przeznaczony do lokalnego developmentu. Użytkownik
+zobaczył „failed to get recent blockhash". Przetestowane pięć endpointów tym
+samym zapytaniem: ankr 403, drpc 400, publicnode 200 z CORS i przepuszczonym
+`sendTransaction`. Domyślny mainnet to od tej pory publicnode.
+
+**2. Wygaśnięcie okna potwierdzania nie znaczy nieudanej transakcji.** Pierwszy
+post dostał „has expired: block height exceeded", a był w tej samej chwili
+`finalized` z pobraną opłatą. Aplikacja skasowała treść, za którą użytkownik
+już zapłacił, i nic nie zapisała do Firestore. Blockhash jest ważny ~150 bloków
+(około minuty), a odliczanie startuje **przed** oknem portfela — kto zastanawia
+się nad podpisem dłużej niż minutę, dostaje „expired" mimo udanej transakcji.
+
+Poprawka: po wyjątku pytamy łańcuch o status podpisu
+(`getSignatureStatuses` z `searchTransactionHistory`, 6 prób przez 15 s)
+i dopiero brak podpisu uznajemy za porażkę. Rozdzielone są też trzy przypadki,
+które wcześniej dawały jeden komunikat: weszło / łańcuch odrzucił / naprawdę
+wygasło.
+
+---
+
+# Blinks (Solana Actions)
+
+Dodane 23 września 2026.
+
+## Co to jest i czego nie jest
+
+Solana Action to endpoint, który **cudzy** klient zamienia w klikalną kartę
+z przyciskiem. Użytkownik podpisuje transakcję tam, gdzie stoi, bez wchodzenia
+na naszą stronę.
+
+**To nie jest natywne osadzenie w X.** Sprawdzone w dokumentacji Solany
+i Phantoma: karta rysuje się wyłącznie u osób, które mają zainstalowane
+rozszerzenie (Phantom, Backpack, Dialect) **i** włączyły Blinki, bo to funkcja
+eksperymentalna domyślnie wyłączona. Dodatkowo adres akcji musi być
+zarejestrowany w Dialect Actions Registry, inaczej rozszerzenia nie uznają go
+za zaufany.
+
+Dla wszystkich pozostałych działa link przez `dial.to` — jedno kliknięcie poza
+X, a nie zero. Dlatego `/blink/tip/<id>` jest też zwykłą stroną: ktoś bez
+rozszerzenia ma zobaczyć post i działający przycisk, a nie martwy link.
+
+## Komu idzie napiwek
+
+Autorem posta w bazie jest adres **EVM**, który SOL-a nie przyjmie. Ale post
+z Solany niesie kwit — podpis transakcji w `txHash`. Płatnik opłaty tej
+transakcji to portfel Solany, którym autor ten post podpisał. Odczytujemy go
+z łańcucha i to on jest odbiorcą.
+
+Dzięki temu nie trzeba nic dopisywać do dokumentów postów ani niczego migrować:
+każdy post opublikowany na Solanie już dziś niesie komplet potrzebnych danych.
+
+**Zastrzeżenie:** to adres, który *podpisał* post, a nie zadeklarowany adres do
+wypłat. Jeśli autor postował z portfela jednorazowego, napiwek trafi właśnie
+tam. Dlatego karta mówi wprost, na który adres idzie przelew.
+
+## Pliki
+
+| Plik | Rola |
+|---|---|
+| `app/api/actions/actionHeaders.ts` | CORS, `X-Action-Version`, CAIP-2 łańcucha |
+| `app/api/actions/tip/[postId]/route.ts` | GET metadane, POST transakcja |
+| `app/actions.json/route.ts` | mapa akcji w korzeniu domeny |
+| `app/blink/tip/[postId]/page.tsx` | strona dla wszystkich bez rozszerzenia |
+
+## Dlaczego `actions.json` nie mapuje `/post/*`
+
+Kuszące było odwzorowanie `/post/*` na akcję — wtedy samo wklejenie linku do
+posta zamieniałoby go w Blinka. Odrzucone: napiwek w SOL wymaga adresu Solany,
+a posty z pozostałych ośmiu sieci go nie mają. Ponieważ posty z Solany są dziś
+ułamkiem feedu, taka reguła psułaby podgląd **większości** udostępnianych
+linków, żeby poprawić mniejszość.
+
+Gdy większość postów będzie niosła adres wypłaty, mapowanie stanie się sensowne
+i będzie jedną linijką.
+
+## Trzy rzeczy zmierzone przy pierwszym teście
+
+1. **Brak `charset=utf-8`** w `Content-Type` rozsypywał każdy znak spoza ASCII.
+   Tytuł `Tip 0xF1…1Dfd` przychodził jako `Tip 0xF1â€¦1Dfd`.
+2. **`next dev -H 0.0.0.0`** sprawia, że origin żądania brzmi
+   `http://0.0.0.0:3000`. To adres nasłuchu, nie adres do wejścia — ikona Blinka
+   z takim hostem nigdy się nie pobierze i karta zostaje pusta.
+3. Transakcja rozebrana po zbudowaniu: płatnik opłaty = nadawca, transfer
+   10 000 000 lamportów do właściwego odbiorcy, memo `mysphere:tip|<postId>`,
+   niepodpisana. Zgadza się co do lamporta.
+
+## Czego brakuje do pełni
+
+**Rejestracja w Dialect Actions Registry.** Bez niej rozszerzenia nie rozwiną
+karty na X — zadziała tylko `dial.to`. To formularz, nie kod.
+
+**`NEXT_PUBLIC_SITE_URL`.** Bez tej zmiennej ikona i adresy akcji biorą się
+z żądania. Na produkcji za Vercelem działa `VERCEL_URL`, ale własna domena
+w tej zmiennej jest pewniejsza.

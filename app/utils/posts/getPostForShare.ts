@@ -24,6 +24,13 @@ export type SharedPost = {
   likes: number;
   commentCount: number;
   network?: string;
+  /**
+   * Kwit transakcji. Dla postow z Solany to podpis base58 - trasa Blinka
+   * (app/api/actions/tip) odczytuje z niego platnika oplaty, czyli adres
+   * Solany autora. Bez tego nie ma komu wyslac napiwku: pole `author` niesie
+   * adres EVM, ktory SOL-a nie przyjmie.
+   */
+  txHash?: string | null;
 };
 
 // cache() z Reacta deduplikuje odczyt W OBREBIE JEDNEGO zadania: trase /post/[id]
@@ -53,6 +60,7 @@ export const getPostForShare = cache(async (postId: string): Promise<SharedPost 
           ? Math.max(0, data.commentsCount)
           : Array.isArray(data.comments) ? data.comments.length : 0,
       network: data.network ?? undefined,
+      txHash: data.txHash ?? null,
     };
   } catch (error) {
     console.error('[getPostForShare] Nie udalo sie odczytac posta:', error);
