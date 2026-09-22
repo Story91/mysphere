@@ -636,7 +636,7 @@ export const createPost = async (post: {
   visibility?: 'public' | 'followers' | 'private';
   txHash?: string; // Keep this as it now represents the Zora creation tx hash
   zoraCoinAddress?: string; // <-- ADDED
-  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood' | 'arc'; // Add network parameter to identify the source network
+  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood' | 'arc' | 'solana' | 'solana'; // Add network parameter to identify the source network
   musicTrack?: { // 🎵 Dodaj obsługę załączników muzycznych
     id: string;
     name: string;
@@ -991,7 +991,7 @@ export const addComment = async (postId: string, comment: {
   likedBy: string[];
   mentions: string[];
   txHash?: string | null;
-  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood' | 'arc';
+  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood' | 'arc' | 'solana';
   /**
    * ZWRACA ID UTWORZONEGO KOMENTARZA.
    *
@@ -1538,7 +1538,7 @@ export const addCommentReply = async (postId: string, commentId: string, replyDa
   author: string, 
   content: string,
   txHash?: string | null,
-  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood' | 'arc'
+  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood' | 'arc' | 'solana'
 }) => {
   try {
     const postRef = doc(db, 'posts', postId);

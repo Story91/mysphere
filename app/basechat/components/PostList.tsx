@@ -77,6 +77,7 @@ import PaidPinButton from '../PinnedJobs/components/PaidPinButton';
 import PinTimer from '../PinnedJobs/components/PinTimer';
 import PendingPinTimer from '../PinnedJobs/components/PendingPinTimer';
 import ExtendPinModal from '../PinnedJobs/components/ExtendPinModal';
+import { SOLANA_EXPLORER_SUFFIX } from '../Solana/config/solanaChain';
 
 // Utility function for formatting large numbers with K, M, B suffixes
 const formatNumberWithSuffix = (value: number | string): string => {
@@ -137,7 +138,7 @@ const forgetCollectionComment = (postId: string, mainCommentId: string) => {
 
 export interface ExtendedPost extends Post {
   pollId?: string;
-  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood' | 'arc';
+  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood' | 'arc' | 'solana';
   // 🚀 Paid Pin fields
   isPaidPin?: boolean;
   pinExpiresAt?: number;
@@ -347,6 +348,17 @@ const NETWORK_BADGES: Record<string, NetworkBadgeDef> = {
     },
     label: { text: 'Arc', className: 'text-soft-ink-muted' },
   },
+  solana: {
+    alt: 'Solana',
+    chipClass: 'bg-soft-sunken',
+    // Ten sam plik, ktorego uzywa pasek sieci i przelacznik w naglowku.
+    // Wersja rysowana inline miala w sobie gradient z `id` - a ta odznaka
+    // renderuje sie RAZ NA POST, wiec dwadziescia postow na Solanie dawalo
+    // dwadziescia tych samych identyfikatorow w jednym dokumencie.
+    src: '/solana.svg',
+    iconClass: { post: 'w-4 h-4', comment: 'w-3 h-3', reply: 'w-2.5 h-2.5' },
+    label: { text: 'Solana', className: 'text-soft-ink-muted' },
+  },
 };
 
 const NetworkBadge = ({ network, size }: { network?: string | null; size: NetworkBadgeSize }) => {
@@ -426,7 +438,7 @@ const ACTION_ITEM_PAID = 'min-h-[40px] [&_svg]:w-4 [&_svg]:h-4';
 // ===== SIEC POSTA / KOMENTARZA =====
 // Ten sam lancuch if-ow byl wczesniej przepisany osobno w handleAddComment
 // i w handleAddReply - rozjechanie sie ich znaczylo cicho zla odznake.
-type PostNetwork = 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood' | 'arc';
+type PostNetwork = 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood' | 'arc' | 'solana';
 
 const resolvePostNetwork = (chainId: number): PostNetwork | undefined => {
   if (chainId === base.id || chainId === baseSepolia.id) return 'base';
@@ -461,7 +473,12 @@ const BASESCAN = {
   tokenUrl: 'https://basescan.org/token/',
 };
 
-const EXPLORERS: Record<string, { name: string; txUrl: string; tokenUrl?: string }> = {
+/**
+ * `txSuffix` istnieje wylacznie dla Solany: explorer.solana.com rozroznia
+ * klaster parametrem `?cluster=devnet`, a nie domena. Sieci EVM maja osobna
+ * domene na testnet, wiec u nich to pole zostaje puste.
+ */
+const EXPLORERS: Record<string, { name: string; txUrl: string; tokenUrl?: string; txSuffix?: string }> = {
   basecamp: {
     name: 'Camp Network Explorer',
     txUrl: 'https://camp.cloud.blockscout.com/tx/',
@@ -485,6 +502,11 @@ const EXPLORERS: Record<string, { name: string; txUrl: string; tokenUrl?: string
   linea: { name: 'Lineascan', txUrl: 'https://lineascan.build/tx/' },
   robinhood: { name: 'Robinhood Explorer', txUrl: 'https://robinhoodchain.blockscout.com/tx/' },
   arc: { name: 'Arcscan', txUrl: 'https://testnet.arcscan.app/tx/', tokenUrl: 'https://testnet.arcscan.app/token/' },
+  solana: {
+    name: 'Solana Explorer',
+    txUrl: 'https://explorer.solana.com/tx/',
+    txSuffix: SOLANA_EXPLORER_SUFFIX,
+  },
 };
 
 const getTxExplorer = (network?: string) => (network && EXPLORERS[network]) || BASESCAN;
@@ -2755,7 +2777,7 @@ function PostList({
 
           {post.txHash && (
             <a
-              href={`${getTxExplorer(post.network).txUrl}${post.txHash}`}
+              href={`${getTxExplorer(post.network).txUrl}${post.txHash}${getTxExplorer(post.network).txSuffix || ''}`}
               target="_blank"
               rel="noopener noreferrer"
               className={ACTION_ITEM}

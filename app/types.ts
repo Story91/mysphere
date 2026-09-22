@@ -25,7 +25,7 @@ export interface Post {
   txHash?: string;
   zoraCoinAddress?: string;
   lastEdited?: any;
-  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood' | 'arc';
+  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood' | 'arc' | 'solana';
   isPinned?: boolean;
   pinnedAt?: number;
   pinnedBy?: string;
@@ -96,7 +96,7 @@ export interface Comment {
   mentions: string[];
   replyTo?: string;
   txHash?: string | null;
-  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood' | 'arc';
+  network?: 'base' | 'basecamp' | 'linea' | 'celo' | 'ethereum' | 'worldchain' | 'robinhood' | 'arc' | 'solana';
   tip?: {
     amount: number;
     currency: string;

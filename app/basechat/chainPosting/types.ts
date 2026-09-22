@@ -25,7 +25,8 @@ export type PostNetworkId =
   | 'ethereum'
   | 'worldchain'
   | 'robinhood'
-  | 'arc';
+  | 'arc'
+  | 'solana';
 
 /** Warstwa czysto wygladowa - osobna dla przycisku postu i przycisku komentarza. */
 export interface ChainButtonSkin {

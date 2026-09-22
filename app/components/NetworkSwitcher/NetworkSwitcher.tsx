@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { useAccount, useSwitchChain, useChainId } from 'wagmi';
 import { base } from 'viem/chains';
 import { baseCampChain } from '@/app/contracts/BaseCampPostContract';
@@ -107,7 +108,37 @@ const arcEntry = {
 } as const;
 
 /**
- * Kolejnosc: Base, Arc, Camp, Linea, Celo, Ethereum, World Chain, Robinhood.
+ * Solana - JEDYNY wpis, ktory nie przelacza lancucha, tylko przenosi.
+ *
+ * Caly ten przelacznik stoi na `switchChain` z wagmi, a ten przyjmuje
+ * NUMERYCZNY chainId sieci EVM. Solana takiego identyfikatora nie ma i nie
+ * bedzie miala - to inna rodzina lancuchow, z innym portfelem i innymi
+ * podpisami. Wpisanie tu atrapy numeru daloby pozycje, ktora po klinieciu
+ * cicho nic nie robi (`switchChain` odrzucilby nieznany lancuch), czyli
+ * najgorszy mozliwy wariant: przycisk, ktory wyglada na dzialajacy.
+ *
+ * Zamiast tego `href` prowadzi do zakladki Solany w basechacie, gdzie stoi
+ * jej wlasny portfel i wlasna sciezka transakcyjna. Obsluge rozdziela
+ * `handleNetworkPick` nizej.
+ *
+ * Znak jest tym samym plikiem, ktorego uzywa pasek sieci w feedzie
+ * (SOFT_NETWORKS) - jedno zrodlo na cala aplikacje, zeby Solana nie miala
+ * dwoch roznych logotypow w dwoch miejscach interfejsu.
+ */
+const solanaEntry = {
+  id: 'solana',
+  name: 'Solana',
+  shortName: 'SOL',
+  href: '/basechat?network=solana',
+  iconUrl: '/solana.svg',
+  color: '#9945FF',
+  bgWhite: false,
+} as const;
+
+/**
+ * Kolejnosc: Base, Arc, Camp, Linea, Celo, Ethereum, World Chain, Robinhood,
+ * Solana. Solana stoi na koncu, bo jako jedyna nie przelacza lancucha w
+ * portfelu, tylko przenosi na wlasna zakladke - patrz `solanaEntry` wyzej.
  *
  * BASE SEPOLIA WYPADLA STAD 16.09.2026, a Arc wszedl na jej miejsce. Powod:
  * to jedyna siec TESTOWA w glownej nawigacji produkcyjnej - stala tam z
@@ -123,8 +154,13 @@ const arcEntry = {
  * swojego wpisu, wiec pastylka pokaze pierwsza siec z listy (patrz
  * `networks[0]` nizej). Tak samo zachowuje sie kazda inna siec spoza listy.
  */
-const networks = [baseEntry, arcEntry, campMainnetEntry, lineaEntry, celoEntry, ethereumEntry, worldChainEntry, robinhoodEntry] as const;
+const networks = [baseEntry, arcEntry, campMainnetEntry, lineaEntry, celoEntry, ethereumEntry, worldChainEntry, robinhoodEntry, solanaEntry] as const;
 type Network = (typeof networks)[number];
+
+/** Wpis, ktory przenosi na inna trase zamiast przelaczac lancuch w portfelu. */
+function networkHref(network: Network): string | null {
+  return 'href' in network ? network.href : null;
+}
 
 /** Adres pliku znaku sieci albo null, gdy wpis go nie ma (patrz `arcEntry`). */
 function networkIcon(network: Network): string | null {
@@ -167,6 +203,7 @@ function isNetworkDisabled(network: Network): boolean {
 
 export function NetworkSwitcher() {
   const { switchChain } = useSwitchChain();
+  const router = useRouter();
   const chainId = useChainId();
   const { isConnected } = useAccount();
   const [isOpen, setIsOpen] = useState(false);
@@ -211,9 +248,17 @@ export function NetworkSwitcher() {
     return null;
   }
 
-  const handleNetworkSwitch = (networkId: number) => {
+  const handleNetworkPick = (network: Network) => {
+    const href = networkHref(network);
+    if (href) {
+      // Siec spoza EVM - nie ma czego przelaczac w portfelu, wiec przenosimy
+      // uzytkownika tam, gdzie ta siec faktycznie dziala.
+      router.push(href);
+      setIsOpen(false);
+      return;
+    }
     if (switchChain) {
-      switchChain({ chainId: networkId });
+      switchChain({ chainId: network.id as number });
     }
     setIsOpen(false);
   };
@@ -285,7 +330,7 @@ export function NetworkSwitcher() {
               <button
                 key={network.id}
                 type="button"
-                onClick={() => handleNetworkSwitch(network.id)}
+                onClick={() => handleNetworkPick(network)}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 text-left rounded-pill transition-[background-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.98] disabled:active:scale-100 outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-inset ${
                   isCurrent
                     ? 'bg-soft-sunken text-soft-ink'

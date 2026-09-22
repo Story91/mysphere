@@ -15,7 +15,7 @@
  * toasty i nie renderuje sie bez adresu. To osobne zachowanie, nie kosmetyka.
  */
 
-import { useState, useRef } from 'react';
+import { useState, useRef, type ComponentType } from 'react';
 import { useAccount } from 'wagmi';
 import { toast } from 'react-hot-toast';
 import BanRestriction from '../../admin/components/BanRestriction';
@@ -26,14 +26,35 @@ import { Avatar } from '../../components/identity';
 import MusicSelector from '../components/MusicSelector';
 import SpotifyTrackCard from '../components/SpotifyTrackCard';
 import ChainPostButton from './ChainPostButton';
-import type { ChainComposerSkin, ChainPostingConfig } from './types';
+import type { ChainComposerSkin, ChainPostButtonProps, ChainPostingConfig } from './types';
 
 /** Lancuch, ktory faktycznie uzywa wspolnego composera - `composer` jest wymagany. */
 export type ChainWithComposer = ChainPostingConfig & { composer: ChainComposerSkin };
 
+/**
+ * Minimum, ktorego potrzebuje SAM formularz. Reszta `ChainPostingConfig`
+ * (chainId, obiekt chain z viem, ABI, adres kontraktu) sluzy wylacznie
+ * przyciskowi transakcji - ten plik nigdy do niej nie siega.
+ *
+ * Istnieje po to, zeby Solana mogla uzyc tego samego formularza. Solana nie ma
+ * ani numerycznego chainId, ani ABI, ani adresu kontraktu w rozumieniu EVM, a
+ * wpisanie tam atrap byloby klamstwem w typach - kod czytalby, ze te wartosci
+ * cos znacza, choc nie znacza nic.
+ */
+export type ComposerOnlyConfig = Pick<ChainPostingConfig, 'isLive'> & {
+  composer: ChainComposerSkin;
+};
+
 export interface ChainCreatePostProps {
-  config: ChainWithComposer;
+  config: ChainWithComposer | ComposerOnlyConfig;
   onPostCreated?: () => Promise<void>;
+  /**
+   * Przycisk wysylajacy transakcje. Pominiety = domyslny `ChainPostButton`
+   * na wagmi, i WTEDY `config` musi byc pelnym `ChainWithComposer` - inaczej
+   * przycisk nie ma czego wyslac. Solana podaje tu wlasny przycisk, bo jej
+   * sciezka transakcyjna nie ma z wagmi nic wspolnego.
+   */
+  PostButton?: ComponentType<ChainPostButtonProps>;
 }
 
 /**
@@ -45,6 +66,7 @@ type SpotifyTrack = NonNullable<Parameters<typeof createPost>[0]['musicTrack']>;
 export default function ChainCreatePost({
   config,
   onPostCreated,
+  PostButton,
 }: ChainCreatePostProps) {
   const [content, setContent] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -323,13 +345,26 @@ export default function ChainCreatePost({
           </div>
 
           <div className="mt-3 flex justify-end">
-            <ChainPostButton
-              config={config}
-              content={content}
-              onTransactionSuccess={handleTransactionSuccess}
-              disabled={isSaving}
-              onPostAdded={onPostCreated}
-            />
+            {PostButton ? (
+              <PostButton
+                content={content}
+                onTransactionSuccess={handleTransactionSuccess}
+                disabled={isSaving}
+                onPostAdded={onPostCreated}
+              />
+            ) : (
+              <ChainPostButton
+                // Rzutowanie pilnuje niezmiennika opisanego przy `PostButton`:
+                // brak wlasnego przycisku oznacza sciezke EVM, a ta jest
+                // wywolywana wylacznie z pelnym configiem (szesc opakowan w
+                // Arc/Celo/ETH/Linea/Robinhood/World podaje `ChainWithComposer`).
+                config={config as ChainWithComposer}
+                content={content}
+                onTransactionSuccess={handleTransactionSuccess}
+                disabled={isSaving}
+                onPostAdded={onPostCreated}
+              />
+            )}
           </div>
         </div>
 

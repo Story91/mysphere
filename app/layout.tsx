@@ -95,13 +95,24 @@ const MINIAPP_EMBED = JSON.stringify({
  * miejsce rozni sie od pozostalych.
  *
  * Teza MySphere jest jedna: OSIA CZASU SA PIENIADZE, nie tresc. Opis mowi wiec
- * dokladnie to i tylko to, co dziala DZIS: posty, napiwki w ETH i USDC na
- * siedmiu sieciach oraz rynek Askow - budzet, zapieczetowane odpowiedzi,
- * wyplata z hashem. Zadnej liczby uzytkownikow, zadnego czasu przyszlego.
+ * dokladnie to i tylko to, co dziala DZIS: posty, napiwki w ETH i USDC oraz
+ * rynek Askow - budzet, zapieczetowane odpowiedzi, wyplata z hashem. Zadnej
+ * liczby uzytkownikow, zadnego czasu przyszlego.
  *
- * Liczba sieci wzieta z app/basechat/soft/SoftStoryRail.tsx (SOFT_NETWORKS):
- * Base, Camp, Linea, Celo, Ethereum, World, Robinhood. SIEDEM. Jesli ta lista
- * urosnie, to zdanie trzeba poprawic recznie - dlatego stoi tu ta notka.
+ * === DLACZEGO DWIE ROZNE LICZBY SIECI ===
+ * Bo to sa dwie rozne listy i od wejscia Solany juz sie nie pokrywaja.
+ *
+ * POSTOWANIE - dziewiec, z app/basechat/soft/SoftStoryRail.tsx (SOFT_NETWORKS):
+ * Base, Camp, Linea, Celo, Ethereum, World, Robinhood, Arc, Solana.
+ *
+ * NAPIWKI - osiem, z `TipNetworkType` w app/utils/firebase.ts: Base, Ethereum,
+ * Celo, World, Linea, Camp, Robinhood, Arc. Solany tam NIE MA i nie wolno jej
+ * doliczyc: napiwki dotykaja pieniedzy, escrow i kwitow weryfikowanych po
+ * stronie serwera, a na Solanie dziala dzis wylacznie postowanie.
+ *
+ * Do 22.09.2026 stalo tu jedno zdanie o "seven networks" i bylo juz falszywe -
+ * Arc doszedl jako osmy i nikt tej notki nie poprawil. Stad rozbicie na dwie
+ * liczby: zeby nastepna siec wymuszala pytanie "ktorej listy dotyczy".
  *
  * === DLACZEGO SLOWO "EVERY" PRZENIESLO SIE Z NAPIWKOW NA ASKI ===
  * Stalo tu "every tip settles onchain with a hash anyone can open". To nie jest
@@ -113,7 +124,7 @@ const MINIAPP_EMBED = JSON.stringify({
  * gdzie da sie go bronic.
  */
 const APP_DESCRIPTION =
-  'Post and tip in ETH or USDC across seven networks. Open an Ask with a budget, collect sealed answers, and pay the ones you pick - every Ask payout carries a transaction hash anyone can open.';
+  'Post across nine networks and tip in ETH or USDC on eight of them. Open an Ask with a budget, collect sealed answers, and pay the ones you pick - every Ask payout carries a transaction hash anyone can open.';
 
 /**
  * Jeden tytul dla <title>, og:title i twitter:title.

@@ -128,9 +128,11 @@ export default function SoftSignInHero({
       <div className="lg:mx-auto lg:flex lg:w-full lg:max-w-[1080px] lg:items-center lg:gap-16">
       {/* ===== ROZLICZENIE ===== */}
       {/* --settle-count: ILE RAZY ma sie odegrac przejazd. Bierze sie z dlugosci
-          SOFT_NETWORKS, a nie z liczby wpisanej w CSS - dojdzie osmy lancuch
-          i przejazd sam sie wydluzy. Wpisanie tu siodemki zlamaloby te sama
-          zasade, ktora ten plik trzyma przy liczbie wezlow (patrz STEP). */}
+          SOFT_NETWORKS, a nie z liczby wpisanej w CSS - dojdzie kolejny lancuch
+          i przejazd sam sie wydluzy. Wpisanie tu liczby na sztywno zlamaloby te
+          sama zasade, ktora ten plik trzyma przy liczbie wezlow (patrz STEP).
+          Notka celowo bez liczby: poprzednia wersja mowila "dojdzie osmy
+          lancuch" i zdezaktualizowala sie dwa razy (Arc, potem Solana). */}
       <div
         aria-hidden="true"
         className="soft-settle-stage soft-hero-rise relative mx-auto mb-7 h-[200px] w-[200px] sm:h-[236px] sm:w-[236px] lg:mb-0 lg:h-[320px] lg:w-[320px] lg:flex-none"

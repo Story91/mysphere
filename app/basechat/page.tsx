@@ -39,6 +39,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import BanMessage from '../admin/components/BanMessage';
 import { useBanStatus } from '../hooks/useBanStatus';
+import { useIsFarcasterMiniApp } from '../hooks/useIsFarcasterMiniApp';
 // ReferralLeaderboard wylaczony w kolumnie bocznej (decyzja wlasciciela) -
 // import wroci razem z kafelkiem.
 import BuilderProfile from './components/BuilderProfile';
@@ -100,6 +101,32 @@ const CreatePostEthereum = dynamic(() => import('./ETH/components/CreatePostEthe
 const CreatePostWorldChain = dynamic(() => import('./World/components/CreatePostWorldChain'), { ssr: false });
 const CreatePostRobinhood = dynamic(() => import('./Robinhood/components/CreatePostRobinhood'), { ssr: false });
 const CreatePostArc = dynamic(() => import('./Arc/components/CreatePostArc'), { ssr: false });
+// Solana: caly stack portfela (web3.js + wallet-adapter) siedzi za tym
+// importem i nie wchodzi do bundle'a feedu, dopoki nikt nie otworzy zakladki.
+const CreatePostSolana = dynamic(() => import('./Solana/components/CreatePostSolana'), { ssr: false });
+
+/**
+ * Sieci, ktore moze wskazac zakladka composera - i jednoczesnie jedyne
+ * wartosci przyjmowane z adresu (`?network=`).
+ *
+ * Lista stoi tu, a nie w unii wpisanej w `useState`, bo od chwili dodania
+ * deep linku czyta ja rowniez walidacja parametru. Dwa zapisy tej samej listy
+ * rozjechalyby sie przy pierwszej nowej sieci - i wtedy link dzialalby dla
+ * sieci, ktorej zakladka juz nie istnieje.
+ *
+ * `optimism`, `arbitrum` i `monad` nie maja dzis wlasnego formularza; zostaja,
+ * bo stan i tak dopuszczal te wartosci przed tym refaktorem.
+ */
+const POSTING_NETWORKS = [
+  'base', 'basecamp', 'optimism', 'ethereum', 'arbitrum', 'monad',
+  'linea', 'celo', 'worldchain', 'robinhood', 'arc', 'solana',
+] as const;
+
+type PostingNetwork = (typeof POSTING_NETWORKS)[number];
+
+function isPostingNetwork(value: string | null): value is PostingNetwork {
+  return !!value && (POSTING_NETWORKS as readonly string[]).includes(value);
+}
 import MockFeed from './prelogin/MockFeed';
 import { BASECAMP_CHAIN_ID } from '../contracts/BaseCampPostContract';
 import { LINEA_CHAIN_ID } from './Linea/config/LineaNetworkConfig';
@@ -409,7 +436,7 @@ function BaseChatContent() {
   } | null>(null);
   
   // Network filter state - renamed to activePostingNetwork to reflect its new purpose
-  const [activePostingNetwork, setActivePostingNetwork] = useState<'base' | 'basecamp' | 'optimism' | 'ethereum' | 'arbitrum' | 'monad' | 'linea' | 'celo' | 'worldchain' | 'robinhood' | 'arc'>('base');
+  const [activePostingNetwork, setActivePostingNetwork] = useState<PostingNetwork>('base');
   
   // Globalne deklaracje stanów modalu przeniesione na początek funkcji
   const [modalMessage, setModalMessage] = useState('');
@@ -801,6 +828,32 @@ function BaseChatContent() {
    * wszystkich kanalach udostepniania.
    */
   const composeParamValue = searchParams.get('compose');
+  /**
+   * Siec composera wskazana z zewnatrz: /basechat?network=solana.
+   *
+   * PO CO: przelacznik sieci w naglowku (NetworkSwitcher) dziala na wagmi,
+   * czyli na numerycznym chainId - a Solana zadnego nie ma i nigdy nie
+   * bedzie miala. Zamiast udawac przelaczenie lancucha, ktore po cichu by sie
+   * nie udalo, wpis Solany w nawigacji PRZENOSI tutaj i otwiera jej zakladke.
+   *
+   * Parametr jest wspolny dla wszystkich sieci, nie tylko dla Solany - dzieki
+   * temu kazdy link "postuj na X" da sie zbudowac tak samo.
+   */
+  const networkParam = searchParams.get('network');
+
+  /**
+   * Zakladka Solany znika w miniappie Farcastera.
+   *
+   * W webview hosta portfel jest wstrzykiwany przez Farcastera i jest to
+   * portfel EVM; rozszerzen typu Phantom tam nie ma i nie bedzie. Pokazana
+   * zakladka otwieralaby wybor portfela, w ktorym nie ma czego wybrac.
+   *
+   * `=== false` (a nie `!isMiniApp`) jest celowe: dopoki wykrycie trwa, hook
+   * zwraca `null` i zakladka sie NIE renderuje. Inaczej mignelaby na ulamek
+   * sekundy u kazdego uzytkownika miniappa.
+   */
+  const isFarcasterMiniApp = useIsFarcasterMiniApp();
+  const showSolanaTab = isFarcasterMiniApp === false;
   const [userStats, setUserStats] = useState<{[key: string]: Stats & { totalPoints: number }}>({});
   // `hoveredElement` bylo ustawiane przy kazdym najechaniu na nazwe uzytkownika w
   // feedzie, ale nikt tej wartosci nie czytal - podpowiedz "Click to view profile"
@@ -1166,6 +1219,19 @@ function BaseChatContent() {
       setActiveMainPanel('notifications');
     }
   }, [urlView]);
+
+  /**
+   * ?network=<siec> otwiera zakladke tej sieci w composerze.
+   *
+   * Nieznana wartosc jest IGNOROWANA, a nie zamieniana na Base: ktos, kto
+   * trafil tu z literowka w linku, ma zobaczyc swoja zwykla zakladke, a nie
+   * cicha podmiane na inna siec. `isPostingNetwork` pilnuje, zeby do stanu
+   * nie wszedl string spoza listy.
+   */
+  useEffect(() => {
+    if (!isPostingNetwork(networkParam)) return;
+    setActivePostingNetwork(networkParam);
+  }, [networkParam]);
 
 
 
@@ -3770,7 +3836,20 @@ function BaseChatContent() {
                       isActive: activePostingNetwork === 'arc',
                       color: '#1E1E1E',
                       specialStyle: 'arc'
-                    }
+                    },
+                    ...(showSolanaTab ? [{
+                      icon: (
+                        <img
+                          src="/solana.svg"
+                          alt="Solana"
+                          className="w-5 h-5"
+                        />
+                      ),
+                      label: 'Solana',
+                      onClick: () => setActivePostingNetwork('solana'),
+                      isActive: activePostingNetwork === 'solana',
+                      color: '#9945FF'
+                    }] : [])
                   ]}
                 />
               </div>
@@ -4650,6 +4729,13 @@ function BaseChatContent() {
                           {/* Arc - kontrakt postow: ArcPostContract.ts */}
                           {activePostingNetwork === 'arc' && (
                             <CreatePostArc onPostCreated={refreshPosts} />
+                          )}
+
+                          {/* Solana - jedyna siec spoza EVM. Autorem posta zostaje
+                              adres z wagmi; portfel Solany podpisuje sam kwit.
+                              Klaster ustala NEXT_PUBLIC_SOLANA_CLUSTER (domyslnie devnet). */}
+                          {activePostingNetwork === 'solana' && (
+                            <CreatePostSolana onPostCreated={refreshPosts} />
                           )}
                         </div>
                       ) : (

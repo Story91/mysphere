@@ -16,8 +16,8 @@ import Image from 'next/image';
  * takze grubosc podpisu, informacja jest podana trzy razy niezaleznie.
  *
  * DOSTEPNOSC: to jest lista przyciskow radiowych w sensie znaczeniowym, wiec
- * kazdy dostaje aria-pressed. Bez tego czytnik ekranu przeczytalby siedem
- * identycznych przyciskow bez informacji, ktory jest wybrany.
+ * kazdy dostaje aria-pressed. Bez tego czytnik ekranu przeczytalby wszystkie
+ * przyciski jako identyczne, bez informacji, ktory jest wybrany.
  */
 
 export type SoftNetwork = {
@@ -39,6 +39,11 @@ export const SOFT_NETWORKS: SoftNetwork[] = [
   { id: 'worldchain', label: 'World', iconSrc: '/logotypy/world-symbol-dark.svg' },
   { id: 'robinhood', label: 'RH', iconSrc: '/robin.webp' },
   { id: 'arc', label: 'Arc', iconSrc: '/arc.jpg' },
+  // Solana - jedyny wpis spoza EVM. Dla tego paska nie ma to znaczenia (czyta
+  // wylacznie `network` z dokumentu posta), ale ma dla wszystkiego, co z tej
+  // listy korzysta dalej: przelaczenie sie na nia nie zmienia lancucha w
+  // portfelu EVM, tylko otwiera osobna sciezke transakcyjna w composerze.
+  { id: 'solana', label: 'Solana', iconSrc: '/solana.svg' },
 ];
 
 export default function SoftStoryRail({

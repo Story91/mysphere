@@ -481,10 +481,17 @@ function HowContent() {
               more than a row in our database.
             </P>
             <P>
-              Seven chains are wired: <Hi>Base</Hi>, Robinhood Chain, Camp,
-              Linea, Celo, Ethereum and World Chain. Same feed, same profile
-              whichever you pick. If you own a <Hi>.base.eth</Hi> name, you show
-              up under it instead of a hex address.
+              Nine chains are wired: <Hi>Base</Hi>, Arc, Robinhood Chain, Camp,
+              Linea, Celo, Ethereum, World Chain and <Hi>Solana</Hi>. Same feed,
+              same profile whichever you pick. If you own a <Hi>.base.eth</Hi>{' '}
+              name, you show up under it instead of a hex address.
+            </P>
+            <P>
+              Solana is the odd one out: it is not an EVM chain, so it needs its
+              own wallet (Phantom and friends) next to the one you signed in
+              with. You stay the same author either way &mdash; the Solana wallet
+              only signs the receipt. Its posts land on <Hi>devnet</Hi> until
+              mainnet is switched on.
             </P>
             <Go href="/basechat">Open the feed</Go>
           </Step>
