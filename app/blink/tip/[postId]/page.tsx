@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getPostForShare, shortAddress } from '../../../utils/posts/getPostForShare';
 import { SOLANA_NETWORK_LABEL } from '../../../basechat/Solana/config/solanaChain';
+import BlinkTipClient from './BlinkTipClient';
 
 /**
  * Adres, ktory udostepnia sie jako Blink.
@@ -22,8 +23,13 @@ import { SOLANA_NETWORK_LABEL } from '../../../basechat/Solana/config/solanaChai
  * wiekszosci odbiorcow.
  *
  * Ta strona jest wiec wariantem awaryjnym, ktory ma dzialac zawsze: pokazuje
- * post, mowi wprost, na ktory adres idzie napiwek, i daje przejscie do
- * interstycjala dial.to, ktory wykona akcje bez zadnego rozszerzenia.
+ * post, mowi wprost, na ktory adres idzie napiwek, i SAMA wykonuje akcje
+ * portfelem Solany (TipPanel).
+ *
+ * Do 23.09.2026 wykonanie oddawalismy interstycjalowi dial.to (Dialect).
+ * Wlasciciel kliknal i trafil na Vercelowe "DEPLOYMENT_PAUSED" pod adresem
+ * dial.to - zewnetrzny serwis padl, a nasz przycisk byl do niego przywiazany.
+ * Strona, ktora ma dzialac zawsze, nie moze zalezec od cudzego deploymentu.
  */
 
 export const runtime = 'nodejs';
@@ -52,9 +58,6 @@ export default async function BlinkTipPage({ params }: Props) {
   if (!post) notFound();
 
   const author = post.authorName || shortAddress(post.author);
-  const actionUrl = `${SITE}/api/actions/tip/${post.id}`;
-  // dial.to wykonuje akcje bez rozszerzenia - to jest sciezka dla wszystkich.
-  const dialTo = `https://dial.to/?action=solana-action:${encodeURIComponent(actionUrl)}`;
   const isSolanaPost = post.network === 'solana' && !!post.txHash;
 
   return (
@@ -66,14 +69,7 @@ export default async function BlinkTipPage({ params }: Props) {
 
       {isSolanaPost ? (
         <>
-          <a
-            href={dialTo}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-pill bg-gradient-to-r from-[#9945FF] to-[#14F195] px-5 py-3 text-center font-semibold text-white transition-opacity hover:opacity-90"
-          >
-            Tip in SOL
-          </a>
+          <BlinkTipClient postId={post.id} />
           <p className="text-center text-sm text-soft-ink-muted">
             The tip goes to the wallet that signed this post on {SOLANA_NETWORK_LABEL}. If you have
             Blinks turned on in Phantom or Backpack, this link also opens as a card directly in your

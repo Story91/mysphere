@@ -21,10 +21,10 @@
  * profili, followow, tipow i rankingu, ktore w calosci stoja na adresie 0x.
  */
 
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
-import { PublicKey, Transaction, TransactionInstruction, type Connection } from '@solana/web3.js';
+import { PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js';
 // Jawny import z 'buffer', a NIE globalny `Buffer`: w bundlu przegladarkowym
 // Next.js nie definiuje globalnego Buffera, wiec `Buffer.from(...)` wywalaloby
 // sie dopiero w runtime ("Buffer is not defined"), juz po podpisie uzytkownika.
@@ -39,6 +39,10 @@ import {
   buildPostMemo,
   solanaExplorerTxUrl,
 } from '../config/solanaChain';
+import { confirmOrAskChain } from '../confirm';
+import { isInsufficientFunds, isUserRejection } from '../walletErrors';
+import { extractMintCandidates } from '../bags/bagsCore';
+import { buildBagsInstruction, detectBagsMints } from '../bags/bagsTx';
 
 /** Klucz localStorage z ostatnim podpisem - parytet z `txHashStorageKey` w EVM. */
 const LAST_SIGNATURE_KEY = 'lastSolanaSignature';
@@ -85,114 +89,6 @@ function Spinner({ className }: { className: string }) {
   );
 }
 
-/**
- * Odmowa podpisu to NIE awaria - tak samo jak w `describeWalletError` po
- * stronie EVM. Bez tego uzytkownik, ktory sam kliknal "Cancel" w Phantomie,
- * dostawalby czerwony toast "Transaction failed".
- */
-function isUserRejection(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return /user rejected|user denied|rejected the request|request rejected/i.test(message);
-}
-
-/** Brak SOL na oplate ma wlasny komunikat - inaczej uzytkownik nie wie, czego brakuje. */
-function isInsufficientFunds(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return /insufficient (lamports|funds)|attempt to debit an account/i.test(message);
-}
-
-/* ------------------------------------------------------------------ *
- * POTWIERDZANIE TRANSAKCJI
- *
- * === DLACZEGO TO NIE JEST ZWYKLE `await confirmTransaction` ===
- *
- * Bo `confirmTransaction` rzuca wyjatkiem takze wtedy, gdy transakcja
- * ZOSTALA PRZYJETA. Zmierzone na mainnecie 22.09.2026, pierwszy post
- * wlasciciela:
- *
- *   podpis 3F7V48xEPn2zh2Ej5HPxua6rq...  ->  "has expired: block height
- *   exceeded"  ->  a w tej samej chwili na lancuchu: finalized, err: null,
- *   Memo Program wykonany, oplata 5413 lamportow pobrana.
- *
- * Aplikacja powiedziala "Transaction failed", posta NIE zapisala do
- * Firestore, a uzytkownik zaplacil i ma swoje memo na mainnecie NA STALE.
- * Najgorszy mozliwy wynik: wziete pieniadze, skasowana tresc, komunikat,
- * ktory klamie.
- *
- * Skad to sie bierze: blockhash jest wazny okolo 150 blokow, czyli mniej
- * wiecej minute. Odliczanie startuje w chwili jego pobrania - a POMIEDZY
- * pobraniem a wyslaniem stoi czlowiek czytajacy okno portfela. Kto zastanawia
- * sie nad podpisem dluzej niz minute, ten dostaje "expired" nawet wtedy, gdy
- * transakcja weszla do bloku sekunde wczesniej.
- *
- * === ZASADA ===
- * Wygasniecie okna potwierdzania NIE jest odpowiedzia na pytanie "czy
- * transakcja przeszla". Odpowiedzia jest wylacznie stan podpisu na lancuchu,
- * wiec po wyjatku PYTAMY LANCUCH, zamiast zgadywac.
- *
- * `searchTransactionHistory` jest tu konieczne: bez niego RPC przeszukuje
- * tylko swiezy bufor i dla transakcji sprzed kilkudziesieciu sekund zwraca
- * `null`, czyli to samo, co "nie ma".
- * ------------------------------------------------------------------ */
-
-/** Ile razy pytamy o status po wygasnieciu okna. */
-const STATUS_POLL_ATTEMPTS = 6;
-/** Odstep miedzy pytaniami. 6 x 2,5 s = 15 s - tyle wystarcza, by RPC nadgonil. */
-const STATUS_POLL_INTERVAL_MS = 2500;
-
-type ConfirmOutcome =
-  /** Transakcja jest na lancuchu i nie zwrocila bledu. */
-  | { kind: 'landed' }
-  /** Transakcja jest na lancuchu, ale wykonala sie z bledem. */
-  | { kind: 'failed'; detail: string }
-  /** Okno wygaslo i po odpytaniu lancucha podpisu nadal nie ma. */
-  | { kind: 'expired' };
-
-async function confirmOrAskChain(
-  connection: Connection,
-  signature: string,
-  blockhash: string,
-  lastValidBlockHeight: number
-): Promise<ConfirmOutcome> {
-  try {
-    const result = await connection.confirmTransaction(
-      { signature, blockhash, lastValidBlockHeight },
-      'confirmed'
-    );
-    if (result.value.err) {
-      return { kind: 'failed', detail: JSON.stringify(result.value.err) };
-    }
-    return { kind: 'landed' };
-  } catch {
-    // Okno potwierdzania wygaslo. To pytanie bez odpowiedzi, a nie odpowiedz -
-    // patrz naglowek. Pytamy lancuch.
-    for (let attempt = 0; attempt < STATUS_POLL_ATTEMPTS; attempt += 1) {
-      try {
-        const statuses = await connection.getSignatureStatuses([signature], {
-          searchTransactionHistory: true,
-        });
-        const status = statuses.value[0];
-        if (status) {
-          if (status.err) {
-            return { kind: 'failed', detail: JSON.stringify(status.err) };
-          }
-          if (status.confirmationStatus === 'confirmed' || status.confirmationStatus === 'finalized') {
-            return { kind: 'landed' };
-          }
-        }
-      } catch (statusError) {
-        // Jedno nieudane pytanie o status nie konczy sprawdzania - RPC bywa
-        // chwilowo niedostepny, a my mamy tu do rozstrzygniecia pieniadze.
-        console.warn('Solana status check failed, retrying:', statusError);
-      }
-      await new Promise(resolve => setTimeout(resolve, STATUS_POLL_INTERVAL_MS));
-    }
-    // Po wygasnieciu blockhasha transakcja nie moze juz wejsc do bloku, wiec
-    // brak podpisu po tych probach znaczy, ze naprawde nie przeszla.
-    return { kind: 'expired' };
-  }
-}
-
 export default function SolanaPostButton({
   content,
   onTransactionSuccess,
@@ -206,6 +102,11 @@ export default function SolanaPostButton({
   const [isTransacting, setIsTransacting] = useState(false);
   const [signature, setSignature] = useState<string | null>(null);
   const [isViewingExplorer, setIsViewingExplorer] = useState(false);
+
+  // Tylko kandydaci z tresci, bez pytania lancucha - notka ma sie pojawic przy
+  // pisaniu, a nie po kazdym znaku wysylac zapytanie RPC. Czy to naprawde mint,
+  // rozstrzyga sie dopiero przy wysylce (detectBagsMints).
+  const mentionsToken = useMemo(() => extractMintCandidates(content).length > 0, [content]);
 
   const handleSuccess = useCallback(
     async (sig: string) => {
@@ -253,6 +154,17 @@ export default function SolanaPostButton({
       });
 
       const transaction = new Transaction().add(instruction);
+
+      // Proof of Bags: jesli post wspomina token, transakcja dostaje konto
+      // tokenowe autora i runtime zapisze jego saldo na zawsze. Awaria
+      // wykrywania NIE blokuje posta - idzie wtedy bez dowodu, jak dotad.
+      const bagMints = await detectBagsMints(connection, content).catch(error => {
+        console.warn('Proof of Bags detection failed, posting without it:', error);
+        return [];
+      });
+      if (bagMints.length > 0) {
+        transaction.add(buildBagsInstruction(publicKey, bagMints));
+      }
 
       // Blockhash pobrany RAZ i uzyty zarowno do wyslania, jak i do
       // potwierdzenia. Drugie `getLatestBlockhash` po wyslaniu potrafi zwrocic
@@ -346,6 +258,18 @@ export default function SolanaPostButton({
   }
 
   return (
+    <div className="flex items-center gap-2">
+      {mentionsToken && (
+        // Autor ma wiedziec PRZED podpisem, ze post zapisze na lancuchu jego
+        // pozycje w tokenie. Saldo portfela i tak jest publiczne, ale
+        // powiazanie go z konkretnym postem to decyzja, ktora nalezy do autora.
+        <span
+          className="max-w-[16rem] text-right text-[11px] leading-tight text-soft-ink-muted"
+          title="If this post mentions a token address, its transaction records how much of that token your Solana wallet holds right now. Anyone can verify it on an explorer."
+        >
+          Proof of Bags: your position in the mentioned token gets recorded with this post
+        </span>
+      )}
     <button
       type="button"
       aria-label={connected ? `Post on ${SOLANA_NETWORK_LABEL}` : 'Connect a Solana wallet'}
@@ -371,5 +295,6 @@ export default function SolanaPostButton({
         </>
       )}
     </button>
+    </div>
   );
 }

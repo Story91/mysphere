@@ -244,3 +244,57 @@ karty na X — zadziała tylko `dial.to`. To formularz, nie kod.
 **`NEXT_PUBLIC_SITE_URL`.** Bez tej zmiennej ikona i adresy akcji biorą się
 z żądania. Na produkcji za Vercelem działa `VERCEL_URL`, ale własna domena
 w tej zmiennej jest pewniejsza.
+
+---
+
+# Proof of Bags
+
+Dodane 23 września 2026. Pełny spec z pomiarami:
+`docs/superpowers/specs/2026-09-23-proof-of-bags-design.md`.
+
+Post z Solany, który wspomina token (adres minta albo link z pump.fun,
+dexscreener, birdeye, jup.ag, solscan), dołącza do własnej transakcji konto
+tokenowe autora. Runtime zapisuje wtedy w metadanych transakcji, ile tego tokena
+autor miał w chwili publikacji — na zawsze, sprawdzalnie w każdym eksploratorze.
+Pod postem pojawia się odznaka: saldo wtedy i co portfel ma teraz.
+
+Trik, na którym to stoi, i dlaczego działa, zmierzone symulacją na mainnecie:
+Memo **v1** przyjmuje konta niepodpisujące (v2 je odrzuca), a runtime zbiera
+`preTokenBalances` tylko wtedy, gdy w transakcji występuje program tokena —
+więc instrukcja niesie oba.
+
+Odznaka mówi o **saldzie portfela**, nie o intencji: „wallet down 82%", nigdy
+„sold 82%". Spadek salda może być przelewem na cold wallet.
+
+## Naprawy przy okazji
+
+**Wiązanie posta z transakcją.** `txHash` w dokumencie posta zapisuje klient
+i do 23.09 nikt go nie sprawdzał. Dla Blinka z napiwkiem znaczyło to, że wpisanie
+cudzego podpisu do własnego posta przekierowywało napiwki na obcy portfel.
+Teraz `app/utils/solana/postReceipt.ts` wymaga, by memo transakcji wskazywało
+płatnika jako autora i zaczynało się treścią tego posta. Używają tego i odznaka,
+i Blink.
+
+**`/blink/tip` podpisuje sam.** Przycisk prowadził do `dial.to`, a deployment
+Dialectu został wstrzymany (`DEPLOYMENT_PAUSED` pod adresem dial.to, zrzut
+właściciela). Strona ma teraz własny portfel Solany i wykonuje tę samą akcję
+co Blink.
+
+**Memo przycinane po bajtach.** 180 znaków emoji to ~720 bajtów, a z instrukcją
+bags transakcja zbliżałaby się do limitu 1232 B. Teraz 280 bajtów UTF-8, bez
+rozrywania znaków. Stare posty (ucięte po znakach) weryfikują się dalej.
+
+## Testy
+
+```
+npm run test:solana-bags
+```
+
+18 testów czystej logiki: wykrywanie mintów (w tym odrzucenie fragmentu
+88-znakowego podpisu i adresu EVM), format memo, werdykty na BigInt,
+przycinanie po bajtach, wiązanie memo z treścią, odczyt dowodu z transakcji
+(w tym odrzucenie cudzego konta tokenowego).
+
+Symulacja na mainnecie z prawdziwym kodem aplikacji: portfel z 1,84 USDC →
+`holding`; portfel bez USDC → konto nie istniało → `no-position`. Transakcja
+555 B przy limicie 1232.

@@ -92,10 +92,15 @@ a podszywanie się pod tickery to podstawowe narzędzie scamerów.
 | 0 | >0 | `bought-after` | posted with no $XYZ · bought after |
 | >0 | = | `holding` | posted holding N $XYZ · still holds 100% |
 | >0 | > | `added` | posted holding N $XYZ · added P% since |
-| >0 | 0 < x < at post | `trimmed` | posted holding N $XYZ · sold P% since |
-| >0 | 0 | `sold-all` | posted holding N $XYZ · sold everything since |
+| >0 | 0 < x < at post | `reduced` | posted holding N $XYZ · wallet down P% since |
+| >0 | 0 | `emptied` | posted holding N $XYZ · wallet now holds none |
 
 Porównania na surowych `amount` (BigInt), nie na liczbach zmiennoprzecinkowych.
+
+**Werdykty opisują saldo portfela, nie intencję autora.** Spadek salda może być
+sprzedażą albo przelewem na cold wallet — odznaka nie pisze „sold", bo przy
+przelewie byłaby nieprawdą o konkretnym człowieku. (Poprawka z 2026-09-23,
+przed pierwszym wdrożeniem.)
 
 ## UI
 

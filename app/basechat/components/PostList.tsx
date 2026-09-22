@@ -78,6 +78,8 @@ import PinTimer from '../PinnedJobs/components/PinTimer';
 import PendingPinTimer from '../PinnedJobs/components/PendingPinTimer';
 import ExtendPinModal from '../PinnedJobs/components/ExtendPinModal';
 import { SOLANA_EXPLORER_SUFFIX } from '../Solana/config/solanaChain';
+// Proof of Bags - odznaka tylko pyta /api/bags, bez web3.js w bundlu feedu.
+import BagsBadge from './BagsBadge';
 
 // Utility function for formatting large numbers with K, M, B suffixes
 const formatNumberWithSuffix = (value: number | string): string => {
@@ -2303,6 +2305,10 @@ function PostList({
               ))}
             </div>
           )}
+
+          {/* Proof of Bags: pozycja autora w tokenie, o ktorym pisze - z kwitu
+              posta na Solanie. Renderuje sie tylko przy pelnym dowodzie. */}
+          {post.network === 'solana' && post.txHash && <BagsBadge postId={post.id} />}
         </div>
 
         {/* 💰 Tip-to-unlock: renderowane WYLACZNIE dla postow z trescia premium.

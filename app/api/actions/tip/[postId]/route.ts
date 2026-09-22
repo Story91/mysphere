@@ -15,8 +15,10 @@
  * i WLACZYLY Blinki, bo to funkcja eksperymentalna domyslnie wylaczona.
  * Dodatkowo adres akcji musi byc zarejestrowany w Dialect Actions Registry,
  * inaczej rozszerzenia nie uznaja go za zaufany i nie rozwina.
- * Dla wszystkich pozostalych dziala link przez dial.to - jedno klikniecie
- * poza X, a nie zero.
+ * Dla wszystkich pozostalych jest nasza strona /blink/tip/[postId], ktora
+ * wykonuje te sama akcje wlasnym portfelem - jedno klikniecie poza X, a nie
+ * zero. (Do 23.09.2026 byl tu dial.to Dialectu; jego deployment zostal
+ * wstrzymany i przycisk prowadzil donikad.)
  *
  * ===========================================================================
  * KOMU IDZIE NAPIWEK I SKAD TO WIEMY
@@ -46,6 +48,7 @@ import {
   LAMPORTS_PER_SOL,
 } from '@solana/web3.js';
 import { getPostForShare } from '../../../../utils/posts/getPostForShare';
+import { verifyPostReceipt } from '../../../../utils/solana/postReceipt';
 import {
   MEMO_PROGRAM_ADDRESS,
   SOLANA_NETWORK_LABEL,
@@ -69,23 +72,32 @@ function connection(): Connection {
 }
 
 /**
- * Adres Solany autora posta, odczytany z kwitu. `null`, gdy post nie pochodzi
- * z Solany albo gdy transakcji nie da sie odczytac.
+ * Adres Solany autora posta, odczytany z kwitu - ale TYLKO wtedy, gdy kwit
+ * naprawde nalezy do tego posta (verifyPostReceipt).
+ *
+ * Do 23.09.2026 brany byl platnik oplaty transakcji z pola `txHash` bez
+ * zadnego sprawdzenia. Pole zapisuje klient, wiec wystarczylo wpisac do
+ * wlasnego posta cudzy podpis - i napiwki za ten post szlyby na obcy portfel.
+ * Teraz memo transakcji musi wskazywac tego samego platnika i zaczynac sie
+ * trescia tego posta.
+ *
+ * Zwraca rodzaj niepowodzenia, bo "nie umiemy teraz odczytac" (502, ponow)
+ * i "to nie jest kwit tego posta" (400, nie ponawiaj) to rozne odpowiedzi.
  */
-async function resolveRecipient(txHash: string): Promise<PublicKey | null> {
+async function resolveRecipient(
+  txHash: string,
+  postContent: string
+): Promise<{ recipient: PublicKey } | { error: string; status: number }> {
   try {
-    const tx = await connection().getTransaction(txHash, {
-      maxSupportedTransactionVersion: 0,
-    });
-    if (!tx) return null;
-
-    // Pierwszy klucz w tablicy kont to zawsze platnik oplaty, czyli podpisujacy.
-    const keys = tx.transaction.message.getAccountKeys();
-    const payer = keys.get(0);
-    return payer ?? null;
+    const receipt = await verifyPostReceipt(connection(), txHash, postContent);
+    if (receipt.ok) return { recipient: new PublicKey(receipt.signer) };
+    if (receipt.reason === 'unverified' || receipt.reason === 'failed-tx') {
+      return { error: 'The on-chain receipt does not match this post, so there is no verified wallet to tip.', status: 400 };
+    }
+    return { error: 'The on-chain receipt for this post could not be read right now.', status: 502 };
   } catch (error) {
     console.error('[actions/tip] Nie udalo sie odczytac transakcji posta:', error);
-    return null;
+    return { error: 'The on-chain receipt for this post could not be read right now.', status: 502 };
   }
 }
 
@@ -110,10 +122,11 @@ export async function GET(request: Request, { params }: { params: { postId: stri
     return actionError('This post was not published on Solana, so it cannot be tipped in SOL.', 400);
   }
 
-  const recipient = await resolveRecipient(post.txHash);
-  if (!recipient) {
-    return actionError('The on-chain receipt for this post could not be read right now.', 502);
+  const resolved = await resolveRecipient(post.txHash, post.content);
+  if ('error' in resolved) {
+    return actionError(resolved.error, resolved.status);
   }
+  const { recipient } = resolved;
 
   const origin = originFrom(request);
   const author = post.authorName || shorten(post.author);
@@ -193,10 +206,11 @@ export async function POST(request: Request, { params }: { params: { postId: str
     return actionError('This post was not published on Solana, so it cannot be tipped in SOL.');
   }
 
-  const recipient = await resolveRecipient(post.txHash);
-  if (!recipient) {
-    return actionError('The on-chain receipt for this post could not be read right now.', 502);
+  const resolved = await resolveRecipient(post.txHash, post.content);
+  if ('error' in resolved) {
+    return actionError(resolved.error, resolved.status);
   }
+  const { recipient } = resolved;
 
   if (recipient.equals(sender)) {
     // Przelew do samego siebie kosztuje oplate i nie robi nic. Lepiej powiedziec
