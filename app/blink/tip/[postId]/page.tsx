@@ -2,7 +2,9 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getPostForShare, shortAddress } from '../../../utils/posts/getPostForShare';
-import { SOLANA_NETWORK_LABEL } from '../../../basechat/Solana/config/solanaChain';
+import { SOLANA_NETWORK_LABEL, solanaExplorerTxUrl } from '../../../basechat/Solana/config/solanaChain';
+import BlinkFrame from '../../components/BlinkFrame';
+import PostCard from '../../components/PostCard';
 import BlinkTipClient from './BlinkTipClient';
 
 /**
@@ -70,34 +72,36 @@ export default async function BlinkTipPage({ params }: Props) {
   const isSolanaPost = post.network === 'solana' && !!post.txHash;
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-[560px] flex-col justify-center gap-5 px-4 py-12">
-      <div className="rounded-card border border-soft-line bg-soft-surface p-5">
-        <p className="text-sm text-soft-ink-muted">{author} on MySphere</p>
-        <p className="mt-2 whitespace-pre-wrap text-soft-ink">{post.content}</p>
+    <BlinkFrame title="Tip">
+      <div className="p-4 sm:p-5">
+        <PostCard
+          authorName={post.authorName}
+          authorAddress={post.author}
+          content={post.content}
+          timestamp={post.timestamp}
+          networkLabel={isSolanaPost ? SOLANA_NETWORK_LABEL : undefined}
+          receiptUrl={isSolanaPost && post.txHash ? solanaExplorerTxUrl(post.txHash) : undefined}
+        />
       </div>
 
-      {isSolanaPost ? (
-        <>
-          <BlinkTipClient postId={post.id} />
-          {/* Do 23.09.2026 stalo tu, ze u osob z Blinkami link "otwiera sie jako
-              karta w feedzie". Nieprawda, dopoki mysphere.fun nie ma w Dialect
-              Actions Registry (sprawdzone 23.09.2026: nie ma) - karta nie
-              rysuje sie nikomu. Zdanie o karcie wraca dopiero po wpisie. */}
-          <p className="text-center text-sm text-soft-ink-muted">
-            The tip goes to the wallet that signed this post on {SOLANA_NETWORK_LABEL}. MySphere does
-            not record it: the Solana transaction is its only receipt.
-          </p>
-        </>
-      ) : (
-        <p className="text-center text-sm text-soft-ink-muted">
-          This post was not published on Solana, so there is no Solana wallet to tip. Open it in the
-          feed to tip the author on the network they used.
-        </p>
-      )}
-
-      <Link href={`/post/${post.id}`} className="text-center text-sm underline text-soft-ink-muted">
-        Open the post in MySphere
-      </Link>
-    </main>
+      <div className="border-t border-soft-line p-4 sm:p-5">
+        {isSolanaPost ? (
+          <BlinkTipClient postId={post.id} author={author} />
+        ) : (
+          <div className="text-sm leading-relaxed text-soft-ink-muted">
+            <p>
+              This post was not published on Solana, so there is no Solana wallet to tip. Open it in the
+              feed to tip the author on the network they used.
+            </p>
+            <Link
+              href={`/post/${post.id}`}
+              className="mt-3 inline-flex min-h-[44px] items-center font-semibold text-soft-primary-deep underline-offset-2 hover:underline"
+            >
+              Open the post on MySphere
+            </Link>
+          </div>
+        )}
+      </div>
+    </BlinkFrame>
   );
 }

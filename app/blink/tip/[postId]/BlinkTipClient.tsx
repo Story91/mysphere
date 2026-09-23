@@ -10,20 +10,23 @@
  */
 
 import dynamic from 'next/dynamic';
+import PanelSkeleton from '../../components/PanelSkeleton';
 
-const SolanaWalletProvider = dynamic(
-  () => import('../../../basechat/Solana/components/SolanaWalletProvider'),
-  { ssr: false }
-);
+// Oba z tym samym szkieletem: bez niego pierwszy chunk (portfel) nie rysowal
+// nic i karta skakala dwa razy.
+const BlinkWalletShell = dynamic(() => import('../../components/BlinkWalletShell'), {
+  ssr: false,
+  loading: () => <PanelSkeleton composer={false} />,
+});
 const TipPanel = dynamic(() => import('./TipPanel'), {
   ssr: false,
-  loading: () => <p className="text-center text-sm text-soft-ink-muted">Loading Solana wallet…</p>,
+  loading: () => <PanelSkeleton composer={false} />,
 });
 
-export default function BlinkTipClient({ postId }: { postId: string }) {
+export default function BlinkTipClient({ postId, author }: { postId: string; author: string }) {
   return (
-    <SolanaWalletProvider>
-      <TipPanel postId={postId} />
-    </SolanaWalletProvider>
+    <BlinkWalletShell>
+      <TipPanel postId={postId} author={author} />
+    </BlinkWalletShell>
   );
 }

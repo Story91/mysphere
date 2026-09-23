@@ -1,22 +1,29 @@
 'use client';
 
-/** Wyspa kliencka strony odpowiedzi - ten sam uklad co BlinkTipClient. */
+/**
+ * Wyspa kliencka strony odpowiedzi - ten sam uklad co BlinkTipClient.
+ * Portfel (BlinkWalletShell) i panel laduja sie dynamicznie, `ssr: false`:
+ * stos Solany ma trafic tylko do kogos, kto na te strone faktycznie wszedl.
+ */
 
 import dynamic from 'next/dynamic';
+import PanelSkeleton from '../../components/PanelSkeleton';
 
-const SolanaWalletProvider = dynamic(
-  () => import('../../../basechat/Solana/components/SolanaWalletProvider'),
-  { ssr: false }
-);
+// Oba z tym samym szkieletem: bez niego pierwszy chunk (portfel) nie rysowal
+// nic i karta skakala dwa razy.
+const BlinkWalletShell = dynamic(() => import('../../components/BlinkWalletShell'), {
+  ssr: false,
+  loading: () => <PanelSkeleton />,
+});
 const ReplyPanel = dynamic(() => import('./ReplyPanel'), {
   ssr: false,
-  loading: () => <p className="text-center text-sm text-soft-ink-muted">Loading Solana wallet…</p>,
+  loading: () => <PanelSkeleton />,
 });
 
-export default function BlinkReplyClient({ postId }: { postId: string }) {
+export default function BlinkReplyClient({ postId, author }: { postId: string; author: string }) {
   return (
-    <SolanaWalletProvider>
-      <ReplyPanel postId={postId} />
-    </SolanaWalletProvider>
+    <BlinkWalletShell>
+      <ReplyPanel postId={postId} author={author} />
+    </BlinkWalletShell>
   );
 }

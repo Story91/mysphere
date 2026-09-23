@@ -33,11 +33,19 @@
  * co czlowiek ma, to podpis transakcji. /blink/reply/[postId]?signature=...
  * (link z karty "Retry saving") albo wklejenie podpisu w panelu uruchamia ten
  * sam zapis - tresc i kwote serwer i tak czyta z lancucha.
+ *
+ * === WYGLAD I PORTFEL (23.09.2026) ===
+ * Wlasciciel: "wyglada troche jak AI" i "nie wykrywa Phantoma" z X. Uklad to
+ * teraz ekran odpowiedzi: pole z licznikiem w srodku, przelacznik napiwku,
+ * jeden przycisk z kwota. Laczenie portfela idzie przez useBlinkWallet - bez
+ * portfela w przegladarce (X) zamiast pustego modala stoi "Open this page in
+ * your wallet", a szkic odpowiedzi jedzie w adresie (`draft`, `amount`).
+ * Logika zapisu, wpisow i odzyskania nizej jest bez zmian.
  */
 
+import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
-import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { LAMPORTS_PER_SOL, Transaction, type Connection } from '@solana/web3.js';
 import { Buffer } from 'buffer';
 import { confirmOrAskChain } from '../../../basechat/Solana/confirm';
@@ -46,6 +54,7 @@ import {
   normalizePostText,
   SOLANA_CLUSTER,
   SOLANA_NETWORK_LABEL,
+  solanaExplorerTxUrl,
   type SolanaCluster,
 } from '../../../basechat/Solana/config/solanaChain';
 import {
@@ -55,6 +64,20 @@ import {
   REPLY_MAX_BYTES,
   validateReplyText,
 } from '../../../basechat/Solana/replies/replyCore';
+import { useBlinkWallet } from '../../components/useBlinkWallet';
+import OpenInWallet from '../../components/OpenInWallet';
+import { takeCarriedParams } from '../../components/walletLinks';
+import {
+  AmountSegments,
+  FOCUS_RING,
+  formatAmount,
+  LINK_CLASS,
+  PrimaryButton,
+  SecondaryButton,
+  SignatureLine,
+  StatusCard,
+  WalletLine,
+} from '../../components/ui';
 
 const CONFIRM_ATTEMPTS = 4;
 
@@ -93,7 +116,8 @@ type PendingReply = {
 type PanelState =
   | { kind: 'idle'; notice?: string }
   | { kind: 'busy'; step: string }
-  | { kind: 'done'; lamports?: string }
+  /** `signature` tylko do linku "View transaction" w potwierdzeniu. */
+  | { kind: 'done'; lamports?: string; signature: string }
   /** Oplacone (albo mozliwe, ze oplacone), niezapisane: glownym ruchem jest ponowienie zapisu. */
   | { kind: 'pending'; entry: PendingReply; message: string }
   | { kind: 'error'; message: string; signature?: string };
@@ -254,15 +278,35 @@ async function postConfirm(postId: string, entry: PendingReply): Promise<Confirm
   return { status: 'pending', message: lastMessage };
 }
 
-export default function ReplyPanel({ postId }: { postId: string }) {
+/** Parametry, ktorymi szkic jedzie do przegladarki portfela (OpenInWallet). */
+const CARRY_KEYS = ['draft', 'amount'] as const;
+/** Szkic w adresie przycinamy - limit odpowiedzi to 280 bajtow, wiecej nie ma sensu wiezc. */
+const DRAFT_CARRY_MAX = 600;
+
+export default function ReplyPanel({ postId, author }: { postId: string; author: string }) {
   const { connection } = useConnection();
   const { publicKey, sendTransaction, connected } = useWallet();
-  const { setVisible } = useWalletModal();
+  const blinkWallet = useBlinkWallet();
   const [text, setText] = useState('');
   const [amount, setAmount] = useState<number>(REPLY_AMOUNTS_SOL[0]);
   const [state, setState] = useState<PanelState>({ kind: 'idle' });
   const [pasted, setPasted] = useState('');
   const [pastedError, setPastedError] = useState<string | null>(null);
+  const [recoverOpen, setRecoverOpen] = useState(false);
+
+  // Szkic przeniesiony z przegladarki X do przegladarki portfela. Raz na
+  // zamontowanie (ten sam powod co `started` nizej); parametry znikaja z
+  // adresu, zeby odswiezenie po wyslaniu nie wstawialo go drugi raz.
+  const carriedRead = useRef(false);
+  useEffect(() => {
+    if (carriedRead.current) return;
+    carriedRead.current = true;
+    const carried = takeCarriedParams(CARRY_KEYS);
+    if (carried.draft) setText(carried.draft.slice(0, DRAFT_CARRY_MAX));
+    const carriedAmount = Number(carried.amount);
+    const preset = REPLY_AMOUNTS_SOL.find(value => value === carriedAmount);
+    if (preset !== undefined) setAmount(preset);
+  }, []);
 
   // Licznik liczy DOKLADNIE to, co wysle przycisk i sprawdzi serwer
   // (normalizacja whitespace). Wczesniej liczyl samo trim(), wiec potrafil
@@ -280,7 +324,7 @@ export default function ReplyPanel({ postId }: { postId: string }) {
         clearPending(postId, entry.signature);
         dropRecoveryParams();
         // Kwota z lancucha; wpis to zapas na wypadek starszego serwera.
-        setState({ kind: 'done', lamports: result.lamports ?? entry.lamports });
+        setState({ kind: 'done', lamports: result.lamports ?? entry.lamports, signature: entry.signature });
       } else if (result.status === 'rejected') {
         clearPending(postId, entry.signature);
         dropRecoveryParams();
@@ -388,7 +432,9 @@ export default function ReplyPanel({ postId }: { postId: string }) {
 
   async function reply() {
     if (!connected || !publicKey) {
-      setVisible(true);
+      // Jeden portfel - laczymy od razu; kilka - modal; zero - panel pokazuje
+      // "Open this page in your wallet" zamiast tego przycisku.
+      blinkWallet.requestConnect();
       return;
     }
     if (!validation.ok) return;
@@ -431,7 +477,7 @@ export default function ReplyPanel({ postId }: { postId: string }) {
       const latest = await connection.getLatestBlockhash('confirmed');
       transaction.recentBlockhash = latest.blockhash;
 
-      setState({ kind: 'busy', step: 'Waiting for your wallet…' });
+      setState({ kind: 'busy', step: 'Check your wallet…' });
       signature = await sendTransaction(transaction, connection);
       // Od tej chwili pieniadze moga byc w drodze - podpis musi przetrwac
       // wszystko, co stanie sie dalej, lacznie z zamknieciem karty. Blockhash
@@ -485,17 +531,36 @@ export default function ReplyPanel({ postId }: { postId: string }) {
     }
   }
 
+
+
+  const tipLabel = formatAmount(amount);
+  const tooLong = bytes > REPLY_MAX_BYTES;
+  const carry = { draft: text.trim() ? text.slice(0, DRAFT_CARRY_MAX) : undefined, amount: String(amount) };
+
   if (state.kind === 'done') {
     return (
-      <div role="status" className="flex flex-col items-center gap-2 rounded-card border border-emerald-200 bg-emerald-50 p-4 text-center">
-        <p className="font-semibold text-emerald-800">
-          {state.lamports
-            ? `Reply posted, and the author got ${formatSol(state.lamports)} SOL.`
-            : 'Reply posted, and the author got your tip.'}
-        </p>
-        <a href={`/post/${postId}`} className="text-sm text-emerald-800 underline">
+      <div className="mt-1 space-y-3">
+        <StatusCard tone="success" title="Reply posted" role="status">
+          <p>
+            {state.lamports ? (
+              <>
+                <span className="font-semibold tabular-nums text-soft-accent-deep">{formatSol(state.lamports)} SOL</span>{' '}
+                went to {author}.
+              </>
+            ) : (
+              <>Your tip went to {author}.</>
+            )}
+          </p>
+          <a href={solanaExplorerTxUrl(state.signature)} target="_blank" rel="noopener noreferrer" className={LINK_CLASS}>
+            View transaction
+          </a>
+        </StatusCard>
+        <Link
+          href={`/post/${postId}`}
+          className={`flex min-h-[48px] w-full items-center justify-center rounded-pill bg-soft-primary-deep px-5 text-[15px] font-bold text-soft-on-primary hover:bg-soft-primary-deep/90 ${FOCUS_RING}`}
+        >
           See it under the post
-        </a>
+        </Link>
       </div>
     );
   }
@@ -503,28 +568,28 @@ export default function ReplyPanel({ postId }: { postId: string }) {
   if (state.kind === 'pending') {
     const { entry } = state;
     return (
-      <div className="flex flex-col gap-3 rounded-card border border-amber-200 bg-amber-50 p-4 text-center" role="alert">
-        <p className="font-semibold text-amber-900">Saving your reply has not gone through yet.</p>
-        <p className="break-words text-sm text-amber-900">{state.message}</p>
-        {entry.lamports && <p className="text-sm text-amber-900">Tip: {formatSol(entry.lamports)} SOL</p>}
-        <p className="break-all text-xs text-amber-900/80">Keep this signature: {entry.signature}</p>
-        <button
-          type="button"
-          onClick={() => resume(entry)}
-          className="rounded-pill bg-amber-600 px-5 py-2.5 font-semibold text-white hover:bg-amber-700"
-        >
-          Retry saving
-        </button>
-        <p className="text-xs text-amber-900/80">This does not charge you again.</p>
-        <div className="border-t border-amber-200 pt-3">
+      <div className="mt-1 space-y-3">
+        <StatusCard tone="pending" title="Your reply is not saved yet" role="alert">
+          <p className="break-words">{state.message}</p>
+          {entry.lamports && (
+            <p>
+              Tip: <span className="font-semibold tabular-nums">{formatSol(entry.lamports)} SOL</span>
+            </p>
+          )}
+          <p className="font-semibold">Keep this signature:</p>
+          <SignatureLine signature={entry.signature} />
+        </StatusCard>
+        <PrimaryButton onClick={() => resume(entry)}>Retry saving</PrimaryButton>
+        <p className="text-center text-xs text-soft-ink-muted">This does not charge you again.</p>
+        <div className="border-t border-soft-line pt-3">
           <button
             type="button"
             onClick={() => dismiss(entry)}
-            className="text-sm font-semibold text-amber-900 underline underline-offset-2"
+            className={`min-h-[44px] rounded text-sm font-semibold text-soft-ink underline underline-offset-2 ${FOCUS_RING}`}
           >
             Dismiss and write a new reply
           </button>
-          <p className="mt-1 text-xs text-amber-900/80">
+          <p className="text-xs leading-relaxed text-soft-ink-muted">
             If you did pay, this reply may be lost - paste the signature above under &quot;Already paid?&quot; to
             recover it later.
           </p>
@@ -533,84 +598,168 @@ export default function ReplyPanel({ postId }: { postId: string }) {
     );
   }
 
+  const { availability, connectError } = blinkWallet;
+  // Blad laczenia ma sens tylko, dopoki portfel nie jest podlaczony.
+  const showConnectError = !connected ? connectError : null;
+
+  let action;
+  if (busy) {
+    action = <PrimaryButton busy>{state.step}</PrimaryButton>;
+  } else if (connected && publicKey) {
+    action = (
+      <PrimaryButton onClick={reply} disabled={!validation.ok}>
+        Reply and send {tipLabel} SOL
+      </PrimaryButton>
+    );
+  } else if (availability === 'none') {
+    action = <OpenInWallet carry={carry} carryNote={carry.draft ? 'Your reply and tip come with you.' : undefined} />;
+  } else if (availability === 'checking') {
+    action = <PrimaryButton busy>Looking for your wallet…</PrimaryButton>;
+  } else {
+    action = (
+      <PrimaryButton onClick={reply} busy={blinkWallet.connecting}>
+        {blinkWallet.connecting
+          ? 'Check your wallet…'
+          : blinkWallet.multipleWallets || !blinkWallet.walletName
+            ? 'Connect a wallet to reply'
+            : `Connect ${blinkWallet.walletName} to reply`}
+      </PrimaryButton>
+    );
+  }
+
   return (
-    <div className="flex flex-col gap-3">
-      {state.kind === 'idle' && state.notice && (
-        <p role="status" className="rounded-card border border-emerald-200 bg-emerald-50 p-3 text-center text-sm text-emerald-800">
-          {state.notice}
-        </p>
-      )}
+    <div className="mt-1 space-y-4">
+      {state.kind === 'idle' && state.notice && <StatusCard tone="success" title={state.notice} role="status" />}
 
-      <textarea
-        value={text}
-        onChange={event => setText(event.target.value)}
-        disabled={busy}
-        rows={4}
-        placeholder="Write your reply…"
-        aria-label="Your reply"
-        aria-describedby="reply-bytes reply-rules"
-        className="w-full resize-none rounded-card border border-soft-line bg-soft-surface p-3 text-soft-ink outline-none focus:ring-2 focus:ring-[#9945FF]"
-      />
-      <div className="flex items-center justify-between gap-3 text-xs text-soft-ink-muted">
-        <span id="reply-rules">
-          A reply tips the author. Spam costs money here.
-          {hasLineBreaks && ' Line breaks become spaces on-chain.'}
-        </span>
-        <span id="reply-bytes" aria-live="polite" className={bytes > REPLY_MAX_BYTES ? 'font-semibold text-rose-700' : ''}>
-          {bytes}/{REPLY_MAX_BYTES} bytes{bytes > REPLY_MAX_BYTES ? ' - too long' : ''}
-        </span>
-      </div>
-
-      <fieldset className="grid grid-cols-3 gap-2" disabled={busy}>
-        <legend className="sr-only">Tip for the author</legend>
-        {REPLY_AMOUNTS_SOL.map(value => (
-          <label
-            key={value}
-            className={`cursor-pointer rounded-pill border px-3 py-2 text-center text-sm font-semibold transition-colors focus-within:ring-2 focus-within:ring-[#9945FF] ${
-              amount === value ? 'border-[#9945FF] bg-[#9945FF]/10 text-[#6d28d9]' : 'border-soft-line text-soft-ink-muted'
+      <div>
+        <label htmlFor="reply-text" className="mb-2 block text-sm text-soft-ink-muted">
+          Replying to <span className="font-semibold text-soft-ink">{author}</span>
+        </label>
+        <div className="relative">
+          <textarea
+            id="reply-text"
+            value={text}
+            onChange={event => setText(event.target.value)}
+            disabled={busy}
+            rows={4}
+            placeholder={`Reply to ${author}…`}
+            aria-describedby={hasLineBreaks ? 'reply-bytes reply-rules' : 'reply-bytes'}
+            aria-invalid={tooLong || undefined}
+            className={`block w-full resize-none rounded-2xl border bg-soft-surface px-3.5 pb-9 pt-3 text-[15px] leading-relaxed text-soft-ink outline-none transition-colors placeholder:text-soft-ink-muted focus:ring-2 disabled:opacity-60 ${
+              tooLong
+                ? 'border-rose-400 focus:ring-rose-200'
+                : 'border-soft-line focus:border-soft-primary focus:ring-soft-primary/25'
+            }`}
+          />
+          <span
+            id="reply-bytes"
+            className={`pointer-events-none absolute bottom-2.5 right-3.5 text-xs tabular-nums ${
+              tooLong ? 'font-semibold text-rose-700' : 'text-soft-ink-muted'
             }`}
           >
-            <input
-              type="radio"
-              name="reply-amount"
-              value={value}
-              checked={amount === value}
-              onChange={() => setAmount(value)}
-              className="sr-only"
-            />
-            {value} SOL
-          </label>
-        ))}
-      </fieldset>
-
-      <button
-        type="button"
-        disabled={busy || (connected && !validation.ok)}
-        onClick={reply}
-        className="rounded-pill bg-gradient-to-r from-[#9945FF] to-[#14F195] px-5 py-3 font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-      >
-        {busy ? state.step : connected ? `Reply and tip ${amount} SOL` : 'Connect a Solana wallet'}
-      </button>
-
-      <p className="text-center text-xs text-soft-ink-muted" role="status">
-        {busy ? state.step : `Runs on ${SOLANA_NETWORK_LABEL}.`}
-      </p>
-
-      {state.kind === 'error' && (
-        <div className="text-center text-sm text-rose-700" role="alert">
-          <p>{state.message}</p>
-          {state.signature && (
-            <p className="mt-1 break-all text-xs text-soft-ink-muted">Signature: {state.signature}</p>
-          )}
+            {bytes}/{REPLY_MAX_BYTES}
+            <span className="sr-only"> bytes</span>
+            {tooLong && ' · too long'}
+          </span>
         </div>
-      )}
+        {/* Licznik nie jest regionem live - czytnik odczytywalby go przy kazdym
+            znaku. Ogloszenie idzie tylko wtedy, gdy tekst przekroczy limit. */}
+        <p className="sr-only" aria-live="polite">
+          {tooLong && `Too long: ${bytes} of ${REPLY_MAX_BYTES} bytes.`}
+        </p>
+        {hasLineBreaks && (
+          <p id="reply-rules" className="mt-1.5 text-xs text-soft-ink-muted">
+            Line breaks become spaces on-chain.
+          </p>
+        )}
+      </div>
+
+      <AmountSegments
+        name="reply-amount"
+        legend="Tip the author"
+        hint="SOL"
+        options={REPLY_AMOUNTS_SOL.map(value => ({ value: String(value), label: formatAmount(value), srSuffix: 'SOL' }))}
+        value={String(amount)}
+        onChange={value => setAmount(Number(value))}
+        disabled={busy}
+      />
+
+      <div className="space-y-3">
+        {connected && publicKey && (
+          <WalletLine
+            address={publicKey.toBase58()}
+            walletName={blinkWallet.walletName}
+            onSwitch={blinkWallet.disconnectWallet}
+            disabled={busy}
+          />
+        )}
+
+        {action}
+
+        <p className="sr-only" role="status" aria-live="polite">
+          {busy && state.step}
+        </p>
+
+        {state.kind === 'error' && (
+          <StatusCard tone="error" title={state.message} role="alert">
+            {state.signature && <SignatureLine signature={state.signature} />}
+          </StatusCard>
+        )}
+
+        {showConnectError &&
+          (showConnectError.kind === 'cancelled' ? (
+            <p role="status" className="text-sm text-soft-ink-muted">
+              {showConnectError.message}
+            </p>
+          ) : (
+            <div className="space-y-3">
+              <StatusCard tone="error" title={showConnectError.message} role="alert" />
+              {/* Telefon bez dzialajacego portfela (np. Mobile Wallet Adapter bez
+                  aplikacji portfela) - zostaje droga przez przegladarke portfela. */}
+              <OpenInWallet compact carry={carry} />
+            </div>
+          ))}
+
+        <p className="text-xs leading-relaxed text-soft-ink-muted">
+          The SOL goes straight to the author&apos;s Solana wallet. Your reply shows under the post once{' '}
+          {SOLANA_NETWORK_LABEL} confirms it.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-x-4 border-t border-soft-line pt-2 text-sm">
+        <Link
+          href={`/post/${postId}`}
+          className={`inline-flex min-h-[44px] items-center rounded font-semibold text-soft-ink-muted hover:text-soft-ink ${FOCUS_RING}`}
+        >
+          Open the post on MySphere
+        </Link>
+        <button
+          type="button"
+          onClick={() => setRecoverOpen(open => !open)}
+          aria-expanded={recoverOpen}
+          aria-controls="reply-recover"
+          className={`inline-flex min-h-[44px] items-center gap-1 rounded font-semibold text-soft-ink-muted hover:text-soft-ink ${FOCUS_RING}`}
+        >
+          Already paid?
+          <svg
+            viewBox="0 0 16 16"
+            aria-hidden="true"
+            className={`h-3.5 w-3.5 transition-transform duration-150 ${recoverOpen ? 'rotate-180' : ''}`}
+          >
+            <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      </div>
 
       {/* Callback Blinka w X potrafi nie dojsc - wtedy podpis to jedyne, co
           czlowiek ma. Zapis czyta tresc i kwote z lancucha, niczego nie pobiera. */}
-      <details className="text-center text-xs text-soft-ink-muted">
-        <summary className="cursor-pointer underline underline-offset-2">Already paid? Paste your transaction signature</summary>
-        <form onSubmit={submitPasted} className="mt-2 flex flex-col gap-2 text-left">
+      {recoverOpen && (
+        <form id="reply-recover" onSubmit={submitPasted} className="space-y-2 rounded-2xl bg-soft-sunken/50 p-3.5">
+          <label htmlFor="reply-recover-signature" className="block text-sm font-semibold text-soft-ink">
+            Paste your transaction signature
+          </label>
           <input
+            id="reply-recover-signature"
             value={pasted}
             onChange={event => {
               setPasted(event.target.value);
@@ -618,28 +767,25 @@ export default function ReplyPanel({ postId }: { postId: string }) {
             }}
             disabled={busy}
             placeholder="Transaction signature"
-            aria-label="Transaction signature"
             aria-invalid={pastedError ? true : undefined}
             aria-describedby="reply-recover-help"
             spellCheck={false}
             autoComplete="off"
-            className="w-full rounded-card border border-soft-line bg-soft-surface p-2.5 font-mono text-xs text-soft-ink outline-none focus:ring-2 focus:ring-[#9945FF]"
+            className="min-h-[44px] w-full rounded-xl border border-soft-line bg-soft-surface px-3 font-mono text-xs text-soft-ink outline-none placeholder:text-soft-ink-muted focus:border-soft-primary focus:ring-2 focus:ring-soft-primary/25"
           />
           {pastedError && (
-            <p className="text-rose-700" role="alert">
+            <p className="text-sm text-rose-700" role="alert">
               {pastedError}
             </p>
           )}
-          <button
-            type="submit"
-            disabled={busy || !pasted.trim()}
-            className="rounded-pill border border-soft-line px-4 py-2 font-semibold text-soft-ink transition-opacity hover:opacity-90 disabled:opacity-50"
-          >
+          <SecondaryButton type="submit" disabled={busy || !pasted.trim()}>
             Recover my reply
-          </button>
-          <p id="reply-recover-help">We read the reply and the tip from the chain. This does not charge you.</p>
+          </SecondaryButton>
+          <p id="reply-recover-help" className="text-xs text-soft-ink-muted">
+            We read the reply and the tip from the chain. This does not charge you.
+          </p>
         </form>
-      </details>
+      )}
     </div>
   );
 }

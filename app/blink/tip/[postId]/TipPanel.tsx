@@ -13,35 +13,77 @@
  * (POST /api/actions/tip/[postId]) o transakcje i daje ja portfelowi do
  * podpisu. Ta sama trasa obsluguje Blinka w rozszerzeniach, wiec logika
  * napiwku istnieje w jednym miejscu.
+ *
+ * === WYGLAD I PORTFEL (23.09.2026) ===
+ * Wczesniej kazda kwota byla osobnym gradientowym przyciskiem, ktory od razu
+ * placil. Teraz jak w panelu odpowiedzi: przelacznik kwoty (z "Other") i jeden
+ * przycisk, ktory mowi, ile wysle. Portfel przez useBlinkWallet - bez portfela
+ * w przegladarce (X) zamiast pustego modala stoi "Open this page in your
+ * wallet", a wybrana kwota jedzie w adresie (`amount`).
  */
 
-import { useState } from 'react';
+import Link from 'next/link';
+import { useEffect, useRef, useState } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
-import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { Transaction } from '@solana/web3.js';
 import { Buffer } from 'buffer';
 import { confirmOrAskChain } from '../../../basechat/Solana/confirm';
 import { isInsufficientFunds, isRentError, isUserRejection } from '../../../basechat/Solana/walletErrors';
-import { SOLANA_NETWORK_LABEL, solanaExplorerTxUrl } from '../../../basechat/Solana/config/solanaChain';
+import { solanaExplorerTxUrl } from '../../../basechat/Solana/config/solanaChain';
+import { useBlinkWallet } from '../../components/useBlinkWallet';
+import OpenInWallet from '../../components/OpenInWallet';
+import { takeCarriedParams } from '../../components/walletLinks';
+import {
+  AmountSegments,
+  FOCUS_RING,
+  formatAmount,
+  LINK_CLASS,
+  PrimaryButton,
+  SignatureLine,
+  StatusCard,
+  WalletLine,
+} from '../../components/ui';
 
 const PRESETS_SOL = [0.01, 0.05, 0.25];
+const OTHER = 'other';
 
 type PanelState =
   | { kind: 'idle' }
-  | { kind: 'busy' }
+  | { kind: 'busy'; step: string }
   | { kind: 'done'; signature: string; amount: number }
-  | { kind: 'error'; message: string };
+  | { kind: 'error'; message: string; signature?: string };
 
-export default function TipPanel({ postId }: { postId: string }) {
+export default function TipPanel({ postId, author }: { postId: string; author: string }) {
   const { connection } = useConnection();
   const { publicKey, sendTransaction, connected } = useWallet();
-  const { setVisible } = useWalletModal();
+  const blinkWallet = useBlinkWallet();
+  const [choice, setChoice] = useState<string>(String(PRESETS_SOL[1]));
   const [custom, setCustom] = useState('');
   const [state, setState] = useState<PanelState>({ kind: 'idle' });
+  const customRef = useRef<HTMLInputElement>(null);
+
+  // Kwota przeniesiona z przegladarki X do przegladarki portfela.
+  const carriedRead = useRef(false);
+  useEffect(() => {
+    if (carriedRead.current) return;
+    carriedRead.current = true;
+    const carried = takeCarriedParams(['amount'] as const);
+    const value = Number(carried.amount);
+    if (!carried.amount || !Number.isFinite(value) || value <= 0) return;
+    if (PRESETS_SOL.includes(value)) {
+      setChoice(String(value));
+    } else {
+      setChoice(OTHER);
+      setCustom(carried.amount);
+    }
+  }, []);
+
+  const amount = choice === OTHER ? Number(custom) : Number(choice);
+  const amountReady = choice !== OTHER || custom.trim() !== '';
 
   async function tip(amount: number) {
     if (!connected || !publicKey) {
-      setVisible(true);
+      blinkWallet.requestConnect();
       return;
     }
     if (!Number.isFinite(amount) || amount < 0.001) {
@@ -49,7 +91,7 @@ export default function TipPanel({ postId }: { postId: string }) {
       return;
     }
 
-    setState({ kind: 'busy' });
+    setState({ kind: 'busy', step: 'Preparing your tip…' });
     try {
       const res = await fetch(`/api/actions/tip/${postId}?amount=${amount}`, {
         method: 'POST',
@@ -69,7 +111,9 @@ export default function TipPanel({ postId }: { postId: string }) {
       const latest = await connection.getLatestBlockhash('confirmed');
       transaction.recentBlockhash = latest.blockhash;
 
+      setState({ kind: 'busy', step: 'Check your wallet…' });
       const signature = await sendTransaction(transaction, connection);
+      setState({ kind: 'busy', step: 'Confirming on Solana…' });
       const outcome = await confirmOrAskChain(
         connection,
         signature,
@@ -82,7 +126,13 @@ export default function TipPanel({ postId }: { postId: string }) {
       } else if (outcome.kind === 'failed') {
         setState({ kind: 'error', message: `The network rejected the tip: ${outcome.detail}` });
       } else if (outcome.kind === 'unknown') {
-        setState({ kind: 'error', message: `We could not confirm the tip with the network. Check this signature on an explorer before tipping again: ${signature}` });
+        // Podpis zostaje na ekranie z linkiem - bez tego drugi napiwek "na
+        // wszelki wypadek" potrafil zaplacic dwa razy.
+        setState({
+          kind: 'error',
+          message: 'We could not confirm the tip with the network. Check the transaction before tipping again.',
+          signature,
+        });
       } else {
         setState({ kind: 'error', message: 'The network did not confirm the tip in time. Nothing was charged.' });
       }
@@ -101,79 +151,161 @@ export default function TipPanel({ postId }: { postId: string }) {
 
   if (state.kind === 'done') {
     return (
-      <div className="flex flex-col items-center gap-2 rounded-card border border-emerald-200 bg-emerald-50 p-4 text-center">
-        <p className="font-semibold text-emerald-800">Sent {state.amount} SOL. Thank you.</p>
-        <a
-          href={solanaExplorerTxUrl(state.signature)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-sm text-emerald-800 underline"
+      <div className="space-y-3">
+        <StatusCard tone="success" title="Tip sent" role="status">
+          <p>
+            <span className="font-semibold tabular-nums text-soft-accent-deep">{formatAmount(state.amount)} SOL</span> went
+            to {author}. Thank you.
+          </p>
+          <a href={solanaExplorerTxUrl(state.signature)} target="_blank" rel="noopener noreferrer" className={LINK_CLASS}>
+            View transaction
+          </a>
+        </StatusCard>
+        <Link
+          href={`/post/${postId}`}
+          className={`flex min-h-[48px] w-full items-center justify-center rounded-pill border border-soft-line-strong bg-soft-surface px-5 text-[15px] font-bold text-soft-ink hover:bg-soft-sunken ${FOCUS_RING}`}
         >
-          View the transaction
-        </a>
+          Open the post on MySphere
+        </Link>
       </div>
     );
   }
 
   const busy = state.kind === 'busy';
+  const { availability, connectError } = blinkWallet;
+  const showConnectError = !connected ? connectError : null;
+  const carry = { amount: amountReady && Number.isFinite(amount) && amount > 0 ? String(amount) : undefined };
+  const amountLabel = amountReady && Number.isFinite(amount) ? formatAmount(amount) : null;
+
+  let action;
+  if (state.kind === 'busy') {
+    action = <PrimaryButton busy>{state.step}</PrimaryButton>;
+  } else if (connected && publicKey) {
+    action = (
+      <PrimaryButton onClick={() => tip(amount)} disabled={!amountReady}>
+        {amountLabel ? `Send ${amountLabel} SOL tip` : 'Enter an amount'}
+      </PrimaryButton>
+    );
+  } else if (availability === 'none') {
+    action = <OpenInWallet carry={carry} />;
+  } else if (availability === 'checking') {
+    action = <PrimaryButton busy>Looking for your wallet…</PrimaryButton>;
+  } else {
+    action = (
+      <PrimaryButton onClick={() => tip(amount)} busy={blinkWallet.connecting}>
+        {blinkWallet.connecting
+          ? 'Check your wallet…'
+          : blinkWallet.multipleWallets || !blinkWallet.walletName
+            ? 'Connect a wallet to tip'
+            : `Connect ${blinkWallet.walletName} to tip`}
+      </PrimaryButton>
+    );
+  }
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="grid grid-cols-3 gap-2">
-        {PRESETS_SOL.map(amount => (
-          <button
-            key={amount}
-            type="button"
-            disabled={busy}
-            onClick={() => tip(amount)}
-            className="rounded-pill bg-gradient-to-r from-[#9945FF] to-[#14F195] px-3 py-2.5 font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-          >
-            {amount} SOL
-          </button>
-        ))}
+    <div className="space-y-4">
+      <div>
+        <AmountSegments
+          name="tip-amount"
+          legend={`Tip ${author}`}
+          hint="SOL"
+          options={[
+            ...PRESETS_SOL.map(value => ({ value: String(value), label: formatAmount(value), srSuffix: 'SOL' })),
+            { value: OTHER, label: 'Other' },
+          ]}
+          value={choice}
+          onChange={value => {
+            setChoice(value);
+            if (state.kind === 'error') setState({ kind: 'idle' });
+            // Po wyborze "Other" od razu pole kwoty - inaczej czlowiek szuka, gdzie wpisac.
+            if (value === OTHER) requestAnimationFrame(() => customRef.current?.focus());
+          }}
+          disabled={busy}
+        />
+        {choice === OTHER && (
+          <div className="relative mt-2">
+            <label htmlFor="tip-custom" className="sr-only">
+              Tip amount in SOL
+            </label>
+            <input
+              id="tip-custom"
+              ref={customRef}
+              type="number"
+              inputMode="decimal"
+              min="0.001"
+              step="any"
+              placeholder="0.1"
+              value={custom}
+              onChange={event => setCustom(event.target.value)}
+              disabled={busy}
+              className="min-h-[48px] w-full rounded-2xl border border-soft-line bg-soft-surface pl-3.5 pr-14 text-[15px] tabular-nums text-soft-ink outline-none placeholder:text-soft-ink-muted focus:border-soft-primary focus:ring-2 focus:ring-soft-primary/25 disabled:opacity-60"
+            />
+            <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-sm font-semibold text-soft-ink-muted">
+              SOL
+            </span>
+          </div>
+        )}
       </div>
 
-      <form
-        className="flex gap-2"
-        onSubmit={event => {
-          event.preventDefault();
-          tip(Number(custom));
-        }}
-      >
-        <input
-          type="number"
-          inputMode="decimal"
-          min="0.001"
-          step="any"
-          placeholder="Other amount (SOL)"
-          value={custom}
-          onChange={event => setCustom(event.target.value)}
-          disabled={busy}
-          aria-label="Tip amount in SOL"
-          className="min-w-0 flex-1 rounded-pill border border-soft-line bg-soft-surface px-4 py-2 text-soft-ink outline-none focus:ring-2 focus:ring-[#9945FF]"
-        />
-        <button
-          type="submit"
-          disabled={busy || !custom}
-          className="rounded-pill border border-[#9945FF] px-4 py-2 font-semibold text-[#6d28d9] disabled:opacity-50"
-        >
-          Tip
-        </button>
-      </form>
+      <div className="space-y-3">
+        {connected && publicKey && (
+          <WalletLine
+            address={publicKey.toBase58()}
+            walletName={blinkWallet.walletName}
+            onSwitch={blinkWallet.disconnectWallet}
+            disabled={busy}
+          />
+        )}
 
-      <p className="text-center text-xs text-soft-ink-muted" role="status">
-        {busy
-          ? 'Waiting for your wallet…'
-          : !connected
-            ? `Clicking an amount connects your Solana wallet first. Runs on ${SOLANA_NETWORK_LABEL}.`
-            : `Connected: ${publicKey?.toBase58().slice(0, 4)}…${publicKey?.toBase58().slice(-4)} on ${SOLANA_NETWORK_LABEL}.`}
-      </p>
+        {action}
 
-      {state.kind === 'error' && (
-        <p className="text-center text-sm text-rose-700" role="alert">
-          {state.message}
+        <p className="sr-only" role="status" aria-live="polite">
+          {state.kind === 'busy' && state.step}
         </p>
-      )}
+
+        {state.kind === 'error' && (
+          <StatusCard tone="error" title={state.message} role="alert">
+            {state.signature && (
+              <>
+                <SignatureLine signature={state.signature} />
+                <a href={solanaExplorerTxUrl(state.signature)} target="_blank" rel="noopener noreferrer" className={LINK_CLASS}>
+                  View transaction
+                </a>
+              </>
+            )}
+          </StatusCard>
+        )}
+
+        {showConnectError &&
+          (showConnectError.kind === 'cancelled' ? (
+            <p role="status" className="text-sm text-soft-ink-muted">
+              {showConnectError.message}
+            </p>
+          ) : (
+            <div className="space-y-3">
+              <StatusCard tone="error" title={showConnectError.message} role="alert" />
+              <OpenInWallet compact carry={carry} />
+            </div>
+          ))}
+
+        {/* Do 23.09.2026 stalo tu, ze u osob z Blinkami link "otwiera sie jako
+            karta w feedzie". Nieprawda, dopoki mysphere.fun nie ma w Dialect
+            Actions Registry (sprawdzone 23.09.2026: nie ma) - karta nie
+            rysuje sie nikomu. Zdanie o karcie wraca dopiero po wpisie. */}
+        <p className="text-xs leading-relaxed text-soft-ink-muted">
+          The SOL goes straight to the Solana wallet that signed this post. MySphere does not record tips: the
+          transaction is the receipt.
+        </p>
+      </div>
+
+      <div className="border-t border-soft-line pt-2 text-sm">
+        <Link
+          href={`/post/${postId}`}
+          className={`inline-flex min-h-[44px] items-center rounded font-semibold text-soft-ink-muted hover:text-soft-ink ${FOCUS_RING}`}
+        >
+          Open the post on MySphere
+        </Link>
+      </div>
     </div>
   );
 }

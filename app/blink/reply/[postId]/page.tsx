@@ -3,6 +3,9 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getPostForShare, shortAddress } from '../../../utils/posts/getPostForShare';
 import { REPLY_MIN_LAMPORTS } from '../../../basechat/Solana/replies/replyCore';
+import { SOLANA_NETWORK_LABEL, solanaExplorerTxUrl } from '../../../basechat/Solana/config/solanaChain';
+import BlinkFrame from '../../components/BlinkFrame';
+import PostCard from '../../components/PostCard';
 import BlinkReplyClient from './BlinkReplyClient';
 
 /**
@@ -54,24 +57,37 @@ export default async function BlinkReplyPage({ params }: Props) {
   const isSolanaPost = post.network === 'solana' && !!post.txHash;
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-[560px] flex-col justify-center gap-5 px-4 py-12">
-      <div className="rounded-card border border-soft-line bg-soft-surface p-5">
-        <p className="text-sm text-soft-ink-muted">{author} on MySphere</p>
-        <p className="mt-2 whitespace-pre-wrap text-soft-ink">{post.content}</p>
+    <BlinkFrame title="Reply">
+      <div className="p-4 sm:p-5">
+        <PostCard
+          authorName={post.authorName}
+          authorAddress={post.author}
+          content={post.content}
+          timestamp={post.timestamp}
+          networkLabel={isSolanaPost ? SOLANA_NETWORK_LABEL : undefined}
+          // Kwit posta to jego transakcja na Solanie - ten sam podpis, z ktorego
+          // trasa akcji czyta portfel autora.
+          receiptUrl={isSolanaPost && post.txHash ? solanaExplorerTxUrl(post.txHash) : undefined}
+          threaded={isSolanaPost}
+        />
+
+        {isSolanaPost ? (
+          <BlinkReplyClient postId={post.id} author={author} />
+        ) : (
+          <div className="mt-4 border-t border-soft-line pt-4 text-sm leading-relaxed text-soft-ink-muted">
+            <p>
+              Paid replies work under posts published on Solana - that is where we know the author&apos;s
+              wallet. Open the post in the feed to comment there.
+            </p>
+            <Link
+              href={`/post/${post.id}`}
+              className="mt-3 inline-flex min-h-[44px] items-center font-semibold text-soft-primary-deep underline-offset-2 hover:underline"
+            >
+              Open the post on MySphere
+            </Link>
+          </div>
+        )}
       </div>
-
-      {isSolanaPost ? (
-        <BlinkReplyClient postId={post.id} />
-      ) : (
-        <p className="text-center text-sm text-soft-ink-muted">
-          Paid replies work under posts published on Solana - that is where we know the author&apos;s
-          wallet. Open the post in the feed to comment there.
-        </p>
-      )}
-
-      <Link href={`/post/${post.id}`} className="text-center text-sm underline text-soft-ink-muted">
-        Open the post in MySphere
-      </Link>
-    </main>
+    </BlinkFrame>
   );
 }
