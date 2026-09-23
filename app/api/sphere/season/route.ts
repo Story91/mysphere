@@ -136,6 +136,11 @@ async function scanRange<T>(
  * `/api/sphere/epochs` ma te deklaracje od poczatku - ta jej nie miala.
  */
 export const dynamic = 'force-dynamic';
+// Trasa eksportuje sam GET, wiec `force-dynamic` nie wylacza Data Cache
+// Nexta 14: zapytania JSON-RPC viem (POST bez `cache`) szly do "auto cache"
+// na rok i swiezy proces potrafil oddac stara glowe lancucha. Pelny opis:
+// app/api/launchpad/pool-swaps/route.ts. Cache brzegowego tu nie ma; zostaje pamiec w procesie (REFRESH_MS, 5 min).
+export const fetchCache = 'force-no-store';
 
 export async function GET() {
   const cached = g.__sphereSeasonV2;

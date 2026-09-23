@@ -35,6 +35,13 @@ import { rpcCandidates } from '../historyRpc';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+// Trasa eksportuje sam GET, wiec `force-dynamic` nie wylacza Data Cache
+// Nexta 14: zapytania JSON-RPC viem (POST bez `cache`) szly do "auto cache"
+// na rok (pelny opis: app/api/launchpad/pool-swaps/route.ts). Tu `revalidate
+// = 0`, a nie `fetchCache = 'force-no-store'` jak w pozostalych trasach, bo
+// kurs z `ethUsd()` ma swiadome `next: { revalidate: 60 }` - `revalidate = 0`
+// zeruje tylko domyslne cache'owanie, jawna minuta zostaje.
+export const revalidate = 0;
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 

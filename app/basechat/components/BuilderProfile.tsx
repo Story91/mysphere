@@ -1366,25 +1366,31 @@ export default function BuilderProfile({
               {!isRouteDisabled('/base') && (
                 <a
                   href="/base"
-                  /* Ten sam granat co karta Aska (#141a33). W produkcie jest
-                     dokladnie JEDEN ciemny kolor - trzy odcienie czerni na
-                     dwoch kaflach obok siebie czytaly sie jak niedokonczona
-                     podmiana, a nie jak decyzja. */
-                  className="mt-3 block w-full rounded-card bg-[#141a33] p-4 text-center shadow-card transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                  /* Biala karta z tokenow, jak post i jak Ask. Granat
+                     (#141a33) stal tu wylacznie po to, zeby kafel zgadzal sie
+                     z granatowa karta Aska. Aski wrocily na biel (wlasciciel:
+                     "kolorystyka tez jakos odstaje Askow od Postow"), wiec ten
+                     kafel zostalby jedynym ciemnym elementem w jasnym produkcie -
+                     czyli wygladalby na niedokonczona podmiane, ktorej granat
+                     mial wlasnie zapobiec. Rozpoznawalnosc niesie niebieskie
+                     kolko Base w pigulce, nie tlo. */
+                  className="mt-3 block w-full rounded-card border border-soft-line bg-soft-surface p-4 text-center shadow-card transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken/60 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                 >
                   <div className="mb-1.5 flex items-center justify-center gap-2">
-                    <span className="font-soft-display text-[15px] font-bold text-white">
+                    <span className="font-soft-display text-[15px] font-bold text-soft-ink">
                       Sphere Identity
                     </span>
-                    <span className="flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5">
+                    <span className="flex items-center gap-1 rounded-full bg-soft-info-soft px-2 py-0.5">
                       <svg className="h-3.5 w-3.5" viewBox="0 0 146 146" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                         <circle cx="73" cy="73" r="73" fill="#0052FF" />
                         <path d="M73.323 123.729C101.617 123.729 124.553 100.832 124.553 72.5875C124.553 44.343 101.617 21.4463 73.323 21.4463C46.4795 21.4463 24.4581 42.0558 22.271 68.2887H89.9859V76.8864H22.271C24.4581 103.119 46.4795 123.729 73.323 123.729Z" fill="white" />
                       </svg>
-                      <span className="font-soft text-[10.5px] font-medium text-white">Base</span>
+                      {/* `ink`, nie `soft-info`: niebieski napis na
+                          `info-soft` ma 4.4:1 i przy 10.5px nie trzyma AA. */}
+                      <span className="font-soft text-[10.5px] font-medium text-soft-ink">Base</span>
                     </span>
                   </div>
-                  <p className="font-soft text-[12px] leading-[1.45] text-blue-200">
+                  <p className="font-soft text-[12px] leading-[1.45] text-soft-ink-muted">
                     Transactions, tokens, NFTs and contracts, straight from the chain.
                   </p>
                 </a>

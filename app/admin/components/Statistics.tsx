@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { collection, query, where, orderBy, getCountFromServer, Timestamp } from 'firebase/firestore';
 import { db } from '../../utils/firebase';
-import { saveGlobalStats } from '../../utils/stats/globalStats';
 
 /**
  * Statystyki panelu admina — liczone AGREGACJĄ, nie pobieraniem dokumentów.
@@ -193,34 +192,19 @@ export default function Statistics() {
       setSnapshot(fresh);
 
       /**
-       * Pomiar trafia takze do globalStats/current, skad czyta go FEED.
+       * TEN POMIAR NIE TRAFIA JUZ DO FEEDU - i to jest celowe.
        *
-       * PO CO: liczniki w panelu Trends czytaly wczesniej wartosci wpisane na
-       * sztywno (175 708 uzytkownikow przy prawdziwych 184 064) z losowym
-       * drganiem "dla realizmu". Po przepisaniu ich na prawdziwy odczyt feed
-       * zostal pusty, bo NIKT tego dokumentu nie zapisywal - i musialem
-       * podlozyc go recznie skryptem.
+       * Stal tu `saveGlobalStats(...)`: kazde klikniecie "Policz" zapisywalo
+       * wynik do globalStats/current, skad czyta go feed. Dzialalo to tylko
+       * wtedy, gdy admin pamietal kliknac, a zapis szedl z PRZEGLADARKI - czyli
+       * regula Firestore musiala zostawic ten dokument otwarty dla kazdego.
+       * Do tego panel zapisywal `likes: null`, bo lajkow nie liczy.
        *
-       * Teraz kazde swiadome przeliczenie tutaj odswieza to, co widza wszyscy.
-       * Jeden odczyt na goscia zamiast ~467, a liczby sa te same, ktore admin
-       * wlasnie zobaczyl.
-       *
-       * Zapis NIE MOZE wywrocic panelu: to skutek uboczny, nie cel klikniecia.
-       * Gdy sie nie uda, liczby i tak sa juz na ekranie.
+       * Feed dostaje teraz liczby z dobowego przeliczenia na serwerze
+       * (app/api/stats/recount/route.ts), a ten panel zostaje narzedziem
+       * admina: liczy dla siebie, pokazuje u siebie i nic nie publikuje.
+       * Dzieki temu dokument da sie zamknac regula `allow write: if false`.
        */
-      void saveGlobalStats({
-        users,
-        posts,
-        comments,
-        tips,
-        // Lajki nie maja wlasnej kolekcji - siedza jako pole `likes` na postach,
-        // wiec ich policzenie wymaga sumy, nie zliczenia. Dopoki tego nie
-        // liczymy, pole zostaje `null`: kreska na ekranie jest uczciwa,
-        // a zero byloby twierdzeniem.
-        likes: null,
-      }).catch((saveError) => {
-        console.warn('[Statistics] Nie udalo sie zapisac globalStats:', saveError);
-      });
       setNow(Date.now());
 
       try {

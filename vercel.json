@@ -8,6 +8,10 @@
     {
       "path": "/api/keeper/perps",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/stats/recount",
+      "schedule": "0 5 * * *"
     }
   ]
 }

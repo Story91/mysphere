@@ -372,35 +372,52 @@ export default function AdminPanel() {
 
 
 
-  // 📊 Export static data template
+  /**
+   * Eksport szablonu z liczbami.
+   *
+   * === BRAK LICZBY TO `null`, NIE WYMYSLONA WARTOSC ===
+   * Kazde pole mialo tu zapasowa liczbe po `||`: 12847 uzytkownikow, 16432
+   * lajki, 2847 kont MySphere i tak dalej. Brak pomiaru dawal wiec plik
+   * wygladajacy jak pomiar, a instrukcja w tym samym pliku kazala wkleic go
+   * do fetchGlobalStats. Wlasnie tam staly potem wpisane na sztywno 175708
+   * uzytkownikow i 18817 lajkow z losowym drganiem "dla realizmu" (naglowek
+   * app/utils/stats/globalStats.ts). Szablon, ktory zgaduje, to przepis na
+   * powrot tamtego bledu.
+   *
+   * `||` mial tez drugi blad: prawdziwe ZERO (np. 0 w pelni podlaczonych kont)
+   * tez podmienial na zmyslona liczbe. `??` przepuszcza zero, a brak daje
+   * `null` - kto otworzy plik, widzi, czego nie zmierzono.
+   *
+   * Instrukcje wklejania sa usuniete. Feed czyta globalStats/current, ktory
+   * przelicza cron (app/api/stats/recount/route.ts), wiec do fetchGlobalStats
+   * nie wkleja sie nic. Druga instrukcja kazala wkleic mySphereStats do
+   * app/api/camp-stats/route.ts - i GET tej trasy do dzis oddaje wpisane na
+   * sztywno 2847 / 234 / 1847, te same liczby co zapasowe wartosci stad.
+   * To osobna naprawa. Usuniete sa tez linijki o koszcie ("$63,000/day",
+   * "800M+") - nie mialy zrodla.
+   */
   const exportStaticData = () => {
     if (!realStatsData && !globalStats) return;
     
     const staticTemplate = {
       homePageStats: {
-        userCount: globalStats?.userCount || 12847,
-        postsCount: globalStats?.postsCount || 8934,
-        likesCount: globalStats?.likesCount || 16432,
-        commentsCount: globalStats?.commentsCount || 13876,
-        transactionsCount: globalStats?.transactionsCount || 22810
+        userCount: globalStats?.userCount ?? null,
+        postsCount: globalStats?.postsCount ?? null,
+        likesCount: globalStats?.likesCount ?? null,
+        commentsCount: globalStats?.commentsCount ?? null,
+        transactionsCount: globalStats?.transactionsCount ?? null
       },
       mySphereStats: {
-        totalUsers: realStatsData.mySphere?.totalUsers || 2847,
-        fullyConnectedUsers: realStatsData.mySphere?.fullyConnectedUsers || 234,
-        averageConnectionsPerUser: realStatsData.mySphere?.averageConnectionsPerUser || 2.1,
-        socialMediaConnections: realStatsData.mySphere?.socialMediaConnections || {
-          twitter: 1847,
-          spotify: 967,
-          tiktok: 543
-        }
+        totalUsers: realStatsData?.mySphere?.totalUsers ?? null,
+        fullyConnectedUsers: realStatsData?.mySphere?.fullyConnectedUsers ?? null,
+        averageConnectionsPerUser: realStatsData?.mySphere?.averageConnectionsPerUser ?? null,
+        socialMediaConnections: realStatsData?.mySphere?.socialMediaConnections ?? null
       },
       lastUpdated: new Date().toISOString(),
       updatedBy: address,
-      instructions: {
-        homePageUpdate: "Copy homePageStats to BaseBook/app/page.tsx in fetchGlobalStats function",
-        myCampUpdate: "Copy mySphereStats to BaseBook/app/api/camp-stats/route.ts in GET function",
-        cost: "$0 to serve users vs $63,000/day with Firebase",
-        firebaseReadsPerDay: "0 vs 800M+ previously"
+      notes: {
+        nullMeans: "not measured in this admin session - never zero, never a guess",
+        feedStats: "The feed reads globalStats/current, recounted daily by /api/stats/recount. Do not paste these numbers into code."
       }
     };
     

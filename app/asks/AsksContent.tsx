@@ -674,9 +674,16 @@ export default function AsksPage() {
             <h2 className="mb-1.5 font-soft-display text-[15px] font-semibold uppercase tracking-[0.14em] text-soft-ink-faint">
               Settled
             </h2>
-            <p className="mb-4 text-[13.5px] leading-[1.6] text-soft-ink-soft">
-              Closed and paid. Every answer is unsealed, and the accepted ones carry the
-              transaction that paid for them.
+            {/* Nie "paid": przy escrow resolve() tylko przypisuje salda, a
+                tokeny wychodza przy claim() (zasada przy zdaniu o `funding`
+                w AskCard.tsx). Prawda w obu wariantach: /accept odrzuca
+                przyjecie bez hasha przelewu, a /escrow-resolve zapisuje hash
+                transakcji resolve() przy kazdej przyznanej odpowiedzi.
+                ink-muted, nie ink-soft: ink-soft ma na bieli 3.43:1 i przy
+                13.5px nie trzyma AA. */}
+            <p className="mb-4 text-[13.5px] leading-[1.6] text-soft-ink-muted">
+              Resolved by their authors. Every answer is unsealed, and each accepted one is
+              recorded with its transaction.
             </p>
             <div className="flex flex-col gap-4">{resolved.map(renderAsk)}</div>
           </div>

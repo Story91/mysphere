@@ -46,6 +46,21 @@ export const SPHERE_TOKEN_ADDRESS = envAddress(
   '0xB200000000000000000000BA5eDb84c678432476'
 );
 
+/**
+ * poolId puli Uniswap v4 tokena SPHERE na Base mainnet - odczytany z
+ * `LiquidityVault.positionOf(SPHERE)` (vault 0x6108...AB63), ten sam, co w
+ * docs/LAUNCHPAD-STAN.md. Sprawdzone ponownie 2026-09-23 na mainnet.base.org.
+ *
+ * PO CO STALA, skoro da sie to przeczytac z lancucha: pasek na /basechat
+ * czytal poolId JEDEN raz, bez ponowien, i ciche `catch {}` zamienialo jeden
+ * nieudany odczyt w pasek bez zasiewu i bez subskrypcji puli na cale zycie
+ * strony. Pula v4 nie zmienia identyfikatora (to hash klucza puli), wiec
+ * znana wartosc jest punktem startu, a odczyt z vaulta juz tylko kontrola -
+ * gdyby kiedys oddal inny niezerowy poolId, wygrywa lancuch.
+ */
+export const SPHERE_POOL_ID =
+  '0xb72656d58775fd33f6b155f1a836669e4c2a8ed436bf8267681df6a06af6a8f3' as const;
+
 /** Faza 1B - wdrozenie Base mainnet 2026-09-02 (scripts/output/sphere-base-1b.json).
  *  Dystrybutor: kumulatywny Merkle ze streamingiem (PROPOSER=deployer,
  *  GUARDIAN=Safe, weto 24h). Buyback: transze <=0.05 ETH, okno 0.5 ETH/7d,

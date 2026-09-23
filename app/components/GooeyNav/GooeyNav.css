@@ -8,23 +8,23 @@
   z-index: 1;
 }
 
+/* Tlo kafla robia nakladki w GooeyNav.tsx (bg-soft-sunken, bg-soft-line,
+   aktywna z activeTileStyle), nie sam przycisk. Stal tu
+   `background: transparent !important`, ktory gasil szare klasy tla na
+   przycisku - tych klas juz nie ma, a preflight Tailwinda i tak zeruje tlo
+   <button>. !important zostalby tylko pulapka na kazda przyszla klase bg-*. */
 .gooey-nav-item {
   position: relative;
   z-index: 1;
   transform-origin: center;
-  background: transparent !important;
 }
 
-.gooey-svg {
-  position: absolute;
-  width: 0;
-  height: 0;
-  pointer-events: none;
-}
-
-/* Ensure icons stay square on mobile */
+/* Bez `border-radius: 0 !important`, ktory tu stal. Znaki sieci w page.tsx
+   maja rounded-none albo nic (<img> i tak ma domyslnie zerowy promien),
+   a jedyny wyjatek to Arc z rounded-[4px] - jego logo jest pelnym
+   kwadratem 400x400 z ciemnym tlem. !important kasowal to zaokraglenie
+   i Arc wychodzil z ostrymi rogami, inaczej niz na odznakach postow
+   (PostList.tsx: rounded-[4px]). */
 .gooey-nav-item img {
-  border-radius: 0 !important;
   object-fit: contain;
 }
-

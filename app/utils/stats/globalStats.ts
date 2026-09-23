@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { toMillis } from '../firestoreTime';
 
@@ -28,9 +28,22 @@ import { toMillis } from '../firestoreTime';
  * wejsciu na feed byloby to 467 odczytow na goscia - czyli dokladnie ten
  * koszt, przed ktorym uciekaly zmyslone liczby.
  *
- * Zamiast tego: liczby zapisuje panel admina po swoim (swiadomym, recznym)
- * przeliczeniu, a feed czyta JEDEN dokument. Jeden odczyt na wejscie, liczby
- * prawdziwe, a ich wiek jest jawny.
+ * Zamiast tego: liczby przelicza RAZ NA DOBE serwer (app/api/stats/recount/
+ * route.ts, cron w vercel.json) i zapisuje kluczem administracyjnym, a feed
+ * czyta JEDEN dokument. Jeden odczyt na wejscie, liczby prawdziwe, a ich wiek
+ * jest jawny.
+ *
+ * Wczesniej zapisywal je panel admina po recznym kliknieciu "Policz" - z
+ * przegladarki, wiec dokument musial byc otwarty do zapisu dla kazdego,
+ * a liczby staly, dopoki nikt nie kliknal. Ta droga jest usunieta; plik nie
+ * eksportuje juz zadnej funkcji zapisujacej i nie powinien.
+ *
+ * === POLA likesSince / likesBaseline* SA HISTORYCZNE ===
+ * Opisy przy nich nizej dotycza okresu, gdy agregacje zwracaly
+ * RESOURCE_EXHAUSTED i lajki skladalo sie ze starej migawki i licznika
+ * w przegladarce. Pierwszy przebieg crona zapisuje pelne `likes` i kasuje
+ * te pola. Typ i galezie w likesTotal() zostaja na czas przejscia (dokument
+ * sprzed pierwszego przebiegu); do usuniecia w osobnej zmianie.
  *
  * === WIEK JEST CZESCIA ODPOWIEDZI ===
  * `measuredAt` wraca razem z liczbami, bo licznik sprzed tygodnia to co innego
@@ -172,39 +185,6 @@ export async function getGlobalStats(): Promise<GlobalStatsResult> {
 }
 
 /**
- * Zapis pomiaru. Wola WYLACZNIE panel admina, po udanym policzeniu.
- *
- * Nie zapisujemy czesciowych wynikow: jesli ktorakolwiek liczba nie doszla,
- * lepiej zostawic poprzedni pomiar w calosci, niz zmieszac swieze liczby ze
- * starymi w jednym dokumencie bez sladu, ktore sa ktore.
- *
- * === MERGE, I TO NIE JEST DROBIAZG ===
- * Bylo tu `setDoc` BEZ `{ merge: true }`, czyli zapis PODMIENIAJACY caly
- * dokument. Panel admina nie liczy lajkow (nie da sie ich policzyc agregacja),
- * wiec w jego danych `likesSince` i `likesBaseline` w ogole nie wystepuja -
- * a zapis bez merge KASOWAL oba. Kazde klikniecie "Policz" w /admin zerowalo
- * licznik lajkow narastajacy od jego wlaczenia i skasowaloby stan poczatkowy
- * policzony skryptem. Licznik przyrostowy, ktory kasuje go inny licznik, nie
- * dojdzie do calkowitej liczby nigdy - to jest jedna z przyczyn, dla ktorych
- * ta liczba nie pokazuje sie po raz trzeci.
- *
- * Merge nie psuje zasady wyzej: pola przekazane tutaj i tak nadpisuja stare
- * w calosci, a `likes: null` dalej jawnie znaczy "nie zmierzono".
- */
-export async function saveGlobalStats(
-  stats: Omit<GlobalStats, 'measuredAt'>
-): Promise<void> {
-  await setDoc(
-    doc(db, STATS_DOC, STATS_ID),
-    {
-      ...stats,
-      measuredAt: serverTimestamp(),
-    },
-    { merge: true }
-  );
-}
-
-/**
  * Calkowita liczba lajkow zlozona z tego, co faktycznie wiemy.
  *
  * === DLACZEGO TO NIE JEST JEDNO POLE ===
@@ -249,7 +229,9 @@ export type LikesTotal = {
 export function likesTotal(stats: GlobalStats | null): LikesTotal {
   if (!stats) return { value: null, basis: 'unknown', since: 0 };
 
-  // Pelna suma z agregacji, gdyby limit kiedys wrocil - wtedy nie ma co skladac.
+  // Pelna suma z dobowego przeliczenia (app/api/stats/recount) - wtedy nie ma
+  // co skladac. Od pierwszego przebiegu crona to jest jedyna droga; nizsze
+  // galezie obsluguja dokument sprzed niego.
   if (stats.likes !== null && stats.likes !== undefined) {
     return { value: stats.likes, basis: 'exact', since: 0 };
   }

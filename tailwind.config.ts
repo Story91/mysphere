@@ -95,6 +95,12 @@ const config: Config = {
           'accent-deep': 'rgb(var(--soft-accent-deep) / <alpha-value>)',
           info: 'rgb(var(--soft-info) / <alpha-value>)',
           'info-soft': 'rgb(var(--soft-info-soft) / <alpha-value>)',
+          // Akcent Aska. Musi stac TU i przy :root w globals.css naraz - sama
+          // zmienna bez tego wpisu daje klasy `bg-soft-ask`, ktore Tailwind
+          // po cichu pomija, a karta Aska traci jedyny wyroznik.
+          ask: 'rgb(var(--soft-ask) / <alpha-value>)',
+          'ask-soft': 'rgb(var(--soft-ask-soft) / <alpha-value>)',
+          'ask-deep': 'rgb(var(--soft-ask-deep) / <alpha-value>)',
         },
         // Paleta startpada. Osobna od `soft`, bo launchpad ma wlasny, gestszy
         // jezyk (wzrost, spadek, krzywa) i wlasny motyw per siec - patrz

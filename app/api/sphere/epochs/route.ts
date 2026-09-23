@@ -50,6 +50,11 @@ const MAX_EPOCH_ROWS = 200;
 const HTTP_PROBE_DEPTH = 12;
 
 export const dynamic = 'force-dynamic';
+// Trasa eksportuje sam GET, wiec `force-dynamic` nie wylacza Data Cache
+// Nexta 14: zapytania JSON-RPC viem (POST bez `cache`) szly do "auto cache"
+// na rok i swiezy proces potrafil oddac stara glowe lancucha. Pelny opis:
+// app/api/launchpad/pool-swaps/route.ts. Cache brzegowego tu nie ma; zostaje pamiec w procesie (REFRESH_MS, 5 min).
+export const fetchCache = 'force-no-store';
 
 /** Wiersz tablicy tworcow - PRZEPISANY z manifestu, nic tu nie jest liczone. */
 type ManifestCreator = {

@@ -54,6 +54,11 @@ import {
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+// Trasa eksportuje sam GET, wiec `force-dynamic` nie wylacza Data Cache
+// Nexta 14: zapytania JSON-RPC viem (POST bez `cache`) szly do "auto cache"
+// na rok i swiezy proces potrafil oddac stara glowe lancucha. Pelny opis:
+// app/api/launchpad/pool-swaps/route.ts. Cache brzegowy (s-maxage) zostaje.
+export const fetchCache = 'force-no-store';
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 

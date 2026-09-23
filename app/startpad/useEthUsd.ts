@@ -17,13 +17,25 @@ import { NATIVE_IS_USD } from './config';
 
 const POLL_MS = 60_000;
 
-export function useEthUsd(): { usd: number | null; refreshedAt: number | null } {
-  const [usd, setUsd] = useState<number | null>(NATIVE_IS_USD ? 1 : null);
+export type EthUsdOptions = {
+  /**
+   * Czy jednostka natywna jest dolarem. Domyslnie: siec WYBRANA na tablicy
+   * (`NATIVE_IS_USD`). Komponent przypiety do jednej sieci podaje to wprost -
+   * pasek na /basechat pokazuje zawsze Base, a z domyslna wartoscia
+   * przegladarka z zapisanym Arc dostawala kurs 1 i kwoty w ETH wychodzily
+   * jako grosze w dolarach.
+   */
+  nativeIsUsd?: boolean;
+};
+
+export function useEthUsd(options?: EthUsdOptions): { usd: number | null; refreshedAt: number | null } {
+  const nativeIsUsd = options?.nativeIsUsd ?? NATIVE_IS_USD;
+  const [usd, setUsd] = useState<number | null>(nativeIsUsd ? 1 : null);
   const [refreshedAt, setRefreshedAt] = useState<number | null>(null);
 
   useEffect(() => {
     // Dolar do dolara. Zadnego zapytania, zadnego pollowania.
-    if (NATIVE_IS_USD) return;
+    if (nativeIsUsd) return;
     let cancelled = false;
     const load = async () => {
       try {
@@ -55,7 +67,7 @@ export function useEthUsd(): { usd: number | null; refreshedAt: number | null } 
       window.clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, []);
+  }, [nativeIsUsd]);
 
   return { usd, refreshedAt };
 }

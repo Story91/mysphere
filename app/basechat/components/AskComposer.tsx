@@ -262,7 +262,13 @@ export default function AskComposer({
       onSubmit={handleSubmit}
       className={`rounded-card border border-soft-line bg-soft-surface p-4 font-soft shadow-card sm:p-5 ${className}`}
     >
-      <h2 className="mb-1 font-soft-display text-[17px] font-bold text-soft-ink">Ask something</h2>
+      {/* Morska kropka to ten sam znak Aska co na pasku stanu AskCard i w
+          naglowku raila - kompozytor stoi w feedzie obok kompozytora postu
+          na identycznej bialej karcie i tylko po niej widac, ktory to tryb. */}
+      <h2 className="mb-1 flex items-center gap-2 font-soft-display text-[17px] font-bold text-soft-ink">
+        <span className="h-2 w-2 shrink-0 rounded-full bg-soft-ask" aria-hidden="true" />
+        Ask something
+      </h2>
       <p className="mb-4 text-[12px] leading-[1.5] text-soft-ink-faint">
         A question with a budget, seats and a deadline. Answers stay sealed until you resolve.
       </p>
@@ -451,10 +457,14 @@ export default function AskComposer({
             Cancel
           </button>
         )}
+        {/* Pigulka z `shadow-chip`, jak przycisk na AskCard i w railu, i w tym
+            samym `primary-deep`: biel na zwyklym `soft-primary` ma 4.22:1 i przy
+            13px nie trzyma AA. `disabled:` stoi w arkuszu Tailwinda 3.4 PO
+            `hover:`, wiec wylaczony przycisk pod kursorem zostaje szary. */}
         <button
           type="submit"
           disabled={blocked}
-          className="rounded-lg bg-soft-primary px-4 py-2 font-soft-display text-[13px] font-semibold text-white transition-transform duration-150 ease-out active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface disabled:cursor-not-allowed disabled:bg-soft-line-strong"
+          className="rounded-pill bg-soft-primary-deep px-4 py-2 font-soft-display text-[13px] font-semibold text-white shadow-chip transition-[background-color,transform] duration-150 ease-out hover:bg-soft-primary-deep/90 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface disabled:cursor-not-allowed disabled:bg-soft-line-strong disabled:shadow-none"
         >
           {submitLabel}
         </button>

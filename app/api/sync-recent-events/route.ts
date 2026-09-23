@@ -7,6 +7,11 @@ import { createPaidPin } from '../../utils/firebase';
 // prerenderowac. Bez tej deklaracji Next probuje ja wygenerowac statycznie
 // przy buildzie i zasmieca log stacktrace'ami DYNAMIC_SERVER_USAGE.
 export const dynamic = 'force-dynamic';
+// Trasa eksportuje sam GET, wiec `force-dynamic` nie wylacza Data Cache
+// Nexta 14: zapytania JSON-RPC viem (POST bez `cache`) szly do "auto cache"
+// na rok i swiezy proces potrafil oddac stara glowe lancucha. Pelny opis:
+// app/api/launchpad/pool-swaps/route.ts. Trasa (cron) nie ma cache'u brzegowego.
+export const fetchCache = 'force-no-store';
 
 /**
  * Backup cron job - automatically sync recent contract events

@@ -609,12 +609,16 @@ export default function SphereOverview() {
           {/* KUP / TWOJE SALDO - jedyne CTA, ktorego szuka zwykly gosc. */}
           {SPHERE_TOKEN_ADDRESS && (
             <div className="mt-4 flex flex-wrap items-center gap-3">
-              <Link
+              {/* Zwykle <a>, nie next/link: siec Startpada liczy sie RAZ, przy
+                  ladowaniu config.ts. Miekkie przejscie zignorowaloby ?c= i ktos
+                  z zapisanym Arc trafialby na token Base podpiety pod Arc - ten
+                  sam blad, co w tasmie StartpadTicker. */}
+              <a
                 href={`/startpad/${SPHERE_TOKEN_ADDRESS}?c=${SPHERE_CHAIN.id}`}
                 className="inline-flex items-center gap-2 rounded-full bg-sp-brand px-5 py-2.5 text-[13px] font-extrabold text-sp-on-brand transition-transform hover:scale-[1.03]"
               >
                 Buy $SPHERE <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </Link>
+              </a>
               {myBalance !== null && (
                 <span className="rounded-full bg-white/70 px-4 py-2 text-[12px] font-extrabold text-sp-shade/70 backdrop-blur-sm">
                   You hold {Number(formatEther(myBalance)).toLocaleString('en-US', { maximumFractionDigits: 0 })} SPHERE

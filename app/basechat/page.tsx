@@ -40,6 +40,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import BanMessage from '../admin/components/BanMessage';
 import { useBanStatus } from '../hooks/useBanStatus';
 import { useIsFarcasterMiniApp } from '../hooks/useIsFarcasterMiniApp';
+import { SOLANA_EXPLORER_SUFFIX } from './Solana/config/solanaChain';
 // ReferralLeaderboard wylaczony w kolumnie bocznej (decyzja wlasciciela) -
 // import wroci razem z kafelkiem.
 import BuilderProfile from './components/BuilderProfile';
@@ -676,7 +677,7 @@ function BaseChatContent() {
    *
    * Rozwijamy TEN SAM, JEDYNY kompozytor - nie budujemy drugiego. Drugi
    * formularz pisania postu bylby drugim miejscem, w ktorym trzeba naprawiac
-   * ten sam blad, a ten obsluguje siedem lancuchow, tresc premium, PostCoin,
+   * ten sam blad, a ten obsluguje kazda siec z selektora, tresc premium, PostCoin,
    * zalaczniki i muzyke.
    *
    * Na DESKTOPIE bez zmian - tam nie ma pigulki i kompozytor stoi otwarty.
@@ -969,6 +970,24 @@ function BaseChatContent() {
 
   // Funkcja pomocnicza do wyświetlania nazwy użytkownika z tooltipem
   const displayUserName = useCallback((userAddress: string, elementId: string, showAvatar: boolean = false) => {
+    // Autor spoza EVM (dzis: platna odpowiedz z Solany) nie ma profilu
+    // w aplikacji. Klikniecie otwieralo pusty profil EVM i zakladalo mu
+    // fantomowy dokument w `users`, wiec prowadzimy do jego adresu
+    // w eksploratorze - to jedyna prawdziwa strona tego portfela.
+    if (!userAddress.startsWith('0x')) {
+      const short = `${userAddress.slice(0, 4)}…${userAddress.slice(-4)}`;
+      return (
+        <a
+          href={`https://explorer.solana.com/address/${userAddress}${SOLANA_EXPLORER_SUFFIX}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={`Solana wallet ${userAddress}`}
+          className="text-base text-gray-900 hover:underline dark:text-white"
+        >
+          {short}
+        </a>
+      );
+    }
     // Sprawdź, czy mamy już nazwę w cache
     const userName = userNames[userAddress]?.name || userAddress.slice(0, 6) + '...' + userAddress.slice(-4);
     const hasBaseName = isBaseName(userName);
@@ -2272,14 +2291,17 @@ function BaseChatContent() {
    * (10 972). Na produkcie o sprawdzalnych liczbach pierwsze cztery liczby
    * na ekranie byly nabite.
    *
-   * Teraz czytamy jeden dokument, ktory zapisuje panel admina po swoim
-   * przeliczeniu. Jeden odczyt na wejscie zamiast 467, liczby prawdziwe,
-   * a przy braku pomiaru pokazujemy PUSTKE, nie wymyslona wartosc.
+   * Teraz czytamy jeden dokument, ktory raz na dobe przelicza serwer
+   * (app/api/stats/recount/route.ts, cron w vercel.json). Jeden odczyt na
+   * wejscie zamiast 467, liczby prawdziwe, a przy braku pomiaru pokazujemy
+   * PUSTKE, nie wymyslona wartosc. Date przeliczenia panel Trends pisze pod
+   * liczbami (`statsMeasuredAt`).
    *
-   * === LAJKI SA SKLADANE, NIE CZYTANE Z JEDNEGO POLA ===
-   * Bylo tu `setTotalLikes(stats.likes)`, a pola `likes` w tym dokumencie NIE
-   * MA i dlugo nie bedzie: panel admina zapisuje je jawnie jako `null`, bo
-   * lajkow nie da sie policzyc agregacja (siedza jako pole na 263 613 postach).
+   * === LAJKI: HISTORIA SKLADANIA ===
+   * Bylo tu `setTotalLikes(stats.likes)`, a pola `likes` w tym dokumencie
+   * dlugo NIE BYLO: panel admina zapisywal je jawnie jako `null`, a agregacja
+   * sum(posts.likes) zwracala wtedy RESOURCE_EXHAUSTED. Od pierwszego
+   * przebiegu crona `likes` jest pelna suma i likesTotal() bierze je wprost.
    * Odczytany dokument mial `likesSince: 6` i zadnego `likes` - czyli jedyna
    * istniejaca liczba lajkow byla po prostu POMIJANA przy odczycie. Kafel
    * dostawal potem `String(null)`, czyli napis "null".
@@ -3178,6 +3200,10 @@ function BaseChatContent() {
           { label: 'Posts', value: totalPosts, tone: 'green' },
           { label: 'Comments', value: totalComments, tone: 'pink' },
         ]}
+        /* Data przeliczenia globalStats/current - panel pisze pod liczbami
+           "Counted Sep 24", a po 48 h "not updated since". Stan byl tu od
+           dawna, tylko nic go nie rysowalo. */
+        measuredAt={statsMeasuredAt}
         /* Cala strona, nie pierwsza piatka. Backend oddaje 10 na
            stronie i do 5 stron (1-50) - `slice(0, 5)` obcinal to
            w polowie i kasowal sens stronicowania, bo strona druga
@@ -3569,11 +3595,12 @@ function BaseChatContent() {
                   oraz git log; kafelek YapScan chowa sie sam, gdy /yapscan
                   jest wylaczony w config/routeStatus.js.
 
-                  `xl:hidden`: od 1280px ten sam blok stoi w osobnej prawej
+                  `xl:hidden`: od progu `xl` (1152px - tailwind.config.ts
+                  przesuwa progi w dol) ten sam blok stoi w osobnej prawej
                   kolumnie, wiec kopia w kolumnie bocznej schodzi - inaczej
                   Trends widnialoby dwa razy naraz. Prog byl wczesniej `2xl`
-                  i przez to na typowym laptopie (1280-1535px) trzeciej
-                  kolumny w ogole nie bylo. */}
+                  (1382px) i przez to na typowym laptopie 1280-1366px
+                  trzeciej kolumny w ogole nie bylo. */}
               <div
                 className={`${
                   activeMobilePanel === 'right' ? 'block' : 'hidden lg:block'
@@ -3666,7 +3693,7 @@ function BaseChatContent() {
                     // Rozwijamy PRAWDZIWY kompozytor zamiast budowac drugi.
                     // Druga implementacja pisania postu bylaby drugim miejscem,
                     // w ktorym trzeba naprawiac ten sam blad - a ten formularz
-                    // obsluguje siedem lancuchow, tresc premium, PostCoin,
+                    // obsluguje kazda siec z selektora, tresc premium, PostCoin,
                     // zalaczniki i muzyke.
                     setMobileComposerOpen(true);
                     // Focus dopiero po tym, jak React wstawi rozwiniety blok do
@@ -3702,14 +3729,14 @@ function BaseChatContent() {
 
                   W TRYBIE ASK ZNIKA. Ask ma jedna siec i jeden token: budzet
                   jest w USDC, a kontrakt escrow stoi na Base (patrz
-                  ASK_ESCROW_CHAIN_ID). Siedem logotypow nad formularzem, ktory
-                  i tak poprosi o Base, obiecywaloby wybor, ktorego nie ma -
-                  a na 360px zabieraloby caly rzad na nic.
+                  ASK_ESCROW_CHAIN_ID). Logotypy wszystkich sieci nad
+                  formularzem, ktory i tak poprosi o Base, obiecywalyby wybor,
+                  ktorego nie ma - a na 360px zabieralyby caly rzad na nic.
 
                   POZA FEEDEM TEZ ZNIKA. Rzad stal nad KAZDYM widokiem
                   srodkowej kolumny: wchodzisz we wlasny profil, w Discover
-                  albo w powiadomienia i dostajesz nad nimi karte z siedmioma
-                  logotypami sieci, ktora steruje kompozytorem stojacym gdzie
+                  albo w powiadomienia i dostajesz nad nimi karte z rzedem
+                  logotypow sieci, ktora steruje kompozytorem stojacym gdzie
                   indziej. Na desktopie zabierala pierwsze 110 pikselow profilu,
                   czyli dokladnie miejsce zdjecia i nazwy. `activeMainPanel`
                   to ta sama galaz, ktora nizej renderuje kompozytor - oprawa
@@ -3720,10 +3747,11 @@ function BaseChatContent() {
                   mobileComposerOpen ? '' : 'hidden'
                 }`}
               >
-                <div className="mb-2 px-1 font-soft text-[11.5px] font-bold uppercase tracking-[0.08em] text-soft-ink-faint">
+                <div id="posting-network-heading" className="mb-2 px-1 font-soft text-[11.5px] font-bold uppercase tracking-[0.08em] text-soft-ink-faint">
                   Network
                 </div>
                 <GooeyNav
+                  ariaLabelledBy="posting-network-heading"
                   items={[
                     {
                       icon: (
@@ -3772,7 +3800,7 @@ function BaseChatContent() {
                         <img 
                           src="/logotypy/AkeHh5LriDwrNIvVvUQ66wSHU.webp"
                           alt="Celo"
-                          className="w-6 h-6 rounded-none"
+                          className="w-5 h-5 rounded-none"
                         />
                       ),
                       label: 'Celo',
@@ -4843,9 +4871,11 @@ function BaseChatContent() {
 
                       W "My Feed" pasa nie ma: tam patrzacy oglada WLASNE posty,
                       a cudze otwarte Aski nie sa czescia tej odpowiedzi. */}
-                  {/* Od 1280px ten sam pas stoi w prawej kolumnie, w ukladzie
+                  {/* Od progu `xl`, czyli od 1152px (tailwind.config.ts
+                      przesuwa progi w dol - to nie jest domyslne 1280px),
+                      ten sam pas stoi w prawej kolumnie, w ukladzie
                       kolumnowym - `xl:hidden` pilnuje, zeby Aski nie byly na
-                      ekranie dwa razy naraz. Ponizej 1280px i na telefonie
+                      ekranie dwa razy naraz. Ponizej 1152px i na telefonie
                       wszystko zostaje tak, jak bylo. */}
                   {!showMyFeed && (
                     <FeedAskRail viewer={address ?? null} className="mb-4 xl:hidden" />
@@ -5133,7 +5163,8 @@ function BaseChatContent() {
 
               To NIE jest `SoftDock`, tylko recznie napisany <nav> - i wlasnie
               dlatego czwarty przycisk dodany kiedys do SoftDock nie pojawil sie
-              w produkcji. SoftDock uzywa tylko trasa prototypowa /basechat/soft.
+              w produkcji. SoftDock nie ma juz zadnego uzycia: jedyna trasa, ktora
+              go renderowala (prototyp /basechat/soft), zostala usunieta.
 
               Dlaczego Asks, a nie Follows (pierwotny pomysl): Ask ma byc
               JEDNOSTKA tego produktu, a nie widokiem pobocznym. Follows

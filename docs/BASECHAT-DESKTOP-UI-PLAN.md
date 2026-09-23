@@ -1023,7 +1023,10 @@ Oczekiwane: pusto.
 - [ ] **Krok 4: Sprawdzenie w przeglądarce**
 
 `/basechat` na 1440px, z podłączonym portfelem, kompozytor w trybie postu.
-Rząd sieci ma siedem pozycji, dokładnie tych samych co przed zmianą.
+Rząd sieci ma dokładnie te same pozycje co przed zmianą i na desktopie wszystkie
+stoją w jednym rzędzie. Liczby nie wpisuj na sztywno: dziś sieci jest dziewięć
+(osiem w miniappie Farcastera, gdzie nie ma Solany), a siatka w `GooeyNav.tsx`
+sama robi tyle kolumn, ile dostaje pozycji (`grid-flow-col auto-cols-fr`).
 Kliknięcie w każdą przestawia kompozytor na tę sieć. Animacja przy przełączaniu
 działa jak przedtem. Na telefonie rząd dalej przewija się w poziomie.
 

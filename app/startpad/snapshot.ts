@@ -233,3 +233,38 @@ export function loadFeedSnapshot<T>(chainId: number): T[] | null {
     return null;
   }
 }
+
+/**
+ * MIGAWKA PASKA Z /basechat - osobna od tasmy tablicy.
+ *
+ * Pasek czytal do 23.09.2026 tasme tablicy (`startpad.feed.*`). Jej wiersze
+ * nie maja czasu zdarzenia, a cala migawka mogla miec dobe - wiec pasek
+ * pokazywal jako "na zywo" transakcje, o ktorych nie wiedzial nawet, z ktorego
+ * dnia sa. Pasek trzyma teraz wlasne wiersze, KAZDY z czasem zdarzenia, i przy
+ * odczycie odrzuca to, co wypadlo z okna (tickerSource.sanitizeTickerItems).
+ *
+ * Ten modul tylko przechowuje; ksztalt sprawdza tickerSource, bo localStorage
+ * moze trzymac cokolwiek, w tym wersje sprzed zmiany ksztaltu.
+ */
+const TICKER_KEY = (chainId: number) => `startpad.ticker.v1.${chainId}`;
+
+export function saveTickerTape(chainId: number, items: unknown[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(TICKER_KEY(chainId), JSON.stringify({ savedAt: Date.now(), items: items.slice(0, 24) }));
+  } catch {
+    // Pasek to wygoda, nie dane. Cisza.
+  }
+}
+
+export function loadTickerTape(chainId: number): unknown[] | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(TICKER_KEY(chainId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { items?: unknown };
+    return Array.isArray(parsed.items) ? parsed.items : null;
+  } catch {
+    return null;
+  }
+}

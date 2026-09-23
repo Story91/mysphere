@@ -39,6 +39,11 @@ import { listProfiles } from '../profileStore';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+// Trasa eksportuje sam GET, wiec `force-dynamic` nie wylacza Data Cache
+// Nexta 14: zapytania JSON-RPC viem (POST bez `cache`) szly do "auto cache"
+// na rok i swiezy proces potrafil oddac stara glowe lancucha. Pelny opis:
+// app/api/launchpad/pool-swaps/route.ts. Naglowek Cache-Control (max-age=300) zostaje.
+export const fetchCache = 'force-no-store';
 
 const MAX_TOKENS = 200;
 

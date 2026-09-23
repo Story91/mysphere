@@ -201,7 +201,7 @@ wolno, czyli opóźnia ruch dokładnie wtedy, gdy użytkownik patrzy najuważnie
 
 **Wdrożone:** `/basechat` (mobile: pasek sieci jako „stories", zakładki-pigułki,
 zwinięty kompozytor; desktop: przemalowana karta postu, nawigacja, panele boczne),
-`/leaderboard`, `/re-definition`, `/basechat/soft`.
+`/leaderboard`, `/re-definition` (prototyp `/basechat/soft` usunięty 2026-09-23).
 
 ### ZASADA, KTÓRA MUSI ZOSTAĆ
 

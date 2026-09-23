@@ -41,8 +41,30 @@ import type { TradeEntry } from '../../../startpad/[address]/detailShared';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+/**
+ * `force-dynamic` NIE wylacza Data Cache Nexta 14 dla zapytan z tej trasy.
+ * Trasa eksportuje sam GET, wiec Next nie zeruje `revalidate` (robi to tylko
+ * przy POST/PUT/...), a viem wysyla JSON-RPC POST-em bez `cache` - i taki
+ * fetch laduje w "auto cache" na rok. Klucz obejmuje tresc zapytania, a
+ * licznik `id` JSON-RPC w viem startuje od zera w kazdym procesie - stad
+ * (wniosek ze zrodel viem i Nexta, nie z logow Vercela) swiezo uruchomiona
+ * instancja oddawala stara glowe lancucha i skan liczony od niej. Sam objaw
+ * jest odtworzony: przy diagnozie jedno z szesciu rownoleglych wywolan oddalo
+ * jako najnowszy swap z 10.09, a 23.09 na serwerze dev jedno z szesciu mialo
+ * highBlock ~2 700 blokow (ok. 1,5 h) za glowa Base. Po tej zmianie 18 z 18
+ * rownoleglych wywolan mialo highBlock rowny glowie (polowa z urwanym
+ * skanem - wezel odbijal getLogs przy serii, patrz pole complete).
+ * Brzegowe `s-maxage` nizej zostaje - ono jest zamierzone i ma 10 s.
+ */
+export const fetchCache = 'force-no-store';
 
 const POOL_ID_RE = /^0x[0-9a-fA-F]{64}$/;
+
+/**
+ * Sufit `sinceSeconds`. Tydzien wystarcza kazdemu wolajacemu, a i tak nie
+ * zmienia sufitu okien nizej - chroni tylko przed liczba, ktora nic nie znaczy.
+ */
+const MAX_SINCE_SECONDS = 7 * 24 * 60 * 60;
 
 /**
  * Okno skanu. Wezel CDP przyjmuje szersze zapytania niz publiczny, ale
@@ -101,6 +123,18 @@ export async function GET(request: Request) {
 
   const startedAt = Number(params.get('startedAt') ?? '0') || 0;
 
+  // Tylko ostatnie N sekund - dla paska na /basechat, ktory pokazuje dobe.
+  // `startedAt` tego nie robi: to tylko dolna granica ESTYMOWANEGO czasu, skan
+  // i tak schodzil do 24 okien wstecz. Liczba jest wzgledna (a nie "od godziny
+  // X"), zeby wszyscy wysylali ten sam adres i trafiali w jeden wpis cache'u.
+  const sinceRaw = params.get('sinceSeconds');
+  let sinceSeconds: number | null = null;
+  if (sinceRaw !== null) {
+    const value = Number(sinceRaw);
+    if (!Number.isInteger(value) || value <= 0 || value > MAX_SINCE_SECONDS) return bad('Bad sinceSeconds.', 400);
+    sinceSeconds = value;
+  }
+
   // Pierwsze zapytanie sluzy tez za probe RPC: wezel, ktory nie odda glowy
   // lancucha, ustepuje nastepnemu z kolejki. Ten sam wzorzec, co w historii.
   let client: ReturnType<typeof createPublicClient> | null = null;
@@ -124,6 +158,14 @@ export async function GET(request: Request) {
   // timestampu kazdego bloku zamienialoby skan w setki zadan.
   const estTs = (block: bigint) =>
     Math.max(startedAt, anchorTs - Number(anchorBlock - block) * net.secondsPerBlock);
+
+  // Podloga z okna czasu, liczona od GLOWY lancucha (nie od `toBlock`) - to
+  // jest "ostatnie N sekund", a nie "N sekund przed dowolnym blokiem".
+  if (sinceSeconds !== null) {
+    const back = BigInt(Math.ceil(sinceSeconds / net.secondsPerBlock));
+    const recentFloor = anchorBlock > back ? anchorBlock - back : 0n;
+    if (recentFloor > floor) floor = recentFloor;
+  }
 
   const top = requestedTo !== null && requestedTo < anchorBlock ? requestedTo : anchorBlock;
   if (floor > top) {

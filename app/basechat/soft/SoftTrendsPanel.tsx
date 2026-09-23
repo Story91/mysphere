@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Avatar } from '../../components/identity';
 import { NameWithSuffix } from '../../utils/nameSuffix';
+import { countedCaption } from '../../utils/stats/countedCaption';
 
 /**
  * Panel Trends - cztery liczby i ranking najaktywniejszych.
@@ -150,7 +151,9 @@ const NUMBER_TONE: Record<SoftTrendTone, string> = {
   green: 'text-[#15803D]',
   pink: 'text-[#BE185D]',
   blue: 'text-[#1D4ED8]',
-  teal: 'text-[#0F766E]',
+  // Ten sam morski co akcent Aska (--soft-ask-deep w globals.css, #0f766e) -
+  // licznik "Open Asks" ma sie kojarzyc z paskiem stanu na karcie Aska.
+  teal: 'text-soft-ask-deep',
   money: 'text-soft-accent-deep',
 };
 
@@ -219,6 +222,7 @@ function StatRow({
   tone,
   detail,
   atLeast,
+  counted,
   divided,
 }: {
   label: string;
@@ -226,6 +230,8 @@ function StatRow({
   tone: SoftTrendTone;
   detail?: string;
   atLeast?: boolean;
+  /** Data przeliczenia ("Sep 24") - tylko dla liczb z globalStats. */
+  counted?: string;
   divided: boolean;
 }) {
   const numeric = Number(value.replace(/\s|,/g, ''));
@@ -245,9 +251,7 @@ function StatRow({
         title={
           value === UNKNOWN
             ? 'Not available right now'
-            : detail
-              ? `${value} — ${detail}`
-              : value
+            : `${detail ? `${value} — ${detail}` : value}${counted ? ` (counted ${counted})` : ''}`
         }
         className={`flex-none font-soft-display text-[21px] font-bold leading-none tabular-nums ${NUMBER_TONE[tone]}`}
       >
@@ -264,6 +268,7 @@ function StatRow({
 
 export default function SoftTrendsPanel({
   stats,
+  measuredAt,
   tips,
   openAsks,
   activeUsers,
@@ -276,6 +281,18 @@ export default function SoftTrendsPanel({
   children,
 }: {
   stats: SoftTrendStat[];
+  /**
+   * Kiedy przeliczono WSZYSTKIE liczby z `stats` - `measuredAt` z
+   * globalStats/current (ms, 0 = nie wiadomo). Nie dotyczy Tips ani Open Asks:
+   * te maja wlasne zrodla i czytaja sie na zywo.
+   *
+   * PO CO: liczby w `stats` przelicza raz na dobe cron
+   * (app/api/stats/recount/route.ts). Bez daty pomiar sprzed miesiaca wyglada
+   * tak samo jak poranny - i tak bylo: data lezala w stanie strony, a nic jej
+   * nie rysowalo. Zdanie pod karta buduje countedCaption() i po 48 godzinach
+   * zmienia je na "not updated since", zeby martwy cron bylo widac na ekranie.
+   */
+  measuredAt?: number;
   /**
    * Liczba rozliczonych platnosci - `totalTips` z getLeaderboard()
    * (app/utils/tips/getLeaderboard.ts). Jedyna liczba w tej siatce, ktora
@@ -310,13 +327,21 @@ export default function SoftTrendsPanel({
   // innego, a medale trafialyby na miejsca 11-13.
   const offset = page && page > 1 ? (page - 1) * 10 : 0;
   const showPager = Boolean(page && totalPages && totalPages > 1 && onPageChange);
+  const caption = countedCaption(measuredAt);
 
   // Kafle skladaja sie z tego, co przyszlo w `stats`, plus dwa liczone gdzie
   // indziej. Tips i Asks nie ida przez `stats`, bo maja WLASNE zrodla (kolekcje
   // `tips` i `asks`) i wlasny stan "nie udalo sie odczytac" - a tone dla
   // pieniedzy ustala ten plik, nie wywolanie.
-  const tiles: { label: string; value: string; tone: SoftTrendTone; note?: string; detail?: string }[] = [
-    ...stats.map((stat) => ({ ...stat, value: toTileValue(stat.value) })),
+  const tiles: {
+    label: string;
+    value: string;
+    tone: SoftTrendTone;
+    note?: string;
+    detail?: string;
+    counted?: string;
+  }[] = [
+    ...stats.map((stat) => ({ ...stat, value: toTileValue(stat.value), counted: caption?.date })),
     ...(tips !== undefined ? [{ label: 'Tips', value: toTileValue(tips), tone: 'money' as const }] : []),
     ...(openAsks !== undefined
       ? [{ label: 'Open Asks', value: toTileValue(openAsks), tone: 'teal' as const }]
@@ -343,11 +368,28 @@ export default function SoftTrendsPanel({
               tone={stat.tone}
               detail={stat.detail}
               atLeast={Boolean(stat.note)}
+              counted={stat.counted}
               divided={index > 0}
             />
           ))}
         </dl>
       </div>
+
+      {/* ===== KIEDY POLICZONO =====
+          Pod karta, nie w niej: to zdanie o calym rejestrze, a nie o jednym
+          wierszu. `-mt-2` przysuwa je do karty, zeby nie wygladalo na podpis
+          sekcji Most Active ponizej. ink-muted, nie ink-soft: ink-soft na tle
+          strony ma okolo 3:1 i przy 11.5px nie trzyma AA. Stary pomiar dostaje
+          pogrubienie, ale nie pomarancz - pomarancz znaczy pieniadze. */}
+      {caption && (
+        <p
+          className={`-mt-2 px-1 font-soft text-[11.5px] text-soft-ink-muted ${
+            caption.stale ? 'font-semibold' : ''
+          }`}
+        >
+          {caption.text}
+        </p>
+      )}
 
       <section className="rounded-card bg-soft-surface p-4 shadow-card">
         <div className="mb-3 flex items-baseline justify-between">

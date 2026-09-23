@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { AvatarPlaceholder } from '../../components/identity/Avatar';
 import { getSlicedAddress } from '../../utils/identity/resolver';
 import {
   type Ask,
@@ -98,7 +99,12 @@ export function formatCountdown(left: number): string {
   )}`;
 }
 
-function formatAgo(since: number): string {
+/**
+ * "3h ago". Eksportowane z tego samego powodu co `formatCountdown`: wiersz
+ * rozstrzygnietego Aska w railu (AskRailRow.tsx) mowi, kiedy go zamknieto,
+ * i ma to powiedziec dokladnie tymi slowami co pasek tej karty.
+ */
+export function formatAgo(since: number): string {
   if (!Number.isFinite(since) || since <= 0) return 'just now';
   if (since < MINUTE) return 'just now';
   if (since < HOUR) return `${Math.floor(since / MINUTE)}m ago`;
@@ -191,34 +197,42 @@ export default function AskCard({
   const author = authorName || (ask.author ? getSlicedAddress(ask.author) : 'unknown address');
 
   /**
-   * Pasek stanu. Trzy stany, trzy rozne kolory - i ZADEN z nich nie jest
+   * Pasek stanu. Trzy stany, trzy rozne natezenia - i ZADEN z nich nie jest
    * pomaranczowy.
    *
-   * Stan "open" mial tu `soft-accent` (tlo, tekst i pulsujaca kropka), czyli
-   * kolor zarezerwowany w tym produkcie WYLACZNIE dla kwot. Odznaka stanu nie
-   * jest kwota, a na karcie Aska pomaranczowy jest juz zajety przez budzet i
-   * stawke za odpowiedz nizej - dwie rzeczy w tym samym kolorze kazaly czytac
-   * pasek jak drugi wiersz z pieniedzmi. Otwarty Ask dostaje `soft-info`:
-   * dalej odroznia sie od fioletu "resolved" i szarosci "expired", ale nie
-   * podszywa sie pod liczbe.
+   * Pomaranczowy (`soft-accent`) nalezy w tym produkcie WYLACZNIE do kwot,
+   * a na karcie Aska trzyma juz budzet i stawke za odpowiedz nizej. Pasek
+   * w tym samym kolorze czytal sie jak drugi wiersz z pieniedzmi.
+   *
+   * Otwarty i rozstrzygniety dostaja morski `soft-ask`, bo to jest ten jeden
+   * kolor, po ktorym Aska poznaje sie na bialej karcie (patrz komentarz przy
+   * <article> nizej). Rozni je natezenie: otwarty ma pelne tlo i pulsujaca
+   * kropke, rozstrzygniety polowe tla i kropke nieruchoma. Przeterminowany
+   * schodzi do szarosci - nikt go nie zamknal i nic sie juz przy nim nie
+   * dzieje, wiec nie ma prawa wygladac jak zywy Ask.
+   *
+   * Tekst paska (napis i zegar) ma PELNE krycie. Zegar mial `opacity-80`
+   * (od 6fb84df, jeszcze na jasnej karcie); na tych jasnych paskach spycha go
+   * to do 3.2-3.5:1, czyli ponizej AA przy 11px - nie dokladac tego z powrotem "dla
+   * hierarchii".
    */
   const bar = {
     open: {
-      wrap: 'border-white/10 bg-white/[0.05]',
-      text: 'text-[#7AB0FF]',
-      dot: 'bg-[#7AB0FF] motion-safe:animate-pulse',
+      wrap: 'border-soft-ask/20 bg-soft-ask-soft',
+      text: 'text-soft-ask-deep',
+      dot: 'bg-soft-ask motion-safe:animate-pulse',
       label: 'Open ask',
     },
     expired: {
-      wrap: 'border-white/10 bg-white/[0.03]',
-      text: 'text-white/45',
-      dot: 'bg-white/25',
+      wrap: 'border-soft-line/70 bg-soft-sunken',
+      text: 'text-soft-ink-muted',
+      dot: 'bg-soft-line-strong',
       label: 'Closed, not resolved',
     },
     resolved: {
-      wrap: 'border-white/10 bg-white/[0.05]',
-      text: 'text-[#B9AAFF]',
-      dot: 'bg-[#B9AAFF]',
+      wrap: 'border-soft-line/70 bg-soft-ask-soft/50',
+      text: 'text-soft-ask-deep',
+      dot: 'bg-soft-ask',
       label: 'Resolved',
     },
   }[view];
@@ -230,7 +244,14 @@ export default function AskCard({
         ? `deadline passed ${formatAgo(reference - ask.deadline)}`
         : ask.resolvedAt
           ? `resolved ${formatAgo(reference - ask.resolvedAt)}`
-          : 'paid out';
+          : // Bez `resolvedAt` nie ma godziny, jest tylko fakt. Przy escrow
+            // NIE "paid out": resolve() przypisuje salda, tokeny wychodza
+            // dopiero przy claim() (ta sama zasada co zdanie o `funding`
+            // nizej). Przy 'on-resolve' autor placil przy przyjmowaniu, wiec
+            // tam "paid out" jest prawda.
+            ask.funding === 'escrowed'
+            ? 'awarded'
+            : 'paid out';
 
   const answers =
     ask.answerCount === 0
@@ -256,19 +277,32 @@ export default function AskCard({
   /** Po terminie przycisk zostaje zywy TYLKO dla autora - patrz naglowek. */
   const actionDisabled = view === 'expired' && !isAuthor;
 
+  /**
+   * Przyciski sa fioletowe jak kazda akcja w produkcie, ale w odcieniu
+   * `primary-deep`: biel na zwyklym `soft-primary` ma 4.22:1 i przy 12px nie
+   * trzyma AA, na `primary-deep` ma 6.26:1. Hover rozjasnia do 90% krycia na
+   * bialej karcie (okolo 5.0:1), bo ciemniejszego fioletu w palecie nie ma.
+   */
   const actionClass =
-    'inline-flex shrink-0 items-center justify-center rounded-pill px-4 py-1.5 font-soft-display text-[12px] font-bold transition-transform duration-150 ease-out active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-accent focus-visible:ring-offset-2 focus-visible:ring-offset-[#141a33]';
+    'inline-flex shrink-0 items-center justify-center rounded-pill px-4 py-1.5 font-soft-display text-[12px] font-bold transition-[background-color,transform] duration-150 ease-out active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface';
+  const actionLive = 'bg-soft-primary-deep text-white shadow-chip hover:bg-soft-primary-deep/90';
 
   return (
-    /* ===== ASK JEST JEDNYM OBIEKTEM, WSZEDZIE TAKIM SAMYM =====
-       Karta byla biala jak kazda inna karta w produkcie, wiec w feedzie
-       gubila sie miedzy postami, a na /asks wygladala jak kolejna lista.
-       Ask nie jest postem: ma budzet, termin i miejsca, ktore sie koncza -
-       i jako jedyny element tej aplikacji ma wlasny, ciemny kolor.
-       Ten sam na feedzie, w prawym railu i na /asks; kto raz zobaczy taka
-       karte, rozpozna ja wszedzie. */
+    /* ===== ASK STOI NA TEJ SAMEJ KARCIE CO POST =====
+       Od 2026-08-13 karta byla granatowa (#141a33), z uzasadnieniem, ze biala
+       gubi sie miedzy postami. Wlasciciel ocenil wynik odwrotnie:
+       "kolorystyka tez jakos odstaje Askow od Postow". Granat byl jedyna
+       ciemna plama w jasnym produkcie i ciagnal za soba polprzezroczysta
+       biel zamiast tokenow, dwa hexy spoza palety i pomaranczowe przyciski,
+       ktorych zasady tego pliku (kwoty i tylko kwoty) wprost zabraniaja.
+
+       Teraz powloka jest ta sama co karta posta w PostList (bialy
+       `soft-surface`, `soft-line`, `shadow-card`), a Aska poznaje sie po
+       JEDNYM akcencie: morskim `soft-ask` na pasku stanu. Ten sam odcien
+       stoi w naglowku prawego raila i w liczniku "Open Asks" w Trends, wiec
+       kto raz go skojarzy, rozpozna Aska wszedzie - bez osobnego tla. */
     <article
-      className={`relative overflow-hidden rounded-card bg-[#141a33] font-soft shadow-card ${className}`}
+      className={`relative overflow-hidden rounded-card border border-soft-line bg-soft-surface font-soft shadow-card ${className}`}
     >
       <div className={`flex items-center justify-between gap-3 border-b px-4 py-2.5 sm:px-5 ${bar.wrap}`}>
         <span
@@ -278,21 +312,23 @@ export default function AskCard({
           <span className="truncate">{bar.label}</span>
         </span>
         {/* Zegar rozjezdza sie miedzy serwerem a przegladarka z definicji. */}
-        <span
-          className={`shrink-0 text-[11px] tabular-nums ${bar.text} opacity-80`}
-          suppressHydrationWarning
-        >
+        <span className={`shrink-0 text-[11px] tabular-nums ${bar.text}`} suppressHydrationWarning>
           {timing}
         </span>
       </div>
 
       <div className="px-4 py-5 sm:px-5">
         <div className="mb-4 flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
-          <span
-            className="h-7 w-7 shrink-0 rounded-full bg-gradient-to-br from-[#0052FF] to-[#00E28A]"
-            aria-hidden="true"
-          />
-          <span className="min-w-0 flex-1 truncate font-soft-display text-[13px] font-semibold text-white/85">
+          {/* Ten sam gradient z adresu, ktory post rysuje autorowi bez
+              zdjecia (fallback w components/identity/Avatar). Pelny <Avatar>
+              doczytalby ENS/Basename na KAZDA karte - w pasie nad feedem to
+              zapytanie razy cztery, ktorego ten pas celowo nie robi (DECYZJA 4
+              w FeedAskRail.tsx). Stary gradient Base-niebieski do zielonego
+              byl ten sam dla wszystkich autorow i spoza palety. */}
+          <span className="h-7 w-7 shrink-0 overflow-hidden rounded-full" aria-hidden="true">
+            <AvatarPlaceholder address={ask.author} />
+          </span>
+          <span className="min-w-0 flex-1 truncate font-soft-display text-[13px] font-semibold text-soft-ink">
             {author}
           </span>
           <ResolveRateBadge rate={resolveRate} />
@@ -302,12 +338,15 @@ export default function AskCard({
           // Pelna tresc zostaje pod kursorem, wiec przyciecie niczego nie chowa
           // bezpowrotnie - ten sam uklad, co w AskRailRow.
           title={clampQuestion ? ask.question : undefined}
-          className={`mb-5 break-words font-soft-display text-[16px] font-bold leading-[1.45] text-white ${clampQuestion ? 'line-clamp-4' : ''}`}
+          className={`mb-5 break-words font-soft-display text-[16px] font-bold leading-[1.45] text-soft-ink ${clampQuestion ? 'line-clamp-4' : ''}`}
         >
           {ask.question}
         </p>
 
-        <div className="grid grid-cols-3 gap-px overflow-hidden rounded-card bg-white/10">
+        {/* `gap-px` na tle `soft-line` rysuje wlosowe linie miedzy komorkami.
+            Komorki sa BIALE, bo kwoty w `accent-deep` trzymaja AA tylko na
+            bieli (5.2:1) - na `soft-sunken` spadaja do 4.36:1. */}
+        <div className="grid grid-cols-3 gap-px overflow-hidden rounded-[18px] border border-soft-line/70 bg-soft-line/60">
           <Cell label="Budget" value={formatAskMoney(ask.budget, ask.token)} money />
           <Cell label="Seats" value={`${ask.acceptedCount} of ${ask.seats}`} />
           <Cell label="Per answer" value={formatAskMoney(ask.perAnswer, ask.token)} money />
@@ -320,7 +359,10 @@ export default function AskCard({
           odpowiadajacego (patrz naglowek contracts/AskEscrow.sol). Przy
           'on-resolve' nie wolno uzyc slowa escrow w ogole - tam nic nie lezy.
         */}
-        <p className="mt-3 break-words text-[11.5px] leading-[1.5] text-white/40">
+        {/* `ink-muted`, a nie `ink-faint`: to zdanie mowi, gdzie leza
+            pieniadze, wiec ma byc do przeczytania (5.5:1), a nie znakiem
+            wodnym. */}
+        <p className="mt-3 break-words text-[11.5px] leading-[1.5] text-soft-ink-muted">
           {ask.funding === 'escrowed' ? (
             <>
               {view === 'resolved'
@@ -333,7 +375,7 @@ export default function AskCard({
                     href={`https://basescan.org/tx/${ask.escrowTxHash}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="font-semibold text-soft-accent underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-accent"
+                    className="font-semibold text-soft-primary-deep underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
                   >
                     Check the deposit
                   </a>
@@ -345,8 +387,8 @@ export default function AskCard({
           )}
         </p>
 
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
-          <span className="min-w-0 break-words text-[12px] text-white/45">{answers}</span>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-soft-line/60 pt-4">
+          <span className="min-w-0 break-words text-[12px] text-soft-ink-muted">{answers}</span>
 
           {actionDisabled ? (
             // Wylaczony przycisk, a nie brak przycisku: to informacja o stanie,
@@ -354,19 +396,21 @@ export default function AskCard({
             <button
               type="button"
               disabled
-              className={`${actionClass} cursor-not-allowed bg-white/10 text-white/35`}
+              // `ink-muted`, nie `ink-faint`: "Answering closed" to informacja,
+              // ktora ma byc przeczytana, a nie tylko zauwazona.
+              className={`${actionClass} cursor-not-allowed bg-soft-sunken text-soft-ink-muted`}
             >
               {actionLabel}
             </button>
           ) : href ? (
-            <Link href={href} className={`${actionClass} bg-soft-accent text-[#1a1f3a]`}>
+            <Link href={href} className={`${actionClass} ${actionLive}`}>
               {actionLabel}
             </Link>
           ) : onAnswer ? (
             <button
               type="button"
               onClick={() => onAnswer(ask)}
-              className={`${actionClass} bg-soft-accent text-[#1a1f3a]`}
+              className={`${actionClass} ${actionLive}`}
             >
               {actionLabel}
             </button>
@@ -377,18 +421,24 @@ export default function AskCard({
   );
 }
 
-/** Komorka liczbowa. `money` wlacza bursztyn - jedyne miejsce, gdzie on nalezy. */
+/**
+ * Komorka liczbowa. `money` wlacza bursztyn (`accent-deep`) - jedyne miejsce,
+ * gdzie on nalezy, i zawsze na bieli.
+ *
+ * Podpis w `ink-muted`, nie w `ink-soft`: przy 10px `ink-soft` ma na bieli
+ * 3.43:1 i nie trzyma AA.
+ */
 function Cell({ label, value, money = false }: { label: string; value: string; money?: boolean }) {
   return (
     // min-w-0 + lamanie: przy duzym budzecie komorka ma sie zwezic, a nie
     // rozepchnac karty na telefonie o szerokosci 320px.
-    <div className="min-w-0 bg-[#141a33] px-2.5 py-3 sm:px-3">
-      <div className="mb-1 text-[10px] uppercase leading-[1.2] tracking-[0.1em] text-white/40">
+    <div className="min-w-0 bg-soft-surface px-2.5 py-3 sm:px-3">
+      <div className="mb-1 text-[10px] uppercase leading-[1.2] tracking-[0.1em] text-soft-ink-muted">
         {label}
       </div>
       <div
         className={`break-words font-soft-display text-[15px] font-bold tabular-nums ${
-          money ? 'text-soft-accent' : 'text-white'
+          money ? 'text-soft-accent-deep' : 'text-soft-ink'
         }`}
       >
         {value}
@@ -409,7 +459,7 @@ function ResolveRateBadge({ rate }: { rate?: ResolveRate | null }) {
 
   if (rate.rate === null || rate.settled === 0) {
     return (
-      <span className="shrink-0 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium text-white/45">
+      <span className="shrink-0 rounded-full border border-soft-line bg-soft-sunken px-2 py-0.5 text-[10px] font-medium text-soft-ink-muted">
         no resolve record yet
       </span>
     );
@@ -433,7 +483,11 @@ function ResolveRateBadge({ rate }: { rate?: ResolveRate | null }) {
   return (
     <span
       className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium tabular-nums ${
-        zaniedbane > 0 ? 'bg-white/[0.14] text-white/70' : 'bg-white/10 text-white/55'
+        // Zaniedbanie mocniejsza obwodka i pelnym `ink`, nie kolorem: to
+        // ostrzezenie o autorze, a nie alarm - i nie kwota.
+        zaniedbane > 0
+          ? 'border border-soft-line-strong bg-soft-sunken text-soft-ink'
+          : 'border border-soft-line bg-soft-sunken text-soft-ink-muted'
       }`}
       title={
         zaniedbane > 0

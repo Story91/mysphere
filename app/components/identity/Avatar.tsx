@@ -8,7 +8,7 @@
  * klasy typu "w-10 h-10 rounded-full mr-2" trafiaja tam, gdzie trafialy.
  */
 
-import { useMemo, type ReactNode } from 'react';
+import { useId, useMemo, type ReactNode } from 'react';
 import type { Address, Chain } from 'viem';
 import { cn } from '@/lib/utils';
 import { useAvatar } from '@/app/utils/identity/useAvatar';
@@ -24,20 +24,42 @@ export type AvatarProps = {
   children?: ReactNode;
 };
 
-/** Dwa odcienie wyliczone z adresu - ten sam adres zawsze daje ten sam gradient. */
+/**
+ * Dwa odcienie wyliczone z adresu - ten sam adres zawsze daje ten sam gradient.
+ *
+ * Hash po znakach, a nie parseInt(hex): adresy Solany sa w base58, a
+ * parseInt('G...', 16) daje NaN - okolo dwoch trzecich awatarow autorow
+ * platnych odpowiedzi rysowalo sie na czarno (znalezisko z przegladu).
+ */
 function gradientForAddress(address: string): { from: string; to: string; id: string } {
-  const hex = address.toLowerCase().replace(/^0x/, '').padEnd(12, '0');
-  const hue = parseInt(hex.slice(0, 4), 16) % 360;
-  const hueShift = 30 + (parseInt(hex.slice(4, 8), 16) % 70);
+  const key = address.toLowerCase().replace(/^0x/, '');
+  let h1 = 2166136261;
+  let h2 = 5381;
+  for (let i = 0; i < key.length; i += 1) {
+    const c = key.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 16777619) >>> 0;
+    h2 = (Math.imul(h2, 33) + c) >>> 0;
+  }
+  const hue = h1 % 360;
+  const hueShift = 30 + (h2 % 70);
   return {
     from: `hsl(${hue}, 70%, 58%)`,
     to: `hsl(${(hue + hueShift) % 360}, 72%, 42%)`,
-    id: `ident-grad-${hex.slice(0, 8)}`,
+    id: `ident-grad-${h1.toString(16).padStart(8, '0')}`,
   };
 }
 
 export function AvatarPlaceholder({ address }: { address: string }) {
-  const { from, to, id } = useMemo(() => gradientForAddress(address), [address]);
+  const { from, to, id: baseId } = useMemo(() => gradientForAddress(address), [address]);
+  // Id gradientu musi byc unikalny na INSTANCJE, nie na adres. Ten sam autor
+  // stoi czesto w dwoch miejscach DOM naraz (karta Aska w pasie `xl:hidden`
+  // nad feedem i jego post pod spodem, dwie kopie Trends). url(#id) bierze
+  // PIERWSZY element o tym id, a gdy lezy on w poddrzewie display:none, Chrome
+  // nie maluje gradientu wcale i awatar znika.
+  // useId daje ten sam wynik na serwerze i w przegladarce (brak rozjazdu
+  // hydracji), ale zawiera ':' (np. ":r3:"), a to psuje url(#...) - stad
+  // wyciecie wszystkiego poza [a-zA-Z0-9_-].
+  const id = `${baseId}-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
 
   return (
     <svg

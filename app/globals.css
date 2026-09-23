@@ -53,6 +53,18 @@
   --soft-info: 36 101 214; /* #2465d6 */
   --soft-info-soft: 217 235 255; /* #d9ebff */
 
+  /* Morski akcent ASKA - i niczego wiecej. Ask stoi na tej samej bialej
+     karcie co post (wlasciciel: "kolorystyka tez jakos odstaje Askow od
+     Postow"), wiec rozpoznaje sie go wylacznie po tym odcieniu: pasek
+     stanu, kropka, naglowek raila, licznik "Open Asks" w Trends. Kolor,
+     ktory dostanie jeszcze cos innego, przestanie mowic "to jest Ask".
+     `deep` na tekst: 5.5:1 na bieli i 4.7:1 na `ask-soft`, czyli AA takze
+     przy 11px. Samo `ask` ma na bieli okolo 3.7:1 - tylko kropki i obwodki,
+     nigdy tekst. */
+  --soft-ask: 13 148 136; /* #0d9488 */
+  --soft-ask-soft: 214 245 240; /* #d6f5f0 */
+  --soft-ask-deep: 15 118 110; /* #0f766e */
+
   /* Cienie. Wszystkie fioletowe, nie czarne - czarny cien na lawendzie
      wyglada jak brud. */
   --soft-shadow-card: 0 6px 24px rgba(102, 86, 190, 0.10);
@@ -461,7 +473,8 @@ h1, h2, h3, h4, h5, h6 {
   -webkit-text-fill-color: transparent;
 }
 
-/* Tasma kursow w widoku Trends (app/basechat/soft/SoftTrends.tsx).
+/* Tasma kursow (app/startpad/StartpadTicker.tsx; wczesniej takze
+   usuniety prototyp app/basechat/soft/SoftTrends.tsx).
    Przesuwamy o -50%, bo zawartosc jest zduplikowana - petla nie ma wtedy szwu.
    linear jest tu jedynym poprawnym wyborem: przyspieszanie i zwalnianie tasmy
    wyglada jak zacinanie, a nie jak ruch. */

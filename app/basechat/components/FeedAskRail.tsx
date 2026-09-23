@@ -133,6 +133,13 @@ import { addTokenAmount, isExpired, type Ask, type TokenAmounts } from '../../ut
  * Karta na powierzchni w zaglebieniu czyta sie jak wpis w archiwum, a nie jak
  * kafelek do klikniecia - i dzieje sie to bez ani jednego nowego koloru.
  *
+ * W prawej kolumnie (`layout="column"`) ten sam chwyt w mniejszej skali:
+ * zaglebienie wewnatrz bialej karty raila, a w nim biale kafle wierszy. Kafle
+ * sa konieczne, nie ozdobne - kwota w `accent-deep` trzyma AA tylko na bieli.
+ *
+ * Aska od posta odroznia JEDEN kolor, morski `soft-ask` (pasek stanu na
+ * AskCard, naglowek raila). Tlo i powloka sa te same co u posta.
+ *
  * POMARANCZOWEGO (`soft-accent`) TU NIE MA I NIE MOZE BYC. Ten kolor nalezy
  * w tym produkcie WYLACZNIE do kwot - na karcie Aska trzyma budzet i stawke za
  * odpowiedz. Odroznienie stanu pomaranczem kazaloby czytac panel jak trzecia
@@ -262,7 +269,9 @@ export type FeedAskRailProps = {
   viewer?: string | null;
   /**
    * `row`    poziomy pas nad lista postow. Domyslny i niezmieniony.
-   * `column` ciemna karta w prawej kolumnie na ekranach od 1280px.
+   * `column` biala karta w prawej kolumnie od progu `xl`, czyli od 1152px
+   *          (tailwind.config.ts przesuwa progi w dol - to NIE jest domyslne
+   *          1280px). Ta sama powloka co karty Trends pod nia.
    *
    * TO JEST WYLACZNIE UKLAD. Odczyty, cache, przelacznik Open/Resolved,
    * odsiew po terminie i miejscach, zwijanie pasa przy pisaniu odpowiedzi
@@ -475,7 +484,7 @@ function FeedAskRail({ viewer = null, layout = 'row', className = '' }: FeedAskR
    * Aski nie zepchnely postow o kilka ekranow w dol. `snap` daje na telefonie
    * zatrzymanie na karcie, a nie w polowie dwoch.
    */
-  const renderCards = (fullList: Ask[]) => {
+  const renderCards = (fullList: Ask[], archive = false) => {
     /**
      * ===== PISANIE ODPOWIEDZI ZWIJA PAS DO JEDNEJ KARTY =====
      * Karty stoja w poziomej karuzeli po 290px. Formularz w takiej kolumnie
@@ -493,12 +502,21 @@ function FeedAskRail({ viewer = null, layout = 'row', className = '' }: FeedAskR
     /**
      * WARIANT KOLUMNOWY. Ta sama lista, ten sam podzial na "odpowiadajacy
      * zostaje, autor wychodzi" - inny tylko ksztalt wiersza i kierunek.
-     * Formularz odpowiedzi zostaje jasny i siedzi w jasnej ramce: to pole do
-     * pisania, a nie element ozdobny, i ma sie czytac tak samo jak w feedzie.
+     *
+     * Formularz odpowiedzi nie dostaje tu wlasnej ramki: FeedAnswerForm
+     * rysuje swoje pudelko sam (obwodka `soft-line` na bieli), a karta raila
+     * jest juz biala. Ramka wokol ramki byla potrzebna tylko wtedy, gdy
+     * formularz stal na granacie.
+     *
+     * `archive` (zakladka Resolved): wiersze leza w zaglebieniu `soft-sunken`
+     * (DECYZJA 5), wiec kazdy dostaje WLASNA biala powierzchnie. Kwota
+     * w `accent-deep` trzyma AA tylko na bieli (5.2:1); wprost na zaglebieniu
+     * spada do 4.36:1. Z tego samego powodu miedzy wierszami jest odstep,
+     * a nie linia - linia na zaglebieniu nie oddziela bialych kafli.
      */
     if (column) {
       return (
-        <ul className="-mx-1 flex flex-col">
+        <ul className={archive ? 'flex flex-col gap-1.5' : '-mx-1 flex flex-col'}>
           {list.map((ask) => {
             const isAuthor = viewerAddress !== null && ask.author.toLowerCase() === viewerAddress;
             const answerable =
@@ -508,13 +526,20 @@ function FeedAskRail({ viewer = null, layout = 'row', className = '' }: FeedAskR
               ask.acceptedCount < ask.seats;
 
             return (
-              <li key={ask.id} className="border-t border-white/10 first:border-t-0">
+              <li
+                key={ask.id}
+                className={
+                  archive
+                    ? 'rounded-xl bg-soft-surface'
+                    : 'border-t border-soft-line/60 first:border-t-0'
+                }
+              >
                 <AskRailRow
                   ask={ask}
                   {...(answerable ? { onAnswer: () => setAnswering(ask.id) } : { href: '/asks' })}
                 />
                 {answering === ask.id && (
-                  <div className="mx-1 mb-2 rounded-card bg-soft-surface p-2">
+                  <div className="mx-1 mb-2">
                     <FeedAnswerForm
                       ask={ask}
                       onSent={bumpAnswerCount}
@@ -602,7 +627,10 @@ function FeedAskRail({ viewer = null, layout = 'row', className = '' }: FeedAskR
 
   return (
     <section
-      className={`font-soft ${column ? 'rounded-card bg-[#141a33] p-4 shadow-card' : ''} ${className}`}
+      // Kolumna: ta sama powloka co karty Trends zaraz pod nia
+      // (SoftTrendsPanel) - biel, `rounded-card`, `shadow-card`. Aska w tej
+      // kolumnie poznaje sie po morskim naglowku, nie po innym tle.
+      className={`font-soft ${column ? 'rounded-card bg-soft-surface p-4 shadow-card' : ''} ${className}`}
       aria-label={shownTab === 'open' ? 'Open asks' : 'Resolved asks'}
     >
       {column ? (
@@ -611,22 +639,29 @@ function FeedAskRail({ viewer = null, layout = 'row', className = '' }: FeedAskR
            oka i jest policzona z tych samych Askow, ktore widac pod nia -
            zadnego drugiego zrodla. Podpis nazywa zakres wprost, bo pas zna
            tylko FETCH_LIMIT najnowszych otwartych Askow i nie wolno mu
-           udawac, ze zna wszystkie. */
+           udawac, ze zna wszystkie.
+
+           Kolory: naglowek i kropka w morskim `soft-ask` - tym samym, ktory
+           niesie pasek stanu na AskCard i licznik "Open Asks" w Trends. Suma
+           w `accent-deep`, bo to kwota i stoi na bieli. */
         <div className="mb-3">
           <div className="mb-1.5 flex items-center justify-between gap-2">
             {/* Krotko, bo w kolumnie 320px dluzszy naglowek lamal sie na dwie
                 linie i wchodzil pod przelacznik. */}
-            <h2 className="min-w-0 font-soft-display text-[10.5px] font-bold uppercase tracking-[0.14em] text-white/45">
-              {shownTab === 'open' ? 'Money on the table' : 'Resolved asks'}
+            <h2 className="flex min-w-0 items-center gap-1.5 font-soft-display text-[10.5px] font-bold uppercase tracking-[0.14em] text-soft-ask-deep">
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-soft-ask" aria-hidden="true" />
+              <span className="truncate">
+                {shownTab === 'open' ? 'Money on the table' : 'Resolved asks'}
+              </span>
             </h2>
-            <RailFilter value={shownTab} onPick={pick} tone="dark" />
+            <RailFilter value={shownTab} onPick={pick} />
           </div>
           {shownTab === 'open' && moneyLines.length > 0 && (
             <>
-              <p className="font-soft-display text-[26px] font-bold leading-none text-white">
+              <p className="font-soft-display text-[26px] font-bold leading-none text-soft-accent-deep">
                 {moneyLines.join(' + ')}
               </p>
-              <p className="mt-1 font-soft text-[11px] text-white/40">
+              <p className="mt-1 font-soft text-[11px] text-soft-ink-muted">
                 across {openAnswerable.length}{' '}
                 {openAnswerable.length === 1 ? 'open ask' : 'open asks'}
                 {unpricedCount > 0 ? `, ${unpricedCount} without a listed budget` : ''}
@@ -638,7 +673,7 @@ function FeedAskRail({ viewer = null, layout = 'row', className = '' }: FeedAskR
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-0.5">
           <h2 className="min-w-0 font-soft-display text-[13px] font-bold text-soft-ink">
             Asks
-            <span className="ml-1.5 font-soft text-[12px] font-normal text-soft-ink-faint">
+            <span className="ml-1.5 font-soft text-[12px] font-normal text-soft-ink-muted">
               questions with a budget and a deadline
             </span>
           </h2>
@@ -658,7 +693,7 @@ function FeedAskRail({ viewer = null, layout = 'row', className = '' }: FeedAskR
       {shownTab === 'open' ? (
         openList.phase === 'failed' ? (
           <FailedLine
-            tone={column ? 'dark' : 'light'}
+            inset={column}
             onRetry={retryOpen}
             message="Open asks could not be checked. This is a failed read, not an empty list. The posts below are unaffected."
           />
@@ -668,14 +703,14 @@ function FeedAskRail({ viewer = null, layout = 'row', className = '' }: FeedAskR
           // Reczny wybor "Open" przy pustej liscie. Historii tu NIE
           // podstawiamy - filtr, ktory pokazuje co innego, niz na nim pisze,
           // jest gorszy niz puste miejsce. Zdanie mowi, gdzie sa tresci.
-          <QuietLine tone={column ? 'dark' : 'light'}>
+          <QuietLine inset={column}>
             No open asks right now. Nothing to answer at this moment, but resolved ones are still
             on the record.
           </QuietLine>
         )
       ) : resolvedList.phase === 'failed' ? (
         <FailedLine
-          tone={column ? 'dark' : 'light'}
+          inset={column}
           onRetry={retryResolved}
           message="Resolved asks could not be loaded. This is a failed read, not an empty history. Open asks and the posts below are unaffected."
         />
@@ -683,37 +718,51 @@ function FeedAskRail({ viewer = null, layout = 'row', className = '' }: FeedAskR
         // Ponowna proba po awarii NIE MOZE zwinac pasa: naglowek i filtr
         // zostaja, zmienia sie sam srodek. Jedna linia, a nie szkielet karty -
         // szkielet obiecywalby karty, ktorych moze wcale nie byc.
-        <QuietLine tone={column ? 'dark' : 'light'}>Checking resolved asks…</QuietLine>
+        <QuietLine inset={column}>Checking resolved asks…</QuietLine>
       ) : resolvedShown.length > 0 ? (
         /*
-          ===== HISTORIA BEZ WLASNEGO ZAGLEBIENIA =====
-          Byl tu panel `soft-sunken` z obwodka: karta na powierzchni WEWNATRZ
-          zaglebienia czytala sie jak wpis w archiwum, a nie jak kafelek do
-          klikniecia (DECYZJA 5). Karty Aska sa od tej zmiany ciemne wszedzie
-          (patrz naglowek AskCard.tsx), wiec jasny panel pod nimi przestal byc
-          tlem, a stal sie ramka wokol ciemnych prostokatow.
+          ===== HISTORIA SIEDZI W ZAGLEBIENIU =====
+          Panel `soft-sunken` z obwodka to cala roznica wobec otwartych: biala
+          karta WEWNATRZ zaglebienia czyta sie jak wpis w archiwum, a nie jak
+          kafelek do klikniecia. Zadnego nowego koloru, zadnego akcentu -
+          uzasadnienie przy DECYZJI 5.
 
-          Rozroznienie niesie teraz samo zdanie nad lista oraz pasek stanu
-          "Resolved" na kazdej karcie - czyli to, co i tak mowilo prawde.
-          W kolumnie zostaje delikatne zaglebienie, bo tam tlem jest granat
-          karty raila, a nie tlo strony.
+          Przez okres granatowych kart Aska (od 2026-08-13) panelu tu nie
+          bylo, bo jasne zaglebienie wokol ciemnych kart robilo sie ramka.
+          Wrocil razem z biela, w obu ukladach. W kolumnie wiersze dostaja
+          wlasne biale kafle (renderCards, `archive`), bo kwoty nie moga stac
+          wprost na zaglebieniu.
+
+          ZDANIE NAD LISTA NIE MOWI "paid". Przy escrow resolve() tylko
+          przypisuje salda, a tokeny wychodza przy claim() - ta sama zasada
+          co przy zdaniu o `funding` w AskCard.tsx. Prawda w obu wariantach
+          jest tylko to, ze kazda przyjeta odpowiedz ma zapisana transakcje
+          (POST /api/asks/[id]/accept odrzuca przyjecie bez hasha przelewu, a
+          /escrow-resolve zapisuje hash transakcji resolve() przy kazdej
+          przyznanej odpowiedzi).
         */
-        <div className={column ? 'rounded-xl bg-white/[0.05] p-2' : ''}>
+        <div
+          className={
+            column
+              ? 'rounded-[18px] border border-soft-line bg-soft-sunken p-2'
+              : 'rounded-card border border-soft-line bg-soft-sunken p-2.5 sm:p-3'
+          }
+        >
           <p
-            className={`mb-2 px-0.5 text-[11.5px] leading-[1.45] ${
-              column ? 'text-white/55' : 'text-soft-ink-muted'
+            className={`mb-2 text-[11.5px] leading-[1.45] text-soft-ink-muted ${
+              column ? 'px-3' : 'px-0.5'
             }`}
           >
-            Closed and paid. Nothing to answer here: each accepted answer already carries the
-            transaction that paid for it.
+            Resolved by their authors. Nothing to answer here: each accepted answer is recorded
+            with its transaction.
           </p>
-          {renderCards(resolvedShown)}
+          {renderCards(resolvedShown, true)}
         </div>
       ) : openList.phase === 'failed' ? (
         // Historia jest pusta, a otwartych NIE UDALO SIE sprawdzic. Nie wolno
         // tu napisac "nikt jeszcze nie zalozyl Aska" - tego wlasnie nie wiemy.
         <FailedLine
-          tone={column ? 'dark' : 'light'}
+          inset={column}
           onRetry={retryOpen}
           message="No resolved asks yet, and open asks could not be checked. This is a failed read, not an empty list. The posts below are unaffected."
         />
@@ -721,24 +770,21 @@ function FeedAskRail({ viewer = null, layout = 'row', className = '' }: FeedAskR
         // Historia pusta, ale otwarte SA - ktos siegnal po nia sam. "No asks
         // yet" bylo by tu klamstwem o produkcie, wiec mowimy dokladnie tyle,
         // ile wiemy, i wskazujemy druga pigulke.
-        <QuietLine tone={column ? 'dark' : 'light'}>
-          Nothing has been resolved yet. Asks that get closed and paid land here; the open ones are
-          under Open.
+        // "resolved", nie "closed and paid" - powod przy zdaniu nad historia.
+        <QuietLine inset={column}>
+          Nothing has been resolved yet. Asks that get resolved land here; the open ones are under
+          Open.
         </QuietLine>
       ) : (
         // ===== PUSTY RYNEK TRZEBA NAZWAC =====
         // Obie listy odczytane, obie puste. To jedyny moment, w ktorym pas nie
         // ma zadnego Aska - i najlepszy, zeby powiedziec, po co on jest.
-        <QuietLine tone={column ? 'dark' : 'light'}>
+        <QuietLine inset={column}>
           No asks yet. An ask is a question with a budget, a deadline and a fixed number of seats.
-          Answers stay sealed until the author resolves and pays.{' '}
+          Answers stay sealed until the author resolves.{' '}
           <Link
             href="/asks"
-            className={`font-semibold underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 ${
-              column
-                ? 'text-soft-accent focus-visible:ring-soft-accent'
-                : 'text-soft-primary-deep focus-visible:ring-soft-primary'
-            }`}
+            className="font-semibold text-soft-primary-deep underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
           >
             See how asks work
           </Link>
@@ -748,10 +794,23 @@ function FeedAskRail({ viewer = null, layout = 'row', className = '' }: FeedAskR
       {column && (
         /* Jedno wyjscie z karty. Prowadzi na /asks, bo tam jest cala lista,
            zakladanie wlasnego Aska i rozstrzyganie. Napis mowi, co sie stanie
-           po klinieciu, a nie jak sie nazywa strona docelowa. */
+           po klinieciu, a nie jak sie nazywa strona docelowa.
+
+           Stal tu pomaranczowy przycisk wersalikami - wbrew DECYZJI 5
+           (pomaranczowy nalezy wylacznie do kwot). Teraz fiolet jak kazda
+           akcja w produkcie: pelny `primary-deep` (6.26:1 dla bieli; zwykly
+           `primary` ma 4.22:1 i przy 12.5px nie trzyma AA) przy otwartych,
+           gdzie jest co zrobic; obrysowana pigulka jak "Sell" w PostList
+           przy historii, gdzie to zwykle przejscie dalej. Pelny wariant ma
+           przezroczysta ramke 1px, bo obrysowany ja ma - bez niej przycisk
+           zmienialby wysokosc o 2px przy przelaczaniu zakladek. */
         <Link
           href="/asks"
-          className="mt-3 block rounded-pill bg-soft-accent px-4 py-2.5 text-center font-soft-display text-[12px] font-bold uppercase tracking-[0.1em] text-[#1a1f3a] transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-accent focus-visible:ring-offset-2 focus-visible:ring-offset-[#141a33]"
+          className={`mt-3 block rounded-pill px-4 py-2.5 text-center font-soft-display text-[12.5px] font-bold transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface ${
+            shownTab === 'open'
+              ? 'border border-transparent bg-soft-primary-deep text-white shadow-chip hover:bg-soft-primary-deep/90'
+              : 'border border-soft-line-strong bg-soft-surface text-soft-primary-deep hover:bg-soft-sunken'
+          }`}
         >
           {shownTab === 'open' ? 'Answer an ask' : 'See all asks'}
         </Link>
@@ -768,29 +827,25 @@ function FeedAskRail({ viewer = null, layout = 'row', className = '' }: FeedAskR
  * chwyt, ktorym rozniamy historie od otwartych: wybrane jest WYZEJ, reszta
  * lezy w zaglebieniu. Ruch wylacznie na transform, czas przez zmienna -
  * `duration-[--dur-press]` NIE KOMPILUJE SIE i nie wolno go tu wpisac.
+ *
+ * Jeden wariant na oba uklady - od kiedy karta raila jest biala, sciezka
+ * `soft-sunken` czyta sie na niej tak samo jak na tle feedu.
+ *   - Niewybrana pigulka w `ink-muted` (4.7:1 na sciezce). `ink-faint` mial
+ *     tu 2.2:1, a `ink-soft` mialby 2.9:1 - oba to napis do zgadywania.
+ *   - `ring-offset` w kolorze SCIEZKI, nie karty: przycisk lezy na
+ *     `soft-sunken`, wiec offset w bieli rysowalby wokol niego jasna aureole.
  */
-function RailFilter({
-  value,
-  onPick,
-  tone = 'light',
-}: {
-  value: RailTab;
-  onPick: (next: RailTab) => void;
-  tone?: 'light' | 'dark';
-}) {
+function RailFilter({ value, onPick }: { value: RailTab; onPick: (next: RailTab) => void }) {
   const options: { key: RailTab; label: string }[] = [
     { key: 'open', label: 'Open' },
     { key: 'resolved', label: 'Resolved' },
   ];
-  const dark = tone === 'dark';
 
   return (
     <div
       role="group"
       aria-label="Filter asks"
-      className={`flex shrink-0 items-center gap-0.5 rounded-pill p-0.5 ${
-        dark ? 'bg-white/10' : 'border border-soft-line bg-soft-sunken'
-      }`}
+      className="flex shrink-0 items-center gap-0.5 rounded-pill border border-soft-line bg-soft-sunken p-0.5"
     >
       {options.map((option) => {
         const active = option.key === value;
@@ -800,14 +855,8 @@ function RailFilter({
             type="button"
             aria-pressed={active}
             onClick={() => onPick(option.key)}
-            className={`rounded-pill px-2.5 py-[3px] font-soft-display text-[11px] font-semibold transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-1 focus-visible:ring-offset-soft-bg ${
-              active
-                ? dark
-                  ? 'bg-white/90 text-[#141a33]'
-                  : 'bg-soft-surface text-soft-ink shadow-chip'
-                : dark
-                  ? 'text-white/50'
-                  : 'text-soft-ink-faint'
+            className={`rounded-pill px-2.5 py-[3px] font-soft-display text-[11px] font-semibold transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-1 focus-visible:ring-offset-soft-sunken ${
+              active ? 'bg-soft-surface text-soft-ink shadow-chip' : 'text-soft-ink-muted'
             }`}
           >
             {option.label}
@@ -819,16 +868,22 @@ function RailFilter({
 }
 
 /**
- * Zdanie zamiast kart. Jedna linia w karcie o tej samej obwodce co reszta
- * produktu - pas ma zajmowac miejsce takze wtedy, gdy nie ma czego pokazac,
- * bo znikanie uczylo ludzi, ze tej funkcji nie ma.
+ * Zdanie zamiast kart. Pas ma zajmowac miejsce takze wtedy, gdy nie ma czego
+ * pokazac, bo znikanie uczylo ludzi, ze tej funkcji nie ma.
+ *
+ * `inset` to POLOZENIE, nie motyw kolorystyczny:
+ *   - bez niego (pas nad feedem) linia stoi wprost na tle strony, wiec jest
+ *     wlasna biala karta z ta sama obwodka co reszta produktu,
+ *   - z nim (wewnatrz bialej karty raila) biala karta w bialej karcie bylaby
+ *     niewidoczna, wiec linia jest wpuszczona w `soft-sunken`.
+ * Tekst w obu przypadkach `ink-muted` - na zaglebieniu trzyma 4.7:1.
  */
-function QuietLine({ children, tone = 'light' }: { children: ReactNode; tone?: 'light' | 'dark' }) {
+function QuietLine({ children, inset = false }: { children: ReactNode; inset?: boolean }) {
   return (
     <p
       className={
-        tone === 'dark'
-          ? 'rounded-xl bg-white/[0.06] px-3.5 py-3 text-[12.5px] leading-[1.5] text-white/70'
+        inset
+          ? 'rounded-[18px] bg-soft-sunken px-3.5 py-3 text-[12.5px] leading-[1.5] text-soft-ink-muted'
           : 'rounded-card border border-soft-line bg-soft-surface px-4 py-3 text-[12.5px] leading-[1.5] text-soft-ink-muted shadow-card'
       }
     >
@@ -837,40 +892,38 @@ function QuietLine({ children, tone = 'light' }: { children: ReactNode; tone?: '
   );
 }
 
-/** Awaria ma wlasny slad na ekranie i wlasne wyjscie - nigdy nie udaje pustki. */
+/**
+ * Awaria ma wlasny slad na ekranie i wlasne wyjscie - nigdy nie udaje pustki.
+ * `inset` jak przy QuietLine. "Try again" w `primary-deep`: biel na zwyklym
+ * `soft-primary` ma 4.22:1 i przy 12px nie trzyma AA. Offset pierscienia
+ * w kolorze tego, na czym przycisk lezy.
+ */
 function FailedLine({
   message,
   onRetry,
-  tone = 'light',
+  inset = false,
 }: {
   message: string;
   onRetry: () => void;
-  tone?: 'light' | 'dark';
+  inset?: boolean;
 }) {
-  const dark = tone === 'dark';
   return (
     <div
       role="status"
       className={
-        dark
-          ? 'flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-xl bg-white/[0.06] px-3.5 py-3'
+        inset
+          ? 'flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-[18px] bg-soft-sunken px-3.5 py-3'
           : 'flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-card border border-soft-line bg-soft-surface px-4 py-3 shadow-card'
       }
     >
-      <p
-        className={`min-w-0 flex-1 break-words text-[12.5px] leading-[1.5] ${
-          dark ? 'text-white/70' : 'text-soft-ink-muted'
-        }`}
-      >
+      <p className="min-w-0 flex-1 break-words text-[12.5px] leading-[1.5] text-soft-ink-muted">
         {message}
       </p>
       <button
         type="button"
         onClick={onRetry}
-        className={`shrink-0 rounded-lg px-3.5 py-1.5 font-soft-display text-[12px] font-semibold transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 ${
-          dark
-            ? 'bg-soft-accent text-[#1a1f3a] focus-visible:ring-soft-accent'
-            : 'bg-soft-primary text-white focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface'
+        className={`shrink-0 rounded-lg bg-soft-primary-deep px-3.5 py-1.5 font-soft-display text-[12px] font-semibold text-white transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 ${
+          inset ? 'focus-visible:ring-offset-soft-sunken' : 'focus-visible:ring-offset-soft-surface'
         }`}
       >
         Try again

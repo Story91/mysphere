@@ -1295,11 +1295,25 @@ export function liveWatchFor(input: {
  * PUBLICZNEGO RPC, ktory przy serii odbija. Z wlasnym endpointem nie ma powodu
  * pytac rzadziej niz raz na blok, a z WebSocketem nie ma powodu pytac w ogole.
  */
-export const LIVE_WATCH = liveWatchFor({
-  secondsPerBlock: ACTIVE_LAUNCHPAD_NETWORK.secondsPerBlock,
-  ownRpc: OWN_RPC_URL[ACTIVE_LAUNCHPAD_NETWORK.chain.id],
-  wsRpc: OWN_WS_URL[ACTIVE_LAUNCHPAD_NETWORK.chain.id],
-});
+export const LIVE_WATCH = liveWatchForChain(ACTIVE_LAUNCHPAD_NETWORK.chain.id);
+
+/**
+ * Tempo podgladu dla KONKRETNEJ sieci, niezaleznie od tej wybranej na tablicy.
+ *
+ * `LIVE_WATCH` opisuje siec z localStorage i to jest dobre dla samego
+ * Startpada. Pasek na /basechat pokazuje jednak zawsze Base, wiec potrzebuje
+ * tempa i endpointow Base, a nie sieci zapisanej na tablicy (przy Arc: blok
+ * 0,5 s i RPC Arc w roli "wlasnego"). Mapy endpointow zostaja prywatne,
+ * bo musza byc literalami (patrz komentarz przy OWN_RPC_URL).
+ */
+export function liveWatchForChain(chainId: number): LiveWatchTempo {
+  return liveWatchFor({
+    // Nieznana siec: tempo Base, bo tylko tam uzywamy tego poza tablica.
+    secondsPerBlock: LAUNCHPAD_NETWORKS[chainId]?.secondsPerBlock ?? 2,
+    ownRpc: OWN_RPC_URL[chainId],
+    wsRpc: OWN_WS_URL[chainId],
+  });
+}
 
 export type LaunchpadToken = {
   id: string;
