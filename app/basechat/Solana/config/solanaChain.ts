@@ -165,37 +165,140 @@ function truncateUtf8(text: string, maxBytes: number): string {
   return `${out}${ELLIPSIS}`;
 }
 
-export function buildPostMemo(content: string, author: string): string {
-  const body = truncateUtf8(normalizePostText(content), SOLANA_MEMO_MAX_BYTES);
-  return `${POST_MEMO_PREFIX}${author}|${body}`;
+/** Cialo memo, jakie z tej tresci buduje dzisiejszy przycisk. */
+export function postMemoBody(content: string): string {
+  return truncateUtf8(normalizePostText(content), SOLANA_MEMO_MAX_BYTES);
 }
 
 /**
- * Rozbiera memo posta. Tresc moze zawierac `|`, wiec dzielimy tylko na
- * pierwszej kresce po prefiksie - reszta to cialo.
+ * Identyfikator posta: 20 znakow z alfabetu, ktorego uzywa Firestore dla
+ * automatycznych ID. Powstaje W PRZEGLADARCE przed transakcja, bo memo musi
+ * go niesc - patrz `buildPostMemo`.
  */
-export function parsePostMemo(memo: string): { author: string; body: string } | null {
+const POST_ID_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+
+export function newPostId(): string {
+  const bytes = new Uint8Array(20);
+  crypto.getRandomValues(bytes);
+  // 256 % 62 != 0, wiec odrzucamy bajty z niepelnego ostatniego przedzialu -
+  // inaczej pierwsze litery alfabetu wypadalyby czesciej.
+  let out = '';
+  while (out.length < 20) {
+    for (const b of Array.from(bytes)) {
+      if (b < 248 && out.length < 20) out += POST_ID_ALPHABET[b % 62];
+    }
+    crypto.getRandomValues(bytes);
+  }
+  return out;
+}
+
+/**
+ * Jakie identyfikatory postow w ogole przyjmujemy od klienta. Firestore
+ * pozwala na `|` w ID, a `|` jest separatorem pol memo - post `abc|x`
+ * rozjechalby parsowanie kazdej platnej odpowiedzi.
+ */
+export const POST_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
+export function isValidPostId(postId: unknown): postId is string {
+  return typeof postId === 'string' && POST_ID_PATTERN.test(postId);
+}
+
+const POST_MEMO_V2 = 'v2|';
+
+/**
+ * Memo posta.
+ *
+ * === DLACZEGO OD 23.09.2026 MEMO NIESIE ID POSTA (v2) ===
+ * Drugi przeglad przeciwnika pokazal, ze memo bez ID da sie podpiac pod
+ * DOWOLNY post o tej samej tresci: wystarczylo skasowac cudzy post i zalozyc
+ * go od nowa (Firestore nadaje wtedy nowy `createTime`, wiec okno czasowe nic
+ * nie dawalo) z wlasna transakcja - i napiwki szly na obcy portfel.
+ *
+ * Z ID w memo jedna transakcja nalezy do jednego posta na zawsze, a post
+ * zapisuje serwer (POST /api/solana/post) razem z wpisem w rejestrze kwitow.
+ * Format:  mysphere:post|v2|<postId>|<podpisujacy>|<tresc>
+ * Stary format bez ID (`mysphere:post|<podpisujacy>|<tresc>`) nadal sie
+ * parsuje - czyta go Proof of Bags i jednorazowa migracja starych postow.
+ */
+export function buildPostMemo(content: string, author: string, postId: string): string {
+  return `${POST_MEMO_PREFIX}${POST_MEMO_V2}${postId}|${author}|${postMemoBody(content)}`;
+}
+
+export interface ParsedPostMemo {
+  author: string;
+  body: string;
+  /** ID posta z memo v2; `null` dla starego formatu. */
+  postId: string | null;
+}
+
+/**
+ * Rozbiera memo posta. Tresc moze zawierac `|`, wiec pola przed trescia
+ * wycinamy po kolei, a reszta to cialo. Klucz base58 nigdy nie brzmi "v2",
+ * wiec oba formaty sie nie myla.
+ */
+export function parsePostMemo(memo: string): ParsedPostMemo | null {
   if (!memo.startsWith(POST_MEMO_PREFIX)) return null;
-  const rest = memo.slice(POST_MEMO_PREFIX.length);
+  let rest = memo.slice(POST_MEMO_PREFIX.length);
+  let postId: string | null = null;
+  if (rest.startsWith(POST_MEMO_V2)) {
+    rest = rest.slice(POST_MEMO_V2.length);
+    const idEnd = rest.indexOf('|');
+    if (idEnd <= 0) return null;
+    postId = rest.slice(0, idEnd);
+    if (!POST_ID_PATTERN.test(postId)) return null;
+    rest = rest.slice(idEnd + 1);
+  }
   const separator = rest.indexOf('|');
   if (separator <= 0) return null;
-  return { author: rest.slice(0, separator), body: rest.slice(separator + 1) };
+  return { author: rest.slice(0, separator), body: rest.slice(separator + 1), postId };
+}
+
+/** Cialo memo w formacie sprzed 23.09.2026: 179 ZNAKOW i wielokropek. */
+function legacyPostMemoBody(content: string): string {
+  const text = normalizePostText(content);
+  return text.length > 180 ? `${text.slice(0, 179)}${ELLIPSIS}` : text;
 }
 
 /**
- * Czy memo z lancucha nalezy do TEGO posta.
+ * Czy memo z lancucha nalezy do TEGO posta - DOKLADNIE, nie prefiksem.
  *
- * Bez tego sprawdzenia pole `txHash` w dokumencie posta jest dowolnym
- * stringiem - kazdy moglby wpisac cudzy podpis i przypisac sobie cudzy portfel
- * (a przez Blinka: cudze napiwki). Memo niesie poczatek tresci, wiec wiazemy
- * post z transakcja przez prefiks.
+ * === DLACZEGO DOKLADNIE ===
+ * Do 23.09.2026 wystarczal prefiks. Przeglad przeciwnika pokazal skutek:
+ * memo "G" pasowalo do kazdego posta zaczynajacego sie na G, wiec jedna tania
+ * transakcja pozwalala podpiac sie pod dowolnie wiele cudzych postow. Teraz
+ * cialo memo musi byc dokladnie tym, co z tresci posta zbudowalby nasz
+ * przycisk - w formacie dzisiejszym (po bajtach) albo sprzed 23.09 (po
+ * znakach).
  *
- * Prefiks, a nie rownosc, bo cialo memo bywa uciete: dzis po bajtach, a w
- * postach sprzed 23.09.2026 po 180 znakach. Oba formaty koncza sie
- * wielokropkiem, ktory zdejmujemy przed porownaniem.
+ * Uzywane juz tylko przez jednorazowa migracje postow sprzed memo v2 (tam
+ * razem z oknem czasowym `isReceiptTimely`). Nowe posty wiaze ID w memo.
  */
 export function memoMatchesPost(memoBody: string, postContent: string): boolean {
-  const body = memoBody.endsWith(ELLIPSIS) ? memoBody.slice(0, -ELLIPSIS.length) : memoBody;
-  if (!body) return false;
-  return normalizePostText(postContent).startsWith(body);
+  if (!memoBody) return false;
+  return memoBody === postMemoBody(postContent) || memoBody === legacyPostMemoBody(postContent);
+}
+
+/**
+ * Ile przed utworzeniem dokumentu posta moze byc potwierdzona jego transakcja.
+ * Przycisk wysyla transakcje, czeka na potwierdzenie i dopiero wtedy zapisuje
+ * post - zwykle to sekundy. 15 minut to zapas na czlowieka, ktory dlugo czytal
+ * okno portfela, i na opoznione potwierdzenie.
+ */
+export const RECEIPT_MAX_LEAD_MS = 15 * 60 * 1000;
+/** Blok moze "wyprzedzic" zapis o kilka sekund zegara - dwie minuty luzu. */
+export const RECEIPT_MAX_LAG_MS = 2 * 60 * 1000;
+
+/**
+ * Czy transakcja mogla byc kwitem posta utworzonego w chwili `postCreatedMs`.
+ *
+ * `postCreatedMs` MUSI pochodzic z `createTime` dokumentu, ktory nadaje
+ * Firestore i ktorego klient nie nadpisze - a nie z pola `timestamp`, ktore
+ * przy obecnych regulach moze zmienic kazdy. Czasu bloku na Solanie tez nie da
+ * sie cofnac, wiec do posta sprzed tygodnia nie podepnie sie transakcja
+ * wyslana dzis.
+ */
+export function isReceiptTimely(blockTimeSec: number | null, postCreatedMs: number): boolean {
+  if (blockTimeSec === null || !Number.isFinite(postCreatedMs)) return false;
+  const blockMs = blockTimeSec * 1000;
+  return blockMs >= postCreatedMs - RECEIPT_MAX_LEAD_MS && blockMs <= postCreatedMs + RECEIPT_MAX_LAG_MS;
 }

@@ -33,29 +33,15 @@ import { DEFAULT_REFERRAL_CONFIG } from './referrals/types';
 // ani niczego ciezkiego (sam viem), wiec import jest bezpieczny takze tutaj.
 import { normalizeAddress, addressReadVariants } from './monetization/types';
 
-// Stała z adresem admina
-/**
- * Brama uprawnien w aplikacji: kasowanie cudzych postow i komentarzy,
- * przypinanie, panel /admin, moderacja tresci, reczny cleanup przypiec.
- *
- * PRZENIESIONE 6 sierpnia 2026 z 0xF1fa2002...1Dfd na ten adres - decyzja
- * wlasciciela. Ten sam portfel trzyma ADMIN_PRIVATE_KEY, wystawia kontrakty
- * i jest odbiorca platnosci x402, wiec od teraz jest JEDNYM adresem
- * administracyjnym calego produktu zamiast dwoch rozjezdzajacych sie.
- *
- * SKUTEK: ze starego portfela nie da sie juz moderowac. To bylo swiadome.
- *
- * === TA STALA JEST JEDYNYM ZRODLEM ===
- * app/utils/friends/config.ts i app/api/cleanup-expired-pins/route.ts mialy
- * wlasne kopie tego adresu; dzis oba importuja stad. Nie dopisuj kolejnej -
- * kopia zostaje przy starym wlascicielu przy nastepnej zmianie.
- *
- * NIE MYLIC z MYSPHERE_ADDRESS w PaidPinModal.tsx. Tamten ma dzis te sama
- * wartosc co STARY admin, ale znaczy co innego: to ODBIORCA PLATNOSCI za
- * przypiete posty. Nie ruszam go tutaj, bo przeniesienie uprawnien i zmiana
- * konta, na ktore wplywaja pieniadze, to dwie osobne decyzje.
- */
-export const ADMIN_ADDRESS = '0xD4885A5aa53446843CABcDE1F35DE9b4E906030e'.toLowerCase();
+// Adres admina zyje w ./adminAddress (plik bez importow, zeby trasy serwerowe
+// mogly go czytac bez odpalania klienta Firebase). Re-eksport trzyma przy
+// zyciu wszystkie dotychczasowe importy `ADMIN_ADDRESS` z tego pliku.
+// Pelny opis bramy uprawnien - w tamtym pliku.
+import { ADMIN_ADDRESS } from './adminAddress';
+export { ADMIN_ADDRESS };
+// Czyste funkcje bez importow serwerowych - ta sama definicja "platnej
+// odpowiedzi" co w trasie moderacji i w regulach Firestore.
+import { PAID_REPLY_MODERATION_PATH, isPaidReplyData } from './solana/moderation';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -134,6 +120,23 @@ const parseAmount = (value: unknown): number => {
 };
 
 /**
+ * Komentarze z LEGACY tablicy `posts/{id}.comments` bez pol platnej odpowiedzi.
+ *
+ * Platna odpowiedz (tipLamports, via) zapisuje WYLACZNIE serwer i WYLACZNIE do
+ * kolekcji `comments` (app/utils/solana/replyStore.ts) - w tablicy posta nie
+ * lezy nigdy. Tablice zapisuje za to kazda przegladarka, wiec wpis z tymi
+ * polami to podrobka, ktora dorysowalaby sobie odznake "paid reply · X SOL"
+ * pod dowolnym postem. Zdejmujemy je przy odczycie. Wpisy niebedace obiektami
+ * odpadaja z tego samego powodu - feed zrobilby na nich `.id` i sie wywrocil.
+ */
+const legacyCommentsWithoutPaidFields = (raw: unknown): Comment[] => {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((entry): entry is Record<string, unknown> => typeof entry === 'object' && entry !== null)
+    .map(({ tipLamports: _tipLamports, via: _via, ...rest }) => rest as unknown as Comment);
+};
+
+/**
  * Mapowanie dokumentu posta na obiekt feedu. Bylo skopiowane znak w znak
  * w fetchPosts i fetchBaseNameFeedPosts - dwie kopie rozjezdzaly sie przy
  * kazdym nowym polu posta.
@@ -149,8 +152,9 @@ const mapPostDoc = (postDoc: QueryDocumentSnapshot): ExtendedPost => {
     likedBy: postData.likedBy || [],
     // Tablica w dokumencie to LEGACY: nowe komentarze zyja tylko w kolekcji
     // `comments` i dociagaja sie przy rozwinieciu sekcji (PostList). Tablicy
-    // nie ruszamy, bo stare komentarze moga istniec wylacznie w niej.
-    comments: postData.comments || [],
+    // nie ruszamy, bo stare komentarze moga istniec wylacznie w niej - ale
+    // bez pol platnej odpowiedzi (patrz legacyCommentsWithoutPaidFields).
+    comments: legacyCommentsWithoutPaidFields(postData.comments),
     // Liczba do plakietki: licznik z zapisu, a dla postow sprzed licznikow
     // dlugosc tablicy, ktora i tak przyjechala z dokumentem. Clamp do zera,
     // bo atomowy decrement przy podwojnym usunieciu moze zejsc ponizej.
@@ -483,43 +487,23 @@ export const toggleLike = async (
     }
 
     /**
-     * GLOBALNY LICZNIK LAJKOW - jeden zapis, zero agregacji.
+     * GLOBALNEGO LICZNIKA LAJKOW TU JUZ NIE MA - i nie wolno go przywracac.
      *
-     * === DLACZEGO NIE LICZYMY TEGO NA ZADANIE ===
-     * Lajki nie maja wlasnej kolekcji - siedza jako pole `likes` na postach,
-     * wiec ich policzenie to SUMA po 263 613 dokumentach. Jedyna tania droga
-     * to `getAggregateFromServer(sum('likes'))`.
+     * Stal tu `setDoc(globalStats/current, { likesSince: increment(+-1) })`
+     * z przegladarki. Powstal, gdy agregacje w tym projekcie zwracaly
+     * RESOURCE_EXHAUSTED i `sum('likes')` bylo niewykonalne. Mial dwie wady,
+     * ktorych nie dalo sie naprawic w tym miejscu:
+     *   - zapis do licznika, ktory widzi kazdy gosc, szedl z KAZDEJ
+     *     przegladarki, wiec mogl go tez zmienic kazdy z konsoli - o dowolna
+     *     wartosc, nie o jeden;
+     *   - licznik nie znal lajkow sprzed swojego startu, wiec feed musial
+     *     skladac go ze stara migawka i pisac "at least".
      *
-     * A agregacje w tym projekcie NIE DZIALAJA. Zmierzone: `count()` zwraca
-     * RESOURCE_EXHAUSTED nawet dla kolekcji z ZEREM dokumentow, podczas gdy
-     * zwykle `getDocs` odpowiada normalnie. Czyli wyczerpany jest limit
-     * LICZBY ZAPYTAN agregujacych, nie ilosci danych - i nie odnowil sie przez
-     * kilkanascie godzin.
-     *
-     * Licznik przyrostowy uniezaleznia te liczbe od tamtego limitu na zawsze:
-     * jeden `increment` przy lajku zamiast sumowania cwiercmiliona dokumentow
-     * przy kazdym pytaniu.
-     *
-     * === CZEGO TA LICZBA NIE OBEJMUJE ===
-     * Lajkow sprzed wprowadzenia licznika. Dlatego `globalStats` trzyma je
-     * w polu `likesSince`, a nie `likes` - interfejs ma powiedziec, od kiedy
-     * liczy, zamiast podawac niepelna sume jako calosc. Gdy limit agregacji
-     * wroci, jednorazowa suma uzupelni stan poczatkowy.
-     *
-     * Zapis NIE MOZE wywrocic lajka - lajk juz sie zapisal w transakcji wyzej.
+     * Teraz sume liczy raz na dobe serwer (app/api/stats/recount/route.ts)
+     * agregacja po `posts.likes` i zapisuje kluczem administracyjnym. Lajk
+     * zmienia wiec liczbe na feedzie dopiero przy nastepnym przeliczeniu,
+     * a panel Trends pokazuje date tego przeliczenia.
      */
-    void (async () => {
-      try {
-        const { doc: fsDoc, setDoc: fsSetDoc, increment: fsIncrement } = await import('firebase/firestore');
-        await fsSetDoc(
-          fsDoc(db, 'globalStats', 'current'),
-          { likesSince: fsIncrement(outcome.isLiked ? -1 : 1) },
-          { merge: true }
-        );
-      } catch (counterError) {
-        console.warn('⚠️ Nie udalo sie zaktualizowac licznika lajkow:', counterError);
-      }
-    })();
 
     return !outcome.isLiked; // true jesli dodano lajka, false jesli usunieto
   } catch (error) {
@@ -566,7 +550,10 @@ export const deletePost = async (postId: string, authorAddress: string) => {
       });
     }
 
-    // Delete post comments
+    // Delete post comments - W TYM SAMYM batchu co post. Platna odpowiedz
+    // (tipLamports) wolno skasowac przegladarce tylko wtedy, gdy jej post
+    // znika w tej samej operacji (firestore.rules: existsAfter). Rozbicie
+    // na dwa zapisy wywrociloby usuwanie kazdego posta z platna odpowiedzia.
     const commentsRef = collection(db, 'comments');
     const commentsQuery = query(commentsRef, where('postId', '==', postId));
     const commentsSnap = await getDocs(commentsQuery);
@@ -1124,6 +1111,15 @@ export const fetchUserProfile = async (address: string, options: { loadSocialLin
       };
     }
     
+    // Profil tworzymy WYLACZNIE dla adresow EVM. Autor platnej odpowiedzi
+    // z Solany ma adres base58 i zadnego konta w aplikacji; klikniecie w jego
+    // nazwe zakladalo mu fantomowy dokument `users/<base58>` z punktami
+    // i profilem EVM, ktory pompowal liczniki uzytkownikow (znalezisko
+    // z przegladu 2026-09-23).
+    if (!/^0x[0-9a-fA-F]{40}$/.test(address)) {
+      return null;
+    }
+
     // 🆕 PRZYWRÓCENIE ORYGINALNEJ FUNKCJONALNOŚCI: Automatyczne tworzenie konta w Firebase
     // Kiedy użytkownik po raz pierwszy łączy portfel, od razu tworzymy mu dokument w bazie
     console.log('🆕 Tworzę nowe konto użytkownika');
@@ -1337,32 +1333,79 @@ export const editComment = async (postId: string, commentId: string, newContent:
   }
 };
 
+/**
+ * Usuniecie platnej odpowiedzi przez serwer. Reguly Firestore nie pozwalaja
+ * przegladarce skasowac dokumentu z `tipLamports` (inaczej kazdy zdjalby cudza
+ * oplacona odpowiedz), wiec admin i autor posta ida przez trase, ktora sama
+ * sprawdza sesje SIWE i rejestr kwitow. Rzuca z komunikatem trasy, zeby UI
+ * pokazal powod odmowy zamiast ogolnego "nie udalo sie".
+ */
+const deletePaidReplyOnServer = async (commentId: string): Promise<void> => {
+  let response: Response;
+  try {
+    response = await fetch(PAID_REPLY_MODERATION_PATH, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ commentId }),
+    });
+  } catch {
+    throw new Error('Could not reach the server to remove this paid reply. Check your connection and try again.');
+  }
+  let payload: { ok?: unknown; error?: unknown } | null = null;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
+  if (!response.ok || payload?.ok !== true) {
+    const message = typeof payload?.error === 'string' && payload.error.trim()
+      ? payload.error
+      : `Removing the paid reply failed (HTTP ${response.status}).`;
+    throw new Error(message);
+  }
+};
+
 // Funkcja do usuwania komentarza - dodaję sprawdzenie uprawnień
 export const deleteComment = async (postId: string, commentId: string, userId: string) => {
   try {
-    
+
     // 1. Przygotuj batch do operacji atomowych
     const batch = writeBatch(db);
-    
-    // 2. Pobierz post
+
+    // 2. Pobierz post i dokument komentarza z kolekcji - ROWNOLEGLE i ZAWSZE.
+    // Dokument z kolekcji czytamy takze wtedy, gdy komentarz jest w tablicy
+    // posta: tylko on mowi, czy to platna odpowiedz. Tablice zapisuje kazda
+    // przegladarka, wiec wpis pod ID platnej odpowiedzi moze byc podrobka -
+    // bez tego odczytu batch kasowalby oplacony dokument i padal na regulach.
     const postRef = doc(db, 'posts', postId);
-    const postDoc = await getDoc(postRef);
-    
+    const commentRef = doc(db, 'comments', commentId);
+    const [postDoc, commentDoc] = await Promise.all([getDoc(postRef), getDoc(commentRef)]);
+    const collectionComment = commentDoc.exists() ? commentDoc.data() : null;
+
+    // Platna odpowiedz: przegladarka nie ma prawa jej skasowac (reguly), wiec
+    // decyzje o uprawnieniach (admin albo autor posta z rejestru kwitow) i samo
+    // usuniecie robi serwer. Tu nie sprawdzamy autora komentarza - to adres
+    // Solany, ktory nigdy nie bedzie rowny adresowi EVM z portfela.
+    if (isPaidReplyData(collectionComment)) {
+      await deletePaidReplyOnServer(commentId);
+      return true;
+    }
+
     if (!postDoc.exists()) {
       console.error(`Post ${postId} nie istnieje!`);
       throw new Error('Post not found');
     }
-    
+
     const postData = postDoc.data();
     const comments = postData.comments || [];
 
     // Komentarz moze zyc w tablicy posta (legacy), w kolekcji `comments`
     // (wszystkie nowe) albo w obu. Do sprawdzenia uprawnien wystarczy
-    // KTORAKOLWIEK kopia.
+    // KTORAKOLWIEK kopia - ale gdy sa obie, liczy sie kopia z kolekcji:
+    // wpis w tablicy pod cudzym ID moglby podstawic innego autora.
     const legacyComment = comments.find((c: any) => c.id === commentId);
-    const commentRef = doc(db, 'comments', commentId);
-    const commentDoc = legacyComment ? null : await getDoc(commentRef);
-    const commentToDelete = legacyComment ?? (commentDoc?.exists() ? commentDoc.data() : null);
+    const commentToDelete = collectionComment ?? legacyComment ?? null;
 
     if (!commentToDelete) {
       throw new Error('Comment not found');
@@ -1386,7 +1429,10 @@ export const deleteComment = async (postId: string, commentId: string, userId: s
       const replySnap = await getDocs(
         query(collection(db, 'comments'), where('postId', '==', postId), where('replyTo', '==', commentId))
       );
-      collectionReplyIds = replySnap.docs.map((d) => d.id);
+      // Dokument z tipLamports nie jest prawdziwa odpowiedzia (serwer nie
+      // zapisuje platnych odpowiedzi z replyTo), a przegladarka nie ma prawa
+      // go skasowac - w batchu zablokowalby usuniecie tego komentarza.
+      collectionReplyIds = replySnap.docs.filter((d) => !isPaidReplyData(d.data())).map((d) => d.id);
     } catch (error) {
       console.error('Błąd odczytu odpowiedzi z kolekcji comments:', error);
     }
@@ -1394,9 +1440,14 @@ export const deleteComment = async (postId: string, commentId: string, userId: s
       new Set([...legacyReplies.map((r: any) => r.id), ...collectionReplyIds])
     ).filter(Boolean);
 
-    // 4-5. Usuń główny komentarz i odpowiedzi z kolekcji comments
+    // 4-5. Usuń główny komentarz i odpowiedzi z kolekcji comments.
+    // Dokumenty kasujemy tylko dla odpowiedzi znalezionych W KOLEKCJI (maja
+    // replyTo === ten komentarz). ID odpowiedzi z samej tablicy to wpisy
+    // legacy bez dokumentu - albo podrobki: wpis z ID cudzej platnej
+    // odpowiedzi wywracalby caly batch na regulach, a z ID zwyklego komentarza
+    // skasowalby go przy okazji. Z tablicy znikaja i tak (krok 6-7).
     batch.delete(commentRef);
-    for (const replyId of replyIds) {
+    for (const replyId of collectionReplyIds) {
       batch.delete(doc(db, 'comments', replyId));
     }
 
@@ -3213,7 +3264,14 @@ export const fetchPinnedPosts = async (): Promise<ExtendedPost[]> => {
     // Map fetched documents to ExtendedPost objects
     const postsMap = new Map<string, ExtendedPost>();
     postsById.forEach((postData, id) => {
-      const post = { id, ...postData } as ExtendedPost;
+      // Tablica `comments` w dokumencie posta jest zapisywalna z przegladarki -
+      // bez czyszczenia podrobiony wpis z `tipLamports` pokazalby odznake
+      // "paid reply" na przypietym poscie (mapPostDoc robi to samo dla feedu).
+      const post = {
+        id,
+        ...postData,
+        comments: legacyCommentsWithoutPaidFields(postData.comments),
+      } as ExtendedPost;
 
       // Add paid pin details if available
       if (paidPostDetails[id]) {

@@ -19,6 +19,9 @@ const {
   buildPostMemo,
   parsePostMemo,
   memoMatchesPost,
+  newPostId,
+  isValidPostId,
+  isReceiptTimely,
   MEMO_PROGRAM_ADDRESS,
   MEMO_V1_PROGRAM_ADDRESS,
 } = require('../app/basechat/Solana/config/solanaChain');
@@ -91,12 +94,40 @@ describe('Proof of Bags: formatowanie kwot', () => {
 });
 
 describe('Memo posta: przycinanie po bajtach i wiazanie z trescia', () => {
+  const POST_ID = 'AbCdEfGhIjKlMnOpQrSt';
+
   it('krotki post przechodzi bez zmian, a whitespace jest znormalizowany', () => {
-    expect(buildPostMemo('GM  from\nSOLANA ', SIGNER)).to.equal(`mysphere:post|${SIGNER}|GM from SOLANA`);
+    expect(buildPostMemo('GM  from\nSOLANA ', SIGNER, POST_ID)).to.equal(
+      `mysphere:post|v2|${POST_ID}|${SIGNER}|GM from SOLANA`
+    );
+  });
+
+  it('memo v2 niesie ID posta, a stary format nadal sie parsuje', () => {
+    expect(parsePostMemo(buildPostMemo('gm', SIGNER, POST_ID))).to.deep.equal({
+      author: SIGNER,
+      body: 'gm',
+      postId: POST_ID,
+    });
+    expect(parsePostMemo(`mysphere:post|${SIGNER}|gm`)).to.deep.equal({ author: SIGNER, body: 'gm', postId: null });
+    // ID puste albo spoza alfabetu - memo odrzucone, a nie przyciete.
+    expect(parsePostMemo(`mysphere:post|v2||${SIGNER}|gm`)).to.equal(null);
+    expect(parsePostMemo(`mysphere:post|v2|a b|${SIGNER}|gm`)).to.equal(null);
+  });
+
+  it('newPostId daje 20 znakow z alfabetu Firestore i przechodzi walidacje', () => {
+    const ids = new Set(Array.from({ length: 200 }, () => newPostId()));
+    expect(ids.size).to.equal(200);
+    for (const id of Array.from(ids)) {
+      expect(id).to.match(/^[A-Za-z0-9]{20}$/);
+      expect(isValidPostId(id)).to.equal(true);
+    }
+    expect(isValidPostId('abc|x')).to.equal(false);
+    expect(isValidPostId('')).to.equal(false);
+    expect(isValidPostId(42)).to.equal(false);
   });
 
   it('dlugi post emoji miesci sie w limicie bajtow i nie rozrywa znaku', () => {
-    const memo = buildPostMemo('🚀'.repeat(200), SIGNER);
+    const memo = buildPostMemo('🚀'.repeat(200), SIGNER, POST_ID);
     const body = parsePostMemo(memo).body;
     expect(Buffer.byteLength(body, 'utf8')).to.be.at.most(280);
     expect(body.endsWith('…')).to.equal(true);
@@ -106,15 +137,31 @@ describe('Memo posta: przycinanie po bajtach i wiazanie z trescia', () => {
   });
 
   it('rozbiera memo z kreska pionowa w tresci', () => {
-    expect(parsePostMemo(`mysphere:post|${SIGNER}|a|b`)).to.deep.equal({ author: SIGNER, body: 'a|b' });
+    expect(parsePostMemo(`mysphere:post|${SIGNER}|a|b`)).to.deep.equal({ author: SIGNER, body: 'a|b', postId: null });
+    expect(parsePostMemo(`mysphere:post|v2|${POST_ID}|${SIGNER}|a|b`)).to.deep.equal({
+      author: SIGNER,
+      body: 'a|b',
+      postId: POST_ID,
+    });
     expect(parsePostMemo('cos innego')).to.equal(null);
   });
 
-  it('wiaze memo z trescia posta, takze uciete starym formatem znakowym', () => {
+  it('wiaze memo z trescia posta DOKLADNIE, w obu formatach uciecia', () => {
     expect(memoMatchesPost('GM from SOLANA', 'GM  from SOLANA')).to.equal(true);
-    expect(memoMatchesPost('GM from…', 'GM from SOLANA, the long version')).to.equal(true);
+    // Nowy format: ucinanie po bajtach.
+    const long = 'x'.repeat(400);
+    expect(memoMatchesPost(parsePostMemo(buildPostMemo(long, SIGNER, POST_ID)).body, long)).to.equal(true);
+    // Stary format (posty sprzed 23.09.2026): 179 znakow + wielokropek.
+    const legacy = 'y'.repeat(200);
+    expect(memoMatchesPost(`${'y'.repeat(179)}…`, legacy)).to.equal(true);
     expect(memoMatchesPost('GM from SOLANA', 'something else entirely')).to.equal(false);
     expect(memoMatchesPost('', 'anything')).to.equal(false);
+  });
+
+  it('sam prefiks NIE wystarcza - jedna tania transakcja nie moze pasowac do wielu postow', () => {
+    // Znalezisko z przegladu 2026-09-23: memo "G" pasowalo do kazdego posta na G.
+    expect(memoMatchesPost('G', 'GM from SOLANA')).to.equal(false);
+    expect(memoMatchesPost('GM from…', 'GM from SOLANA, the long version')).to.equal(false);
   });
 });
 
@@ -136,7 +183,7 @@ describe('Proof of Bags: odczyt dowodu z transakcji', () => {
 
   it('czyta memo posta i saldo z chwili publikacji', () => {
     const proof = readBagsProof(baseTx());
-    expect(proof.postMemo).to.deep.equal({ author: SIGNER, body: `gm ${USDC}` });
+    expect(proof.postMemo).to.deep.equal({ author: SIGNER, body: `gm ${USDC}`, postId: null });
     expect(proof.positions).to.have.length(1);
     expect(proof.positions[0]).to.deep.include({ mint: USDC, ata: ATA, existed: true, ownerOk: true, decimals: 6 });
     expect(proof.positions[0].atPost).to.equal(1842829n);
@@ -165,5 +212,23 @@ describe('Proof of Bags: odczyt dowodu z transakcji', () => {
     const proof = readBagsProof({ ...tx, instructions: [tx.instructions[0]] });
     expect(proof.positions).to.equal(null);
     expect(proof.postMemo).to.not.equal(null);
+  });
+});
+
+describe('Kwit posta: okno czasowe rejestracji', () => {
+  // createTime dokumentu posta nadaje Firestore i klient go nie zmieni. Transakcja
+  // posta potwierdza sie PRZED zapisem dokumentu, zwykle kilka sekund wczesniej.
+  const created = Date.UTC(2026, 8, 22, 21, 52, 50);
+  const sec = (ms: number) => Math.floor(ms / 1000);
+
+  it('przyjmuje transakcje z chwili tworzenia posta', () => {
+    expect(isReceiptTimely(sec(created - 5_000), created)).to.equal(true);
+    expect(isReceiptTimely(sec(created + 60_000), created)).to.equal(true);
+  });
+
+  it('odrzuca transakcje doklejona do starego posta i transakcje sprzed tygodnia', () => {
+    expect(isReceiptTimely(sec(created + 3 * 86_400_000), created)).to.equal(false);
+    expect(isReceiptTimely(sec(created - 7 * 86_400_000), created)).to.equal(false);
+    expect(isReceiptTimely(null, created)).to.equal(false);
   });
 });

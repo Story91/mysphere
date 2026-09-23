@@ -157,3 +157,58 @@ export function shortAddress(address: string): string {
   if (!address || address.length < 10) return address || 'unknown';
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }
+
+export type SharedComment = {
+  id: string;
+  author: string;
+  authorName?: string;
+  content: string;
+  timestamp: number;
+  txHash?: string | null;
+  /** Platna odpowiedz z X - napiwek w lamportach (string, u64). */
+  tipLamports?: string;
+};
+
+/**
+ * Komentarze posta na udostepnialnej stronie /post/[id].
+ *
+ * Do 23.09.2026 ta strona pokazywala tylko liczbe komentarzy - a wlasnie tu
+ * odsyla po zapisie platna odpowiedz z X ("See it under the post"). Czlowiek
+ * placil, klikal i swojej odpowiedzi nie widzial (znalezisko z przegladu).
+ *
+ * To samo zapytanie co fetchCommentsForPost w feedzie (postId + timestamp
+ * malejaco), wiec korzysta z istniejacego indeksu. Blad nie wywraca strony -
+ * post jest wazniejszy niz jego komentarze.
+ */
+export const getPostCommentsForShare = cache(async (postId: string, max = 50): Promise<SharedComment[]> => {
+  try {
+    const snap = await getDocs(
+      query(collection(getDb(), 'comments'), where('postId', '==', postId), orderBy('timestamp', 'desc'), limit(max))
+    );
+    return snap.docs
+      // Odpowiedzi na komentarze (`replyTo`) pomijamy: lista jest plaska, wiec
+      // "a to nieprawda" pod postem wygladaloby na odpowiedz autorowi posta,
+      // a nie komentarzowi, ktoremu odpowiada. Feed pokazuje je w watku.
+      .filter(d => !d.get('replyTo'))
+      .map(d => {
+        const data = d.data() as Record<string, any>;
+        return {
+          id: d.id,
+          author: typeof data.author === 'string' ? data.author : '',
+          authorName: typeof data.authorName === 'string' ? data.authorName : undefined,
+          content: typeof data.content === 'string' ? data.content : '',
+          timestamp: toMillis(data.timestamp),
+          txHash: typeof data.txHash === 'string' ? data.txHash : null,
+          // Tylko cyfry: dopoki reguly `comments` nie sa wdrozone, pole moze
+          // wpisac przegladarka, a strona robi z niego liczbe ("NaN SOL").
+          tipLamports:
+            typeof data.tipLamports === 'string' && /^\d{1,20}$/.test(data.tipLamports) ? data.tipLamports : undefined,
+        };
+      })
+      .filter(c => c.content)
+      .reverse();
+  } catch (error) {
+    console.error('[getPostCommentsForShare] Nie udalo sie odczytac komentarzy:', error);
+    return [];
+  }
+});

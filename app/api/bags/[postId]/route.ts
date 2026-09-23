@@ -7,7 +7,7 @@
  * odznaka: lepiej, zeby post nie mial odznaki wcale, niz zeby mial falszywa.
  *
  *   1. post istnieje i pochodzi z Solany,
- *   2. transakcja jest kwitem TEGO posta (verifyPostReceipt),
+ *   2. post ma wpis w rejestrze kwitow (zapisany przez serwer razem z postem),
  *   3. transakcja niesie instrukcje Proof of Bags,
  *   4. kazde konto tokenowe to ATA autora, a runtime zapisal jego saldo
  *      z autorem jako wlascicielem,
@@ -16,11 +16,13 @@
 
 import { Connection, PublicKey, type ParsedAccountData } from '@solana/web3.js';
 import { getPostForShare } from '../../../utils/posts/getPostForShare';
-import { verifyPostReceipt } from '../../../utils/solana/postReceipt';
+import { fetchPlainTransaction } from '../../../utils/solana/postReceipt';
+import { resolveRegisteredReceipt } from '../../../utils/solana/receiptRegistry';
 import { ataProgramFor } from '../../../basechat/Solana/bags/ata';
 import {
   computeVerdict,
   formatTokenAmount,
+  readBagsProof,
   type BagsPositionDto,
   type BagsResponse,
 } from '../../../basechat/Solana/bags/bagsCore';
@@ -78,22 +80,46 @@ function parsedInfo<T>(account: { data: Buffer | ParsedAccountData } | null): T 
 }
 
 export async function GET(_request: Request, { params }: { params: { postId: string } }) {
-  const post = await getPostForShare(params.postId).catch(() => null);
+  let post;
+  try {
+    post = await getPostForShare(params.postId);
+  } catch (error) {
+    console.error('[api/bags] Chwilowy blad odczytu posta:', error);
+    return json({ status: 'error' }, 503);
+  }
   if (!post) return json({ status: 'not-found' }, 404);
   if (post.network !== 'solana' || !post.txHash) return json({ status: 'not-applicable' }, 200, true);
 
   const connection = new Connection(SOLANA_RPC_URL, 'confirmed');
 
-  let receipt;
+  // Kwit z REJESTRU, nie z pola `txHash` posta: to pole moze zmienic kazda
+  // przegladarka, a wtedy pod cudzym postem pokazalibysmy czyjes bagi.
+  // Szczegoly: naglowek app/utils/solana/receiptRegistry.ts.
+  let resolution;
   try {
-    receipt = await verifyPostReceipt(connection, post.txHash, post.content);
+    resolution = await resolveRegisteredReceipt(params.postId);
   } catch (error) {
     console.error('[api/bags] Nie udalo sie odczytac kwitu posta:', error);
     return json({ status: 'error' }, 502);
   }
-  if (!receipt.ok) {
-    return json({ status: receipt.reason === 'not-found' ? 'not-found' : 'unverified' }, 200, true);
+  if (!resolution.ok) {
+    if (resolution.reason === 'not-solana') return json({ status: 'not-applicable' }, 200, true);
+    if (resolution.reason === 'post-missing') return json({ status: 'not-found' }, 200, true);
+    if (resolution.reason === 'unavailable') return json({ status: 'error' }, 503);
+    return json({ status: 'unverified' }, 200, true);
   }
+
+  let fetched;
+  try {
+    fetched = await fetchPlainTransaction(connection, resolution.receipt.txHash);
+  } catch (error) {
+    console.error('[api/bags] Nie udalo sie odczytac transakcji z rejestru:', error);
+    return json({ status: 'error' }, 502);
+  }
+  if (!fetched || fetched.failed || fetched.plain.feePayer !== resolution.receipt.signer) {
+    return json({ status: 'unverified' }, 200, true);
+  }
+  const receipt = { signer: resolution.receipt.signer, blockTime: resolution.receipt.blockTime, proof: readBagsProof(fetched.plain) };
   if (!receipt.proof.positions) return json({ status: 'no-proof' }, 200, true);
 
   const signer = receipt.signer;
@@ -148,8 +174,8 @@ export async function GET(_request: Request, { params }: { params: { postId: str
     {
       status: 'ok',
       signer,
-      txHash: post.txHash,
-      explorerUrl: solanaExplorerTxUrl(post.txHash),
+      txHash: resolution.receipt.txHash,
+      explorerUrl: solanaExplorerTxUrl(resolution.receipt.txHash),
       blockTime: receipt.blockTime,
       positions,
     },

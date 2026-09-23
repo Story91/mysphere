@@ -21,7 +21,7 @@ import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { Transaction } from '@solana/web3.js';
 import { Buffer } from 'buffer';
 import { confirmOrAskChain } from '../../../basechat/Solana/confirm';
-import { isInsufficientFunds, isUserRejection } from '../../../basechat/Solana/walletErrors';
+import { isInsufficientFunds, isRentError, isUserRejection } from '../../../basechat/Solana/walletErrors';
 import { SOLANA_NETWORK_LABEL, solanaExplorerTxUrl } from '../../../basechat/Solana/config/solanaChain';
 
 const PRESETS_SOL = [0.01, 0.05, 0.25];
@@ -44,8 +44,8 @@ export default function TipPanel({ postId }: { postId: string }) {
       setVisible(true);
       return;
     }
-    if (!Number.isFinite(amount) || amount <= 0) {
-      setState({ kind: 'error', message: 'Enter an amount greater than zero.' });
+    if (!Number.isFinite(amount) || amount < 0.001) {
+      setState({ kind: 'error', message: 'Tips start at 0.001 SOL.' });
       return;
     }
 
@@ -81,12 +81,16 @@ export default function TipPanel({ postId }: { postId: string }) {
         setState({ kind: 'done', signature, amount });
       } else if (outcome.kind === 'failed') {
         setState({ kind: 'error', message: `The network rejected the tip: ${outcome.detail}` });
+      } else if (outcome.kind === 'unknown') {
+        setState({ kind: 'error', message: `We could not confirm the tip with the network. Check this signature on an explorer before tipping again: ${signature}` });
       } else {
         setState({ kind: 'error', message: 'The network did not confirm the tip in time. Nothing was charged.' });
       }
     } catch (error) {
       if (isUserRejection(error)) {
         setState({ kind: 'idle' });
+      } else if (isRentError(error)) {
+        setState({ kind: 'error', message: "The author's wallet is empty, and Solana needs at least ~0.0009 SOL to open it. Try a bigger tip." });
       } else if (isInsufficientFunds(error)) {
         setState({ kind: 'error', message: 'Not enough SOL in this wallet for the tip and the network fee.' });
       } else {
@@ -139,7 +143,7 @@ export default function TipPanel({ postId }: { postId: string }) {
         <input
           type="number"
           inputMode="decimal"
-          min="0"
+          min="0.001"
           step="any"
           placeholder="Other amount (SOL)"
           value={custom}

@@ -24,6 +24,7 @@
  *   asks, askAnswers    -> MUSZA byc czytelne (metadane sa jawne z zalozenia).
  *   askAnswerContent    -> MUSI byc ODMOWA. To jest ta obietnica z /asks.
  *   premiumContent      -> MUSI byc ODMOWA. To jest tresc, za ktora ktos placi.
+ *   solanaPostReceipts  -> MUSI byc ODMOWA. Rejestr portfeli do wyplat z Solany.
  */
 import { config } from 'dotenv';
 import { initializeApp } from 'firebase/app';
@@ -55,6 +56,10 @@ const PROBES = [
   ['agents', 'open'],
   ['askAnswerContent', 'denied'],
   ['premiumContent', 'denied'],
+  // Rejestr kwitow Solany: jedyne zrodlo portfela do napiwkow i platnych
+  // odpowiedzi. Otwarty = kazdy moze go skasowac i wylaczyc platnosci
+  // (przekierowac ich nie moze - wpisy niosa HMAC). Patrz receiptRegistry.ts.
+  ['solanaPostReceipts', 'denied'],
 ];
 
 let zle = 0;

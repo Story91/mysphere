@@ -54,28 +54,65 @@ export function actionJson(body: unknown, status = 200): Response {
 }
 
 /**
- * Adres wlasnej domeny. Bierzemy go z zadania, a nie ze stalej, bo ta sama
- * trasa musi dzialac na podgladzie Vercela i na localhoscie - a ikona w karcie
- * Blinka MUSI byc adresem absolutnym.
+ * Adres wlasnej domeny - potrzebny WYLACZNIE do ikony karty, ktora musi byc
+ * adresem absolutnym. Linki akcji (`href`, `links.next`) sa WZGLEDNE: klient
+ * Blinka rozwiazuje je wzgledem adresu, z ktorego pobral akcje.
+ *
+ * === DLACZEGO NIE `VERCEL_URL` ===
+ * Do 23.09.2026 stal tu `VERCEL_URL`, gdy brakowalo NEXT_PUBLIC_SITE_URL.
+ * Przeglad przeciwnika sprawdzil to na prod: `VERCEL_URL` to host
+ * KONKRETNEGO deploymentu (mysphere-xxxx.vercel.app), a projekt ma wlaczona
+ * ochrone SSO dla takich adresow. Ikona, akcje i callback prowadzily wiec na
+ * strone logowania Vercela - karta w X bylaby martwa. Host bierzemy z samego
+ * zadania: to jest dokladnie ta domena, pod ktora klient nas znalazl.
  */
 export function originFrom(request: Request): string {
   const configured = process.env.NEXT_PUBLIC_SITE_URL;
   if (configured) return configured.replace(/\/$/, '');
 
-  // Podglad Vercela ma wlasna domene i to na niej stoi ikona.
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  const forwardedHost = request.headers.get('x-forwarded-host');
+  if (forwardedHost && !/^(0\.0\.0\.0|\[?::\]?)(:|$)/.test(forwardedHost)) {
+    const proto = request.headers.get('x-forwarded-proto') || 'https';
+    return `${proto.split(',')[0].trim()}://${forwardedHost.split(',')[0].trim()}`;
+  }
 
   try {
     const url = new URL(request.url);
     // `next dev -H 0.0.0.0` sprawia, ze origin zadania brzmi
     // "http://0.0.0.0:3000". To adres nasluchu, a NIE adres, pod ktory da sie
-    // wejsc - ikona Blinka z takim hostem nigdy sie nie pobierze i karta
-    // zostanie pusta. Zmierzone przy pierwszym tescie trasy.
-    if (url.hostname === '0.0.0.0' || url.hostname === '::') {
+    // wejsc - ikona Blinka z takim hostem nigdy sie nie pobierze.
+    if (url.hostname === '0.0.0.0' || url.hostname === '::' || url.hostname === '[::]') {
       return `${url.protocol}//localhost:${url.port}`;
     }
     return url.origin;
   } catch {
-    return 'https://mysphere.fun';
+    // Domena produkcyjna projektu (nie deploymentu) - bez ochrony SSO.
+    const production = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+    return production ? `https://${production}` : 'https://mysphere.fun';
   }
+}
+
+/**
+ * Bezpiecznik: produkcja zbudowana na devnecie nie wystawia Blinkow.
+ *
+ * NEXT_PUBLIC_SOLANA_CLUSTER jest wklejany w kod przy buildzie. Gdy go brakuje,
+ * aplikacja cicho wraca na devnet - a karta Blinka z naglowkiem devnetu jest
+ * odrzucana przez portfele na mainnecie, podczas gdy link do niej krazy juz
+ * po X (znalezisko z przegladu 2026-09-23: dokladnie tak stal prod). Lepiej
+ * odmowic jasnym komunikatem niz pokazac karte, ktora nic nie zrobi.
+ */
+export function misconfiguredCluster(): Response | null {
+  if (blinksDisabled()) {
+    return actionError('Solana is not switched to mainnet on this deployment yet.', 503);
+  }
+  return null;
+}
+
+/**
+ * Ta sama decyzja co misconfiguredCluster, bez odpowiedzi HTTP - dla stron,
+ * ktore linkuja do Blinkow (np. /post/[id]). Link do akcji, ktora i tak
+ * odpowie 503, to obietnica bez pokrycia.
+ */
+export function blinksDisabled(): boolean {
+  return process.env.VERCEL_ENV === 'production' && !IS_SOLANA_MAINNET;
 }

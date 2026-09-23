@@ -605,8 +605,97 @@ service cloud.firestore {
         'launchpadTokens',
         'launchpadHistory',
         'launchpadTokenIndex',
-        'launchpadBoardStats'
+        'launchpadBoardStats',
+        'posts',
+        'comments',
+        'solanaPostReceipts',
+        'globalStats'
       ];
+    }
+
+    // ========================================================================
+    // SOLANA: KWITY POSTOW, POSTY I KOMENTARZE (2026-09-23)
+    //
+    // Przeglad przeciwnika wykazal, ze `posts` i `comments` byly pod ogolna
+    // regula "kazdy moze wszystko". Dla Solany to znaczylo: podpiecie wlasnej
+    // transakcji pod CUDZY post i przekierowanie napiwkow oraz platnych
+    // odpowiedzi na swoj portfel, a takze podrobienie odznaki "paid reply".
+    //
+    // Kod juz sie przed tym broni: post z Solany zapisuje wylacznie serwer
+    // (POST /api/solana/post), razem z wpisem w rejestrze kwitow z HMAC, a memo
+    // transakcji niesie ID posta (app/utils/solana/receiptRegistry.ts); platne
+    // odpowiedzi zapisuje i naprawia serwer (replyStore.ts). Te reguly
+    // zamykaja dziure u zrodla.
+    //
+    // Swiadomie NIE zamykaja wiecej niz trzeba: posty i komentarze zostaja
+    // otwarte dla wszystkich operacji, ktore aplikacja dzis wykonuje z
+    // przegladarki (tworzenie, polubienia, liczniki, edycja tresci, piny,
+    // usuwanie). Zamrozone sa wylacznie pola, ktorych zaden kod klienta nie
+    // zmienia po utworzeniu - sprawdzone grepem wszystkich updateDoc na
+    // `posts` i `comments` w app/.
+    // ========================================================================
+
+    // Rejestr kwitow pisze i czyta WYLACZNIE serwer (Firebase Admin omija
+    // reguly). Przegladarka nie ma tu nic do roboty.
+    match /solanaPostReceipts/{postId} {
+      allow read, write: if false;
+    }
+
+    match /posts/{postId} {
+      allow read: if true;
+      // Posty z innych sieci kasuje kazdy, jak dotad. Post z Solany niesie
+      // platne odpowiedzi i to on otwiera Blinka - skasowac go moze tylko autor
+      // albo admin, zalogowani do Firebase tokenem z SIWE (uid = adres portfela
+      // malymi literami, patrz mintFirebaseToken). Inaczej kazdy moglby jednym
+      // batchem zdjac cudzy post razem z oplaconymi odpowiedziami.
+      allow delete: if resource.data.get('network', 'base') != 'solana'
+        || (request.auth != null
+          && (request.auth.uid == string(resource.data.get('author', '')).lower()
+            || request.auth.uid == '0xd4885a5aa53446843cabcde1f35de9b4e906030e'));
+      // Post z Solany tworzy WYLACZNIE serwer - przegladarka zakladajaca
+      // `network: 'solana'` to proba podpiecia wlasnego portfela pod post.
+      // Skasowanie posta niczego nie przejmuje: rejestr kwitow jest poza
+      // zasiegiem klienta, a drugiego wpisu pod tym ID serwer nie utworzy.
+      allow create: if request.resource.data.get('network', 'base') != 'solana';
+      // txHash, network i author to kwit posta i jego autor - po utworzeniu
+      // nie zmienia ich zaden kod aplikacji, a ich podmiana byla wektorem
+      // przejecia napiwkow.
+      allow update: if !request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny(['txHash', 'network', 'author']);
+    }
+
+    // Podkolekcje postow zostaja dokladnie tak otwarte jak przed ta zmiana -
+    // wpisanie `posts` na liste wyzej odcieloby je od regul ogolnych.
+    match /posts/{postId}/{rest=**} {
+      allow read, write: if true;
+    }
+
+    match /comments/{commentId} {
+      allow read: if true;
+      // Platna odpowiedz (tipLamports, via) zapisuje wylacznie serwer po
+      // weryfikacji transakcji. Klient nie moze jej stworzyc ani podrobic.
+      allow create: if !request.resource.data.keys().hasAny(['tipLamports', 'via']);
+      // Zwykly komentarz: edycja jak dotad, byle nie dopisac pol platnej
+      // odpowiedzi. Kazdy komentarz, takze platny: polubienia.
+      allow update: if (
+          resource.data.get('tipLamports', null) == null
+          && !request.resource.data.keys().hasAny(['tipLamports', 'via'])
+        ) || request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['likes', 'likedBy', 'lastUpdated']);
+      // Oplaconej odpowiedzi nie usunie przegladarka - moderuje ja serwer
+      // (/api/solana/reply-moderation, admin albo autor posta). Wyjatki:
+      //   - dokument, ktorego nie ma: deleteComment kasuje tez identyfikatory
+      //     starych komentarzy zyjacych tylko w tablicy posta, a `resource`
+      //     jest wtedy null - bez tej galezi caly batch by padl,
+      //   - post kasowany w tym samym batchu (deletePost): odpowiedzi znikaja
+      //     razem z nim, inaczej posta z platna odpowiedzia nie dalo sie usunac.
+      allow delete: if resource == null
+        || resource.data.get('tipLamports', null) == null
+        || !existsAfter(/databases/$(database)/documents/posts/$(resource.data.postId));
+    }
+
+    match /comments/{commentId}/{rest=**} {
+      allow read, write: if true;
     }
 
     // ========================================================================
@@ -687,6 +776,34 @@ service cloud.firestore {
     }
 
     match /curatorChanges/{changeId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // ========================================================================
+    // LICZNIKI FEEDU: globalStats (2026-09-23)
+    //
+    // Jeden dokument `globalStats/current`, z ktorego panel Trends czyta
+    // liczbe uzytkownikow, postow, lajkow i komentarzy. Do tej pory lezal pod
+    // ogolna regula "kazdy moze wszystko" - i przegladarka faktycznie tam
+    // pisala: toggleLike dodawal `likesSince`, a panel admina nadpisywal
+    // liczby po kliknieciu "Policz". Kazdy mogl wiec z konsoli wpisac dowolna
+    // liczbe, ktora zobaczy kazdy gosc.
+    //
+    // Teraz liczby przelicza raz na dobe serwer (app/api/stats/recount/
+    // route.ts) kluczem administracyjnym, ktory omija reguly - wiec `if false`
+    // nie blokuje crona. Zapisy z przegladarki zostaly usuniete z kodu.
+    //
+    // KOLEJNOSC: wdrozyc te regule DOPIERO po pierwszym recznym przebiegu
+    // /api/stats/recount. Karty ze starym kodem dostana wtedy odmowe na
+    // likesSince - lapana w try/catch, lajk sie zapisuje.
+    //
+    // Czego ta regula NIE zamyka: `posts`, `users` i `comments`, z ktorych
+    // cron liczy, dalej sa zapisywalne z przegladarki (posts.likes zmienia
+    // toggleLike). Straznik w app/utils/stats/recountGuard.ts lapie skoki,
+    // ale nie zastapi reguly na `likes` - to osobna zmiana.
+    // ========================================================================
+    match /globalStats/{docId} {
       allow read: if true;
       allow write: if false;
     }

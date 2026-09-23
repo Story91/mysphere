@@ -27,6 +27,8 @@ const ACTIONS_MANIFEST = {
   rules: [
     // Sciezka czytelna dla czlowieka - to ja udostepnia sie na X.
     { pathPattern: '/blink/tip/*', apiPath: '/api/actions/tip/*' },
+    // Platna odpowiedz na post - druga akcja, ktora udostepnia sie na X.
+    { pathPattern: '/blink/reply/*', apiPath: '/api/actions/reply/*' },
     // Bezposredni adres akcji tez musi byc zadeklarowany, bo dial.to i testy
     // odpytuja wlasnie jego.
     { pathPattern: '/api/actions/**', apiPath: '/api/actions/**' },

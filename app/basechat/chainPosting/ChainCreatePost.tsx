@@ -26,7 +26,7 @@ import { Avatar } from '../../components/identity';
 import MusicSelector from '../components/MusicSelector';
 import SpotifyTrackCard from '../components/SpotifyTrackCard';
 import ChainPostButton from './ChainPostButton';
-import type { ChainComposerSkin, ChainPostButtonProps, ChainPostingConfig } from './types';
+import type { ChainComposerSkin, ChainPostButtonProps, ChainPostReceipt, ChainPostingConfig } from './types';
 
 /** Lancuch, ktory faktycznie uzywa wspolnego composera - `composer` jest wymagany. */
 export type ChainWithComposer = ChainPostingConfig & { composer: ChainComposerSkin };
@@ -109,7 +109,7 @@ export default function ChainCreatePost({
     reader.readAsDataURL(file);
   };
 
-  const handleTransactionSuccess = async (txHash: string) => {
+  const handleTransactionSuccess = async (txHash: string, receipt?: ChainPostReceipt) => {
     if (!address) {
       // Transakcja JUZ poszla na lancuch i uzytkownik zaplacil za gaz. Ciche
       // `return` zostawialo go z przekonaniem, ze post zostal zapisany, choc
@@ -185,7 +185,9 @@ export default function ChainCreatePost({
         musicTrack: selectedMusic ?? undefined,
       };
 
-      const newPostId = await createPost(postFields);
+      const newPostId = composer.savePost
+        ? await composer.savePost(postFields, receipt)
+        : await createPost(postFields);
 
       window.dispatchEvent(
         new CustomEvent('newPost', {

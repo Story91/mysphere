@@ -41,8 +41,15 @@ export type ConfirmOutcome =
   | { kind: 'landed' }
   /** Transakcja jest na lancuchu, ale wykonala sie z bledem. */
   | { kind: 'failed'; detail: string }
-  /** Okno wygaslo i po odpytaniu lancucha podpisu nadal nie ma. */
-  | { kind: 'expired' };
+  /** Okno wygaslo, RPC odpowiadal, a podpisu nadal nie ma - transakcja nie weszla. */
+  | { kind: 'expired' }
+  /**
+   * Okno wygaslo i ANI RAZU nie dostalismy odpowiedzi o status - nie wiemy nic.
+   * Do 23.09.2026 zlewalo sie to z `expired` i uzytkownik slyszal "nothing was
+   * charged", choc RPC po prostu milczal (znalezisko z przegladu). Tu podpis
+   * trzeba mu oddac, zeby mogl sprawdzic sam.
+   */
+  | { kind: 'unknown' };
 
 export async function confirmOrAskChain(
   connection: Connection,
@@ -62,11 +69,13 @@ export async function confirmOrAskChain(
   } catch {
     // Okno potwierdzania wygaslo. To pytanie bez odpowiedzi, a nie odpowiedz -
     // patrz naglowek. Pytamy lancuch.
+    let answered = false;
     for (let attempt = 0; attempt < STATUS_POLL_ATTEMPTS; attempt += 1) {
       try {
         const statuses = await connection.getSignatureStatuses([signature], {
           searchTransactionHistory: true,
         });
+        answered = true;
         const status = statuses.value[0];
         if (status) {
           if (status.err) {
@@ -84,7 +93,8 @@ export async function confirmOrAskChain(
       await new Promise(resolve => setTimeout(resolve, STATUS_POLL_INTERVAL_MS));
     }
     // Po wygasnieciu blockhasha transakcja nie moze juz wejsc do bloku, wiec
-    // brak podpisu po tych probach znaczy, ze naprawde nie przeszla.
-    return { kind: 'expired' };
+    // brak podpisu po tych probach znaczy, ze naprawde nie przeszla - ale tylko
+    // wtedy, gdy RPC w ogole odpowiadal.
+    return answered ? { kind: 'expired' } : { kind: 'unknown' };
   }
 }

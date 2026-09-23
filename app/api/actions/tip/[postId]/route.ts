@@ -40,21 +40,15 @@
  */
 
 import {
-  Connection,
   PublicKey,
   SystemProgram,
   Transaction,
   TransactionInstruction,
   LAMPORTS_PER_SOL,
 } from '@solana/web3.js';
-import { getPostForShare } from '../../../../utils/posts/getPostForShare';
-import { verifyPostReceipt } from '../../../../utils/solana/postReceipt';
-import {
-  MEMO_PROGRAM_ADDRESS,
-  SOLANA_NETWORK_LABEL,
-  SOLANA_RPC_URL,
-} from '../../../../basechat/Solana/config/solanaChain';
-import { ACTION_HEADERS, actionError, actionJson, originFrom } from '../../actionHeaders';
+import { MEMO_PROGRAM_ADDRESS, SOLANA_NETWORK_LABEL } from '../../../../basechat/Solana/config/solanaChain';
+import { ACTION_HEADERS, actionError, actionJson, misconfiguredCluster, originFrom } from '../../actionHeaders';
+import { resolveSolanaPostAuthor, shortenAddress, solanaConnection } from '../../solanaPostAuthor';
 
 export const runtime = 'nodejs';
 // Odbiorca wynika ze stanu lancucha, a tresc posta z Firestore - jedno i drugie
@@ -67,71 +61,25 @@ const PRESET_AMOUNTS_SOL = [0.01, 0.05, 0.25];
 /** Gorny limit dla kwoty wpisanej recznie - ochrona przed pomylka o rzad wielkosci. */
 const MAX_TIP_SOL = 100;
 
-function connection(): Connection {
-  return new Connection(SOLANA_RPC_URL, 'confirmed');
-}
-
-/**
- * Adres Solany autora posta, odczytany z kwitu - ale TYLKO wtedy, gdy kwit
- * naprawde nalezy do tego posta (verifyPostReceipt).
- *
- * Do 23.09.2026 brany byl platnik oplaty transakcji z pola `txHash` bez
- * zadnego sprawdzenia. Pole zapisuje klient, wiec wystarczylo wpisac do
- * wlasnego posta cudzy podpis - i napiwki za ten post szlyby na obcy portfel.
- * Teraz memo transakcji musi wskazywac tego samego platnika i zaczynac sie
- * trescia tego posta.
- *
- * Zwraca rodzaj niepowodzenia, bo "nie umiemy teraz odczytac" (502, ponow)
- * i "to nie jest kwit tego posta" (400, nie ponawiaj) to rozne odpowiedzi.
- */
-async function resolveRecipient(
-  txHash: string,
-  postContent: string
-): Promise<{ recipient: PublicKey } | { error: string; status: number }> {
-  try {
-    const receipt = await verifyPostReceipt(connection(), txHash, postContent);
-    if (receipt.ok) return { recipient: new PublicKey(receipt.signer) };
-    if (receipt.reason === 'unverified' || receipt.reason === 'failed-tx') {
-      return { error: 'The on-chain receipt does not match this post, so there is no verified wallet to tip.', status: 400 };
-    }
-    return { error: 'The on-chain receipt for this post could not be read right now.', status: 502 };
-  } catch (error) {
-    console.error('[actions/tip] Nie udalo sie odczytac transakcji posta:', error);
-    return { error: 'The on-chain receipt for this post could not be read right now.', status: 502 };
-  }
-}
-
-function shorten(address: string): string {
-  return `${address.slice(0, 4)}…${address.slice(-4)}`;
-}
-
 export async function OPTIONS() {
   return new Response(null, { status: 204, headers: ACTION_HEADERS });
 }
 
 export async function GET(request: Request, { params }: { params: { postId: string } }) {
-  const post = await getPostForShare(params.postId).catch(() => null);
+  const misconfigured = misconfiguredCluster();
+  if (misconfigured) return misconfigured;
 
-  if (!post) {
-    return actionError('This post no longer exists.', 404);
-  }
-
-  if (post.network !== 'solana' || !post.txHash) {
-    // Post z innej sieci nie ma adresu Solany, na ktory mozna wyslac napiwek.
-    // Mowimy to wprost zamiast pokazywac karte, ktora i tak by nie zadzialala.
-    return actionError('This post was not published on Solana, so it cannot be tipped in SOL.', 400);
-  }
-
-  const resolved = await resolveRecipient(post.txHash, post.content);
-  if ('error' in resolved) {
-    return actionError(resolved.error, resolved.status);
-  }
-  const { recipient } = resolved;
+  // Portfel autora ze ZWERYFIKOWANEGO kwitu posta - ten sam modul, co przy
+  // platnych odpowiedziach (app/api/actions/solanaPostAuthor.ts).
+  const resolved = await resolveSolanaPostAuthor(params.postId);
+  if (!resolved.ok) return actionError(resolved.error, resolved.status);
+  const { post, wallet: recipient, payeeLabel: author } = resolved;
 
   const origin = originFrom(request);
-  const author = post.authorName || shorten(post.author);
   const excerpt = post.content.length > 120 ? `${post.content.slice(0, 120)}…` : post.content;
-  const base = `${origin}/api/actions/tip/${post.id}`;
+  // Wzgledny: klient Blinka rozwiazuje go wzgledem adresu, z ktorego pobral
+  // akcje (patrz originFrom w actionHeaders.ts).
+  const base = `/api/actions/tip/${post.id}`;
 
   return actionJson({
     type: 'action',
@@ -159,7 +107,7 @@ export async function GET(request: Request, { params }: { params: { postId: stri
               name: 'amount',
               label: 'Amount in SOL',
               type: 'number' as const,
-              min: 0.000001,
+              min: 0.001,
               max: MAX_TIP_SOL,
               required: true,
             },
@@ -171,6 +119,9 @@ export async function GET(request: Request, { params }: { params: { postId: stri
 }
 
 export async function POST(request: Request, { params }: { params: { postId: string } }) {
+  const misconfigured = misconfiguredCluster();
+  if (misconfigured) return misconfigured;
+
   let body: { account?: string };
   try {
     body = await request.json();
@@ -194,23 +145,20 @@ export async function POST(request: Request, { params }: { params: { postId: str
   if (!amountRaw || !Number.isFinite(amount) || amount <= 0) {
     return actionError('Enter an amount greater than zero.');
   }
+  // Minimum 0.001 SOL. Portfel, ktorym podpisano post, bywa pusty (portfele
+  // jednorazowe), a Solana nie przyjmie przelewu, po ktorym konto odbiorcy
+  // mialoby mniej niz ~0.00089 SOL (rent). Portfel zglaszal to jako "brak
+  // srodkow", wiec placacy myslal, ze to jemu brakuje SOL.
+  if (amount < 0.001) {
+    return actionError('Tips start at 0.001 SOL.');
+  }
   if (amount > MAX_TIP_SOL) {
     return actionError(`For safety this Blink is capped at ${MAX_TIP_SOL} SOL.`);
   }
 
-  const post = await getPostForShare(params.postId).catch(() => null);
-  if (!post) {
-    return actionError('This post no longer exists.', 404);
-  }
-  if (post.network !== 'solana' || !post.txHash) {
-    return actionError('This post was not published on Solana, so it cannot be tipped in SOL.');
-  }
-
-  const resolved = await resolveRecipient(post.txHash, post.content);
-  if ('error' in resolved) {
-    return actionError(resolved.error, resolved.status);
-  }
-  const { recipient } = resolved;
+  const resolved = await resolveSolanaPostAuthor(params.postId);
+  if (!resolved.ok) return actionError(resolved.error, resolved.status);
+  const { post, wallet: recipient } = resolved;
 
   if (recipient.equals(sender)) {
     // Przelew do samego siebie kosztuje oplate i nie robi nic. Lepiej powiedziec
@@ -226,7 +174,7 @@ export async function POST(request: Request, { params }: { params: { postId: str
   }
 
   try {
-    const conn = connection();
+    const conn = solanaConnection();
     const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash('confirmed');
 
     const transaction = new Transaction({
@@ -257,7 +205,7 @@ export async function POST(request: Request, { params }: { params: { postId: str
     return actionJson({
       type: 'transaction',
       transaction: serialized,
-      message: `Tipping ${amount} SOL to ${shorten(recipient.toBase58())} for this post.`,
+      message: `Tipping ${amount} SOL to ${shortenAddress(recipient.toBase58())} for this post.`,
     });
   } catch (error) {
     console.error('[actions/tip] Nie udalo sie zbudowac transakcji:', error);

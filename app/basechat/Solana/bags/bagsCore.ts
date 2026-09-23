@@ -14,6 +14,7 @@ import {
   MEMO_PROGRAM_ADDRESS,
   MEMO_V1_PROGRAM_ADDRESS,
   parsePostMemo,
+  type ParsedPostMemo,
 } from '../config/solanaChain';
 
 export const TOKEN_PROGRAM_ADDRESS = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
@@ -191,7 +192,7 @@ export interface BagsProofPosition {
 }
 
 export interface BagsProof {
-  postMemo: { author: string; body: string } | null;
+  postMemo: ParsedPostMemo | null;
   /** `null`, gdy transakcja nie niesie instrukcji Proof of Bags. */
   positions: BagsProofPosition[] | null;
 }

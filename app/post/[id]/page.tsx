@@ -2,7 +2,9 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
-import { getPostForShare, getPostTipTotals, shortAddress } from '../../utils/posts/getPostForShare';
+import { getPostCommentsForShare, getPostForShare, getPostTipTotals, shortAddress } from '../../utils/posts/getPostForShare';
+import { SOLANA_EXPLORER_SUFFIX } from '../../basechat/Solana/config/solanaChain';
+import { blinksDisabled } from '../../api/actions/actionHeaders';
 import SharePostActions from './SharePostActions';
 
 /**
@@ -68,9 +70,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function PostPage({ params }: Props) {
   // Tresc i sumy tipow rownolegle - to dwa niezalezne odczyty, a strona czeka
   // na oba, wiec sekwencyjnie kosztowalyby dwa razy tyle czasu.
-  const [post, tipTotals] = await Promise.all([
+  const [post, tipTotals, comments] = await Promise.all([
     getPostForShare(params.id),
     getPostTipTotals(params.id),
+    getPostCommentsForShare(params.id),
   ]);
   if (!post) notFound();
 
@@ -144,6 +147,58 @@ export default async function PostPage({ params }: Props) {
             )}
           </div>
         </article>
+
+        {comments.length > 0 && (
+          <section aria-label="Replies" className="mt-4 rounded-card bg-soft-surface p-5 shadow-card sm:p-6">
+            <h2 className="mb-3 font-soft-display text-[14px] font-bold text-soft-ink">Replies</h2>
+            <ul className="flex flex-col gap-4">
+              {comments.map(comment => {
+                const isSolana = !comment.author.startsWith('0x');
+                const name = comment.authorName || (isSolana
+                  ? `${comment.author.slice(0, 4)}…${comment.author.slice(-4)}`
+                  : shortAddress(comment.author));
+                const tipSol = comment.tipLamports ? Number(comment.tipLamports) / 1e9 : null;
+                return (
+                  <li key={comment.id} className="border-t border-soft-line pt-3 first:border-t-0 first:pt-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-soft-display text-[13.5px] font-bold text-soft-ink">{name}</span>
+                      {tipSol !== null && comment.txHash && (
+                        <a
+                          href={`https://explorer.solana.com/tx/${comment.txHash}${SOLANA_EXPLORER_SUFFIX}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-pill border border-[#9945FF]/30 bg-[#9945FF]/10 px-1.5 py-0.5 text-[10.5px] font-semibold text-[#6d28d9]"
+                        >
+                          paid reply · {tipSol} SOL
+                        </a>
+                      )}
+                    </div>
+                    <p className="mt-1 whitespace-pre-wrap break-words text-[14.5px] leading-[1.55] text-soft-ink-muted">
+                      {comment.content}
+                    </p>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
+
+        {/* Bez linku, gdy Blinki sa na tym deploymencie wylaczone (prod na
+            devnecie): obie trasy odpowiedzialyby wtedy 503, a czlowiek
+            szykowalby odpowiedz, ktorej nie da sie oplacic. */}
+        {post.network === 'solana' && !blinksDisabled() && (
+          <p className="mt-4 text-center font-soft text-[13px] text-soft-ink-soft">
+            This post was written on Solana.{' '}
+            <Link href={`/blink/reply/${post.id}`} className="font-semibold text-soft-primary-deep underline underline-offset-2">
+              Reply and tip the author
+            </Link>{' '}
+            or{' '}
+            <Link href={`/blink/tip/${post.id}`} className="font-semibold text-soft-primary-deep underline underline-offset-2">
+              just tip
+            </Link>
+            .
+          </p>
+        )}
 
         <SharePostActions postId={post.id} authorName={author} />
 

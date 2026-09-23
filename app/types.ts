@@ -101,6 +101,14 @@ export interface Comment {
     amount: number;
     currency: string;
   };
+  /**
+   * Platna odpowiedz z X (Blink): napiwek dla autora posta w lamportach, jako
+   * string (u64 nie miesci sie bezpiecznie w number). Zapisuje go wylacznie
+   * serwer po weryfikacji transakcji - app/utils/solana/replyStore.ts.
+   */
+  tipLamports?: string;
+  /** Skad przyszedl komentarz: 'blink' = platna odpowiedz z X albo /blink/reply. */
+  via?: 'blink';
   replies?: Comment[];
 }
 

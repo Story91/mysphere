@@ -109,12 +109,43 @@ export interface ChainComposerSkin {
   savingLabel: string;
   /** Baner nad polem tekstowym, pokazywany gdy `isLive()` zwraca false. */
   notice?: ReactNode;
+  /**
+   * Zapis posta zamiast klienckiego `createPost`. Uzywa tego tylko Solana:
+   * tam post zapisuje serwer (POST /api/solana/post) razem z wpisem w
+   * rejestrze kwitow, bo od `txHash` zaleza wyplaty - patrz
+   * app/utils/solana/receiptRegistry.ts. Zwraca ID zapisanego posta,
+   * rzuca z czytelnym komunikatem.
+   */
+  savePost?: (fields: ComposerPostFields, receipt: ChainPostReceipt | undefined) => Promise<string>;
+}
+
+/** Pola posta skladane przez composer - wspolne dla `createPost` i `savePost`. */
+export interface ComposerPostFields {
+  author: string;
+  content: string;
+  timestamp: number;
+  tags: string[];
+  mentions: string[];
+  visibility: 'public';
+  txHash: string;
+  network: PostNetworkId;
+  image: string | null;
+  video: string | null;
+  musicTrack?: Record<string, unknown>;
+}
+
+/**
+ * Dodatkowe dane z przycisku transakcji. Solana generuje ID posta PRZED
+ * transakcja (memo je niesie), wiec musi je przekazac do zapisu.
+ */
+export interface ChainPostReceipt {
+  postId: string;
 }
 
 /** Propsy przycisku postu - takie same we wszystkich szesciu sieciach. */
 export interface ChainPostButtonProps {
   content: string;
-  onTransactionSuccess: (txHash: string) => void;
+  onTransactionSuccess: (txHash: string, receipt?: ChainPostReceipt) => void;
   disabled?: boolean;
   autoPost?: boolean;
   onPostAdded?: () => Promise<void>;

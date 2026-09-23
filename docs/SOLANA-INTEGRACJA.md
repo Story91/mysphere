@@ -205,6 +205,10 @@ każdy post opublikowany na Solanie już dziś niesie komplet potrzebnych danych
 wypłat. Jeśli autor postował z portfela jednorazowego, napiwek trafi właśnie
 tam. Dlatego karta mówi wprost, na który adres idzie przelew.
 
+Od drugiego przeglądu (23.09) portfel nie jest już odczytywany z `txHash`
+posta, tylko z rejestru kwitów zapisanego przez serwer w chwili publikacji —
+szczegóły w sekcji „Kto decyduje o portfelu do wypłat”.
+
 ## Pliki
 
 | Plik | Rola |
@@ -271,9 +275,8 @@ Odznaka mówi o **saldzie portfela**, nie o intencji: „wallet down 82%", nigdy
 **Wiązanie posta z transakcją.** `txHash` w dokumencie posta zapisuje klient
 i do 23.09 nikt go nie sprawdzał. Dla Blinka z napiwkiem znaczyło to, że wpisanie
 cudzego podpisu do własnego posta przekierowywało napiwki na obcy portfel.
-Teraz `app/utils/solana/postReceipt.ts` wymaga, by memo transakcji wskazywało
-płatnika jako autora i zaczynało się treścią tego posta. Używają tego i odznaka,
-i Blink.
+Pierwsza naprawa (weryfikacja memo z pól posta) okazała się niewystarczająca —
+patrz „Kto decyduje o portfelu do wypłat” niżej.
 
 **`/blink/tip` podpisuje sam.** Przycisk prowadził do `dial.to`, a deployment
 Dialectu został wstrzymany (`DEPLOYMENT_PAUSED` pod adresem dial.to, zrzut
@@ -287,7 +290,7 @@ rozrywania znaków. Stare posty (ucięte po znakach) weryfikują się dalej.
 ## Testy
 
 ```
-npm run test:solana-bags
+npm run test:solana
 ```
 
 18 testów czystej logiki: wykrywanie mintów (w tym odrzucenie fragmentu
@@ -298,3 +301,76 @@ przycinanie po bajtach, wiązanie memo z treścią, odczyt dowodu z transakcji
 Symulacja na mainnecie z prawdziwym kodem aplikacji: portfel z 1,84 USDC →
 `holding`; portfel bez USDC → konto nie istniało → `no-position`. Transakcja
 555 B przy limicie 1232.
+
+---
+
+# Kto decyduje o portfelu do wypłat
+
+Stan po drugim przeglądzie przeciwnika, 23 września 2026 (19 potwierdzonych
+znalezisk, 3 głosy na każde).
+
+## Problem
+
+Kolekcja `posts` jest zapisywalna dla każdej przeglądarki — pada pod ogólną
+regułę na końcu `firestore.rules`, a nowe reguły czekają na wdrożenie przez
+właściciela. Napiwki z Blinka, płatne odpowiedzi i odznaka Proof of Bags biorą
+portfel autora z kwitu posta, więc kwit musi pochodzić z miejsca, którego klient
+nie zapisze.
+
+Pierwsza naprawa (rejestr weryfikowany „leniwie”, z pól posta, z oknem czasowym
+względem `createTime`) miała dziurę: `createTime` resetuje się, gdy dokument
+zostanie skasowany i założony od nowa. Ktoś mógł skasować cudzy post, założyć go
+od nowa z identyczną treścią i własną świeżą transakcją — i przejąć napiwki.
+
+## Rozwiązanie
+
+1. **Memo niesie ID posta** (`mysphere:post|v2|<postId>|<podpisujący>|<treść>`).
+   ID powstaje w przeglądarce przed transakcją (`newPostId`), więc jedna
+   transakcja należy do jednego posta na zawsze.
+2. **Post z Solany zapisuje wyłącznie serwer** — `POST /api/solana/post`.
+   Weryfikuje: memo niesie to ID i tę treść, podpisujący memo = płatnik opłaty,
+   transakcja nie starsza niż 30 minut. Autor (adres EVM) pochodzi z sesji SIWE,
+   nie z żądania — dlatego przycisk loguje przed transakcją, a nie po.
+3. **Post i wpis w rejestrze powstają w jednej transakcji Firestore**, a wpis
+   przez `create`: istniejącego nikt nie nadpisze, pierwszy zapis wygrywa.
+4. **Odczyt nigdy niczego nie wyprowadza z posta.** Brak wpisu = brak wypłat
+   (`unregistered`). Wpis z nieprawidłowym HMAC = alarm w logach i blokada
+   (`tampered`), a nie „zweryfikuj od nowa”.
+5. **Klucz HMAC ma identyfikator** (`kid`): `SOLANA_RECEIPT_SECRET` albo klucz
+   prywatny konta usługowego po sparsowaniu (JSON i base64 dają ten sam klucz).
+   Celowo nie `AUTH_SESSION_SECRET` — jego rotacja nie może unieważniać rejestru.
+6. **Karta Blinka nazywa odbiorcę z rejestru** (adres z sesji SIWE albo portfel),
+   nie z pól posta, które zmieni każdy.
+7. **Wpis pamięta klaster.** Kwit z devnetu nie otworzy płatności na mainnecie.
+
+Najgorsze, co może zrobić napastnik przed wdrożeniem reguł: skasować wpis
+w rejestrze i wyłączyć napiwki pod postem. Przekierować ich nie może.
+
+## Stare posty
+
+Posty z Solany zapisane przez przeglądarkę przed tą zmianą nie mają wpisu, więc
+napiwki i odznaka są pod nimi wyłączone. Rejestruje je jednorazowo
+`scripts/solana-backfill-receipts.cjs` (domyślnie suchy bieg, zapis z `--apply`)
+— tylko posty z `createTime` przed granicą `LEGACY_POST_CUTOFF_MS`. Post
+skasowany i założony od nowa dostaje nowy `createTime` i migracji nie podlega.
+
+## Reguły Firestore (czekają na wdrożenie)
+
+- `solanaPostReceipts`: odczyt i zapis tylko serwer.
+- `posts`: przeglądarka nie założy posta z `network: 'solana'`; `txHash`,
+  `network` i `author` są zamrożone po utworzeniu.
+- `comments`: płatnej odpowiedzi nie stworzy ani nie podrobi przeglądarka;
+  usunąć ją może serwer (moderacja: admin albo autor posta z rejestru) albo
+  kasowanie posta w tym samym batchu.
+
+Po wdrożeniu: `node scripts/checkRulesEffect.mjs` → `solanaPostReceipts: denied`.
+
+## Kolejność dla właściciela
+
+1. `firebase deploy --only firestore:rules`, potem `node scripts/checkRulesEffect.mjs`.
+2. Zmienne produkcji: `NEXT_PUBLIC_SOLANA_CLUSTER=mainnet-beta`,
+   `NEXT_PUBLIC_SOLANA_RPC_URL`, `NEXT_PUBLIC_SITE_URL`; opcjonalnie
+   `SOLANA_RECEIPT_SECRET` (ustaw raz i nie zmieniaj). Redeploy.
+3. `node scripts/solana-backfill-receipts.cjs` z tymi samymi zmiennymi co
+   produkcja, przejrzeć raport, potem `--apply`.
+

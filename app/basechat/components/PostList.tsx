@@ -80,6 +80,7 @@ import ExtendPinModal from '../PinnedJobs/components/ExtendPinModal';
 import { SOLANA_EXPLORER_SUFFIX } from '../Solana/config/solanaChain';
 // Proof of Bags - odznaka tylko pyta /api/bags, bez web3.js w bundlu feedu.
 import BagsBadge from './BagsBadge';
+import SolanaBlinkShare from './SolanaBlinkShare';
 
 // Utility function for formatting large numbers with K, M, B suffixes
 const formatNumberWithSuffix = (value: number | string): string => {
@@ -1135,8 +1136,24 @@ function PostList({
       return;
     }
 
+    // Platna odpowiedz usuwa serwer (moderacja: admin albo autor posta) i moze
+    // odmowic - wtedy nie wolno jej wczesniej zdjac z ekranu, bo po odmowie
+    // znikalaby tylko u tego widza, a w bazie zostawala.
+    const target = internalPosts.find(p => p.id === postId)?.comments?.find(c => c.id === commentId);
+    const isPaidReply = Boolean(target?.tipLamports);
+
     try {
-      if (confirm('Are you sure you want to delete this comment?')) {
+      if (
+        confirm(
+          isPaidReply
+            ? 'Remove this paid reply? The SOL already went to the author and stays there.'
+            : 'Are you sure you want to delete this comment?'
+        )
+      ) {
+        if (isPaidReply) {
+          await deleteComment(postId, commentId, address);
+        }
+
         // Lustro w cache'u modulu: scalenie po resecie nie moze wskrzesic
         // usunietego komentarza ani jego odpowiedzi.
         forgetCollectionComment(postId, commentId);
@@ -1165,19 +1182,24 @@ function PostList({
         }
         
         // Wykonaj rzeczywistą operację w tle
-        await deleteComment(postId, commentId, address);
-        
-        toast.success('Comment deleted');
+        if (!isPaidReply) {
+          await deleteComment(postId, commentId, address);
+        }
+
+        toast.success(isPaidReply ? 'Paid reply removed' : 'Comment deleted');
         
         // ✅ OPTYMALIZACJA: Usunięto refreshPosts - optimistic update już usunął komentarz
         // Oszczędność: 50 Firebase reads po każdym usunięciu komentarza
       }
     } catch (error) {
       console.error('Error deleting comment:', error);
-      toast.error('Failed to delete comment');
-      
-      // W przypadku błędu, przywróć poprzedni stan
-      if (onRefreshPosts) {
+      // Trasa moderacji mowi, DLACZEGO odmowila ("Sign in with your wallet…",
+      // "Only the admin or the author…") - ogolnik ukrywal jedyna wskazowke.
+      toast.error(error instanceof Error && error.message ? error.message : 'Failed to delete comment');
+
+      // Platna odpowiedz nie zostala zdjeta z ekranu przed odpowiedzia serwera,
+      // wiec nie ma czego przywracac.
+      if (!isPaidReply && onRefreshPosts) {
         await onRefreshPosts();
       }
     }
@@ -1566,20 +1588,70 @@ function PostList({
    * inaczej efekt zapetlilby sie na wlasnej zaleznosci.
    */
   useEffect(() => {
+    /**
+     * Czy przy kolizji ID kopia z kolekcji ma wyprzec kopie z tablicy posta.
+     * Tak dla platnej odpowiedzi: zapisuje ja wylacznie serwer i wylacznie do
+     * kolekcji, a tablice `posts/{id}.comments` zapisuje kazda przegladarka -
+     * wpis pod tym samym ID to podrobka, ktora podmienilaby tresc albo autora
+     * oplaconej odpowiedzi (a z odznaka "paid reply" dawniej takze kwote).
+     * Porownanie po polach tozsamosci, nie po referencji: polubienia
+     * zmieniane optymistycznie nie wywoluja podmiany, a po podmianie pola sa
+     * rowne, wiec efekt nie zapetla sie na wlasnym setState.
+     */
+    const collectionCopyWins = (inList: Comment, fromCollection: Comment) =>
+      fromCollection.tipLamports != null &&
+      (inList.tipLamports !== fromCollection.tipLamports ||
+        inList.content !== fromCollection.content ||
+        inList.author !== fromCollection.author ||
+        inList.replyTo !== fromCollection.replyTo ||
+        inList.txHash !== fromCollection.txHash);
+
+    /**
+     * Lista po scaleniu z cache'em i czy cokolwiek sie zmienilo. Ta sama
+     * funkcja sluzy do sprawdzenia przed setState i w samym updaterze, wiec
+     * drugi przebieg na jej wyniku zawsze daje `changed: false` (brak petli).
+     * Platna odpowiedz zostaje na liscie RAZ: dwa wpisy w tablicy pod jej ID
+     * (podrobki) dawaly po podmianie dwie kopie tej samej odpowiedzi
+     * i zdublowany klucz Reacta.
+     */
+    const reconcile = (list: Comment[], cached: Comment[]) => {
+      const fromCollection = new Map(cached.map(c => [c.id, c] as const));
+      const paidSeen = new Set<string>();
+      let changed = false;
+      const kept: Comment[] = [];
+      for (const c of list) {
+        const winner = fromCollection.get(c.id);
+        if (winner && winner.tipLamports != null) {
+          if (paidSeen.has(c.id)) {
+            changed = true;
+            continue;
+          }
+          paidSeen.add(c.id);
+          if (collectionCopyWins(c, winner)) {
+            changed = true;
+            kept.push(winner);
+            continue;
+          }
+        }
+        kept.push(c);
+      }
+      const have = new Set(kept.map(c => c.id));
+      const missing = cached.filter(c => !have.has(c.id));
+      if (missing.length > 0) changed = true;
+      return { changed, comments: [...kept, ...missing] };
+    };
+
     const mergeFromCache = (postId: string) => {
       const cached = collectionCommentsCache.get(postId);
       if (!cached || cached.length === 0) return;
       const post = internalPosts.find(p => p.id === postId);
       if (!post) return;
-      const known = new Set((post.comments || []).map(c => c.id));
-      if (!cached.some(c => !known.has(c.id))) return;
+      if (!reconcile(post.comments || [], cached).changed) return;
       setInternalPosts(current =>
         current.map(p => {
           if (p.id !== postId) return p;
-          const have = new Set((p.comments || []).map(c => c.id));
-          const missing = cached.filter(c => !have.has(c.id));
-          if (missing.length === 0) return p;
-          const merged = [...(p.comments || []), ...missing];
+          const { changed, comments: merged } = reconcile(p.comments || [], cached);
+          if (!changed) return p;
           merged.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
           return {
             ...p,
@@ -1897,7 +1969,11 @@ function PostList({
               <div className="ml-3 flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex flex-col min-w-0">
-                    <div className="flex items-center min-w-0">
+                    {/* flex-wrap: odznaka "paid reply" ma stala szerokosc, a przy
+                        375px sciskala nazwe autora do 30-80px - jedynego
+                        identyfikatora odpowiadajacego. Teraz przechodzi do
+                        kolejnej linii (znalezisko z przegladu). */}
+                    <div className="flex flex-wrap items-center gap-y-1 min-w-0">
                       <span className="min-w-0 overflow-hidden font-soft-display font-semibold text-soft-ink">
                         {displayUserName(comment.author, `comment-${comment.id}`, false)}
                       </span>
@@ -1907,6 +1983,20 @@ function PostList({
                       
                       {/* Odznaka sieci komentarza */}
                       <NetworkBadge network={comment.network} size="comment" />
+
+                      {/* Platna odpowiedz z X: tresc i napiwek dla autora w jednej
+                          transakcji, zapisana przez serwer po weryfikacji. */}
+                      {comment.tipLamports && (
+                        <a
+                          href={`https://explorer.solana.com/tx/${comment.txHash}${SOLANA_EXPLORER_SUFFIX}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Paid reply: this comment tipped the author in the same Solana transaction"
+                          className="ml-2 flex-none rounded-pill border border-[#9945FF]/30 bg-[#9945FF]/10 px-1.5 py-0.5 font-soft text-[10.5px] font-semibold text-[#6d28d9] hover:bg-[#9945FF]/15"
+                        >
+                          paid reply · {Number(comment.tipLamports) / 1e9} SOL
+                        </a>
+                      )}
                     </div>
                     {editingComment && editingComment.commentId === comment.id ? (
                       <div className="mt-1">
@@ -1941,9 +2031,18 @@ function PostList({
                     )}
                   </div>
                   
-                  {(comment.author === address || address?.toLowerCase() === ADMIN_ADDRESS.toLowerCase()) && !editingComment && (
+                  {/* Platna odpowiedz: autorem jest adres Solany, a skasowac ja
+                      moze tylko admin albo autor posta - przez serwer
+                      (deleteComment -> /api/solana/reply-moderation), ktory
+                      sprawdza autora w rejestrze kwitow. Tu post.author sluzy
+                      tylko do schowania przycisku; edycji nie ma wcale, bo
+                      tresc pochodzi z memo na lancuchu. */}
+                  {(comment.tipLamports != null
+                    ? address?.toLowerCase() === ADMIN_ADDRESS.toLowerCase() ||
+                      (!!address && post.author?.toLowerCase() === address.toLowerCase())
+                    : comment.author === address || address?.toLowerCase() === ADMIN_ADDRESS.toLowerCase()) && !editingComment && (
                     <div className="flex space-x-1">
-                      {comment.author === address && (
+                      {comment.author === address && comment.tipLamports == null && (
                         <button
                           onClick={() => {
                             setEditingComment({ postId: post.id, commentId: comment.id });
@@ -2309,6 +2408,9 @@ function PostList({
           {/* Proof of Bags: pozycja autora w tokenie, o ktorym pisze - z kwitu
               posta na Solanie. Renderuje sie tylko przy pelnym dowodzie. */}
           {post.network === 'solana' && post.txHash && <BagsBadge postId={post.id} />}
+          {/* Link do platnej odpowiedzi z X - bez niego nikt nie wiedzial, ze
+              pod postem z Solany mozna odpowiedziec i dac napiwek w SOL. */}
+          {post.network === 'solana' && post.txHash && <SolanaBlinkShare postId={post.id} />}
         </div>
 
         {/* 💰 Tip-to-unlock: renderowane WYLACZNIE dla postow z trescia premium.

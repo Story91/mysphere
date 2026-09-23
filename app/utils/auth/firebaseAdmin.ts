@@ -66,8 +66,13 @@ function warnOnce(message: string, error?: unknown) {
   else console.warn(message);
 }
 
-/** Parsuje konto uslugowe z env. Zwraca null, gdy nieskonfigurowane. */
-function readServiceAccount(): Record<string, string> | null {
+/**
+ * Parsuje konto uslugowe z env. Zwraca null, gdy nieskonfigurowane.
+ * Eksportowane dla rejestru kwitow Solany, ktory wyprowadza z klucza konta
+ * swoj klucz HMAC - musi czytac GOOGLE_CREDENTIALS tym samym parserem, inaczej
+ * na maszynie z surowymi znakami nowej linii w .env nie mialby klucza.
+ */
+export function readServiceAccount(): Record<string, string> | null {
   const raw = process.env.GOOGLE_CREDENTIALS?.trim();
   if (!raw) return null;
 

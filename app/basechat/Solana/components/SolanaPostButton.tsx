@@ -15,10 +15,16 @@
  *   waitForReceipt()         confirmTransaction()
  *   txHash 0x...             signature base58
  *
- * CZEGO TEN PRZYCISK NIE ROBI: nie dotyka tozsamosci. Autorem posta pozostaje
- * adres EVM z wagmi (`author` w dokumencie Firestore) - portfel Solany sluzy
- * wylacznie do podpisania kwitu. Zmiana tego wymagalaby przepisania logowania,
- * profili, followow, tipow i rankingu, ktore w calosci stoja na adresie 0x.
+ * Autorem posta pozostaje adres EVM (`author` w dokumencie Firestore) - portfel
+ * Solany sluzy wylacznie do podpisania kwitu. Zmiana tego wymagalaby
+ * przepisania logowania, profili, followow, tipow i rankingu, ktore w calosci
+ * stoja na adresie 0x.
+ *
+ * Od 23.09.2026 post z Solany zapisuje serwer i bierze autora z sesji SIWE
+ * (POST /api/solana/post). Dlatego przycisk PRZED transakcja upewnia sie, ze
+ * sesja jest - inaczej uzytkownik zaplacilby za kwit posta, ktorego serwer
+ * potem nie zapisze. Z tego samego powodu ID posta powstaje tutaj: memo musi
+ * je niesc, zeby transakcji nie dalo sie podpiac pod inny post.
  */
 
 import { useCallback, useMemo, useState } from 'react';
@@ -31,12 +37,15 @@ import { PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js'
 // Pakiet 'buffer' i tak lezy w node_modules jako zaleznosc @solana/web3.js.
 import { Buffer } from 'buffer';
 import { toast } from 'react-hot-toast';
+import { useAccount } from 'wagmi';
 import { useAutoReset } from '../../../components/useTxFeedback';
+import { useSiweAuth } from '../../../utils/auth/useSiweAuth';
 import type { ChainPostButtonProps } from '../../chainPosting/types';
 import {
   MEMO_PROGRAM_ADDRESS,
   SOLANA_NETWORK_LABEL,
   buildPostMemo,
+  newPostId,
   solanaExplorerTxUrl,
 } from '../config/solanaChain';
 import { confirmOrAskChain } from '../confirm';
@@ -98,6 +107,8 @@ export default function SolanaPostButton({
   const { connection } = useConnection();
   const { publicKey, sendTransaction, connected } = useWallet();
   const { setVisible } = useWalletModal();
+  const { address: evmAddress } = useAccount();
+  const { address: sessionAddress, signIn } = useSiweAuth();
 
   const [isTransacting, setIsTransacting] = useState(false);
   const [signature, setSignature] = useState<string | null>(null);
@@ -109,9 +120,9 @@ export default function SolanaPostButton({
   const mentionsToken = useMemo(() => extractMintCandidates(content).length > 0, [content]);
 
   const handleSuccess = useCallback(
-    async (sig: string) => {
+    async (sig: string, postId: string) => {
       localStorage.setItem(LAST_SIGNATURE_KEY, sig);
-      onTransactionSuccess(sig);
+      onTransactionSuccess(sig, { postId });
       if (onPostAdded) {
         try {
           await onPostAdded();
@@ -136,13 +147,33 @@ export default function SolanaPostButton({
 
     if (!content.trim()) return;
 
+    // Post zapisuje sie pod profilem EVM, a serwer bierze autora z sesji SIWE.
+    // Oba warunki sprawdzamy PRZED podpisem transakcji, nie po.
+    if (!evmAddress) {
+      toast.error('Connect your main (EVM) wallet first - your Solana post is saved under that profile.');
+      return;
+    }
+
     let loadingToastId: string | undefined;
 
     try {
       setIsTransacting(true);
+
+      if (sessionAddress !== evmAddress.toLowerCase()) {
+        loadingToastId = toast.loading('Sign in with your wallet to post...');
+        const signedIn = await signIn();
+        toast.dismiss(loadingToastId);
+        loadingToastId = undefined;
+        if (!signedIn) {
+          toast.error('Sign in with your wallet to post on Solana. Nothing was sent.');
+          return;
+        }
+      }
+
       loadingToastId = toast.loading(`Preparing transaction on ${SOLANA_NETWORK_LABEL}...`);
 
-      const memo = buildPostMemo(content, publicKey.toBase58());
+      const postId = newPostId();
+      const memo = buildPostMemo(content, publicKey.toBase58(), postId);
 
       const instruction = new TransactionInstruction({
         // Memo Program przyjmuje podpisujacego jako konto opcjonalne - podany
@@ -189,6 +220,16 @@ export default function SolanaPostButton({
         return;
       }
 
+      if (outcome.kind === 'unknown') {
+        // RPC nie odpowiadal - nie wiemy, czy post wszedl. Podpis zostaje
+        // u uzytkownika, zeby mogl sprawdzic w eksploratorze.
+        toast.error(
+          `We could not confirm this post with the network. Check this signature on an explorer before posting again: ${sig}`,
+          { duration: 15000 }
+        );
+        return;
+      }
+
       if (outcome.kind === 'expired') {
         // Podpis istnieje, wiec uzytkownik ma czego szukac - ale lancuch go nie
         // przyjal i pieniadze nie wyszly. Podajemy podpis mimo to: gdyby RPC
@@ -202,7 +243,7 @@ export default function SolanaPostButton({
       }
 
       setSignature(sig);
-      await handleSuccess(sig);
+      await handleSuccess(sig, postId);
     } catch (error) {
       console.error('Solana transaction error:', error);
       if (isUserRejection(error)) {
@@ -229,6 +270,9 @@ export default function SolanaPostButton({
     sendTransaction,
     handleSuccess,
     setVisible,
+    evmAddress,
+    sessionAddress,
+    signIn,
   ]);
 
   useAutoReset(isViewingExplorer, 2000, () => {
@@ -272,7 +316,9 @@ export default function SolanaPostButton({
       )}
     <button
       type="button"
-      aria-label={connected ? `Post on ${SOLANA_NETWORK_LABEL}` : 'Connect a Solana wallet'}
+      // Etykieta zastepuje widoczny tekst dla czytnika ekranu - w trakcie
+      // transakcji musi mowic "Processing", inaczej niewidomy nie wie, ze trwa.
+      aria-label={isTransacting ? 'Processing' : connected ? `Post on ${SOLANA_NETWORK_LABEL}` : 'Connect a Solana wallet'}
       className={`flex items-center justify-center px-3 py-0.5 sm:px-4 sm:py-0.5 rounded-lg transition-all duration-300 font-medium text-xs sm:text-sm h-[32px] ${
         connected
           ? 'bg-gradient-to-r from-[#9945FF] to-[#14F195] text-white hover:opacity-90 border border-[#9945FF]'

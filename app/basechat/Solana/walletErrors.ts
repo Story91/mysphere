@@ -20,3 +20,12 @@ export function isUserRejection(error: unknown): boolean {
 export function isInsufficientFunds(error: unknown): boolean {
   return /insufficient (lamports|funds)|attempt to debit an account/i.test(messageOf(error));
 }
+
+/**
+ * Przelew, po ktorym konto ODBIORCY mialoby mniej niz minimum rent. Sprawdzac
+ * PRZED isInsufficientFunds - oba komunikaty zawieraja "insufficient funds",
+ * a ten dotyczy portfela odbiorcy, nie placacego.
+ */
+export function isRentError(error: unknown): boolean {
+  return /insufficient funds for rent/i.test(messageOf(error));
+}

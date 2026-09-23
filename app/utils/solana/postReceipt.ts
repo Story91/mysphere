@@ -1,47 +1,16 @@
 import 'server-only';
 
 /**
- * Kwit posta z Solany: czy transakcja istnieje, czy przeszla i czy NALEZY do
- * tego posta.
+ * Transakcja z lancucha jako zwykle dane - wspolny odczyt dla zapisu posta
+ * z Solany (rejestr kwitow), Proof of Bags i platnych odpowiedzi.
  *
- * ===========================================================================
- * DLACZEGO "NALEZY" JEST OSOBNYM PYTANIEM
- * ===========================================================================
- * Pole `txHash` w dokumencie posta zapisuje klient. Do 23.09.2026 nikt go nie
- * sprawdzal, wiec byl dowolnym stringiem: dalo sie wpisac CUDZY podpis
- * i przypisac sobie cudzy portfel. Dla odznaki sieci to kosmetyka. Dla
- * Proof of Bags byloby to podrobienie cudzych bagow, a dla Blinka z napiwkiem -
- * przekierowanie cudzych napiwkow na obcy portfel.
- *
- * Wiazanie: memo posta (`mysphere:post|<autor>|<poczatek tresci>`) musi
- * wskazywac platnika oplaty jako autora, a jego tresc musi byc poczatkiem
- * tresci posta w Firestore. Cudzej transakcji nie da sie wiec podpiac pod
- * wlasny post - chyba ze post jest identyczny z cudzym, a wtedy portfel i tak
- * wskazuje na autora oryginalu.
+ * Samo wiazanie transakcji z postem (memo v2 z ID posta, platnik = podpisujacy,
+ * tresc) sprawdza app/utils/solana/receiptRegistry.ts - to jedyne miejsce,
+ * ktore o nim decyduje.
  */
 
 import type { Connection, VersionedTransactionResponse } from '@solana/web3.js';
-import { readBagsProof, type BagsProof, type PlainTransaction } from '../../basechat/Solana/bags/bagsCore';
-import { memoMatchesPost } from '../../basechat/Solana/config/solanaChain';
-
-export type PostReceipt =
-  | {
-      ok: true;
-      /** Portfel Solany, ktory podpisal i oplacil post. */
-      signer: string;
-      slot: number;
-      blockTime: number | null;
-      proof: BagsProof;
-    }
-  | {
-      ok: false;
-      /**
-       * not-found - RPC nie zna transakcji (swieza albo zly podpis),
-       * failed-tx - transakcja jest, ale wykonala sie z bledem,
-       * unverified - transakcja nie jest kwitem TEGO posta.
-       */
-      reason: 'not-found' | 'failed-tx' | 'unverified';
-    };
+import type { PlainTransaction } from '../../basechat/Solana/bags/bagsCore';
 
 /** Transakcja z RPC zamieniona na zwykle dane, ktore czyta readBagsProof. */
 function toPlain(res: VersionedTransactionResponse): PlainTransaction | null {
@@ -81,26 +50,20 @@ function toPlain(res: VersionedTransactionResponse): PlainTransaction | null {
   };
 }
 
-export async function verifyPostReceipt(
+/**
+ * Transakcja z lancucha jako zwykle dane - wspolny odczyt dla kwitu posta
+ * i dla platnych odpowiedzi. `null`, gdy RPC jej (jeszcze) nie zna.
+ */
+export async function fetchPlainTransaction(
   connection: Connection,
-  txHash: string,
-  postContent: string
-): Promise<PostReceipt> {
-  const res = await connection.getTransaction(txHash, {
+  signature: string
+): Promise<{ plain: PlainTransaction; failed: boolean; slot: number; blockTime: number | null } | null> {
+  const res = await connection.getTransaction(signature, {
     maxSupportedTransactionVersion: 0,
     commitment: 'confirmed',
   });
-  if (!res) return { ok: false, reason: 'not-found' };
-  if (res.meta?.err) return { ok: false, reason: 'failed-tx' };
-
+  if (!res) return null;
   const plain = toPlain(res);
-  if (!plain) return { ok: false, reason: 'not-found' };
-
-  const proof = readBagsProof(plain);
-  const memo = proof.postMemo;
-  if (!memo || memo.author !== plain.feePayer || !memoMatchesPost(memo.body, postContent)) {
-    return { ok: false, reason: 'unverified' };
-  }
-
-  return { ok: true, signer: plain.feePayer, slot: res.slot, blockTime: res.blockTime ?? null, proof };
+  if (!plain) return null;
+  return { plain, failed: !!res.meta?.err, slot: res.slot, blockTime: res.blockTime ?? null };
 }

@@ -3,7 +3,40 @@
 /** Wszystko, czym Solana rozni sie od pozostalych lancuchow w formularzu postu. */
 
 import type { ComposerOnlyConfig } from '../../chainPosting/ChainCreatePost';
+import type { ChainPostReceipt, ComposerPostFields } from '../../chainPosting/types';
 import { IS_SOLANA_MAINNET, SOLANA_NETWORK_LABEL } from './solanaChain';
+
+/**
+ * POST /api/solana/post. Serwer sam ponawia odczyt transakcji przez kilka
+ * sekund; 202 znaczy, ze RPC dalej jej nie widzi - wtedy probujemy jeszcze
+ * dwa razy, zanim poddamy sie z czytelnym komunikatem.
+ */
+async function saveSolanaPost(fields: ComposerPostFields, receipt: ChainPostReceipt | undefined): Promise<string> {
+  if (!receipt) throw new Error('Missing post ID from the Solana transaction.');
+  const body = JSON.stringify({
+    postId: receipt.postId,
+    signature: fields.txHash,
+    content: fields.content,
+    author: fields.author,
+    image: fields.image,
+    video: fields.video,
+    musicTrack: fields.musicTrack ?? null,
+  });
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (attempt > 0) await new Promise(r => setTimeout(r, 2000));
+    const response = await fetch('/api/solana/post', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    });
+    const data = (await response.json().catch(() => ({}))) as { ok?: boolean; postId?: string; error?: string };
+    if (response.ok && data.ok && data.postId) return data.postId;
+    if (response.status !== 202) throw new Error(data.error || `Saving failed (${response.status}).`);
+  }
+  throw new Error(`Solana has not confirmed the transaction to our server yet. Transaction: ${fields.txHash}`);
+}
 
 /**
  * Brak pol `chainId`, `chain`, `abi` i `getContractAddress` jest celowy - patrz
@@ -20,6 +53,10 @@ export const SOLANA_POSTING: ComposerOnlyConfig = {
     network: 'solana',
     mediaFilePrefix: 'solana-post-media',
     savingLabel: 'Solana',
+    // Post z Solany zapisuje serwer, razem z wpisem w rejestrze kwitow - od
+    // `txHash` zaleza napiwki i platne odpowiedzi, a kolekcje `posts` zapisuje
+    // dzis kazda przegladarka. Szczegoly: app/utils/solana/receiptRegistry.ts.
+    savePost: saveSolanaPost,
     // Baner tylko na devnecie: uzytkownik ma wiedziec, ze podpis, ktory za
     // chwile zobaczy w eksploratorze, nie stoi na sieci glownej. Na mainnecie
     // pole znika samo, bez zmiany kodu.

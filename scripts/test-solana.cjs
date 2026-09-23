@@ -1,4 +1,5 @@
-// Uruchamia testy czystej logiki Proof of Bags (test/solanaBags.test.ts).
+// Uruchamia testy czystej logiki Solany: Proof of Bags (test/solanaBags.test.ts)
+// i platnych odpowiedzi z X (test/solanaReplies.test.ts).
 //
 // Ten sam runner co scripts/test-perps-math.cjs i z tego samego powodu:
 // `npx hardhat test` na Node 24 laduje .ts z app/ natywnym loaderem ESM, ktory
@@ -14,7 +15,7 @@ const env = {
   TS_NODE_TRANSPILE_ONLY: '1',
 };
 const mocha = path.join(__dirname, '..', 'node_modules', 'mocha', 'bin', 'mocha.js');
-const r = spawnSync(process.execPath, [mocha, '-r', 'ts-node/register', 'test/solanaBags.test.ts'], {
+const r = spawnSync(process.execPath, [mocha, '-r', 'ts-node/register', 'test/solanaBags.test.ts', 'test/solanaReplies.test.ts'], {
   stdio: 'inherit',
   env,
 });
