@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import type { Ask } from '../../utils/asks/types';
-import { formatAgo, formatAskMoney, formatCountdown, useNow } from './AskCard';
+import { formatAgo, formatAskAmount, formatCountdown, useNow } from './AskCard';
+import { solRailBadge } from '../../utils/asks/solAskDisplay';
 
 /**
  * ZWARTY WIERSZ ASKA - wylacznie do prawego raila (FeedAskRail w trybie
@@ -73,7 +74,8 @@ export function resolvedRowMeta(
       ? `resolved ${formatAgo(now - ask.resolvedAt)}`
       : 'closed';
   return {
-    amount: formatAskMoney(ask.perAnswer, ask.token),
+    // Ask SOL z lamportow - "0.005 SOL", nie zaokraglone "0.01 SOL".
+    amount: formatAskAmount(ask, 'perAnswer'),
     detail: ['per answer', `${ask.acceptedCount} of ${ask.seats} accepted`, when].join(DOT),
   };
 }
@@ -95,6 +97,17 @@ export default function AskRailRow({ ask, onAnswer, href }: AskRailRowProps) {
   const left = now === null ? null : ask.deadline - now;
   const seatsLeft = Math.max(0, ask.seats - ask.acceptedCount);
   const resolvedMeta = resolved ? resolvedRowMeta(ask, now) : null;
+  /**
+   * Szyna SOL w wierszu: sam znacznik "SOL" (+ "devnet") w morskim akcencie
+   * Aska. Pelna odznaka "SOL · Solana" z karty nie miesci sie w kolumnie 320px
+   * obok kwoty i zegara, a kwota i tak juz mowi "SOL".
+   */
+  const rail = solRailBadge(ask);
+  const railTag = rail ? (
+    <span className="rounded-full bg-soft-ask-soft px-1.5 py-0.5 text-[10px] font-bold leading-none text-soft-ask-deep">
+      {rail.devnet ? 'SOL devnet' : 'SOL'}
+    </span>
+  ) : null;
 
   const body = (
     <>
@@ -116,14 +129,14 @@ export default function AskRailRow({ ask, onAnswer, href }: AskRailRowProps) {
           11.5px ma 3.43:1. */}
       {resolved ? (
         <p className="font-soft text-[11.5px] leading-[1.4] text-soft-ink-muted" suppressHydrationWarning>
+          {railTag && <>{railTag} </>}
           <span className="font-bold text-soft-accent-deep">{resolvedMeta?.amount}</span>{' '}
           {resolvedMeta?.detail}
         </p>
       ) : (
         <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 font-soft text-[11.5px] leading-none">
-          <span className="font-bold text-soft-accent-deep">
-            {formatAskMoney(ask.perAnswer, ask.token)}
-          </span>
+          {railTag}
+          <span className="font-bold text-soft-accent-deep">{formatAskAmount(ask, 'perAnswer')}</span>
           <span className="text-soft-ink-muted">
             {seatsLeft} {seatsLeft === 1 ? 'slot' : 'slots'}
           </span>

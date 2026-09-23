@@ -10,6 +10,18 @@ import {
   shareTakesAnswers,
 } from '../../utils/asks/askPublicView';
 import ShareAskActions from './ShareAskActions';
+// Czysty modul (bez 'use client') - komponent serwerowy moze go wolac.
+// formatAskAmount z AskCard.tsx tu NIE wolno: patrz formatShareMoney.
+import { solAskAmount, solRailBadge } from '../../utils/asks/solAskDisplay';
+import type { Ask } from '../../utils/asks/types';
+
+/**
+ * Kwota na tej stronie: Ask SOL z lamportow (dokladnie to, co zapieczetowal
+ * serwer), reszta przez formatShareMoney jak dotad.
+ */
+function shareAmount(ask: Ask, which: 'budget' | 'perAnswer'): string {
+  return solAskAmount(ask, which) ?? formatShareMoney(which === 'budget' ? ask.budget : ask.perAnswer, ask.token);
+}
 
 /**
  * Udostepnialna strona jednego Aska.
@@ -68,15 +80,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
    * liczba autora. Ta sama zasada rzadzi karta w feedzie, gdzie `per answer`
    * jest najwiekszym drukiem w formularzu.
    */
-  const money = formatShareMoney(ask.perAnswer, ask.token);
+  const money = shareAmount(ask, 'perAnswer');
   const question = ask.question.length > 90 ? `${ask.question.slice(0, 87)}…` : ask.question;
 
   return {
     title: `${money} for an answer: ${question}`,
-    description: `A question with a budget on MySphere. ${formatShareMoney(
-      ask.budget,
-      ask.token
-    )} across ${ask.seats} ${ask.seats === 1 ? 'seat' : 'seats'}. Answers stay sealed until the author resolves.`,
+    description: `A question with a budget on MySphere. ${shareAmount(ask, 'budget')} across ${ask.seats} ${ask.seats === 1 ? 'seat' : 'seats'}. Answers stay sealed until the author resolves.`,
     openGraph: {
       title: `${money} for an answer`,
       description: question,
@@ -93,6 +102,8 @@ export default async function AskPage({ params }: Props) {
   const now = Date.now();
   const open = shareTakesAnswers(share, now);
   const funding = shareFundingNote(share);
+  /** Szyna SOL - ze stanu (publicAsk bierze token/network z pieczeci), nie z lustra. */
+  const solBadge = solRailBadge(ask);
 
   return (
     <div className="min-h-screen bg-soft-bg px-4 pb-24 pt-6 font-soft sm:pt-10">
@@ -105,9 +116,25 @@ export default async function AskPage({ params }: Props) {
         </Link>
 
         <article className="rounded-card border border-soft-line bg-soft-surface p-5 shadow-card sm:p-6">
-          <p className="mb-1 font-soft-display text-[11px] font-bold uppercase tracking-[0.12em] text-soft-ink-faint">
-            Ask by {shortAskAuthor(ask.author)}
-          </p>
+          <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+            <p className="font-soft-display text-[11px] font-bold uppercase tracking-[0.12em] text-soft-ink-faint">
+              Ask by {shortAskAuthor(ask.author)}
+            </p>
+            {/* Ta sama odznaka co na karcie w feedzie (AskRailBadge), tylko
+                zlozona tutaj - AskCard.tsx jest 'use client'. */}
+            {solBadge && (
+              <span className="inline-flex items-center gap-1">
+                <span className="rounded-full border border-soft-ask/30 bg-soft-ask-soft px-2 py-0.5 text-[10px] font-semibold text-soft-ask-deep">
+                  {solBadge.label}
+                </span>
+                {solBadge.devnet && (
+                  <span className="rounded-full border border-soft-line-strong bg-soft-sunken px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-soft-ink">
+                    devnet
+                  </span>
+                )}
+              </span>
+            )}
+          </div>
 
           <h1 className="font-soft-display text-[20px] font-bold leading-[1.3] text-soft-ink sm:text-[24px]">
             {ask.question}
@@ -122,7 +149,7 @@ export default async function AskPage({ params }: Props) {
                 Per answer
               </dt>
               <dd className="font-soft-display text-[19px] font-bold tabular-nums text-soft-accent-deep">
-                {formatShareMoney(ask.perAnswer, ask.token)}
+                {shareAmount(ask, 'perAnswer')}
               </dd>
             </div>
             <div>
@@ -130,7 +157,7 @@ export default async function AskPage({ params }: Props) {
                 Budget
               </dt>
               <dd className="font-soft-display text-[19px] font-bold tabular-nums text-soft-accent-deep">
-                {formatShareMoney(ask.budget, ask.token)}
+                {shareAmount(ask, 'budget')}
               </dd>
             </div>
             <div>
@@ -177,6 +204,11 @@ export default async function AskPage({ params }: Props) {
               // Dokument mowi 'escrowed', ale pieczeci nie ma - hash z dokumentu
               // mogla wpisac przegladarka, wiec go nie linkujemy.
               <>The author says the budget is locked in escrow on Base. That deposit has not been verified yet.</>
+            ) : solBadge ? (
+              <>
+                Paid on accept in SOL. Nothing is locked: the author pays each accepted answer from
+                their Solana wallet{solBadge.devnet ? ' on devnet' : ''}.
+              </>
             ) : (
               <>Nothing is locked: the author pays out of their own wallet on resolve.</>
             )}
@@ -193,7 +225,7 @@ export default async function AskPage({ params }: Props) {
             </Link>
           )}
 
-          <ShareAskActions askId={ask.id} perAnswer={formatShareMoney(ask.perAnswer, ask.token)} />
+          <ShareAskActions askId={ask.id} perAnswer={shareAmount(ask, 'perAnswer')} />
         </article>
 
         <p className="mt-4 px-1 text-[11.5px] leading-[1.5] text-soft-ink-faint">

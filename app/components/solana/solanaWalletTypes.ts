@@ -21,6 +21,13 @@ export interface SolanaSigner {
     connection: Connection,
     options?: SendTransactionOptions
   ) => Promise<string>;
+  /**
+   * Podpis wiadomosci (ed25519) - uzywany przy powiazaniu portfela Solany
+   * z kontem do Askow SOL (app/utils/asks/useSolanaAskWallet.ts). Opcjonalny,
+   * bo wallet-adapter oddaje undefined, gdy portfel tego nie umie - wtedy
+   * interfejs mowi to wprost, zamiast wywracac sie na wywolaniu.
+   */
+  signMessage?: (message: Uint8Array) => Promise<Uint8Array>;
 }
 
 /**

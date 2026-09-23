@@ -27,6 +27,13 @@ import {
   type FundPhase,
 } from './escrow';
 import { normalizeAddress } from '../monetization/types';
+import {
+  MAX_BUDGET_LAMPORTS,
+  MIN_PER_ANSWER_LAMPORTS,
+  formatLamports,
+  isLamportsString,
+  perAnswerLamportsFor,
+} from './solAmounts';
 import useSiweAuth from '../auth/useSiweAuth';
 import { MAX_QUESTION_LENGTH } from '../../api/asks/pricing';
 
@@ -96,7 +103,25 @@ export type AskDraftInput = {
   seats: number;
   durationMs: number;
   funding: AskFunding;
+  /**
+   * Szyna pieniedzy. Brak = 'usdc-base' (tak wysylal kazdy szkic sprzed Askow
+   * SOL - feed i /asks nie musza nic zmieniac, zeby dzialac jak dotad).
+   */
+  rail?: AskRail;
+  /**
+   * Budzet Aska SOL w lamportach, dziesietnie. PRAWDA o kwocie - `budget`
+   * (liczba SOL) jest przy SOL tylko do wyswietlania. Wymagany przy 'sol-solana'.
+   */
+  budgetLamports?: string;
 };
+
+/**
+ * - `usdc-base`   USDC na Base: escrow albo przelew przy przyjeciu (jak dotad)
+ * - `sol-solana`  natywny SOL na Solanie, WYLACZNIE przy przyjeciu: nic nie
+ *                 jest blokowane, autor placi kazda przyjeta odpowiedz z portfela
+ *                 Solany powiazanego z kontem (docs/superpowers/specs/2026-09-23-solana-asks-design.md)
+ */
+export type AskRail = 'usdc-base' | 'sol-solana';
 
 export type UseCreateAskResult = {
   /** Rzuca bledem z gotowym zdaniem dla czlowieka. Oddaje Aska, ktory powstal. */
@@ -118,6 +143,14 @@ export type UseCreateAskResult = {
 
 type CreateBody =
   | { funding: 'on-resolve'; question: string; budget: number; seats: number; durationMs: number }
+  | {
+      network: 'solana';
+      funding: 'on-resolve';
+      question: string;
+      budgetLamports: string;
+      seats: number;
+      durationMs: number;
+    }
   | {
       funding: 'escrowed';
       askId: string;
@@ -365,6 +398,60 @@ export function useCreateAsk(): UseCreateAskResult {
         },
         onWaiting: () => setProgressNote('Waiting for Base to show the deposit to our server…'),
       });
+
+      /* ---------------- SOL NA SOLANIE ---------------- */
+      // Tylko 'on-resolve': nic nie jest blokowane, autor placi kazda przyjeta
+      // odpowiedz z portfela Solany powiazanego z kontem. Platnika serwer bierze
+      // z POWIAZANIA (i zamraza w stanie Aska) - nie z tego, co tu wyslemy.
+      if (draft.rail === 'sol-solana') {
+        if (draft.funding !== 'on-resolve') {
+          throw new Error('SOL Asks are paid on accept. There is no escrow for SOL. Nothing was charged.');
+        }
+        const budgetLamports = draft.budgetLamports;
+        if (!isLamportsString(budgetLamports) || BigInt(budgetLamports) <= 0n) {
+          throw new Error('Set a budget in SOL. Nothing was charged.');
+        }
+        if (BigInt(budgetLamports) > MAX_BUDGET_LAMPORTS) {
+          throw new Error(`The budget is capped at ${formatLamports(MAX_BUDGET_LAMPORTS)} SOL. Nothing was charged.`);
+        }
+        if (perAnswerLamportsFor(budgetLamports, draft.seats) < MIN_PER_ANSWER_LAMPORTS) {
+          throw new Error(
+            `Each answer has to be worth at least ${formatLamports(MIN_PER_ANSWER_LAMPORTS)} SOL. Nothing was charged.`
+          );
+        }
+
+        setProgressNote('Posting the Ask…');
+        const result = await recordAsk(
+          {
+            network: 'solana',
+            funding: 'on-resolve',
+            question: draft.question,
+            budgetLamports,
+            seats: draft.seats,
+            durationMs: draft.durationMs,
+          },
+          // Id nadaje serwer - ponowienie po bledzie sieci mogloby postawic
+          // pytanie dwa razy (ta sama zasada co przy USDC on-resolve).
+          recordOptions(false)
+        );
+        setProgressNote(null);
+
+        if (!result.ok) {
+          console.error('[asks] Zalozenie Aska SOL nie powiodlo sie:', result);
+          if (result.code === 'network_error') {
+            throw new Error(
+              'We could not confirm the Ask was saved. Nothing was charged. Check the Asks list before posting it again.'
+            );
+          }
+          if (result.code === 'solana_wallet_required') {
+            throw new Error(
+              'Link your Solana wallet to your account first - SOL Asks are paid from it. Nothing was charged.'
+            );
+          }
+          throw new Error(`The Ask was not created: ${result.error} Nothing was charged.`);
+        }
+        return result.ask;
+      }
 
       /* ---------------- ESCROW ---------------- */
       if (draft.funding === 'escrowed') {

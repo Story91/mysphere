@@ -1,11 +1,14 @@
 import { toAnswerMeta } from './askMapping';
 import {
+  isSolanaAcceptance,
   lowerAddress,
-  type AcceptanceRecord,
+  type AnyAcceptanceRecord,
   type AskTrust,
   type AskView,
+  type SealedAskState,
   type SealedEscrow,
 } from './askSealCore';
+import { formatLamports } from './solAmounts';
 import type { Ask, AskStatus } from './types';
 
 /**
@@ -60,7 +63,22 @@ const isIndex = (v: unknown): v is number => typeof v === 'number' && Number.isS
  */
 export function formatShareMoney(amount: number, token = 'USDC'): string {
   const value = Number.isFinite(amount) ? amount : 0;
+  if (token === 'SOL') return `${formatSolNumber(value)} SOL`;
   return token === 'USDC' || token === 'USD' ? `$${value.toFixed(2)}` : `${value.toFixed(2)} ${token}`;
+}
+
+/**
+ * Kwota SOL do wyswietlania - do 9 miejsc, bez zbednych zer. toFixed(2)
+ * zamienilby 0.005 SOL (minimum na odpowiedz) w "0.01 SOL", czyli obiecywal
+ * dwa razy wiecej, niz autor placi. Przez lamporty, zeby nie pokazac
+ * 0.30000000000000004. Ask z lamportami ma je w `perAnswerLamports` /
+ * `budgetLamports` - wtedy lepiej formatLamports wprost.
+ */
+function formatSolNumber(value: number): string {
+  if (!(value > 0)) return '0';
+  const lamports = Math.round(value * 1e9);
+  if (!Number.isSafeInteger(lamports)) return value.toString();
+  return formatLamports(BigInt(lamports));
 }
 
 /* ------------------------------------------------------------------ */
@@ -72,7 +90,10 @@ export function formatShareMoney(amount: number, token = 'USDC'): string {
  * Aska. Tylko ona robi z "resolved" rozstrzygniecie, za ktore ktos dostal
  * pieniadze.
  */
-export function hasPaidAnswer(records: Iterable<Pick<AcceptanceRecord, 'payee'>>, askAuthor: unknown): boolean {
+// Rekord SOL ma odbiorce w base58 - lowerAddress daje null, wiec liczy sie
+// jako wyplata dla kogos innego niz autor (EVM). Przelew do wlasnego portfela
+// autora odrzuca juz verifySolanaAskPayout (self-pay) i pickSolanaAcceptance.
+export function hasPaidAnswer(records: Iterable<Pick<AnyAcceptanceRecord, 'payee'>>, askAuthor: unknown): boolean {
   const author = lowerAddress(askAuthor);
   for (const record of records) {
     if (author === null || lowerAddress(record.payee) !== author) return true;
@@ -97,7 +118,7 @@ export function hasPaidAnswer(records: Iterable<Pick<AcceptanceRecord, 'payee'>>
  * - unverified - flaga wlaczona, pieczeci brak: nie odslaniamy.
  * - broken     - trasa odpowiada 503, zanim tu dojdzie; tu i tak false.
  */
-export function revealsAllAnswers(view: AskView, acceptances: ReadonlyMap<string, AcceptanceRecord>): boolean {
+export function revealsAllAnswers(view: AskView, acceptances: ReadonlyMap<string, AnyAcceptanceRecord>): boolean {
   if (view.trust === 'sealed') {
     return view.state !== null && view.state.status === 'resolved' && hasPaidAnswer(acceptances.values(), view.state.author);
   }
@@ -114,6 +135,12 @@ export type AnswerPayoutFacts = {
    * regulami). false przy Asku 'legacy' znaczy "tak mowi dokument odpowiedzi".
    */
   payoutVerified: boolean;
+  /**
+   * Siec dowodu wyplaty - do linku w eksploratorze: 'base' (basescan, hash)
+   * albo 'solana' (explorer.solana.com, podpis base58). null = nieprzyjeta.
+   * Z rekordu, nigdy z pola payoutNetwork dokumentu odpowiedzi.
+   */
+  payoutNetwork: 'base' | 'solana' | null;
 };
 
 const NOT_ACCEPTED: AnswerPayoutFacts = {
@@ -121,6 +148,7 @@ const NOT_ACCEPTED: AnswerPayoutFacts = {
   payoutTxHash: null,
   payoutLogIndex: null,
   payoutVerified: false,
+  payoutNetwork: null,
 };
 
 /**
@@ -135,18 +163,26 @@ const NOT_ACCEPTED: AnswerPayoutFacts = {
 export function answerPayoutFacts(
   trust: AskTrust,
   raw: Record<string, any>,
-  record: AcceptanceRecord | undefined
+  record: AnyAcceptanceRecord | undefined
 ): AnswerPayoutFacts {
   if (record) {
-    return { accepted: true, payoutTxHash: record.txHash, payoutLogIndex: record.logIndex, payoutVerified: true };
+    if (isSolanaAcceptance(record)) {
+      // Podpis Solany w oryginalnej wielkosci liter; Solana nie ma logIndex.
+      return { accepted: true, payoutTxHash: record.signature, payoutLogIndex: null, payoutVerified: true, payoutNetwork: 'solana' };
+    }
+    return { accepted: true, payoutTxHash: record.txHash, payoutLogIndex: record.logIndex, payoutVerified: true, payoutNetwork: 'base' };
   }
   if (trust === 'legacy') {
+    // Ask 'legacy' to zawsze Ask sprzed pieczeci, czyli USDC na Base - Aski
+    // SOL powstaja wylacznie razem ze stanem.
+    const accepted = Boolean(raw.accepted);
     return {
       // Boolean(...) jak w toAnswerMeta - dokladnie dzisiejsza odpowiedz trasy.
-      accepted: Boolean(raw.accepted),
+      accepted,
       payoutTxHash: typeof raw.payoutTxHash === 'string' ? raw.payoutTxHash : null,
       payoutLogIndex: isIndex(raw.payoutLogIndex) ? raw.payoutLogIndex : null,
       payoutVerified: false,
+      payoutNetwork: accepted ? 'base' : null,
     };
   }
   return NOT_ACCEPTED;
@@ -190,7 +226,7 @@ export function planAnswerThread(input: {
   askId: string;
   view: AskView;
   rows: readonly ThreadRowInput[];
-  acceptances: ReadonlyMap<string, AcceptanceRecord>;
+  acceptances: ReadonlyMap<string, AnyAcceptanceRecord>;
   viewer: string | null;
 }): AnswerThreadPlan {
   const { askId, view } = input;
@@ -225,20 +261,33 @@ export function planAnswerThread(input: {
  * sa null, nawet gdy dokument niesie jakis hash: przegladarka moze dzis
  * wpisac tam cokolwiek o dlugosci 66 znakow.
  *
- * token/network zawsze USDC na Base: kazdy Ask w tej aplikacji jest w USDC na
- * Base (rowniez te oplacone przez x402 w USDG), a pola w dokumencie da sie
- * dzis przestawic z przegladarki (patrz mirrorAsk w askStore.ts).
+ * token/network ze STANU: SOL na Solanie tylko wtedy, gdy zapieczetowany stan
+ * mowi 'solana' (razem z lamportami i klastrem ze stanu); w kazdym innym
+ * przypadku USDC na Base - jak kazdy Ask sprzed Solany (rowniez oplacone przez
+ * x402 w USDG). Pola w dokumencie da sie dzis przestawic z przegladarki
+ * (patrz mirrorAsk w askStore.ts), wiec lustro szyny nie wybiera.
+ * Adresu platnika autora (state.solana.payer) NIE publikujemy - widzi go
+ * tylko autor i odpowiadajacy przez GET answers.
  */
-function publicAsk(ask: Ask, escrow: SealedEscrow | null, acceptedCount = ask.acceptedCount): Ask {
+function publicAsk(
+  ask: Ask,
+  escrow: SealedEscrow | null,
+  acceptedCount = ask.acceptedCount,
+  state: SealedAskState | null = null
+): Ask {
+  const sol = state?.solana ?? null;
   return {
     id: ask.id,
     author: ask.author,
     question: ask.question,
-    budget: ask.budget,
+    budget: sol && state ? state.budget : ask.budget,
     seats: ask.seats,
     perAnswer: ask.perAnswer,
-    token: 'USDC',
-    network: 'base',
+    token: sol ? 'SOL' : 'USDC',
+    network: sol ? 'solana' : 'base',
+    ...(sol
+      ? { budgetLamports: sol.budgetLamports, perAnswerLamports: sol.perAnswerLamports, solanaCluster: sol.cluster }
+      : {}),
     deadline: ask.deadline,
     createdAt: ask.createdAt,
     status: ask.status,
@@ -250,6 +299,11 @@ function publicAsk(ask: Ask, escrow: SealedEscrow | null, acceptedCount = ask.ac
     escrowChainId: escrow ? escrow.chainId : null,
     escrowResolveTxHash: escrow ? ask.escrowResolveTxHash ?? null : null,
   };
+}
+
+/** Stan tylko z widoku zapieczetowanego - on jeden wybiera szyne. */
+function sealedState(view: AskView): SealedAskState | null {
+  return view.trust === 'sealed' ? view.state : null;
 }
 
 /** Pozycja listy GET /api/asks: dotychczasowy ksztalt Aska plus dwa pola. */
@@ -273,7 +327,7 @@ export type ListedAsk = Ask & {
 export function listingEntry(view: AskView): ListedAsk | null {
   if (view.trust === 'broken' || view.trust === 'unverified') return null;
   if (view.status !== 'open') return null;
-  return { ...publicAsk(view, view.escrow), trust: view.trust, escrowVerified: view.escrow !== null };
+  return { ...publicAsk(view, view.escrow, view.acceptedCount, sealedState(view)), trust: view.trust, escrowVerified: view.escrow !== null };
 }
 
 /** Pozycja listy, gdy magazyn pieczeci jest niedostepny: nic nie jest "zweryfikowane". */
@@ -306,7 +360,7 @@ export function shareFromView(view: AskView, records?: { valid: number; invalid:
     return { ask: publicAsk(view, null, 0), trust: 'broken', escrow: null };
   }
   const acceptedCount = view.trust === 'sealed' && records !== undefined ? records.valid : view.acceptedCount;
-  return { ask: publicAsk(view, view.escrow, acceptedCount), trust: view.trust, escrow: view.escrow };
+  return { ask: publicAsk(view, view.escrow, acceptedCount, sealedState(view)), trust: view.trust, escrow: view.escrow };
 }
 
 /** Strona udostepniania z samego dokumentu, gdy magazyn jest niedostepny. */

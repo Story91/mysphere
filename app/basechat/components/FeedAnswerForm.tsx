@@ -4,8 +4,11 @@ import { useState } from 'react';
 import { useAccount } from 'wagmi';
 import useSiweAuth from '../../utils/auth/useSiweAuth';
 import { MAX_ANSWER_LENGTH } from '../../api/asks/pricing';
-import { formatAskMoney } from './AskCard';
+import { formatAskAmount } from './AskCard';
+import AskSolanaWallet, { SolanaAnswerPayee } from './AskSolanaWallet';
 import type { Ask } from '../../utils/asks/types';
+import { isSolAsk } from '../../utils/asks/solAmounts';
+import { useSolanaAskWallet } from '../../utils/asks/useSolanaAskWallet';
 
 /**
  * Pisanie odpowiedzi na Aska BEZ WYCHODZENIA Z FEEDU.
@@ -43,6 +46,16 @@ import type { Ask } from '../../utils/asks/types';
  * pokazuje wiec trzy rozne stany zamiast jednego "zaloguj sie": brak portfela,
  * portfel bez podpisu, i gotowy. Kazdy ma inne wyjscie, bo kazdy wymaga czego
  * innego od czlowieka.
+ *
+ * ===========================================================================
+ * ASK SOL: WYPLATA IDZIE NA PORTFEL SOLANY
+ * ===========================================================================
+ * Odpowiedz podpisuje sesja EVM, ale SOL za przyjeta odpowiedz trafia na
+ * portfel Solany powiazany z kontem - zamrozony przy odpowiedzi w chwili
+ * zapisu. Serwer przyjmie odpowiedz i bez powiazania, tylko nikt jej wtedy nie
+ * zaplaci. Dlatego ramka "Get paid in SOL" stoi NAD polem odpowiedzi, a gdy
+ * serwer powie `payoutAddressBound: false`, potwierdzenie prowadzi przez
+ * powiazanie i przypiecie portfela do tej odpowiedzi (SolanaAnswerPayee).
  */
 
 export default function FeedAnswerForm({
@@ -62,6 +75,12 @@ export default function FeedAnswerForm({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+  /** Odpowiedz Aska SOL bez zamrozonego odbiorcy - id do POST .../payee. */
+  const [unboundAnswerId, setUnboundAnswerId] = useState<string | null>(null);
+
+  const sol = isSolAsk(ask);
+  // Serwer pytamy o powiazanie tylko przy Asku SOL - pas ma kilka kart naraz.
+  const solWallet = useSolanaAskWallet({ enabled: sol });
 
   const content = draft.trim();
   const tooLong = draft.length >= MAX_ANSWER_LENGTH;
@@ -96,6 +115,19 @@ export default function FeedAnswerForm({
         return;
       }
 
+      // Ask SOL: czy odbiorca wyplaty zostal zamrozony razem z odpowiedzia.
+      // Brak pola (starszy serwer, Ask USDC) = nie pytamy o nic wiecej.
+      if (sol) {
+        try {
+          const saved = (await response.json()) as { id?: unknown; payoutAddressBound?: unknown };
+          if (saved.payoutAddressBound === false && typeof saved.id === 'string') {
+            setUnboundAnswerId(saved.id);
+          }
+        } catch {
+          // Odpowiedz bez JSON-a - zapis sie udal, reszta i tak jest na /asks.
+        }
+      }
+
       setDraft('');
       setSent(true);
       onSent(ask.id);
@@ -122,8 +154,12 @@ export default function FeedAnswerForm({
       <div className={box}>
         <p className="text-[12.5px] leading-[1.5] text-soft-ink">
           Answer sealed. The author sees it only when they resolve. If they pick yours, it pays{' '}
-          {formatAskMoney(ask.perAnswer, ask.token)}.
+          {formatAskAmount(ask, 'perAnswer')}
+          {sol ? ' to your Solana wallet' : ''}.
         </p>
+        {sol && unboundAnswerId && (
+          <SolanaAnswerPayee askId={ask.id} answerId={unboundAnswerId} wallet={solWallet} className="mt-2" />
+        )}
         <button type="button" onClick={onClose} className={`${button} mt-2 bg-soft-primary text-white`}>
           Done
         </button>
@@ -162,6 +198,10 @@ export default function FeedAnswerForm({
 
   return (
     <form onSubmit={submit} className={box}>
+      {/* Nad polem, nie pod przyciskiem: portfel na wyplate trzeba ustawic,
+          ZANIM ktos spedzi czas na odpowiedzi. Serwer przyjmie ja i bez tego,
+          ale wtedy nikt jej nie zaplaci. */}
+      {sol && <AskSolanaWallet wallet={solWallet} purpose="receive" className="mb-2" />}
       <textarea
         value={draft}
         onChange={(event) => setDraft(event.target.value.slice(0, MAX_ANSWER_LENGTH))}

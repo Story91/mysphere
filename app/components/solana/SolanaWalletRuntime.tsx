@@ -108,8 +108,18 @@ function SolanaWalletBridge({
   requestRef,
 }: SolanaRuntimeProps & { requestRef: MutableRefObject<UserRequest | null> }) {
   const { connection } = useConnection();
-  const { wallets, wallet, publicKey, connected, connecting, select, connect, disconnect, sendTransaction } =
-    useWallet();
+  const {
+    wallets,
+    wallet,
+    publicKey,
+    connected,
+    connecting,
+    select,
+    connect,
+    disconnect,
+    sendTransaction,
+    signMessage,
+  } = useWallet();
   const { setVisible } = useWalletModal();
 
   const detected = useMemo<DetectedSolanaWallet[]>(
@@ -173,9 +183,14 @@ function SolanaWalletBridge({
   const restoring = !restoreSettled && !connected && (!!wallet || !!rememberedRef.current);
 
   // ----- Stan do kontekstu --------------------------------------------------
+  // signMessage przepuszczamy tylko, gdy portfel go ma (undefined = nie umie).
+  // Potrzebny do powiazania portfela z Askami SOL - patrz solanaWalletTypes.ts.
   const signer = useMemo<SolanaSigner | null>(
-    () => (connected && publicKey ? { publicKey, connection, sendTransaction } : null),
-    [connected, publicKey, connection, sendTransaction]
+    () =>
+      connected && publicKey
+        ? { publicKey, connection, sendTransaction, ...(signMessage ? { signMessage } : {}) }
+        : null,
+    [connected, publicKey, connection, sendTransaction, signMessage]
   );
   const address = publicKey ? publicKey.toBase58() : null;
   const walletName = wallet?.adapter.name ?? null;

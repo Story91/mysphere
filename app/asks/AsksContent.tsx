@@ -6,9 +6,15 @@ import { HandCoins, Lock, PenLine } from 'lucide-react';
 import { useAccount, useChainId, useConfig, usePublicClient, useSwitchChain } from 'wagmi';
 import { getWalletClient } from 'wagmi/actions';
 import { base } from 'wagmi/chains';
-import AskCard, { formatAskMoney } from '../basechat/components/AskCard';
+import AskCard, { formatAskAmount, formatAskMoney } from '../basechat/components/AskCard';
 import AskClaimPanel from '../basechat/components/AskClaimPanel';
 import AskComposer, { type AskDraft } from '../basechat/components/AskComposer';
+import AskSolanaWallet, { SolanaAnswerPayee } from '../basechat/components/AskSolanaWallet';
+import { SOLANA_CLUSTER } from '../basechat/Solana/config/solanaChain';
+import { isInsufficientFunds, isRentError, isUserRejection } from '../basechat/Solana/walletErrors';
+import { formatLamports, isLamportsString, isSolAsk } from '../utils/asks/solAmounts';
+import { clusterMismatch, payoutExplorerUrl, shortBase58 } from '../utils/asks/solAskDisplay';
+import { useSolanaAskWallet } from '../utils/asks/useSolanaAskWallet';
 import { usePaymentFlow } from '../components/monetization/usePaymentFlow';
 import useSiweAuth from '../utils/auth/useSiweAuth';
 import { getOpenAsks, getResolvedAsks, getResolveRate } from '../utils/asks/asks';
@@ -95,8 +101,11 @@ const MAX_RATE_LOOKUPS = 12;
  */
 const MAX_RESOLVED = 10;
 
-/** Jedyna siec, w ktorej dzialaja wyplaty (usePaymentFlow placi na Base). */
-const EXPLORER_TX = 'https://basescan.org/tx/';
+/*
+ * Link do wyplaty skladamy WEDLUG SIECI rekordu (payoutExplorerUrl
+ * w app/utils/asks/solAskDisplay.ts): Base -> basescan, Solana ->
+ * explorer.solana.com z klastrem. Do Askow SOL stal tu na sztywno basescan.
+ */
 
 /**
  * Siec escrow. Ta sama, w ktorej placi usePaymentFlow, i jedyna z rodziny Base
@@ -517,6 +526,25 @@ type AnswerRow = {
   /** `null` znaczy ZAPIECZETOWANA, nigdy "pusta" - patrz typ AskAnswer. */
   content: string | null;
   sealed: boolean;
+  /* --- tylko Ask SOL (z GET /api/asks/[id]/answers) --- */
+  /** 'solana' | 'base' | null - siec rekordu przyjecia, do linku eksploratora. */
+  payoutNetwork?: string | null;
+  /** Czy odbiorca wyplaty jest zamrozony przy tej odpowiedzi. */
+  payoutAddressBound?: boolean;
+  /** Adres base58 odbiorcy - widzi go tylko autor Aska i autor odpowiedzi. */
+  payoutAddress?: string | null;
+};
+
+/**
+ * Warunki Aska SOL ZE STANU, podane przez serwer. Kwota i platnik do zaplaty
+ * biora sie WYLACZNIE stad - lustro Aska w Firestore moze klamac (spec, sekcja 0).
+ */
+type SolRail = {
+  cluster: string | null;
+  /** Stawka w lamportach, dziesietnie. */
+  perAnswerLamports: string | null;
+  /** Portfel, z ktorego ma wyjsc przelew. Tylko dla autora; inaczej null. */
+  payer: string | null;
 };
 
 type Thread = {
@@ -525,7 +553,102 @@ type Thread = {
   viewerIsAuthor: boolean;
   count: number;
   answers: AnswerRow[];
+  /** null = Ask nie placi w SOL (albo serwer tego nie potwierdzil). */
+  sol: SolRail | null;
 };
+
+/**
+ * Szyna SOL z odpowiedzi GET answers. Przyjmuje dwa ksztalty: `rail` jako
+ * obiekt {token, network, cluster, perAnswerLamports} (kontrakt ze specu) albo
+ * pola plasko obok `rail: 'sol-solana'` (tak oddaje je trasa). Adresy base58
+ * bez zmiany wielkosci liter.
+ */
+function readSolRail(data: Record<string, unknown>): SolRail | null {
+  const nested =
+    data.rail && typeof data.rail === 'object' ? (data.rail as Record<string, unknown>) : null;
+  const token = nested?.token ?? data.token;
+  const network = nested?.network ?? data.network;
+  const isSol = (token === 'SOL' && network === 'solana') || data.rail === 'sol-solana';
+  if (!isSol) return null;
+  const cluster = nested?.cluster ?? data.solanaCluster ?? data.cluster;
+  const perAnswer = nested?.perAnswerLamports ?? data.perAnswerLamports;
+  const payer = data.solanaPayer ?? nested?.payer;
+  return {
+    cluster: typeof cluster === 'string' ? cluster : null,
+    perAnswerLamports: isLamportsString(perAnswer) ? perAnswer : null,
+    payer: typeof payer === 'string' && payer !== '' ? payer : null,
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/*  NIEZAPISANA WYPLATA SOL                                            */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Podpis wyslanej wyplaty SOL, ktorej przyjecia jeszcze nie zapisano.
+ *
+ * Trzymany w stanie ORAZ w localStorage (klucz = Ask): przelew moze juz isc,
+ * wiec zamkniecie karty w trakcie potwierdzania nie moze zgubic jedynego
+ * dowodu - drugi przelew za te sama odpowiedz to realne pieniadze.
+ */
+type SolProof = { answerId: string; signature: string; savedAt: number };
+
+const SOL_PROOF_STORAGE_KEY = 'mysphere:ask-sol-payouts:v1';
+
+function readSolProofs(): Record<string, SolProof> {
+  try {
+    const raw = window.localStorage.getItem(SOL_PROOF_STORAGE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as unknown) : null;
+    if (!parsed || typeof parsed !== 'object') return {};
+    const out: Record<string, SolProof> = {};
+    for (const [askId, value] of Object.entries(parsed as Record<string, unknown>)) {
+      const entry = value as Partial<SolProof> | null;
+      if (entry && typeof entry.answerId === 'string' && typeof entry.signature === 'string') {
+        out[askId] = { answerId: entry.answerId, signature: entry.signature, savedAt: Number(entry.savedAt) || 0 };
+      }
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+function writeSolProof(askId: string, proof: SolProof | null): void {
+  try {
+    const all = readSolProofs();
+    if (proof) all[askId] = proof;
+    else delete all[askId];
+    if (Object.keys(all).length === 0) window.localStorage.removeItem(SOL_PROOF_STORAGE_KEY);
+    else window.localStorage.setItem(SOL_PROOF_STORAGE_KEY, JSON.stringify(all));
+  } catch (error) {
+    console.warn('[asks] Nie udalo sie zapamietac podpisu wyplaty SOL:', error);
+  }
+}
+
+/** Kody odmowy przyjecia SOL, przy ktorych ten sam podpis warto wyslac jeszcze raz. */
+const SOL_RETRYABLE_CODES = new Set([
+  'payout_unverified',
+  'payout_time_unknown',
+  'chain_unavailable',
+  'store_unavailable',
+  'ask_unavailable',
+  'network_error',
+]);
+
+/** Ile razy sami ponawiamy zapis, zanim oddamy przycisk czlowiekowi. */
+const SOL_RECORD_RETRIES = 4;
+const SOL_RECORD_DELAY_MS = 2500;
+
+class SolAcceptError extends Error {
+  constructor(
+    message: string,
+    readonly code: string | null,
+    readonly retryable: boolean
+  ) {
+    super(message);
+    this.name = 'SolAcceptError';
+  }
+}
 
 const panelClass =
   'rounded-card border border-soft-line bg-soft-surface p-4 font-soft shadow-card sm:p-5';
@@ -598,6 +721,21 @@ function AskThread({
   const { switchChainAsync } = useSwitchChain();
 
   const escrowed = ask.funding === 'escrowed';
+  /**
+   * Ask SOL. Lustro wystarcza do WYGLADU (odznaka, zdania) - kwote, klaster
+   * i platnika do zaplaty bierzemy wylacznie z `thread.sol` (serwer, stan).
+   */
+  // Po zaladowaniu watku szyna ZE STANU (GET answers oddaje `rail` tylko dla
+  // Aska SOL z wazna pieczecia). Samo lustro dalo sie przestawic: Ask SOL
+  // udajacy USDC pokazalby autorowi przelew USDC na Base, ktory serwer odrzuci
+  // (wrong_rail) juz po zaplaceniu, a Ask USDC udajacy SOL - martwy przycisk.
+  const solAsk = thread ? thread.sol !== null : isSolAsk(ask);
+  /**
+   * Portfel Solany. Powiazanie czytamy tylko dla odpowiadajacego (ramka "Get
+   * paid in SOL"); autor potrzebuje stad samego podpisujacego portfela - platnik
+   * przychodzi z serwera (`solanaPayer`), nie z powiazania.
+   */
+  const solWallet = useSolanaAskWallet({ enabled: solAsk && !isAuthor });
   /** Identyfikatory odpowiedzi wskazanych do wyplaty. Jedna transakcja, cala lista. */
   const [picked, setPicked] = useState<Set<string>>(() => new Set());
   const [awarding, setAwarding] = useState(false);
@@ -644,6 +782,7 @@ function AskThread({
         viewerIsAuthor: data.viewerIsAuthor === true,
         count: typeof data.count === 'number' ? data.count : 0,
         answers: Array.isArray(data.answers) ? (data.answers as AnswerRow[]) : [],
+        sol: readSolRail(data),
       });
       setPhase('ready');
     } catch (error) {
@@ -810,6 +949,282 @@ function AskThread({
       if (mountedRef.current) setRecording(false);
     }
   }
+
+  /* -------------------- WYPLATA W SOL -------------------- */
+
+  const solRail = thread?.sol ?? null;
+  const [solPayingId, setSolPayingId] = useState<string | null>(null);
+  const [solPhase, setSolPhase] = useState<'signing' | 'confirming' | 'recording' | null>(null);
+  const [solError, setSolError] = useState<{ answerId: string; message: string } | null>(null);
+  /** Podpis wyslanej wyplaty, ktorej przyjecia jeszcze nie zapisano - patrz SolProof. */
+  const [solProof, setSolProof] = useState<SolProof | null>(null);
+  const [solProofError, setSolProofError] = useState<{ message: string; retryable: boolean } | null>(null);
+  const [solRecording, setSolRecording] = useState(false);
+
+  // Podpis z poprzedniej wizyty (karta zamknieta w trakcie potwierdzania).
+  useEffect(() => {
+    if (!solAsk) return;
+    const stored = readSolProofs()[ask.id];
+    if (stored) setSolProof(stored);
+  }, [solAsk, ask.id]);
+
+  // Odpowiedz, ktorej dotyczy zapamietany podpis, jest juz przyjeta (np. zapis
+  // doszedl z innej karty) - dowod nie jest juz potrzebny.
+  useEffect(() => {
+    if (!solProof || !thread) return;
+    const target = thread.answers.find((answer) => answer.id === solProof.answerId);
+    if (target?.accepted) {
+      writeSolProof(ask.id, null);
+      setSolProof(null);
+      setSolProofError(null);
+    }
+  }, [solProof, thread, ask.id]);
+
+  const rememberSolProof = useCallback(
+    (proofToKeep: SolProof | null) => {
+      writeSolProof(ask.id, proofToKeep);
+      if (mountedRef.current) setSolProof(proofToKeep);
+    },
+    [ask.id]
+  );
+
+  /**
+   * POST accept z podpisem Solany. Odmowy "jeszcze nie widac" (RPC serwera
+   * nie dogonil potwierdzenia) ponawiamy sami z tym samym podpisem - drugi
+   * przelew nie wchodzi w gre. Rzuca SolAcceptError, gdy sie nie udalo.
+   */
+  const recordSolAccept = useCallback(
+    async (answerId: string, signature: string) => {
+      for (let attempt = 0; ; attempt += 1) {
+        let status = 0;
+        let data: Record<string, unknown> = {};
+        try {
+          const response = await fetch(`/api/asks/${encodeURIComponent(ask.id)}/accept`, {
+            method: 'POST',
+            credentials: 'include',
+            cache: 'no-store',
+            headers: { 'Content-Type': 'application/json' },
+            // base58 dokladnie tak, jak oddal portfel - bez zmiany wielkosci liter.
+            body: JSON.stringify({ answerId, payoutSignature: signature }),
+          });
+          status = response.status;
+          try {
+            data = (await response.json()) as Record<string, unknown>;
+          } catch {
+            data = {};
+          }
+          if (response.ok) {
+            const patch: Partial<Ask> = {};
+            if (typeof data.acceptedCount === 'number') patch.acceptedCount = data.acceptedCount;
+            // Ostatnie miejsce zamyka Aska po stronie serwera (auto-full).
+            if (data.status === 'resolved') {
+              patch.status = 'resolved';
+              patch.resolvedAt = Date.now();
+            }
+            if (Object.keys(patch).length > 0) onPatch(ask.id, patch);
+            rememberSolProof(null);
+            if (mountedRef.current) setSolProofError(null);
+            await load();
+            return;
+          }
+        } catch (error) {
+          console.warn('[asks] Zapis przyjecia SOL nie dotarl do serwera:', error);
+          data = { code: 'network_error', error: 'We could not reach the server.' };
+        }
+
+        const code = typeof data.code === 'string' ? data.code : null;
+        const retryable = data.retryable === true || (code !== null && SOL_RETRYABLE_CODES.has(code));
+        if (!retryable || attempt >= SOL_RECORD_RETRIES) {
+          const message =
+            typeof data.error === 'string' && data.error.trim() !== ''
+              ? data.error
+              : `The payout could not be recorded (server answered ${status}).`;
+          throw new SolAcceptError(message, code, retryable);
+        }
+        await new Promise((resolve) => setTimeout(resolve, SOL_RECORD_DELAY_MS));
+        if (!mountedRef.current) return;
+      }
+    },
+    [ask.id, load, onPatch, rememberSolProof]
+  );
+
+  /**
+   * Czy i dlaczego NIE mozna teraz zaplacic tej odpowiedzi w SOL. Powod stoi
+   * przy przycisku ZANIM ktos kliknie - kazdy z nich inaczej skonczylby sie
+   * odmowa serwera juz po przelewie.
+   */
+  function solBlocker(answer: AnswerRow): string | null {
+    if (!solRail) return 'Loading the payment details from the server…';
+    if (!solRail.perAnswerLamports) return 'The server did not give the amount for this Ask, so it cannot be paid here yet.';
+    if (!solRail.payer) return 'The server did not say which Solana wallet pays this Ask. Sign in again as its author.';
+    if (clusterMismatch(solRail.cluster, SOLANA_CLUSTER)) {
+      return `This Ask pays on Solana ${solRail.cluster}, but this app is set to ${SOLANA_CLUSTER}. Paying here would send SOL on the wrong network.`;
+    }
+    if (answer.payoutAddressBound === false || !answer.payoutAddress) {
+      return 'This answerer has not linked a Solana wallet yet, so there is nowhere to send the SOL. You can pay once they do.';
+    }
+    if (solProof) return 'Finish recording the payout below before paying another answer.';
+    return null;
+  }
+
+  async function startSolPayout(answer: AnswerRow) {
+    if (solPayingId || !solRail?.payer || !solRail.perAnswerLamports || !answer.payoutAddress) return;
+    if (solBlocker(answer)) return;
+    setSolError(null);
+
+    const signer = solWallet.signer;
+    // Brak podlaczonego konta Solany - podlaczamy (ten sam portfel co strona
+    // EVM, inaczej wybor) i czekamy na drugie klikniecie.
+    if (!solWallet.available) {
+      setSolError({ answerId: answer.id, message: 'Solana wallets do not work in this app view. Open MySphere in a browser to pay.' });
+      return;
+    }
+    if (!signer || !solWallet.address) {
+      solWallet.connect();
+      setSolError({
+        answerId: answer.id,
+        message: `Connect ${shortBase58(solRail.payer)} - the Solana wallet this Ask pays from - then press Pay again.`,
+      });
+      return;
+    }
+    // Porownanie DOKLADNE: base58 rozroznia wielkosc liter.
+    if (solWallet.address !== solRail.payer) {
+      setSolError({
+        answerId: answer.id,
+        message: `This Ask pays from ${shortBase58(solRail.payer)}, but you are connected with ${shortBase58(
+          solWallet.address
+        )}. Switch to that wallet - nothing was sent.`,
+      });
+      return;
+    }
+
+    setSolPayingId(answer.id);
+    setSolPhase('signing');
+    // Obiekt, nie `let`: przypisanie w callbacku nie zawezaloby typu.
+    const sentRef: { signature: string | null } = { signature: null };
+    try {
+      // web3.js laduje sie DOPIERO TUTAJ - patrz naglowek solanaAskPay.ts.
+      const { payAskAnswerInSol } = await import('../utils/asks/solanaAskPay');
+      const outcome = await payAskAnswerInSol({
+        signer,
+        askId: ask.id,
+        answerId: answer.id,
+        payee: answer.payoutAddress,
+        lamports: solRail.perAnswerLamports,
+        expectedPayer: solRail.payer,
+        onSent: (sent) => {
+          sentRef.signature = sent;
+          // Dowod ZANIM zapytamy lancuch i serwer - patrz SolProof.
+          rememberSolProof({ answerId: answer.id, signature: sent, savedAt: Date.now() });
+          if (mountedRef.current) setSolPhase('confirming');
+        },
+      });
+
+      if (outcome.kind === 'failed') {
+        rememberSolProof(null);
+        setSolError({
+          answerId: answer.id,
+          message: `The transfer failed on Solana (${outcome.detail.slice(0, 120)}). No SOL left your wallet except the network fee.`,
+        });
+        return;
+      }
+      if (outcome.kind === 'expired') {
+        rememberSolProof(null);
+        setSolError({
+          answerId: answer.id,
+          message: 'Solana did not take the transfer in time, so nothing was paid. Press Pay to try again.',
+        });
+        return;
+      }
+      if (outcome.kind === 'unknown') {
+        // Nie wiemy - podpis zostaje w ramce nizej razem z ponowieniem zapisu.
+        setSolProofError({
+          message:
+            'We could not confirm the transfer with Solana. Check the signature in the explorer before paying again - recording it is safe to retry.',
+          retryable: true,
+        });
+        return;
+      }
+
+      setSolPhase('recording');
+      await recordSolAccept(answer.id, outcome.signature);
+    } catch (error) {
+      if (error instanceof SolAcceptError) {
+        // Przelew jest na lancuchu, zapis nie - podpis zostaje w ramce.
+        setSolProofError({ message: error.message, retryable: error.retryable });
+      } else if (sentRef.signature === null && isUserRejection(error)) {
+        setSolError({ answerId: answer.id, message: 'Signature cancelled. Nothing was sent.' });
+      } else if (sentRef.signature === null && isRentError(error)) {
+        setSolError({
+          answerId: answer.id,
+          message: 'Solana refused the transfer: the receiving wallet would be left below the rent minimum. Nothing was sent.',
+        });
+      } else if (sentRef.signature === null && isInsufficientFunds(error)) {
+        setSolError({
+          answerId: answer.id,
+          message: `Not enough SOL in ${shortBase58(solRail.payer)} for ${formatLamports(solRail.perAnswerLamports)} SOL plus the network fee. Nothing was sent.`,
+        });
+      } else {
+        console.error('[asks] Wyplata SOL nie powiodla sie:', error);
+        const detail = error instanceof Error ? error.message.slice(0, 160) : 'unknown error';
+        setSolError({
+          answerId: answer.id,
+          message:
+            sentRef.signature === null
+              ? `The transfer was not sent: ${detail}`
+              : `Something went wrong after the transfer was sent: ${detail}. The signature is kept below.`,
+        });
+      }
+    } finally {
+      if (mountedRef.current) {
+        setSolPayingId(null);
+        setSolPhase(null);
+      }
+    }
+  }
+
+  async function retrySolRecord() {
+    if (!solProof || solRecording) return;
+    setSolRecording(true);
+    setSolProofError(null);
+    try {
+      await recordSolAccept(solProof.answerId, solProof.signature);
+    } catch (error) {
+      if (!mountedRef.current) return;
+      setSolProofError(
+        error instanceof SolAcceptError
+          ? { message: error.message, retryable: error.retryable }
+          : { message: 'Could not record the payout. Try again.', retryable: true }
+      );
+    } finally {
+      if (mountedRef.current) setSolRecording(false);
+    }
+  }
+
+  function forgetSolProof() {
+    // Odmowa "jeszcze nie widac" moze znaczyc, ze przelew nigdy nie wszedl
+    // (RPC milczal, okno wygaslo) - bez wyjscia podpis blokowalby na zawsze
+    // placenie kazdej odpowiedzi tego Aska. Wtedy tylko z ostrzezeniem.
+    if (
+      solProofError?.retryable &&
+      !window.confirm(
+        'Only dismiss this if the explorer shows the transfer never landed. If it did land, paying this answer again sends SOL twice.'
+      )
+    ) {
+      return;
+    }
+    rememberSolProof(null);
+    setSolProofError(null);
+  }
+
+  const solPayLabel =
+    solPhase === 'signing'
+      ? 'Check your wallet…'
+      : solPhase === 'confirming'
+        ? 'Confirming on Solana…'
+        : solPhase === 'recording'
+          ? 'Recording…'
+          : null;
 
   /* -------------------- ROZSTRZYGANIE PRZEZ ESCROW -------------------- */
 
@@ -1045,6 +1460,24 @@ function AskThread({
         </div>
       )}
 
+      {/* ---------- ASK SOL: Z KTOREGO PORTFELA IDZIE WYPLATA ----------
+          Platnik jest ZAMROZONY w Asku przy zakladaniu (serwer oddaje go
+          autorowi jako `solanaPayer`). Przelew z innego portfela serwer
+          odrzuci juz po zaplaceniu, wiec zgodnosc widac tu, zanim ktos kliknie. */}
+      {solAsk && isAuthor && isSignedIn && ask.status !== 'resolved' && solRail?.payer && (
+        <SolPayerBar
+          payer={solRail.payer}
+          cluster={solRail.cluster}
+          available={solWallet.available}
+          connected={solWallet.connected}
+          connecting={solWallet.connecting}
+          address={solWallet.address}
+          walletName={solWallet.walletName}
+          onConnect={solWallet.connect}
+          onSwitch={solWallet.pickWallet}
+        />
+      )}
+
       {/* ---------- FORMULARZ ODPOWIEDZI ---------- */}
       {!isAuthor && canStillAnswer && !alreadyAnswered && (
         <form onSubmit={submitAnswer} className="mb-4">
@@ -1064,6 +1497,8 @@ function AskThread({
             </div>
           ) : (
             <>
+              {/* Ask SOL: portfel na wyplate ZANIM ktos zacznie pisac. */}
+              {solAsk && <AskSolanaWallet wallet={solWallet} purpose="receive" className="mb-3" />}
               <label className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-soft-ink-faint">
                 Your answer
                 <textarea
@@ -1083,7 +1518,7 @@ function AskThread({
                   disabled={sending || draft.trim() === ''}
                   className={`${buttonClass} bg-soft-primary text-white`}
                 >
-                  {sending ? 'Sending…' : `Answer for ${formatAskMoney(ask.perAnswer, ask.token)}`}
+                  {sending ? 'Sending…' : `Answer for ${formatAskAmount(ask, 'perAnswer')}`}
                 </button>
               </div>
               {/* Zdanie dla PISZACEGO, czyli dla tego, kto ryzykuje. Musi
@@ -1096,6 +1531,12 @@ function AskThread({
                     contract the author cannot empty. If they pick your answer you get{' '}
                     {formatAskMoney(ask.perAnswer, ask.token)} to collect; if they pick nobody, the
                     budget only unlocks back to them 48 hours after the deadline.
+                  </>
+                ) : solAsk ? (
+                  <>
+                    You write before you are paid. Nothing is locked for a SOL Ask: the author pays
+                    each accepted answer from their Solana wallet, so check their resolve record on
+                    the card above before you spend time on this.
                   </>
                 ) : (
                   <>
@@ -1164,12 +1605,22 @@ function AskThread({
             // autor zaplacilby z portfela za cos, co juz oplacil w escrow.
             const canAccept =
               !escrowed &&
+              !solAsk &&
               isAuthor &&
               isSignedIn &&
               !answer.accepted &&
               ask.status !== 'resolved' &&
               seatsLeft > 0 &&
               payable;
+            // Ask SOL: przelew z portfela Solany autora, kwota i platnik z serwera.
+            const canAcceptSol =
+              solAsk &&
+              isAuthor &&
+              isSignedIn &&
+              !answer.accepted &&
+              ask.status !== 'resolved' &&
+              seatsLeft > 0;
+            const solBlocked = canAcceptSol ? solBlocker(answer) : null;
 
             const canPick =
               escrowed &&
@@ -1207,7 +1658,13 @@ function AskThread({
 
                 {answer.accepted && answer.payoutTxHash && (
                   <a
-                    href={`${EXPLORER_TX}${answer.payoutTxHash}`}
+                    // Eksplorator WEDLUG SIECI rekordu: podpis Solany pod
+                    // basescan prowadzilby na pusta strone.
+                    href={payoutExplorerUrl(
+                      answer.payoutNetwork ?? (solAsk ? 'solana' : 'base'),
+                      answer.payoutTxHash,
+                      solRail?.cluster ?? ask.solanaCluster ?? null
+                    )}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="mt-2 inline-block break-all text-[11px] font-medium text-soft-primary-deep underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
@@ -1235,6 +1692,70 @@ function AskThread({
                       Award {formatAskMoney(ask.perAnswer, ask.token)} to this answer
                     </span>
                   </label>
+                )}
+
+                {/* Wlasna odpowiedz na Asku SOL: dokad pojdzie wyplata, albo
+                    prosba o portfel, gdy odbiorca nie jest jeszcze przypiety. */}
+                {solAsk && mine && !isAuthor && !answer.accepted && (
+                  answer.payoutAddressBound === false ? (
+                    <SolanaAnswerPayee
+                      askId={ask.id}
+                      answerId={answer.id}
+                      wallet={solWallet}
+                      onBound={() => void load()}
+                      className="mt-2.5"
+                    />
+                  ) : answer.payoutAddress ? (
+                    <p className="mt-2 break-words text-[11.5px] leading-[1.5] text-soft-ink-faint">
+                      If accepted, the SOL goes to{' '}
+                      <span className="font-semibold text-soft-ask-deep" title={answer.payoutAddress}>
+                        {shortBase58(answer.payoutAddress)}
+                      </span>
+                      .
+                    </p>
+                  ) : null
+                )}
+
+                {canAcceptSol && (
+                  <div className="mt-2.5">
+                    <button
+                      type="button"
+                      onClick={() => void startSolPayout(answer)}
+                      disabled={solPayingId !== null || solBlocked !== null}
+                      className={`${buttonClass} bg-soft-primary text-white`}
+                    >
+                      {solPayingId === answer.id && solPayLabel
+                        ? solPayLabel
+                        : `Pay ${
+                            solRail?.perAnswerLamports
+                              ? `${formatLamports(solRail.perAnswerLamports)} SOL`
+                              : formatAskAmount(ask, 'perAnswer')
+                          } and accept`}
+                    </button>
+                    {answer.payoutAddress && !solBlocked && (
+                      <p className="mt-1.5 break-words text-[11.5px] leading-[1.5] text-soft-ink-faint">
+                        To{' '}
+                        <span className="font-semibold text-soft-ink-muted" title={answer.payoutAddress}>
+                          {shortBase58(answer.payoutAddress)}
+                        </span>{' '}
+                        on Solana{solRail?.cluster === 'devnet' ? ' devnet' : ''}, from your linked wallet.
+                        {seatsLeft === 1 ? ' Paying this last seat closes the Ask and unseals every answer.' : ''}
+                      </p>
+                    )}
+                    {solBlocked && (
+                      <p className="mt-1.5 break-words text-[11.5px] leading-[1.5] text-soft-ink-muted">
+                        {solBlocked}
+                      </p>
+                    )}
+                    {solError?.answerId === answer.id && (
+                      <p
+                        className="mt-2 break-words text-[12px] leading-[1.5] text-soft-accent-deep"
+                        role="alert"
+                      >
+                        {solError.message}
+                      </p>
+                    )}
+                  </div>
                 )}
 
                 {canAccept && (
@@ -1301,6 +1822,56 @@ function AskThread({
               {recordError}
             </p>
           )}
+        </div>
+      )}
+
+      {/* ---------- WYSLANA WYPLATA SOL, NIEZAPISANE PRZYJECIE ----------
+          Ta sama rola co ramka wyzej dla Base: podpis jest jedynym dowodem
+          przelewu, wiec zostaje na ekranie (i w localStorage), dopoki serwer
+          nie zapisze przyjecia. Ponowienie wysyla TEN SAM podpis. */}
+      {solAsk && isAuthor && solProof && (
+        <div className="mt-4 rounded-lg border border-soft-accent/40 bg-soft-accent-soft p-3">
+          <p className="mb-2 break-words text-[12.5px] leading-[1.5] text-soft-accent-deep">
+            {solRecording || (solPhase !== null && solPayingId === solProof.answerId)
+              ? 'The SOL transfer is sent. Recording the acceptance…'
+              : 'The SOL transfer was sent but the acceptance is not recorded yet. Retrying uses the same signature, so you will not pay twice.'}
+          </p>
+          <a
+            href={payoutExplorerUrl('solana', solProof.signature, solRail?.cluster ?? ask.solanaCluster ?? null)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mb-2 block break-all font-mono text-[11px] text-soft-ink-muted underline decoration-dotted underline-offset-2 hover:text-soft-primary-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+          >
+            {solProof.signature}
+          </a>
+          {solProofError && (
+            <p className="mb-2 break-words text-[12px] leading-[1.5] text-soft-accent-deep" role="alert">
+              {solProofError.message}
+            </p>
+          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void retrySolRecord()}
+              disabled={solRecording || solPhase !== null}
+              className={`${buttonClass} bg-soft-primary text-white`}
+            >
+              {solRecording ? 'Recording…' : 'Record this payout'}
+            </button>
+            {/* Zapomniec wolno po odmowie serwera: stalej (inna kwota albo
+                odbiorca - podpis niczego nie zapisze) bez pytania, "jeszcze nie
+                widac" dopiero po potwierdzeniu (forgetSolProof) - przelew,
+                ktory nigdy nie wszedl, nie moze blokowac Aska na zawsze. */}
+            {solProofError && !solRecording && (
+              <button
+                type="button"
+                onClick={forgetSolProof}
+                className={`${buttonClass} border border-soft-line bg-soft-surface text-soft-ink-muted`}
+              >
+                Dismiss
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -1577,6 +2148,86 @@ function EscrowFacts({ ask }: { ask: Ask }) {
           The per-answer amount on this card does not match the one locked in the contract. The
           contract is the one that pays, so believe it, not the card.
         </p>
+      )}
+    </div>
+  );
+}
+
+/* ==================================================================== */
+/*  ASK SOL: PORTFEL PLATNIKA                                            */
+/* ==================================================================== */
+
+/**
+ * Pasek "Pays from …" nad odpowiedziami Aska SOL (tylko dla autora).
+ *
+ * Trzy stany i trzy rozne wyjscia: podlaczony wlasciwy portfel (gotowe),
+ * podlaczony INNY (przelacz - przelew z niego serwer odrzuci po fakcie),
+ * zaden (podlacz). Morski akcent Aska, bursztyn zostaje dla kwot.
+ */
+function SolPayerBar({
+  payer,
+  cluster,
+  available,
+  connected,
+  connecting,
+  address,
+  walletName,
+  onConnect,
+  onSwitch,
+}: {
+  payer: string;
+  cluster: string | null;
+  available: boolean;
+  connected: boolean;
+  connecting: boolean;
+  address: string | null;
+  walletName: string | null;
+  onConnect: () => void;
+  onSwitch: () => void;
+}) {
+  // base58 - porownanie dokladne.
+  const matches = connected && address === payer;
+  const devnet = cluster === 'devnet';
+
+  return (
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-soft-ask/25 bg-soft-ask-soft/50 px-3 py-2.5">
+      <p className="min-w-0 break-words text-[12px] leading-[1.5] text-soft-ink-muted">
+        <span className="mr-1.5 inline-flex items-center gap-1.5 font-soft-display text-[11px] font-bold uppercase tracking-[0.12em] text-soft-ask-deep">
+          <span
+            className={`h-1.5 w-1.5 shrink-0 rounded-full ${matches ? 'bg-soft-ask' : 'bg-soft-line-strong'}`}
+            aria-hidden="true"
+          />
+          Pays from
+        </span>
+        <span className="font-semibold text-soft-ink" title={payer}>
+          {shortBase58(payer)}
+        </span>
+        {devnet ? ' on Solana devnet' : ' on Solana'}
+        {matches
+          ? ` · connected${walletName ? ` in ${walletName}` : ''}`
+          : connected && address
+            ? ` · you are connected with ${shortBase58(address)}`
+            : ''}
+      </p>
+      {!available ? (
+        <span className="text-[11.5px] text-soft-ink-faint">Open in a browser with a Solana wallet to pay.</span>
+      ) : matches ? null : connected ? (
+        <button
+          type="button"
+          onClick={onSwitch}
+          className={`${buttonClass} border border-soft-line bg-soft-surface text-soft-ink-muted`}
+        >
+          Switch wallet
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={onConnect}
+          disabled={connecting}
+          className={`${buttonClass} bg-soft-primary text-white`}
+        >
+          {connecting ? 'Connecting…' : 'Connect Solana wallet'}
+        </button>
       )}
     </div>
   );

@@ -16,7 +16,7 @@
 const path = require('node:path');
 const Module = require('node:module');
 
-const TEST_FILES = ['test/asksSeals.test.ts', 'test/asksEscrowProof.test.ts', 'test/asksStore.test.ts', 'test/asksCreate.test.ts', 'test/asksPublicView.test.ts', 'test/asksReseal.test.ts', 'test/asksAcceptResolve.test.ts', 'test/asksEscrowRoutes.test.ts'];
+const TEST_FILES = ['test/asksSeals.test.ts', 'test/asksEscrowProof.test.ts', 'test/asksStore.test.ts', 'test/asksCreate.test.ts', 'test/asksPublicView.test.ts', 'test/asksReseal.test.ts', 'test/asksAcceptResolve.test.ts', 'test/asksEscrowRoutes.test.ts', 'test/asksSolanaCore.test.ts', 'test/asksSolanaStore.test.ts', 'test/asksSolanaAccept.test.ts'];
 
 if (require.main !== module) {
   const originalLoad = Module._load;

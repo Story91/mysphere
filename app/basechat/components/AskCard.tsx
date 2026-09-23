@@ -9,6 +9,7 @@ import {
   type ResolveRate,
   isExpired,
 } from '../../utils/asks/types';
+import { formatSolNumber, solAskAmount, solRailBadge } from '../../utils/asks/solAskDisplay';
 
 /**
  * Karta Aska - ten sam obiekt, ktory manifest na /re-definition rysowal jako
@@ -76,9 +77,42 @@ function viewOf(ask: Ask, now: number): AskView {
  */
 export function formatAskMoney(amount: number, token = 'USDC'): string {
   const value = Number.isFinite(amount) ? amount : 0;
+  // SOL do 9 miejsc: toFixed(2) zrobiloby z minimum 0.005 SOL "0.01 SOL",
+  // czyli obiecalo dwa razy wiecej, niz autor placi (solAskDisplay.ts).
+  if (token === 'SOL') return `${formatSolNumber(value)} SOL`;
   return token === 'USDC' || token === 'USD'
     ? `$${value.toFixed(2)}`
     : `${value.toFixed(2)} ${token}`;
+}
+
+/**
+ * Budzet albo stawka Aska jako napis. Ask SOL liczy z LAMPORTOW (dokladnie to,
+ * co zapieczetowal serwer), kazdy inny - jak dotad z liczby.
+ */
+export function formatAskAmount(ask: Ask, which: 'budget' | 'perAnswer'): string {
+  return solAskAmount(ask, which) ?? formatAskMoney(which === 'budget' ? ask.budget : ask.perAnswer, ask.token);
+}
+
+/**
+ * Odznaka szyny Aska SOL: "SOL · Solana", a na devnecie osobne "devnet" -
+ * darmowy SOL z faucetu nie moze wygladac jak prawdziwe pieniadze. Morski
+ * akcent Aska, nie bursztyn: to nie jest kwota. Ask USDC odznaki nie ma.
+ */
+export function AskRailBadge({ ask, className = '' }: { ask: Ask; className?: string }) {
+  const badge = solRailBadge(ask);
+  if (!badge) return null;
+  return (
+    <span className={`inline-flex shrink-0 items-center gap-1 ${className}`}>
+      <span className="rounded-full border border-soft-ask/30 bg-soft-ask-soft px-2 py-0.5 text-[10px] font-semibold text-soft-ask-deep">
+        {badge.label}
+      </span>
+      {badge.devnet && (
+        <span className="rounded-full border border-soft-line-strong bg-soft-sunken px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-soft-ink">
+          devnet
+        </span>
+      )}
+    </span>
+  );
 }
 
 const pad2 = (value: number) => String(value).padStart(2, '0');
@@ -195,6 +229,7 @@ export default function AskCard({
   const left = ask.deadline - reference;
 
   const author = authorName || (ask.author ? getSlicedAddress(ask.author) : 'unknown address');
+  const isSolAskCard = solRailBadge(ask) !== null;
 
   /**
    * Pasek stanu. Trzy stany, trzy rozne natezenia - i ZADEN z nich nie jest
@@ -331,6 +366,7 @@ export default function AskCard({
           <span className="min-w-0 flex-1 truncate font-soft-display text-[13px] font-semibold text-soft-ink">
             {author}
           </span>
+          <AskRailBadge ask={ask} />
           <ResolveRateBadge rate={resolveRate} />
         </div>
 
@@ -347,9 +383,9 @@ export default function AskCard({
             Komorki sa BIALE, bo kwoty w `accent-deep` trzymaja AA tylko na
             bieli (5.2:1) - na `soft-sunken` spadaja do 4.36:1. */}
         <div className="grid grid-cols-3 gap-px overflow-hidden rounded-[18px] border border-soft-line/70 bg-soft-line/60">
-          <Cell label="Budget" value={formatAskMoney(ask.budget, ask.token)} money />
+          <Cell label="Budget" value={formatAskAmount(ask, 'budget')} money />
           <Cell label="Seats" value={`${ask.acceptedCount} of ${ask.seats}`} />
-          <Cell label="Per answer" value={formatAskMoney(ask.perAnswer, ask.token)} money />
+          <Cell label="Per answer" value={formatAskAmount(ask, 'perAnswer')} money />
         </div>
 
         {/*
@@ -382,6 +418,10 @@ export default function AskCard({
                 </>
               )}
             </>
+          ) : isSolAskCard ? (
+            // Ask SOL: tylko przy przyjeciu, z portfela Solany autora. Nigdy
+            // slowo escrow - dla SOL go nie ma.
+            'Paid on accept in SOL. Nothing is locked: the author pays each accepted answer from their Solana wallet.'
           ) : (
             `Not held in escrow: the author pays each accepted answer on ${ask.network} when they resolve.`
           )}

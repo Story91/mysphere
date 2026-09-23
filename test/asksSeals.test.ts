@@ -191,6 +191,82 @@ describe('asks seals: keys', () => {
 });
 
 /* ------------------------------------------------------------------ */
+/*  Zlote wektory MAC                                                  */
+/* ------------------------------------------------------------------ */
+
+// Wartosci policzone kodem sprzed Askow na Solanie (2026-09-23) i wpisane na
+// sztywno. Pieczecie Base juz leza w Firestore - kazda zmiana ladunku (nowy
+// klucz, inna kolejnosc, undefined zamiast braku pola) uniewaznilaby je
+// wszystkie naraz. Gdy ten test pada, NIE przepisuj heksow: napraw kod.
+describe('asks seals: golden MAC vectors (Base payloads must never change)', () => {
+  const golden = deriveAskSealKeys({ ASK_SEAL_SECRET: 'golden' });
+  const GOLDEN_AUTHOR = '0xd4885a5aa53446843cabcde1f35de9b4e906030e';
+  const onResolve = {
+    v: 1,
+    askId: 'goldenAsk00000000001',
+    author: GOLDEN_AUTHOR,
+    funding: 'on-resolve',
+    token: 'USDC',
+    network: 'base',
+    budget: 1.5,
+    seats: 3,
+    deadline: 1790000000000,
+    origin: 'session',
+    escrow: null,
+    status: 'resolved',
+    resolvedAt: 1790000500000,
+    resolveKind: 'author',
+    resolveTxHash: null,
+    expiredTxHash: null,
+    expiredLogIndex: null,
+  };
+  const escrowed = {
+    ...baseState(),
+    askId: 'goldenAsk00000000002',
+  };
+  const acceptance = () =>
+    transferAcceptance({
+      askId: 'goldenAsk00000000001',
+      answerId: 'goldenAnswer00000001',
+      payee: PAYEE,
+      from: GOLDEN_AUTHOR,
+      txHash: PAY_TX,
+      logIndex: 447,
+      units: 500000n,
+    });
+
+  it('the golden key id is stable', () => {
+    expect(golden.current.kid).to.equal('ask:dd56de41');
+  });
+
+  it('on-resolve Base state', () => {
+    const doc = sealStateDoc(golden.current, onResolve);
+    expect(doc.mac).to.equal('b8d4856f99e83ff48d44796ad63125dc8ad39a209e05f0c2837bd5bcfaa00d6f');
+    expect(Object.keys(doc).filter((key) => key !== 'mac' && key !== 'kid').sort()).to.deep.equal(Object.keys(onResolve).sort());
+    expect(readSealedState(golden, 'goldenAsk00000000001', roundTrip(doc)).kind).to.equal('valid');
+  });
+
+  it('escrowed Base state', () => {
+    const doc = sealStateDoc(golden.current, escrowed);
+    expect(doc.mac).to.equal('133e390f961faa922d520cd75415dcc830e3428982ad7bf987934b52842340f2');
+    expect(doc).to.not.have.property('solana');
+    expect(readSealedState(golden, 'goldenAsk00000000002', roundTrip(doc)).kind).to.equal('valid');
+  });
+
+  it('EVM acceptance record', () => {
+    const doc = sealAcceptanceDoc(golden.current, acceptance());
+    expect(doc.mac).to.equal('55f6e782b071c3a7f2b898ad71329383a9022333530d6b289fa9f6f20bce1811');
+    expect(readAcceptance(golden, 'goldenAsk00000000001', 'goldenAnswer00000001', roundTrip(doc)).kind).to.equal('valid');
+  });
+
+  it('EVM payout registry entry', () => {
+    const doc = registryDoc(golden.current, payoutEntryFor(acceptance()));
+    expect(doc.mac).to.equal('0f417c5a4398397b47f5eaade93274f71a6d4fab9b0e754ba3ecc454418ecdfa');
+    expect(readRegistry(golden, payoutRegistryId(8453, PAY_TX, 447), roundTrip(doc)).kind).to.equal('valid');
+  });
+});
+
+/* ------------------------------------------------------------------ */
 /*  canonicalJson                                                      */
 /* ------------------------------------------------------------------ */
 

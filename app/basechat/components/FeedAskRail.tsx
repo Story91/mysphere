@@ -7,6 +7,8 @@ import AskRailRow from './AskRailRow';
 import FeedAnswerForm from './FeedAnswerForm';
 import { getOpenAsks, getResolvedAsks } from '../../utils/asks/asks';
 import { addTokenAmount, isExpired, type Ask, type TokenAmounts } from '../../utils/asks/types';
+import { isSolAsk } from '../../utils/asks/solAmounts';
+import { useIsFarcasterMiniApp } from '../../hooks/useIsFarcasterMiniApp';
 
 /**
  * Aski NA FEEDZIE - wezszy pas nad lista postow.
@@ -329,6 +331,19 @@ function FeedAskRail({ viewer = null, layout = 'row', className = '' }: FeedAskR
     };
   }, [openAttempt]);
 
+  /**
+   * ===== ASKI SOL NIE W MINIAPPIE =====
+   * W miniappie Farcastera portfel jest wylacznie EVM i zadnego portfela
+   * Solany nie da sie tam podpiac - ani zeby zaplacic, ani zeby dostac
+   * wyplate. Ask SOL w tym pasie bylby zaproszeniem do pracy, za ktora nie da
+   * sie odebrac pieniedzy, wiec pas go tam nie pokazuje (spec: "tylko do
+   * odczytu, ukryte w pasie feedu"). `null` (jeszcze nie wiemy) NIE chowa -
+   * migniecie karty, ktora zaraz znika, jest gorsze niz jej obecnosc przez
+   * ulamek sekundy w przegladarce, gdzie i tak zostanie.
+   */
+  const isMiniApp = useIsFarcasterMiniApp();
+  const railVisible = (ask: Ask) => isMiniApp !== true || !isSolAsk(ask);
+
   // Odsiew na BIEZACYM czasie, nie na tym z chwili pobrania.
   const now = Date.now();
   /**
@@ -337,7 +352,9 @@ function FeedAskRail({ viewer = null, layout = 'row', className = '' }: FeedAskR
    * na stole, a nie o pieniadzach lezacych na czterech pierwszych kartach.
    */
   const openAnswerable =
-    openList.phase === 'ready' ? openList.asks.filter((ask) => isAnswerable(ask, now)) : [];
+    openList.phase === 'ready'
+      ? openList.asks.filter((ask) => isAnswerable(ask, now) && railVisible(ask))
+      : [];
   const openShown = openAnswerable.slice(0, SHOW_LIMIT);
 
   /** Odczyt sie udal i nie zostalo nic, w co da sie jeszcze wejsc. */
@@ -463,7 +480,7 @@ function FeedAskRail({ viewer = null, layout = 'row', className = '' }: FeedAskR
   }, []);
 
   const resolvedShown =
-    resolvedList.phase === 'ready' ? resolvedList.asks.slice(0, SHOW_LIMIT) : [];
+    resolvedList.phase === 'ready' ? resolvedList.asks.filter(railVisible).slice(0, SHOW_LIMIT) : [];
 
   // ===== PIERWSZE WEJSCIE: NIC, DOPOKI NIE WIEMY, CO POKAZAC =====
   // Pas w stanie pustym to jedno zdanie, a nie kafelek - naglowek narysowany

@@ -1,4 +1,5 @@
 import { toMillis } from '../firestoreTime';
+import { isLamportsString, isSolAsk, lamportsToSolNumber, parseSolToLamports, perAnswerLamportsFor } from './solAmounts';
 import { perAnswerFor, type Ask, type AskAnswer } from './types';
 
 /**
@@ -19,11 +20,37 @@ import { perAnswerFor, type Ask, type AskAnswer } from './types';
  * zmieniaja importow.
  */
 
+/**
+ * Budzet Aska SOL w lamportach z dokumentu: `budgetLamports`, a gdy go brak -
+ * z liczby `budget` (dziesietny zapis liczby, np. 0.25). null = nie da sie.
+ */
+function solBudgetLamports(data: Record<string, any>): bigint | null {
+  if (isLamportsString(data.budgetLamports)) return BigInt(data.budgetLamports);
+  const fromNumber = typeof data.budget === 'number' && Number.isFinite(data.budget) ? parseSolToLamports(String(data.budget)) : null;
+  return fromNumber;
+}
+
 /** Mapowanie dokumentu na Aska. Znaczniki przez toMillis - patrz firestoreTime. */
 export function toAsk(id: string, data: Record<string, any>): Ask {
-  const budget = Number(data.budget) || 0;
   const seats = Number(data.seats) || 0;
+  // Ask SOL liczy stawke w lamportach: perAnswerFor zaokragla do centa, a
+  // 0.005 SOL "do centa" to 0.00 albo 0.01 - kwota, ktorej nikt nie obiecal.
+  // Stawke zawsze przeliczamy z budzetu (tak jak nizej dla USDC), nigdy nie
+  // czytamy zapisanej.
+  const solBudget = isSolAsk(data) ? solBudgetLamports(data) : null;
+  const solFields =
+    solBudget !== null
+      ? {
+          budgetLamports: solBudget.toString(),
+          perAnswerLamports: perAnswerLamportsFor(solBudget, seats).toString(),
+          ...(data.solanaCluster === 'devnet' || data.solanaCluster === 'mainnet-beta'
+            ? { solanaCluster: data.solanaCluster as string }
+            : {}),
+        }
+      : null;
+  const budget = solFields ? lamportsToSolNumber(solFields.budgetLamports) : Number(data.budget) || 0;
   return {
+    ...(solFields ?? {}),
     id,
     author: typeof data.author === 'string' ? data.author : '',
     question: typeof data.question === 'string' ? data.question : '',
@@ -32,7 +59,7 @@ export function toAsk(id: string, data: Record<string, any>): Ask {
     // Liczymy z budzetu i miejsc, a nie czytamy zapisanej wartosci: gdyby
     // kiedys rozjechala sie z budzetem, karta obiecywalaby inna kwote, niz
     // wyplaci rozstrzygniecie.
-    perAnswer: perAnswerFor(budget, seats),
+    perAnswer: solFields ? lamportsToSolNumber(solFields.perAnswerLamports) : perAnswerFor(budget, seats),
     token: typeof data.token === 'string' ? data.token : 'USDC',
     network: typeof data.network === 'string' ? data.network : 'base',
     deadline: toMillis(data.deadline),

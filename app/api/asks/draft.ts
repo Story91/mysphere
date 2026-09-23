@@ -5,16 +5,28 @@ import {
   lowerTxHash,
   type SealedAskState,
   type SealedEscrow,
+  type SolanaClusterName,
 } from '../../utils/asks/askSealCore';
+import {
+  MAX_BUDGET_LAMPORTS,
+  MIN_PER_ANSWER_LAMPORTS,
+  formatLamports,
+  isLamportsString,
+  lamportsToSolNumber,
+  parseSolToLamports,
+  perAnswerLamportsFor,
+} from '../../utils/asks/solAmounts';
 import { ASK_DURATIONS, MAX_SEATS, MIN_PER_ANSWER, perAnswerFor } from '../../utils/asks/types';
 import {
   ASK_ANSWERS_COLLECTION,
   AskError,
+  createSealedAsk,
   readAskBundle,
   usableView,
   writeNewAsk,
   type AskStore,
   type AskView,
+  type CreatedAsk,
 } from './askStore';
 import { MAX_QUESTION_LENGTH } from './pricing';
 
@@ -88,6 +100,92 @@ export function validateAskDraft(body: Record<string, unknown>): AskDraftCheck<A
   }
 
   return { ok: true, value: { question, budget, seats, perAnswer } };
+}
+
+export type SolAskDraftFields = {
+  question: string;
+  /** Budzet w lamportach, dziesietnie - prawda o kwocie. */
+  budgetLamports: string;
+  seats: number;
+  /** floor(budget / seats) w lamportach - policzone RAZ tutaj. */
+  perAnswerLamports: string;
+};
+
+/**
+ * Szkic Aska SOL (POST /api/asks/create z `network: 'solana'`).
+ *
+ * Budzet: `budgetLamports` (dziesietny napis lamportow) albo `budget` jako
+ * kwota SOL ("0.05", "0,05" albo liczba). Liczymy w lamportach od poczatku
+ * do konca - perAnswerFor zaokraglalby do centow USDC. Minimum 0.005 SOL na
+ * odpowiedz (decyzja wlasciciela), sufit 1000 SOL.
+ *
+ * Kody: missing_question, question_too_long, invalid_budget, budget_too_high,
+ * invalid_seats, per_answer_too_low.
+ */
+export function validateSolAskDraft(body: Record<string, unknown>): AskDraftCheck<SolAskDraftFields> {
+  const question = typeof body.question === 'string' ? body.question.trim() : '';
+  if (!question) return refuse('missing_question', 'Missing question');
+  if (question.length > MAX_QUESTION_LENGTH) {
+    return refuse('question_too_long', `Question is limited to ${MAX_QUESTION_LENGTH} characters`);
+  }
+
+  let budget: bigint | null = null;
+  if (body.budgetLamports !== undefined) {
+    budget = isLamportsString(body.budgetLamports) ? BigInt(body.budgetLamports) : null;
+  } else if (typeof body.budget === 'string') {
+    budget = parseSolToLamports(body.budget);
+  } else if (typeof body.budget === 'number' && Number.isFinite(body.budget)) {
+    // String(1e-7) to '1e-7' - wykladnika parseSolToLamports nie przyjmuje,
+    // wiec taka kwota wraca jako invalid_budget, a nie jako cichy zaokraglony.
+    budget = parseSolToLamports(String(body.budget));
+  }
+  if (budget === null || budget <= 0n) return refuse('invalid_budget', 'Invalid budget');
+  if (budget > MAX_BUDGET_LAMPORTS) {
+    return refuse('budget_too_high', `The budget is limited to ${formatLamports(MAX_BUDGET_LAMPORTS)} SOL`);
+  }
+
+  const seats = asNumber(body.seats);
+  if (!Number.isSafeInteger(seats) || seats < 1 || seats > MAX_SEATS) {
+    return refuse('invalid_seats', `Seats must be a whole number between 1 and ${MAX_SEATS}`);
+  }
+
+  const perAnswer = perAnswerLamportsFor(budget, seats);
+  if (perAnswer < MIN_PER_ANSWER_LAMPORTS) {
+    return refuse(
+      'per_answer_too_low',
+      `Each seat must be worth at least ${formatLamports(MIN_PER_ANSWER_LAMPORTS)} SOL - this budget gives ${formatLamports(perAnswer)} SOL per answer`,
+      { minPerAnswerLamports: MIN_PER_ANSWER_LAMPORTS.toString() }
+    );
+  }
+
+  return {
+    ok: true,
+    value: { question, budgetLamports: budget.toString(), seats, perAnswerLamports: perAnswer.toString() },
+  };
+}
+
+/**
+ * Zapis Aska SOL: id i termin nadaje serwer, platnik = zapieczetowane
+ * powiazanie autora czytane w transakcji (createSealedAsk), klaster = klaster
+ * serwera. Nic z tego nie pochodzi z ciala zadania poza szkicem.
+ * Odmowy (AskError): solana_wallet_required 409, seal_invalid 503,
+ * invalid_ask / invalid_funding 400 (bezpiecznik newAskState).
+ */
+export function commitSolAsk(
+  store: AskStore,
+  input: { session: string; draft: SolAskDraftFields; deadline: number; cluster: SolanaClusterName }
+): Promise<CreatedAsk> {
+  return createSealedAsk(store, {
+    author: input.session,
+    origin: 'session',
+    question: input.draft.question,
+    // Liczba SOL tylko do wyswietlania - newAskState i tak liczy ja z lamportow.
+    budget: lamportsToSolNumber(input.draft.budgetLamports),
+    seats: input.draft.seats,
+    deadline: input.deadline,
+    rail: 'sol-solana',
+    solana: { cluster: input.cluster, budgetLamports: input.draft.budgetLamports },
+  });
 }
 
 export const ALLOWED_DURATIONS: ReadonlySet<number> = new Set<number>(ASK_DURATIONS.map((duration) => duration.ms));

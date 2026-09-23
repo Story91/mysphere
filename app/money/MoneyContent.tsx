@@ -30,6 +30,9 @@ import { formatAmount, formatReceived } from '../utils/tips/getLeaderboard';
 import { getIdentities, type Identity } from '../utils/identity/getIdentities';
 import { getSlicedAddress } from '../utils/identity/resolver';
 import type { TokenAmounts } from '../utils/asks/types';
+import { formatSolNumber } from '../utils/asks/solAskDisplay';
+// Tylko napisy i process.env - zadnego @solana/* (naglowek solanaChain.ts).
+import { solanaExplorerTxUrl } from '../basechat/Solana/config/solanaChain';
 
 /**
  * TWOJE PIENIADZE TUTAJ - tresc zakladki "Money" na /money.
@@ -135,7 +138,11 @@ function timeAgo(ms: number): string {
  * zero - sekcja z trzema pozycjami bez zapisanej kwoty nie jest sekcja zerowa.
  */
 function totalsLine(totals: TokenAmounts): string | null {
-  const line = formatReceived(totals, 3);
+  // SOL osobno (do 9 miejsc) - formatReceived zaokragla ponizej 1 do 4 miejsc.
+  const { SOL: sol, ...rest } = totals;
+  const parts = [formatReceived(rest, 3)];
+  if (typeof sol === 'number' && sol > 0) parts.push(`${formatSolNumber(sol)} SOL`);
+  const line = parts.filter((part) => part !== '').join(' + ');
   return line === '' ? null : line;
 }
 
@@ -1336,7 +1343,9 @@ function EventRow({
           ) : (
             <>
               {direction === 'in' ? '+' : '−'}
-              {formatAmount(event.amount)} {event.token}
+              {/* SOL do 9 miejsc: formatAmount zaokragla do 4, czyli 0.00555 SOL
+                  pokazalby jako 0.0056 - kwota ma byc ta, ktora przyszla. */}
+              {event.token === 'SOL' ? formatSolNumber(event.amount) : formatAmount(event.amount)} {event.token}
             </>
           )}
         </span>
@@ -1349,7 +1358,13 @@ function EventRow({
         </span>
         {event.txHash ? (
           <a
-            href={getProofLink(resolveTipNetwork(event.network), event.txHash)}
+            // Solana ma wlasny eksplorator: resolveTipNetwork nie zna 'solana'
+            // i podpis base58 trafilby pod basescan (pusta strona).
+            href={
+              event.network === 'solana'
+                ? solanaExplorerTxUrl(event.txHash)
+                : getProofLink(resolveTipNetwork(event.network), event.txHash)
+            }
             target="_blank"
             rel="noopener noreferrer"
             title="Open this transaction in a block explorer"

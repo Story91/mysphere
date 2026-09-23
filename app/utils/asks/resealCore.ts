@@ -6,19 +6,28 @@ import {
   escrowSeatAcceptance,
   isAutoFull,
   isDocId,
+  isSolanaAcceptance,
   lowerAddress,
   lowerTxHash,
   payoutRegistryId,
   pickTransfer,
+  railOf,
   transferAcceptance,
   weakAcceptance,
   type AcceptanceRecord,
+  type AnyAcceptanceRecord,
+  type AnyPayoutRegistryEntry,
+  type AskRail,
   type PayoutRegistryEntry,
   type SealCheck,
   type SealedAskState,
   type SealedEscrow,
   type TransferLike,
 } from './askSealCore';
+import { lamportsToSolNumber } from './solAmounts';
+
+export { railOf };
+export type { AskRail };
 
 /**
  * RESEAL ASKOW SPRZED PIECZECI - czysta logika decyzji, bez Firestore i RPC.
@@ -53,6 +62,13 @@ import {
  *    odpowiedzial (nie ma czego odslonic ani komu zaplacic). Okno, w ktorym
  *    przegladarka moze to podrobic, to czas miedzy wdrozeniem a resealem -
  *    dlatego raport pokazuje createTime i status z lustra obok werdyktu.
+ * 4. Ask SOL (network 'solana' w STANIE) nie ma starego swiata: powstaje
+ *    zawsze razem ze stanem, a kazda wyplata od razu dostaje rekord. Lustro
+ *    `accepted: true` bez rekordu na takim Asku to zawsze podrobka - nie
+ *    weryfikujemy jej na lancuchu (dowod USDC nie ma tu sensu), raportujemy
+ *    `forged_on_sol_ask` i czekamy na resetForged wlasciciela. Nigdy
+ *    automatycznie. Adresy i podpisy Solany nie przechodza przez
+ *    lowerTxHash / lowerAddress - wielkosc liter base58 jest czescia wartosci.
  */
 
 /* ------------------------------------------------------------------ */
@@ -289,8 +305,12 @@ export function registrySlot(
 
 const BASE_CHAIN_ID = 8453;
 
-/** Id wpisow rejestru, ktore trasa musi przeczytac, zanim wywola planAcceptances. */
-export function registryIdsToRead(answers: readonly AnswerAcceptanceInput[]): string[] {
+/**
+ * Id wpisow rejestru, ktore trasa musi przeczytac, zanim wywola planAcceptances.
+ * Ask SOL: nic - bez weryfikacji starych przyjec nie ma czego szukac w rejestrze.
+ */
+export function registryIdsToRead(answers: readonly AnswerAcceptanceInput[], rail: AskRail = 'usdc-base'): string[] {
+  if (rail === 'sol-solana') return [];
   const ids = new Set<string>();
   for (const answer of answers) {
     const verdict = answer.verdict;
@@ -359,8 +379,14 @@ export function planAcceptances(input: {
   resetForged: ReadonlySet<string>;
   /** repairInvalid dla tego Aska: niewazne rekordy i wpisy wolno nadpisac. */
   repair: boolean;
+  /**
+   * Szyna ze STANU (railOf(state)). Domyslnie 'usdc-base' - dzisiejszy
+   * resealEngine nie musi nic podawac. Dla 'sol-solana' werdykty sa ignorowane.
+   */
+  rail?: AskRail;
 }): AcceptancePlan {
   const { askId, registry, trustWeak, resetForged, repair } = input;
+  const solAsk = (input.rail ?? 'usdc-base') === 'sol-solana';
   const author = input.author.toLowerCase();
   const plan: AcceptancePlan = { records: [], resets: [], undecided: [], unknown: [], blocked: [], notes: [] };
   /** txHash -> logIndexy wziete w tym Asku. */
@@ -415,12 +441,35 @@ export function planAcceptances(input: {
     candidates: [],
   });
 
+  /**
+   * Odpowiedz na Asku SOL (patrz zasada 4). Rekordu nie da sie tu odtworzyc
+   * z lancucha (to robi wylacznie trasa accept z podpisem od autora), wiec
+   * niewazny rekord blokuje Aska takze przy repairInvalid.
+   */
+  const planSolanaAnswer = (answer: AnswerAcceptanceInput) => {
+    const { answerId } = answer;
+    if (answer.record === 'invalid') {
+      plan.blocked.push({ answerId, code: repair ? 'record_invalid_unrecoverable' : 'record_invalid' });
+      return;
+    }
+    if (trustWeak.has(answerId)) plan.notes.push({ answerId, code: 'trust_weak_not_applicable' });
+    if (!answer.mirrorAccepted) {
+      if (resetForged.has(answerId)) plan.notes.push({ answerId, code: 'reset_not_needed' });
+      return;
+    }
+    undecidedOrReset(answer, forgedEntry(answer, 'forged_on_sol_ask'));
+  };
+
   for (const answer of input.answers) {
     const { answerId } = answer;
 
     if (answer.record === 'valid') {
       if (resetForged.has(answerId)) plan.notes.push({ answerId, code: 'reset_refused_recorded' });
       if (trustWeak.has(answerId)) plan.notes.push({ answerId, code: 'trust_weak_not_needed' });
+      continue;
+    }
+    if (solAsk) {
+      planSolanaAnswer(answer);
       continue;
     }
     if (answer.record === 'invalid' && !repair) {
@@ -671,6 +720,12 @@ function statusLabel(raw: unknown): string {
 export function classifyLegacyAsk(input: AskStateInput): AskStatePlan {
   const { askId, pub, escrow } = input;
   if (!pub) return { ok: false, code: 'public_doc_missing', detail: 'The Ask document is missing; nothing to adopt.' };
+  if (pub.network === 'solana' || pub.token === 'SOL') {
+    // Ask SOL powstaje wylacznie razem ze stanem. Dokument "SOL" bez stanu to
+    // spoof albo nieudane tworzenie - adopcja zrobilaby z niego prawdziwy Ask
+    // USDC z cudzym autorem. Decyzja nalezy do wlasciciela (deleteUnverified).
+    return { ok: false, code: 'sol_ask_without_state', detail: 'A SOL Ask document without a sealed state cannot be adopted.' };
+  }
 
   const labels: string[] = ['adopted'];
   const anomalies: string[] = [];
@@ -813,6 +868,9 @@ function sameHash(value: unknown, expected: string): boolean {
   return lowerTxHash(value) === expected;
 }
 
+/** Pola lustra Aska SOL - na Asku USDC to smieci z przegladarki. */
+const SOL_MIRROR_FIELDS = ['budgetLamports', 'perAnswerLamports', 'solanaCluster'] as const;
+
 /**
  * Lustro asks/{id} zgodne ze stanem. `answers` = null, gdy liczby odpowiedzi
  * nie znamy na pewno (wtedy answerCount zostaje, jak jest).
@@ -830,8 +888,22 @@ export function askMirrorPlan(
   if (pub.acceptedCount !== counts.accepted) set.acceptedCount = counts.accepted;
   if (counts.answers !== null && pub.answerCount !== counts.answers) set.answerCount = counts.answers;
   if (pub.funding !== state.funding) set.funding = state.funding;
-  if (pub.token !== 'USDC') set.token = 'USDC';
-  if (pub.network !== 'base') set.network = 'base';
+  // Szyna ze stanu. Lustro Aska SOL niesie lamporty i klaster (do wyswietlania),
+  // ale NIGDY adresu platnika autora; lustro Aska USDC nie niesie pol SOL wcale.
+  const sol = railOf(state) === 'sol-solana' ? state.solana ?? null : null;
+  const token = sol ? 'SOL' : 'USDC';
+  const network = sol ? 'solana' : 'base';
+  if (pub.token !== token) set.token = token;
+  if (pub.network !== network) set.network = network;
+  if (sol) {
+    if (pub.budget !== state.budget) set.budget = state.budget;
+    if (pub.budgetLamports !== sol.budgetLamports) set.budgetLamports = sol.budgetLamports;
+    if (pub.perAnswerLamports !== sol.perAnswerLamports) set.perAnswerLamports = sol.perAnswerLamports;
+    if (pub.solanaCluster !== sol.cluster) set.solanaCluster = sol.cluster;
+  } else {
+    for (const field of SOL_MIRROR_FIELDS) if (present(pub[field])) remove.push(field);
+  }
+  if (present(pub.solanaPayer)) remove.push('solanaPayer');
 
   if (state.resolvedAt !== null) {
     const shown = toMillis(pub.resolvedAt);
@@ -883,7 +955,8 @@ function unitsToUsdc(units: string): number {
  * gdy go nie ma albo jest WIEKSZY niz faktyczny log (zawyzony przychod na
  * /money); mniejsza wartosc (trasa accept zapisuje stawke) zostaje.
  */
-export function answerAcceptedMirrorPlan(raw: Record<string, any>, record: AcceptanceRecord): MirrorPlan {
+export function answerAcceptedMirrorPlan(raw: Record<string, any>, record: AnyAcceptanceRecord): MirrorPlan {
+  if (isSolanaAcceptance(record)) return solanaAcceptedMirrorPlan(raw, record);
   const set: Record<string, unknown> = {};
   const stamp: string[] = [];
   if (raw.accepted !== true) set.accepted = true;
@@ -898,6 +971,30 @@ export function answerAcceptedMirrorPlan(raw: Record<string, any>, record: Accep
   }
   if (!present(raw.acceptedAt)) stamp.push('acceptedAt');
   return finishPlan({ set, remove: [], stamp });
+}
+
+/**
+ * Lustro odpowiedzi z rekordem SOL. Podpis porownujemy DOKLADNIE (bez
+ * lowerTxHash - base58 malymi literami to inny podpis), logIndex nie istnieje
+ * na Solanie, wiec stare pole znika. Kwota: ta sama zasada "nie wiecej niz
+ * faktyczny przelew" co dla USDC.
+ */
+function solanaAcceptedMirrorPlan(raw: Record<string, any>, record: Extract<AnyAcceptanceRecord, { network: 'solana' }>): MirrorPlan {
+  const set: Record<string, unknown> = {};
+  const remove: string[] = [];
+  const stamp: string[] = [];
+  if (raw.accepted !== true) set.accepted = true;
+  if (raw.payoutTxHash !== record.signature) set.payoutTxHash = record.signature;
+  if (raw.payoutLogIndex !== undefined) remove.push('payoutLogIndex');
+  if (raw.payoutToken !== 'SOL') set.payoutToken = 'SOL';
+  if (raw.payoutNetwork !== 'solana') set.payoutNetwork = 'solana';
+  const amount = lamportsToSolNumber(record.lamports);
+  const shown = raw.payoutAmount;
+  if (!(typeof shown === 'number' && Number.isFinite(shown) && shown > 0 && shown <= amount + 1e-12)) {
+    set.payoutAmount = amount;
+  }
+  if (!present(raw.acceptedAt)) stamp.push('acceptedAt');
+  return finishPlan({ set, remove, stamp });
 }
 
 const PAYOUT_MIRROR_FIELDS = ['payoutLogIndex', 'payoutAmount', 'payoutToken', 'payoutNetwork', 'acceptedAt'] as const;
@@ -942,6 +1039,9 @@ const PUB_FIELDS = [
   'escrowChainId',
   'escrowResolveTxHash',
   'expiredTxHash',
+  'budgetLamports',
+  'perAnswerLamports',
+  'solanaCluster',
 ] as const;
 
 export function pubFingerprint(raw: Record<string, any> | null | undefined): string {
@@ -978,11 +1078,11 @@ function checkFingerprint<T>(check: SealCheck<T> | undefined): unknown {
   return ['valid', canonicalJson(check.value), check.kid];
 }
 
-export function acceptancesFingerprint(all: ReadonlyMap<string, SealCheck<AcceptanceRecord>>): string {
+export function acceptancesFingerprint(all: ReadonlyMap<string, SealCheck<AnyAcceptanceRecord>>): string {
   return JSON.stringify([...all.keys()].sort().map((id) => [id, checkFingerprint(all.get(id))]));
 }
 
-export function registryFingerprint(check: SealCheck<PayoutRegistryEntry> | undefined): string {
+export function registryFingerprint(check: SealCheck<AnyPayoutRegistryEntry> | undefined): string {
   return JSON.stringify(checkFingerprint(check));
 }
 

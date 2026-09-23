@@ -59,6 +59,7 @@ import {
   payoutRegistryId,
   pickTransfer,
   readAcceptance,
+  railOf,
   readRegistry,
   transferAcceptance,
   type TransferLike,
@@ -70,6 +71,7 @@ import { notifyAskPayout } from '../../../../utils/friends/notifications';
 import { readUsdcTransfers } from '../../../../utils/monetization/verifyPayment';
 import { proveLegacyEscrow, readEscrowReceipt } from '../../escrowProof';
 import { sessionAddress } from '../../identity';
+import { acceptSolanaAnswer } from '../../solanaAccept';
 import {
   ASK_ANSWERS_COLLECTION,
   AskError,
@@ -133,6 +135,8 @@ const RPC_CONCURRENCY = 5;
 interface AcceptBody {
   answerId?: unknown;
   payoutTxHash?: unknown;
+  /** Ask SOL: podpis transakcji Solany (base58). Patrz ../../solanaAccept.ts. */
+  payoutSignature?: unknown;
 }
 
 /* ------------------------------------------------------------------ */
@@ -160,6 +164,34 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
   const answerId = typeof body.answerId === 'string' ? body.answerId.trim() : '';
   if (!isDocId(answerId)) return fail(400, 'invalid_id', 'Missing or invalid answerId.');
+
+  // Ask SOL: dowodem jest podpis transakcji Solany (base58 - bez zmiany
+  // wielkosci liter). Cala logika w ../../solanaAccept.ts; tutaj tylko wybor
+  // szyny po polu ciala. Bez `payoutSignature` trasa dziala jak dotad.
+  if (body.payoutSignature !== undefined) {
+    const signature = typeof body.payoutSignature === 'string' ? body.payoutSignature.trim() : '';
+    if (!signature) return fail(400, 'invalid_signature', 'A Solana payout transaction signature is required to accept an answer.');
+    const solStore = await openAskStore();
+    if (!solStore) {
+      return fail(
+        503,
+        'store_unavailable',
+        'Ask storage is not configured on this deployment. Nothing was recorded - retry later with the same signature.'
+      );
+    }
+    try {
+      const result = await acceptSolanaAnswer(solStore, { askId, answerId, signature, viewer });
+      return NextResponse.json(result.body, { status: result.status, headers: NO_STORE_PRIVATE });
+    } catch (error) {
+      if (error instanceof AskError) return fail(error.status, error.code, error.message, error.details);
+      console.error('[api/asks/accept] Odczyt przed zapisem przyjecia SOL nie powiodl sie:', error);
+      return fail(
+        503,
+        'ask_unavailable',
+        'Could not read this Ask right now. Nothing was recorded - retry with the same signature.'
+      );
+    }
+  }
 
   const rawHash = typeof body.payoutTxHash === 'string' ? body.payoutTxHash.trim() : '';
   const hash = lowerTxHash(rawHash);
@@ -211,6 +243,15 @@ async function acceptAnswer(store: AskStore, input: AcceptInput): Promise<NextRe
 
   const bundle = await readAskBundle(store, askId);
   const view = usableView(bundle); // 404 albo 503 seal_invalid
+  // Ask SOL (szyna ze STANU) nie przyjmuje hashy z Base - wyplata idzie
+  // podpisem Solany (payoutSignature). Lustro szyny nie wybiera.
+  if (railOf(bundle.state) === 'sol-solana') {
+    throw new AskError(
+      'wrong_rail',
+      409,
+      'This Ask pays in SOL on Solana. Accept it with the Solana transaction signature (payoutSignature).'
+    );
+  }
   const pub = requirePub(bundle);
   const author = lowerAddress(view.author);
   if (!author || author !== viewer) {
@@ -585,11 +626,17 @@ async function acceptInTransaction(tx: Transaction, store: AskStore, input: TxIn
   recordAcceptance(tx, store, record, input.perAnswer, { createPayout: !ownedLog });
 
   if (!bundle.state || next.status !== bundle.state.status) putState(tx, store, next);
-  mirrorAsk(tx, store, askId, {
-    acceptedCount,
-    status: next.status,
-    ...(next.status === 'resolved' && next.resolvedAt !== null ? { resolvedAt: next.resolvedAt } : {}),
-  });
+  mirrorAsk(
+    tx,
+    store,
+    askId,
+    {
+      acceptedCount,
+      status: next.status,
+      ...(next.status === 'resolved' && next.resolvedAt !== null ? { resolvedAt: next.resolvedAt } : {}),
+    },
+    next
+  );
 
   return { kind: 'recorded', record, acceptedCount, seats: next.seats, status: next.status, autoResolved };
 }

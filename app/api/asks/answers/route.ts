@@ -154,6 +154,15 @@ export async function POST(request: NextRequest) {
       content: null,
       sealed: true,
       sealedUntil: 'The author resolves this Ask, or you ask for your own answer.',
+      // Tylko Ask SOL: czy odbiorca wyplaty jest juz zamrozony. false -> UI
+      // prosi o powiazanie portfela i POST /api/asks/[id]/payee.
+      ...(saved.rail === 'sol-solana'
+        ? {
+            rail: saved.rail,
+            payoutAddressBound: saved.payoutAddressBound === true,
+            ...(saved.payoutAddressIssue ? { payoutAddressIssue: saved.payoutAddressIssue } : {}),
+          }
+        : {}),
     },
     { status: 201, headers: NO_STORE_PRIVATE }
   );

@@ -37,6 +37,7 @@ import {
   lowerAddress,
   lowerTxHash,
   payoutEntryFor,
+  railOf,
   readRegistry,
   readSealedState,
   registryDoc,
@@ -498,7 +499,11 @@ async function processAsk(
   /* ---- 2. dowody ---- */
   let evidence: EscrowEvidence | null = null;
   let ctxEscrow: SealedEscrow | null = null;
-  let ctx: LegacyAcceptanceContext;
+  // Ask SOL (szyna ze STANU): bez starego swiata - zadnej weryfikacji USDC na
+  // lancuchu, legacyContext (centy USDC) w ogole nie powstaje. planAcceptances
+  // z rail 'sol-solana' raportuje lustro bez rekordu jako forged_on_sol_ask.
+  const rail = railOf(sealed);
+  let ctx: LegacyAcceptanceContext | null = null;
   const answers: AnswerAcceptanceInput[] = [];
   const registry = new Map<string, SealCheck<PayoutRegistryEntry>>();
   try {
@@ -536,11 +541,13 @@ async function processAsk(
       }
     }
 
-    try {
-      ctx = legacyContext(askId, bundle.view, ctxEscrow, store.legacyCutoffMs);
-    } catch (error) {
-      if (error instanceof AskError) return skip(error.code, error.message);
-      throw error;
+    if (rail !== 'sol-solana') {
+      try {
+        ctx = legacyContext(askId, bundle.view, ctxEscrow, store.legacyCutoffMs);
+      } catch (error) {
+        if (error instanceof AskError) return skip(error.code, error.message);
+        throw error;
+      }
     }
 
     for (const row of answerRows) {
@@ -548,7 +555,7 @@ async function processAsk(
       const record: AnswerAcceptanceInput['record'] =
         check?.kind === 'valid' ? 'valid' : check?.kind === 'invalid' ? 'invalid' : 'absent';
       const mirrorAccepted = row.raw.accepted === true;
-      const verdict = record !== 'valid' && mirrorAccepted ? await deps.verifyAcceptance(ctx, row) : null;
+      const verdict = ctx && record !== 'valid' && mirrorAccepted ? await deps.verifyAcceptance(ctx, row) : null;
       answers.push({
         answerId: row.id,
         record,
@@ -559,7 +566,7 @@ async function processAsk(
       });
     }
 
-    const regIds = registryIdsToRead(answers);
+    const regIds = registryIdsToRead(answers, rail);
     if (regIds.length > 0) {
       const snaps = await store.db.getAll(...regIds.map((id) => payoutRef(store, id)));
       snaps.forEach((snap, i) => {
@@ -585,14 +592,18 @@ async function processAsk(
   }
 
   /* ---- 3. plan ---- */
+  // Autor: z kontekstu (USDC) albo ze stanu (SOL - kontekstu nie ma).
+  const planAuthor = ctx?.author ?? sealed?.author ?? null;
+  if (!planAuthor) return skip('ask_malformed', 'This Ask has no valid author address.');
   const plan: AcceptancePlan = planAcceptances({
     askId,
-    author: ctx.author,
+    author: planAuthor,
     answers,
     registry,
     trustWeak: decisions.trustWeak,
     resetForged: decisions.resetForged,
     repair,
+    rail,
   });
   for (const note of plan.notes) report.notes.push({ askId, ...note });
 
@@ -722,7 +733,7 @@ async function processAsk(
         }
         if (writeState) putState(tx, store, statePlan.state);
         if (askMirror.fields.length > 0) {
-          mirrorAsk(tx, store, askId, toFirestorePatch(store, askMirror) as AskMirrorPatch);
+          mirrorAsk(tx, store, askId, toFirestorePatch(store, askMirror) as AskMirrorPatch, statePlan.state);
         }
       });
       written = true;

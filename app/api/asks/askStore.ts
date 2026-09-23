@@ -16,16 +16,21 @@ import {
   newAskState,
   payoutEntryFor,
   payoutIsTimely,
-  payoutRegistryId,
-  readAcceptance,
+  payoutRegistryIdFor,
+  railOf,
+  readAnyAcceptance,
   readSealedState,
+  readSolanaBinding,
   registryDoc,
   sealAcceptanceDoc,
   sealStateDoc,
   unsealedAskBornAfterCutoff,
   type AcceptanceRecord,
   type AnswererGuard,
+  type AnyAcceptanceRecord,
+  type AnyPayoutRegistryEntry,
   type AskOrigin,
+  type AskRail,
   type AskSealKey,
   type AskSealKeys,
   type AskView,
@@ -33,8 +38,11 @@ import {
   type SealCheck,
   type SealedAskState,
   type SealedEscrow,
+  type SolanaClusterName,
+  type SolanaWalletBinding,
 } from '../../utils/asks/askSealCore';
 import { answerIdToBytes32, escrowKeyFor, perAnswerToUnits } from '../../utils/asks/escrow';
+import { lamportsToSolNumber } from '../../utils/asks/solAmounts';
 import { findSeatAwards, type SeatAward } from '../../utils/asks/escrowProofCore';
 import { perAnswerFor, type AskFunding, type AskStatus } from '../../utils/asks/types';
 import { usdcTransfersFromLogs, type UsdcTransferLog } from '../../utils/monetization/verifyPayment';
@@ -56,7 +64,11 @@ import { readEscrowReceipt } from './escrowProof';
  *   acceptanceRef(id, ans)  asks/{id}/acceptances/{ans}      przyjecie (HMAC)
  *   answererRef(id, addr)   asks/{id}/answerers/{addrLower}  "juz odpowiedzial"
  *   payoutRef(regId)        askAnswerContent/_registry/payouts/{regId}
- *                                                            zuzyte wyplaty (HMAC)
+ *                                                            zuzyte wyplaty (HMAC);
+ *                                                            SOL: regId `solana:<podpis>`
+ *   payeeRef(id, ans)       asks/{id}/payees/{ans}           odbiorca SOL odpowiedzi (HMAC)
+ *   solanaWalletRef(evm)    askAnswerContent/_registry/solanaWallets/{evmLower}
+ *                                                            powiazanie portfela Solany (HMAC)
  *
  * Dokument asks/{id} i pola askAnswers (accepted, payoutTxHash...) sa
  * wylacznie LUSTREM dla przegladarki. Rodzic '_registry' nigdy nie istnieje,
@@ -138,8 +150,9 @@ import { readEscrowReceipt } from './escrowProof';
  *                                             przyjecie + (opcjonalnie) wpis
  *                                             rejestru + lustro odpowiedzi
  *   mirrorAnswerAcceptance(tx, store, record, payoutAmount)
- *   mirrorAsk(tx, store, askId, patch)        tx.set(merge) lustra; zawsze
- *                                             naprawia token/network
+ *   mirrorAsk(tx, store, askId, patch, state?) tx.set(merge) lustra; zawsze
+ *                                             naprawia token/network - szyna
+ *                                             ze `state` (bez stanu: USDC/base)
  *   writeNewAsk(tx, store, askId, input, mode): SealedAskState
  *     mode 'create' - tx.create dokumentu (nowe id z serwera),
  *     mode 'overwrite' - tx.set bez merge (tylko po decyzji o utworzeniu
@@ -148,11 +161,19 @@ import { readEscrowReceipt } from './escrowProof';
  *   createSealedAsk(store, input): Promise<CreatedAsk>   async
  *     Ask 'on-resolve' z id nadanym przez serwer, publiczny dokument + stan
  *     w jednej transakcji. Zwraca { askId, state, ask: AskView }.
+ *     rail 'sol-solana': platnik z powiazania autora czytanego w tej samej
+ *     transakcji (solana_wallet_required 409, seal_invalid 503).
+ *   readSolanaWalletBinding(store, evm, tx?): Promise<SealCheck<SolanaWalletBinding>>
+ *
+ * Aski SOL (powiazania, odbiorcy, akceptacja): solanaWalletStore.ts,
+ * solanaAccept.ts. Przyjecia i wpisy rejestru sa uniami obu szyn
+ * (AnyAcceptanceRecord / AnyPayoutRegistryEntry).
  *
  * Odpowiedzi: app/api/asks/answerStore.ts
  *   saveAnswer(store, { askId, author, content }): Promise<SaveAnswerResult>
  *     jedna transakcja: stan Aska + straznik + zapytanie o duplikat, potem
- *     straznik, tresc, metadane i licznik. { ok: true, answer } albo
+ *     straznik, tresc, metadane i licznik (Ask SOL: + odbiorca z powiazania,
+ *     wynik z rail/payoutAddressBound). { ok: true, answer } albo
  *     { ok: false, code, status } z kodami: invalid_id 400, invalid_author 400,
  *     ask_not_found 404, seal_invalid 503, ask_unverified 409, ask_closed 409,
  *     own_ask 403, already_answered 409, answer_write_failed 500.
@@ -183,7 +204,16 @@ export const ASK_ANSWER_CONTENT_COLLECTION = 'askAnswerContent';
 export const PAYOUT_REGISTRY_PARENT = '_registry';
 
 export { AskError, isDocId, adoptLegacyState };
-export type { AcceptanceRecord, AskView, PayoutRegistryEntry, SealCheck, SealedAskState, SealedEscrow };
+export type {
+  AcceptanceRecord,
+  AnyAcceptanceRecord,
+  AnyPayoutRegistryEntry,
+  AskView,
+  PayoutRegistryEntry,
+  SealCheck,
+  SealedAskState,
+  SealedEscrow,
+};
 
 /* ------------------------------------------------------------------ */
 /*  OTWARCIE MAGAZYNU                                                  */
@@ -272,6 +302,34 @@ export function payoutRef(store: AskStore, regId: string): DocumentReference {
     .doc(regId);
 }
 
+/**
+ * Odbiorca SOL zamrozony dla odpowiedzi - asks/{askId}/payees/{answerId}.
+ * Zamkniete regulami (asks jest w hasOwnRules), zapisuje tylko serwer przez
+ * tx.create - nigdy nie nadpisujemy.
+ */
+export function payeeRef(store: AskStore, askId: string, answerId: string): DocumentReference {
+  return askRef(store, askId).collection('payees').doc(requireDocId(answerId, 'answer'));
+}
+
+export function payeesCol(store: AskStore, askId: string) {
+  return askRef(store, askId).collection('payees');
+}
+
+/**
+ * Powiazanie portfela Solany z kontem EVM -
+ * askAnswerContent/_registry/solanaWallets/{evmLower}. Klucz to adres EVM
+ * malymi literami (z sesji), wartosc (base58) zostaje w oryginalnej postaci.
+ */
+export function solanaWalletRef(store: AskStore, evm: string): DocumentReference {
+  const lower = lowerAddress(evm);
+  if (!lower) throw new AskError('invalid_id', 400, 'Invalid account address.');
+  return store.db
+    .collection(ASK_ANSWER_CONTENT_COLLECTION)
+    .doc(PAYOUT_REGISTRY_PARENT)
+    .collection('solanaWallets')
+    .doc(lower);
+}
+
 /* ------------------------------------------------------------------ */
 /*  ODCZYT ASKA                                                        */
 /* ------------------------------------------------------------------ */
@@ -320,6 +378,14 @@ export function askBundleFromSnapshots(
   const enforce =
     store.enforce ||
     (stateCheck.kind === 'absent' && pub !== null && unsealedAskBornAfterCutoff(createTimeMs, store.legacyCutoffMs));
+  // Ask SOL powstaje wylacznie razem ze stanem. Dokument BEZ stanu, ktory
+  // udaje SOL (token/network/budgetLamports przestawi kazda przegladarka), to
+  // Ask USDC sprzed pieczeci - widok 'legacy' nie moze brac budzetu
+  // z niezamrozonych lamportow (toAsk liczy je dla isSolAsk).
+  const viewPub =
+    stateCheck.kind === 'absent' && pub !== null && (pub.network === 'solana' || pub.token === 'SOL')
+      ? { ...pub, token: 'USDC', network: 'base' }
+      : pub;
   return {
     askId,
     exists,
@@ -327,7 +393,7 @@ export function askBundleFromSnapshots(
     createTimeMs,
     stateCheck,
     state: stateCheck.kind === 'valid' ? stateCheck.value : null,
-    view: exists ? effectiveAsk(askId, pub, stateCheck, enforce) : null,
+    view: exists ? effectiveAsk(askId, viewPub, stateCheck, enforce) : null,
   };
 }
 
@@ -351,9 +417,15 @@ export function usableView(bundle: AskBundle): AskView {
 /*  ODCZYT PRZYJEC I ODPOWIEDZI                                        */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Przyjecia obu szyn: rekord EVM (txHash, logIndex, units) albo SOL
+ * (signature, lamports) - rozroznia `network` (isSolanaAcceptance). Wolajacy,
+ * ktory potrzebuje pol jednej szyny, zaweza typ; licznik miejsc i odslona
+ * (hasPaidAnswer) dzialaja na obu bez zmian.
+ */
 export type AcceptanceSet = {
-  all: Map<string, SealCheck<AcceptanceRecord>>;
-  valid: Map<string, AcceptanceRecord>;
+  all: Map<string, SealCheck<AnyAcceptanceRecord>>;
+  valid: Map<string, AnyAcceptanceRecord>;
   /** Id odpowiedzi z niewazna pieczecia przyjecia. Niepuste -> 503. */
   invalid: string[];
 };
@@ -362,11 +434,11 @@ export type AcceptanceSet = {
 export async function readAcceptances(store: AskStore, askId: string, tx?: Transaction): Promise<AcceptanceSet> {
   const col = acceptancesCol(store, askId);
   const snap = tx ? await tx.get(col) : await col.get();
-  const all = new Map<string, SealCheck<AcceptanceRecord>>();
-  const valid = new Map<string, AcceptanceRecord>();
+  const all = new Map<string, SealCheck<AnyAcceptanceRecord>>();
+  const valid = new Map<string, AnyAcceptanceRecord>();
   const invalid: string[] = [];
   for (const doc of snap.docs) {
-    const check = readAcceptance(store.keys, askId, doc.id, doc.data() as Record<string, unknown>);
+    const check = readAnyAcceptance(store.keys, askId, doc.id, doc.data() as Record<string, unknown>);
     all.set(doc.id, check);
     if (check.kind === 'valid') valid.set(doc.id, check.value);
     else if (check.kind === 'invalid') invalid.push(doc.id);
@@ -454,6 +526,11 @@ export function legacyContext(
   escrow: SealedEscrow | null,
   legacyCutoffMs: number
 ): LegacyAcceptanceContext {
+  // Ask SOL nie ma starego swiata (patrz resealCore, zasada 4), a stawka
+  // w centach USDC nic o nim nie mowi. Szyna ze STANU - lustro nie wybiera.
+  if (railOf(view.state) === 'sol-solana') {
+    throw new AskError('wrong_rail', 409, 'This Ask pays in SOL on Solana; USDC payout checks do not apply to it.');
+  }
   const author = lowerAddress(view.author);
   if (!author) throw new AskError('ask_malformed', 409, 'This Ask has no valid author address.');
   let perAnswerUnits: bigint;
@@ -587,8 +664,8 @@ export function putState(tx: Transaction, store: AskStore, state: SealedAskState
   });
 }
 
-/** Zapieczetowane przyjecie odpowiedzi. */
-export function putAcceptance(tx: Transaction, store: AskStore, record: AcceptanceRecord): void {
+/** Zapieczetowane przyjecie odpowiedzi (EVM albo SOL). */
+export function putAcceptance(tx: Transaction, store: AskStore, record: AnyAcceptanceRecord): void {
   tx.set(acceptanceRef(store, record.askId, record.answerId), {
     ...sealAcceptanceDoc(store.key, record),
     recordedAt: store.FieldValue.serverTimestamp(),
@@ -599,10 +676,11 @@ export function putAcceptance(tx: Transaction, store: AskStore, record: Acceptan
  * Wpis w rejestrze zuzytych wyplat. tx.create, NIE set: gdy rownolegla
  * transakcja zdazyla zapisac ten sam log, commit tej sie wywraca, zamiast
  * nadpisac cudze przyjecie. Wolaj tylko, gdy odczyt w tej transakcji dal
- * 'absent'.
+ * 'absent'. Id wpisu z payoutRegistryIdFor: `<chainId>:<hash>:<log>` dla
+ * EVM, `solana:<podpis>` (wielkosc liter zachowana) dla SOL.
  */
-export function createPayoutEntry(tx: Transaction, store: AskStore, entry: PayoutRegistryEntry): void {
-  tx.create(payoutRef(store, payoutRegistryId(entry.chainId, entry.txHash, entry.logIndex)), {
+export function createPayoutEntry(tx: Transaction, store: AskStore, entry: AnyPayoutRegistryEntry): void {
+  tx.create(payoutRef(store, payoutRegistryIdFor(entry)), {
     ...registryDoc(store.key, entry),
     recordedAt: store.FieldValue.serverTimestamp(),
   });
@@ -611,13 +689,31 @@ export function createPayoutEntry(tx: Transaction, store: AskStore, entry: Payou
 /**
  * Lustro przyjecia w askAnswers - dla przegladarki i statystyk. Nadpisuje
  * podrobione pola wyplaty (merge), ale samo w sobie niczego nie dowodzi.
+ * SOL: podpis base58 bez zmiany wielkosci liter w payoutTxHash, logIndex nie
+ * istnieje (pole usuwamy - moglo zostac podrobione).
  */
 export function mirrorAnswerAcceptance(
   tx: Transaction,
   store: AskStore,
-  record: AcceptanceRecord,
+  record: AnyAcceptanceRecord,
   payoutAmount: number
 ): void {
+  if (record.network === 'solana') {
+    tx.set(
+      answerRef(store, record.answerId),
+      {
+        accepted: true,
+        payoutTxHash: record.signature,
+        payoutLogIndex: store.FieldValue.delete(),
+        payoutAmount,
+        payoutToken: 'SOL',
+        payoutNetwork: 'solana',
+        acceptedAt: store.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+    return;
+  }
   tx.set(
     answerRef(store, record.answerId),
     {
@@ -641,7 +737,7 @@ export function mirrorAnswerAcceptance(
 export function recordAcceptance(
   tx: Transaction,
   store: AskStore,
-  record: AcceptanceRecord,
+  record: AnyAcceptanceRecord,
   payoutAmount: number,
   opts: { createPayout: boolean }
 ): void {
@@ -669,11 +765,42 @@ export type AskMirrorPatch = Partial<{
  * (przegladarka moze je dzis zmienic i zablokowac przyjecia). Wartosci
  * `unknown` pozwalaja podac FieldValue.delete()/serverTimestamp().
  * askRef waliduje id, wiec lustro nigdy nie trafi w cudza podsciezke.
+ *
+ * `state` - stan, ktory wolajacy wlasnie zapisuje albo przeczytal (wazny).
+ * Szyna WYLACZNIE z niego: bez stanu albo ze stanem Base lustro dostaje
+ * dokladnie to, co przed Solana (USDC/base). Stan SOL naprawia token/network
+ * na SOL/solana i pola do wyswietlania (budzet, lamporty, klaster), a adres
+ * platnika autora NIGDY nie trafia do lustra (podrzucony przez przegladarke
+ * - kasujemy; prawdziwy dostaje tylko autor przez GET answers).
  */
-export function mirrorAsk(tx: Transaction, store: AskStore, askId: string, patch: AskMirrorPatch): void {
+export function mirrorAsk(
+  tx: Transaction,
+  store: AskStore,
+  askId: string,
+  patch: AskMirrorPatch,
+  state?: SealedAskState | null
+): void {
   // Firestore odrzuca `undefined` w zapisie - pomijamy takie pola, zamiast
   // wywracac cala transakcje (z przyjeciem i pieczecia) na lustrze.
   const defined = Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined));
+  const sol = state && railOf(state) === 'sol-solana' ? state.solana ?? null : null;
+  if (state && sol) {
+    tx.set(
+      askRef(store, askId),
+      {
+        ...defined,
+        token: 'SOL',
+        network: 'solana',
+        budget: state.budget,
+        budgetLamports: sol.budgetLamports,
+        perAnswerLamports: sol.perAnswerLamports,
+        solanaCluster: sol.cluster,
+        solanaPayer: store.FieldValue.delete(),
+      },
+      { merge: true }
+    );
+    return;
+  }
   tx.set(askRef(store, askId), { ...defined, token: 'USDC', network: 'base' }, { merge: true });
 }
 
@@ -691,12 +818,22 @@ export type NewAskInput = {
   deadline: number;
   funding: AskFunding;
   escrow: SealedEscrow | null;
+  /** Domyslnie 'usdc-base'. */
+  rail?: AskRail;
+  /**
+   * Tylko rail 'sol-solana'. `payer` WYLACZNIE z zapieczetowanego powiazania
+   * autora (createSealedAsk czyta je w transakcji), nigdy z ciala zadania.
+   */
+  solana?: { cluster: SolanaClusterName; payer: string; budgetLamports: string };
 };
 
 /**
  * Publiczny dokument + stan nowego Aska w podanej transakcji.
  * Autor i warunki MUSZA pochodzic z sesji/platnosci i z dowodu z lancucha -
  * nigdy z ciala zadania. Zwraca zapisany stan.
+ *
+ * Ask SOL: lustro dostaje SOL/solana, budzet w SOL (do wyswietlania), lamporty
+ * i klaster - bez adresu platnika autora (widzi go tylko autor, GET answers).
  */
 export function writeNewAsk(
   tx: Transaction,
@@ -715,16 +852,22 @@ export function writeNewAsk(
     deadline: input.deadline,
     funding: input.funding,
     escrow: input.escrow,
+    ...(input.rail !== undefined ? { rail: input.rail } : {}),
+    ...(input.solana !== undefined ? { solana: input.solana } : {}),
   });
 
+  const sol = railOf(state) === 'sol-solana' ? state.solana ?? null : null;
   const pub = {
     author: state.author,
     question,
     budget: state.budget,
     seats: state.seats,
-    perAnswer: perAnswerFor(state.budget, state.seats),
-    token: 'USDC',
-    network: 'base',
+    perAnswer: sol ? lamportsToSolNumber(sol.perAnswerLamports) : perAnswerFor(state.budget, state.seats),
+    token: sol ? 'SOL' : 'USDC',
+    network: sol ? 'solana' : 'base',
+    ...(sol
+      ? { budgetLamports: sol.budgetLamports, perAnswerLamports: sol.perAnswerLamports, solanaCluster: sol.cluster }
+      : {}),
     deadline: state.deadline,
     createdAt: store.FieldValue.serverTimestamp(),
     status: 'open',
@@ -752,12 +895,50 @@ export type CreatedAsk = { askId: string; state: SealedAskState; ask: AskView };
  */
 export async function createSealedAsk(
   store: AskStore,
-  input: { author: string; origin: 'session' | 'x402'; question: string; budget: number; seats: number; deadline: number }
+  input: {
+    author: string;
+    origin: 'session' | 'x402';
+    question: string;
+    budget: number;
+    seats: number;
+    deadline: number;
+    /** Domyslnie 'usdc-base'. 'sol-solana' wymaga `solana` i sesji. */
+    rail?: AskRail;
+    /**
+     * Ask SOL: klaster serwera i budzet w lamportach. Platnika NIE podaje
+     * wolajacy - czytamy go w transakcji z zapieczetowanego powiazania autora.
+     */
+    solana?: { cluster: SolanaClusterName; budgetLamports: string };
+  }
 ): Promise<CreatedAsk> {
   const askId = store.db.collection(ASKS_COLLECTION).doc().id;
-  const state = await store.db.runTransaction(async (tx) =>
-    writeNewAsk(tx, store, askId, { ...input, funding: 'on-resolve', escrow: null }, 'create')
-  );
+  const { rail, solana, ...common } = input;
+  const state = await store.db.runTransaction(async (tx) => {
+    if (rail !== 'sol-solana') {
+      return writeNewAsk(tx, store, askId, { ...common, funding: 'on-resolve', escrow: null }, 'create');
+    }
+    if (!solana) throw new AskError('invalid_ask', 400, 'Missing Solana terms.');
+    // Platnik = powiazanie autora W TEJ transakcji: zmiana portfela w trakcie
+    // nie da Aska z platnikiem, ktorego autor juz nie ma.
+    const binding = await readSolanaWalletBinding(store, common.author, tx);
+    if (binding.kind === 'invalid') throw new AskError('seal_invalid', 503, 'Your linked Solana wallet cannot be verified right now. Nothing was saved.');
+    if (binding.kind === 'absent') {
+      throw new AskError('solana_wallet_required', 409, 'Link a Solana wallet before posting an Ask paid in SOL.');
+    }
+    return writeNewAsk(
+      tx,
+      store,
+      askId,
+      {
+        ...common,
+        funding: 'on-resolve',
+        escrow: null,
+        rail: 'sol-solana',
+        solana: { cluster: solana.cluster, payer: binding.value.solana, budgetLamports: solana.budgetLamports },
+      },
+      'create'
+    );
+  });
   const now = Date.now();
   const ask = effectiveAsk(
     askId,
@@ -766,6 +947,28 @@ export async function createSealedAsk(
     store.enforce
   );
   return { askId, state, ask };
+}
+
+/**
+ * Powiazanie portfela Solany konta EVM. Nieznany kid albo zly MAC -> 'invalid'
+ * (trasa: 503 seal_invalid, nigdy nie nadpisujemy automatycznie).
+ */
+export async function readSolanaWalletBinding(
+  store: AskStore,
+  evm: string,
+  tx?: Transaction
+): Promise<SealCheck<SolanaWalletBinding>> {
+  const ref = solanaWalletRef(store, evm);
+  const snap = tx ? await tx.get(ref) : await ref.get();
+  const check = readSolanaBinding(
+    store.keys,
+    evm,
+    snap.exists ? ((snap.data() ?? {}) as Record<string, unknown>) : null
+  );
+  if (check.kind === 'invalid') {
+    console.error(`[asks/askStore] ALARM: powiazanie portfela Solany konta ${lowerAddress(evm)} ma niewazna pieczec (${check.reason}).`);
+  }
+  return check;
 }
 
 /** Straznik "jedna odpowiedz na adres" - dokument do tx.create. */

@@ -47,7 +47,9 @@ import { getAddress } from 'viem';
 import { notifyAskPayout } from '../../../../utils/friends/notifications';
 import { answerIdToBytes32, escrowKeyFor, unitsToAmount } from '../../../../utils/asks/escrow';
 import {
+  acceptancePayoutRef,
   escrowSeatAcceptance,
+  isSolanaAcceptance,
   lowerAddress,
   lowerTxHash,
   payoutRegistryId,
@@ -416,13 +418,15 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         // przy odpowiedzi nie blokuje zapisu prawdziwej nagrody.
         const existing = acceptances.valid.get(answerId);
         if (existing) {
-          if (existing.txHash === txHash && existing.logIndex === item.award.logIndex) {
+          // Rekord SOL na Asku escrow (zawsze Base) nie ma prawa istniec - gdyby
+          // byl, to i tak "inna wyplata", nie ta nagroda.
+          if (!isSolanaAcceptance(existing) && existing.txHash === txHash && existing.logIndex === item.award.logIndex) {
             alreadyAccepted.push(answerId);
           } else {
             // Odpowiedz ma juz inna wyplate. Nie nadpisujemy zapieczetowanego
             // rekordu - to decyzja wlasciciela, a nagroda z lancucha zostaje
             // w odpowiedzi jako konflikt.
-            conflicts.push({ answerId, reason: 'answer_already_paid', payoutTxHash: existing.txHash });
+            conflicts.push({ answerId, reason: 'answer_already_paid', payoutTxHash: acceptancePayoutRef(existing).txRef });
           }
           return;
         }
@@ -468,15 +472,21 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       const acceptedCount = acceptances.valid.size + recorded.length;
       // Lustro dla przegladarki - wartosci wylacznie ze stanu i rekordow,
       // wiec kazde wywolanie naprawia pola podmienione z devtools.
-      mirrorAsk(tx, store, askId, {
-        status: next.status,
-        resolvedAt: next.status === 'resolved' && next.resolvedAt !== null ? next.resolvedAt : undefined,
-        escrowResolveTxHash: next.resolveKind === 'escrow' && next.resolveTxHash ? next.resolveTxHash : undefined,
-        acceptedCount,
-        funding: 'escrowed',
-        escrowChainId: escrow.chainId,
-        escrowTxHash: escrow.fundTxHash ?? undefined,
-      });
+      mirrorAsk(
+        tx,
+        store,
+        askId,
+        {
+          status: next.status,
+          resolvedAt: next.status === 'resolved' && next.resolvedAt !== null ? next.resolvedAt : undefined,
+          escrowResolveTxHash: next.resolveKind === 'escrow' && next.resolveTxHash ? next.resolveTxHash : undefined,
+          acceptedCount,
+          funding: 'escrowed',
+          escrowChainId: escrow.chainId,
+          escrowTxHash: escrow.fundTxHash ?? undefined,
+        },
+        next
+      );
 
       // Odslona wszystkich odpowiedzi wymaga wyplaty (revealsAllAnswers) - samo
       // AskResolved z nagrodami dla portfeli autora niczego nie odslania.

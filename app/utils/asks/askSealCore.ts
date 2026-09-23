@@ -1,6 +1,15 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { isSolanaAddress, isSolanaSignature } from '../../basechat/Solana/replies/replyCore';
 import { toMillis } from '../firestoreTime';
 import { toAsk } from './askMapping';
+import {
+  MAX_BUDGET_LAMPORTS,
+  MIN_PER_ANSWER_LAMPORTS,
+  formatLamports,
+  isLamportsString,
+  lamportsToSolNumber,
+  perAnswerLamportsFor,
+} from './solAmounts';
 import { MAX_SEATS, perAnswerFor, type Ask, type AskFunding, type AskStatus } from './types';
 
 /**
@@ -97,6 +106,35 @@ const isLowerHash = (v: unknown): v is string => typeof v === 'string' && LOWER_
 const isUintDecimal = (v: unknown): v is string => typeof v === 'string' && UINT_DECIMAL.test(v);
 const isIndex = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0;
 const isFiniteNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+/** 32 znaki hex malymi literami - nonce powiazania portfela. */
+const isNonceHex = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{32}$/.test(v);
+
+/* ------------------------------------------------------------------ */
+/*  SZYNA (USDC na Base albo SOL na Solanie)                           */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Czym Ask placi. Zamrozone w stanie przy tworzeniu. Adresy i podpisy Solany
+ * to base58 - wielkosc liter jest czescia wartosci, wiec NIGDY nie przechodza
+ * przez lowerAddress / lowerTxHash / toLowerCase (inny zapis = inny klucz).
+ */
+export type AskRail = 'usdc-base' | 'sol-solana';
+
+export type SolanaClusterName = 'devnet' | 'mainnet-beta';
+
+const SOLANA_CLUSTERS: readonly SolanaClusterName[] = ['devnet', 'mainnet-beta'];
+
+export const isSolanaClusterName = (v: unknown): v is SolanaClusterName =>
+  SOLANA_CLUSTERS.includes(v as SolanaClusterName);
+
+/**
+ * Szyna ze stanu albo z widoku zbudowanego ze stanu. Wolajacy podaje
+ * SealedAskState albo AskView - NIGDY surowy dokument asks/{id}, bo jego
+ * `network` przestawi kazda przegladarka.
+ */
+export function railOf(source: { network?: unknown } | null | undefined): AskRail {
+  return source?.network === 'solana' ? 'sol-solana' : 'usdc-base';
+}
 
 /* ------------------------------------------------------------------ */
 /*  KLUCZE                                                             */
@@ -245,6 +283,12 @@ export const SEAL_DOMAINS = {
   accept: 'askaccept:v1',
   payout: 'askpayout:v1',
   answerer: 'askanswerer:v1',
+  /** Odbiorca SOL zamrozony przy odpowiedzi - asks/{id}/payees/{answerId}. */
+  payee: 'askpayee:v1',
+  /** Powiazanie portfela Solany z kontem EVM - _registry/solanaWallets/{evm}. */
+  solBind: 'asksolbind:v1',
+  /** Bezstanowy challenge powiazania (solanaAskCore.ts). */
+  solChallenge: 'asksolchallenge:v1',
 } as const;
 
 export type SealDomain = (typeof SEAL_DOMAINS)[keyof typeof SEAL_DOMAINS];
@@ -338,14 +382,33 @@ export type SealedEscrow = {
   source: 'fund-log' | 'escrowFor';
 };
 
+/**
+ * Warunki Aska SOL - istnieja WYLACZNIE przy network 'solana'.
+ * - cluster          klaster z chwili tworzenia; accept na innym -> wrong_cluster,
+ * - payer            portfel Solany autora (z powiazania), zrodlo kazdej wyplaty;
+ *                    base58, wielkosc liter zachowana,
+ * - budgetLamports   prawda o budzecie (dziesietnie),
+ * - perAnswerLamports floor(budget / seats) - policzone RAZ, sprawdzane przy odczycie.
+ */
+export type SealedSolanaTerms = {
+  cluster: SolanaClusterName;
+  payer: string;
+  budgetLamports: string;
+  perAnswerLamports: string;
+};
+
 export type SealedAskState = {
   v: 1;
   askId: string;
   /** Malymi literami. */
   author: string;
   funding: AskFunding;
-  token: 'USDC';
-  network: 'base';
+  token: 'USDC' | 'SOL';
+  network: 'base' | 'solana';
+  /**
+   * Dla SOL: liczba SOL do wyswietlania, zawsze rowna
+   * lamportsToSolNumber(solana.budgetLamports) - sprawdzane przy odczycie.
+   */
   budget: number;
   seats: number;
   /** ms */
@@ -358,6 +421,13 @@ export type SealedAskState = {
   resolveTxHash: string | null;
   expiredTxHash: string | null;
   expiredLogIndex: number | null;
+  /**
+   * Tylko Aski SOL. Klucza NIE MA w ogole w stanie Base (nie undefined, nie
+   * null) - ladunek MAC Base musi zostac bajt w bajt taki jak przed Solana,
+   * inaczej wszystkie istniejace pieczecie przestalyby sie zgadzac
+   * (zlote wektory w test/asksSeals.test.ts).
+   */
+  solana?: SealedSolanaTerms;
 };
 
 const ORIGINS: readonly AskOrigin[] = ['session', 'x402', 'legacy', 'adopted'];
@@ -387,8 +457,93 @@ function pickEscrow(raw: unknown): SealedEscrow | null | undefined {
   };
 }
 
-/** Wybiera i sprawdza pola stanu. null = zly ksztalt (-> invalid/malformed). */
+/**
+ * Wybiera i sprawdza pola stanu. null = zly ksztalt (-> invalid/malformed).
+ *
+ * Rozgalezienie po `network`: galaz Base zwraca DOKLADNIE dzisiejszy zestaw
+ * kluczy (zlote wektory), galaz Solany - ten sam zestaw plus `solana`.
+ * Dokument Base z doklejonym kluczem `solana` przechodzi galezia Base, a obcy
+ * klucz nie wchodzi do ladunku - nie zmienia MAC ani niczego nie obiecuje.
+ */
 function pickState(raw: Record<string, unknown>): SealedAskState | null {
+  return raw.network === 'solana' ? pickSolanaState(raw) : pickBaseState(raw);
+}
+
+/**
+ * Niezmienniki Aska SOL. Kazdy z nich dotyczy pieniedzy albo tego, skad
+ * pieniadze wyjda, wiec stan, ktory ktoregos nie spelnia, jest 'malformed'
+ * (503), a nie "prawie dobry":
+ * - tylko 'on-resolve' bez escrow (escrow istnieje tylko na Base),
+ * - origin 'session' (x402 zostaje w USDC, adopcja dotyczy Askow sprzed pieczeci),
+ * - platnik base58 w oryginalnej wielkosci liter,
+ * - budzet w (0, 1000 SOL], stawka = floor(budzet / miejsca) >= 0.005 SOL,
+ * - `budget` (liczba) rowny budzetowi z lamportow - dwie prawdy o kwocie to
+ *   o jedna za duzo,
+ * - brak hashy EVM (resolve/expire escrow) i rozstrzygniec 'escrow'/'legacy'.
+ */
+function pickSolanaState(raw: Record<string, unknown>): SealedAskState | null {
+  if (raw.v !== 1) return null;
+  if (!isDocId(raw.askId)) return null;
+  if (!isLowerAddress(raw.author)) return null;
+  if (raw.funding !== 'on-resolve') return null;
+  if (raw.token !== 'SOL' || raw.network !== 'solana') return null;
+  if (!(typeof raw.seats === 'number' && Number.isSafeInteger(raw.seats) && raw.seats >= 1 && raw.seats <= MAX_SEATS)) return null;
+  if (!isFiniteNumber(raw.deadline) || raw.deadline <= 0) return null;
+  if (raw.origin !== 'session') return null;
+  if (raw.escrow !== null) return null;
+  if (!STATUSES.includes(raw.status as AskStatus)) return null;
+  if (!(raw.resolvedAt === null || isFiniteNumber(raw.resolvedAt))) return null;
+  if (!(raw.resolveKind === null || raw.resolveKind === 'author' || raw.resolveKind === 'auto-full')) return null;
+  if (raw.resolveTxHash !== null || raw.expiredTxHash !== null || raw.expiredLogIndex !== null) return null;
+
+  const terms = pickSolanaTerms(raw.solana, raw.seats);
+  if (!terms) return null;
+  if (!isFiniteNumber(raw.budget) || raw.budget !== lamportsToSolNumber(terms.budgetLamports)) return null;
+
+  return {
+    v: 1,
+    askId: raw.askId,
+    author: raw.author,
+    funding: 'on-resolve',
+    token: 'SOL',
+    network: 'solana',
+    budget: raw.budget,
+    seats: raw.seats,
+    deadline: raw.deadline,
+    origin: 'session',
+    escrow: null,
+    status: raw.status as AskStatus,
+    resolvedAt: raw.resolvedAt as number | null,
+    resolveKind: raw.resolveKind as AskResolveKind | null,
+    resolveTxHash: null,
+    expiredTxHash: null,
+    expiredLogIndex: null,
+    solana: terms,
+  };
+}
+
+function pickSolanaTerms(raw: unknown, seats: number): SealedSolanaTerms | null {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
+  const t = raw as Record<string, unknown>;
+  if (!isSolanaClusterName(t.cluster)) return null;
+  // isSolanaAddress sprawdza base58 i 32 bajty - bez zadnej normalizacji.
+  // Adres zapisany malymi literami to INNY (albo zaden) klucz publiczny.
+  if (!isSolanaAddress(t.payer)) return null;
+  if (!isLamportsString(t.budgetLamports) || !isLamportsString(t.perAnswerLamports)) return null;
+  const budget = BigInt(t.budgetLamports);
+  if (budget <= 0n || budget > MAX_BUDGET_LAMPORTS) return null;
+  const perAnswer = perAnswerLamportsFor(budget, seats);
+  if (perAnswer < MIN_PER_ANSWER_LAMPORTS || perAnswer.toString() !== t.perAnswerLamports) return null;
+  return {
+    cluster: t.cluster,
+    payer: t.payer,
+    budgetLamports: t.budgetLamports,
+    perAnswerLamports: t.perAnswerLamports,
+  };
+}
+
+/** Galaz Base - bez zmian od wdrozenia pieczeci (zlote wektory). */
+function pickBaseState(raw: Record<string, unknown>): SealedAskState | null {
   if (raw.v !== 1) return null;
   if (!isDocId(raw.askId)) return null;
   if (!isLowerAddress(raw.author)) return null;
@@ -519,26 +674,189 @@ function pickAcceptance(raw: Record<string, unknown>): AcceptanceRecord | null {
   };
 }
 
-export function sealAcceptanceDoc(key: AskSealKey, record: AcceptanceRecord): SealedDoc<AcceptanceRecord> {
-  const picked = pickAcceptance(record as unknown as Record<string, unknown>);
+/**
+ * Przyjecie odpowiedzi na Asku SOL: przelew SystemProgram od zamrozonego
+ * platnika autora (state.solana.payer) do zamrozonego odbiorcy odpowiedzi
+ * (asks/{id}/payees/{answerId}), z memo `mysphere:ask|v1|<askId>|<answerId>`
+ * podpisanym przez platnika. Adresy i podpis w base58, wielkosc liter
+ * zachowana. Ta sama domena MAC co przyjecie EVM - `kind` i `network`
+ * w ladunku i tak nie pozwalaja pomylic jednego z drugim.
+ */
+export type SolanaAcceptanceRecord = {
+  v: 1;
+  askId: string;
+  answerId: string;
+  /** Portfel Solany odpowiadajacego (base58). */
+  payee: string;
+  kind: 'sol-transfer';
+  cluster: SolanaClusterName;
+  /** Podpis transakcji (base58) - jeden podpis placi jedna odpowiedz. */
+  signature: string;
+  /** Suma przelewow platnik -> odbiorca w tej transakcji, dziesietnie. */
+  lamports: string;
+  /** Platnik autora (base58). */
+  from: string;
+  token: 'SOL';
+  network: 'solana';
+};
+
+/**
+ * Przyjecie dowolnej szyny. `AcceptanceRecord` zostaje nazwa typu EVM, zeby
+ * dzisiejsze trasy (txHash, logIndex, units) kompilowaly sie bez zmian;
+ * wolajacy, ktory obsluguje obie szyny, bierze te unie i rozroznia po
+ * `network` (albo `kind === 'sol-transfer'`).
+ */
+export type AnyAcceptanceRecord = AcceptanceRecord | SolanaAcceptanceRecord;
+
+export const isSolanaAcceptance = (record: AnyAcceptanceRecord): record is SolanaAcceptanceRecord =>
+  record.network === 'solana';
+
+function pickSolanaAcceptance(raw: Record<string, unknown>): SolanaAcceptanceRecord | null {
+  if (raw.v !== 1) return null;
+  if (!isDocId(raw.askId) || !isDocId(raw.answerId)) return null;
+  if (raw.kind !== 'sol-transfer') return null;
+  if (!isSolanaClusterName(raw.cluster)) return null;
+  if (!isSolanaAddress(raw.payee) || !isSolanaAddress(raw.from)) return null;
+  // Przelew autora do samego siebie nie jest wyplata (verifySolanaAskPayout
+  // odrzuca go jako self-pay) - taki rekord nie ma prawa powstac.
+  if (raw.payee === raw.from) return null;
+  if (!isSolanaSignature(raw.signature)) return null;
+  if (!isLamportsString(raw.lamports) || raw.lamports === '0') return null;
+  if (raw.token !== 'SOL' || raw.network !== 'solana') return null;
+  return {
+    v: 1,
+    askId: raw.askId,
+    answerId: raw.answerId,
+    payee: raw.payee,
+    kind: 'sol-transfer',
+    cluster: raw.cluster,
+    signature: raw.signature,
+    lamports: raw.lamports,
+    from: raw.from,
+    token: 'SOL',
+    network: 'solana',
+  };
+}
+
+function pickAnyAcceptance(raw: Record<string, unknown>): AnyAcceptanceRecord | null {
+  return raw.network === 'solana' ? pickSolanaAcceptance(raw) : pickAcceptance(raw);
+}
+
+export function sealAcceptanceDoc(key: AskSealKey, record: AcceptanceRecord): SealedDoc<AcceptanceRecord>;
+export function sealAcceptanceDoc(key: AskSealKey, record: SolanaAcceptanceRecord): SealedDoc<SolanaAcceptanceRecord>;
+export function sealAcceptanceDoc(key: AskSealKey, record: AnyAcceptanceRecord): SealedDoc<AnyAcceptanceRecord>;
+export function sealAcceptanceDoc(key: AskSealKey, record: AnyAcceptanceRecord): SealedDoc<AnyAcceptanceRecord> {
+  const picked = pickAnyAcceptance(record as unknown as Record<string, unknown>);
   if (!picked) throw new AskError('seal_write_malformed', 500, 'Refusing to seal a malformed acceptance.');
   return sealDoc(key, SEAL_DOMAINS.accept, picked);
 }
 
-/** Odczyt przyjecia - zwiazany z askId i answerId ze SCIEZKI. */
+function readAcceptanceWith<T extends AnyAcceptanceRecord>(
+  pick: (raw: Record<string, unknown>) => T | null,
+  keys: AskSealKeys,
+  askId: string,
+  answerId: string,
+  raw: RawDoc
+): SealCheck<T> {
+  if (!raw) return { kind: 'absent' };
+  const picked = pick(raw);
+  if (!picked) return { kind: 'invalid', reason: 'malformed' };
+  const check = verifySealed(keys, SEAL_DOMAINS.accept, picked, raw.mac, raw.kid);
+  if (check.kind !== 'valid') return check;
+  if (picked.askId !== askId || picked.answerId !== answerId) return { kind: 'invalid', reason: 'wrong_binding' };
+  return check;
+}
+
+/**
+ * Odczyt przyjecia EVM - zwiazany z askId i answerId ze SCIEZKI.
+ *
+ * Rekord SOL wychodzi tu 'invalid/malformed' (zamknieto): dzisiejsze trasy
+ * znaja tylko USDC i trasa odpowie 503, zamiast potraktowac przyjecie SOL jak
+ * brak przyjecia. Wolajacy obslugujacy obie szyny uzywa readAnyAcceptance.
+ */
 export function readAcceptance(
   keys: AskSealKeys,
   askId: string,
   answerId: string,
   raw: RawDoc
 ): SealCheck<AcceptanceRecord> {
-  if (!raw) return { kind: 'absent' };
-  const picked = pickAcceptance(raw);
-  if (!picked) return { kind: 'invalid', reason: 'malformed' };
-  const check = verifySealed(keys, SEAL_DOMAINS.accept, picked, raw.mac, raw.kid);
-  if (check.kind !== 'valid') return check;
-  if (picked.askId !== askId || picked.answerId !== answerId) return { kind: 'invalid', reason: 'wrong_binding' };
-  return check;
+  return readAcceptanceWith(pickAcceptance, keys, askId, answerId, raw);
+}
+
+/** Odczyt przyjecia dowolnej szyny - zwiazany z askId i answerId ze SCIEZKI. */
+export function readAnyAcceptance(
+  keys: AskSealKeys,
+  askId: string,
+  answerId: string,
+  raw: RawDoc
+): SealCheck<AnyAcceptanceRecord> {
+  return readAcceptanceWith(pickAnyAcceptance, keys, askId, answerId, raw);
+}
+
+/** Przyjecie z przelewu SOL (akceptacja na Asku SOL). Rzuca seal_write_malformed. */
+export function solanaTransferAcceptance(input: {
+  askId: string;
+  answerId: string;
+  payee: string;
+  from: string;
+  cluster: SolanaClusterName;
+  signature: string;
+  lamports: bigint | string;
+}): SolanaAcceptanceRecord {
+  const lamports = typeof input.lamports === 'bigint' ? input.lamports.toString() : input.lamports;
+  const record = pickSolanaAcceptance({
+    v: 1,
+    askId: input.askId,
+    answerId: input.answerId,
+    payee: input.payee,
+    kind: 'sol-transfer',
+    cluster: input.cluster,
+    signature: input.signature,
+    lamports,
+    from: input.from,
+    token: 'SOL',
+    network: 'solana',
+  });
+  if (!record) throw new AskError('seal_write_malformed', 500, 'Refusing to build a malformed Solana acceptance record.');
+  return record;
+}
+
+/**
+ * Co pokazac przy przyjetej odpowiedzi (lustro askAnswers, GET answers,
+ * linki do eksploratora) - jedno miejsce, ktore wie, jak wyglada dowod
+ * kazdej szyny. `amount` tylko do wyswietlania.
+ */
+export type AcceptancePayoutRef = {
+  network: 'base' | 'solana';
+  token: 'USDC' | 'SOL';
+  /** Hash transakcji Base (malymi literami) albo podpis Solany (base58). */
+  txRef: string;
+  /** logIndex na Base; Solana nie ma logow -> null. */
+  logIndex: number | null;
+  amount: number;
+  /** Identyfikator wpisu w rejestrze zuzytych wyplat. */
+  regId: string;
+};
+
+export function acceptancePayoutRef(record: AnyAcceptanceRecord): AcceptancePayoutRef {
+  if (isSolanaAcceptance(record)) {
+    return {
+      network: 'solana',
+      token: 'SOL',
+      txRef: record.signature,
+      logIndex: null,
+      amount: lamportsToSolNumber(record.lamports),
+      regId: solanaPayoutRegistryId(record.signature),
+    };
+  }
+  return {
+    network: 'base',
+    token: 'USDC',
+    txRef: record.txHash,
+    logIndex: record.logIndex,
+    amount: Number(BigInt(record.units)) / 1_000_000,
+    regId: payoutRegistryId(record.chainId, record.txHash, record.logIndex),
+  };
 }
 
 /** Przyjecie z bezposredniego przelewu USDC (on-resolve albo escrow po terminie). */
@@ -621,9 +939,35 @@ export function payoutRegistryId(chainId: number, txHash: string, logIndex: numb
   return `${chainId}:${txHash.toLowerCase()}:${logIndex}`;
 }
 
+/** Prefiks wpisow rejestru dla wyplat SOL. */
+export const SOLANA_PAYOUT_REGISTRY_PREFIX = 'solana:';
+
+/**
+ * Identyfikator wpisu wyplaty SOL: `solana:<podpis>`. Podpis transakcji jest
+ * jeden na transakcje i placi JEDNA odpowiedz na zawsze (niezaleznie od liczby
+ * instrukcji Transfer w srodku). Wielkosc liter ZACHOWANA - base58 malymi
+ * literami to inny (albo zaden) podpis, a dwa zapisy jednego podpisu daliby
+ * dwa wpisy, czyli podwojna wyplate z jednego przelewu.
+ */
+export function solanaPayoutRegistryId(signature: string): string {
+  return `${SOLANA_PAYOUT_REGISTRY_PREFIX}${signature}`;
+}
+
 /** Ksztalt identyfikatora - zeby trasa nie podala do doc() niczego innego. */
 export function isPayoutRegistryId(id: unknown): id is string {
-  return typeof id === 'string' && /^[1-9][0-9]{0,9}:0x[0-9a-f]{64}:(0|[1-9][0-9]{0,8})$/.test(id);
+  if (typeof id !== 'string') return false;
+  if (id.startsWith(SOLANA_PAYOUT_REGISTRY_PREFIX)) {
+    return isSolanaSignature(id.slice(SOLANA_PAYOUT_REGISTRY_PREFIX.length));
+  }
+  return /^[1-9][0-9]{0,9}:0x[0-9a-f]{64}:(0|[1-9][0-9]{0,8})$/.test(id);
+}
+
+/** Identyfikator wpisu rejestru dla przyjecia albo wpisu dowolnej szyny. */
+export function payoutRegistryIdFor(source: AnyAcceptanceRecord | AnyPayoutRegistryEntry): string {
+  // `in`, nie `network`: wpis rejestru EVM nie ma pola network (i miec nie
+  // moze - zmienilby sie jego ladunek MAC).
+  if ('signature' in source) return solanaPayoutRegistryId(source.signature);
+  return payoutRegistryId(source.chainId, source.txHash, source.logIndex);
 }
 
 export type PayoutRegistryEntry = {
@@ -663,8 +1007,74 @@ function pickRegistry(raw: Record<string, unknown>): PayoutRegistryEntry | null 
   };
 }
 
+/**
+ * Wpis rejestru wyplaty SOL - askAnswerContent/_registry/payouts/solana:<podpis>.
+ * `network` jest tu jawne (w odroznieniu od wpisu EVM), wiec obu ksztaltow
+ * nie da sie pomylic przy odczycie.
+ */
+export type SolanaPayoutRegistryEntry = {
+  v: 1;
+  network: 'solana';
+  cluster: SolanaClusterName;
+  signature: string;
+  kind: 'sol-transfer';
+  askId: string;
+  answerId: string;
+  payee: string;
+  from: string;
+  lamports: string;
+  token: 'SOL';
+};
+
+/** Wpis dowolnej szyny. `PayoutRegistryEntry` zostaje nazwa typu EVM (patrz AnyAcceptanceRecord). */
+export type AnyPayoutRegistryEntry = PayoutRegistryEntry | SolanaPayoutRegistryEntry;
+
+function pickSolanaRegistry(raw: Record<string, unknown>): SolanaPayoutRegistryEntry | null {
+  if (raw.v !== 1 || raw.network !== 'solana') return null;
+  if (!isSolanaClusterName(raw.cluster) || !isSolanaSignature(raw.signature)) return null;
+  if (raw.kind !== 'sol-transfer') return null;
+  if (!isDocId(raw.askId) || !isDocId(raw.answerId)) return null;
+  if (!isSolanaAddress(raw.payee) || !isSolanaAddress(raw.from) || raw.payee === raw.from) return null;
+  if (!isLamportsString(raw.lamports) || raw.lamports === '0' || raw.token !== 'SOL') return null;
+  return {
+    v: 1,
+    network: 'solana',
+    cluster: raw.cluster,
+    signature: raw.signature,
+    kind: 'sol-transfer',
+    askId: raw.askId,
+    answerId: raw.answerId,
+    payee: raw.payee,
+    from: raw.from,
+    lamports: raw.lamports,
+    token: 'SOL',
+  };
+}
+
+function pickAnyRegistry(raw: Record<string, unknown>): AnyPayoutRegistryEntry | null {
+  return raw.network === 'solana' ? pickSolanaRegistry(raw) : pickRegistry(raw);
+}
+
 /** Wpis rejestru dla danego przyjecia - te same pola, ta sama prawda. */
-export function payoutEntryFor(record: AcceptanceRecord): PayoutRegistryEntry {
+export function payoutEntryFor(record: AcceptanceRecord): PayoutRegistryEntry;
+export function payoutEntryFor(record: SolanaAcceptanceRecord): SolanaPayoutRegistryEntry;
+export function payoutEntryFor(record: AnyAcceptanceRecord): AnyPayoutRegistryEntry;
+export function payoutEntryFor(record: AnyAcceptanceRecord): AnyPayoutRegistryEntry {
+  if (isSolanaAcceptance(record)) {
+    return {
+      v: 1,
+      network: 'solana',
+      cluster: record.cluster,
+      signature: record.signature,
+      kind: 'sol-transfer',
+      askId: record.askId,
+      answerId: record.answerId,
+      payee: record.payee,
+      from: record.from,
+      lamports: record.lamports,
+      token: 'SOL',
+    };
+  }
   return {
     v: 1,
     chainId: record.chainId,
@@ -680,23 +1090,42 @@ export function payoutEntryFor(record: AcceptanceRecord): PayoutRegistryEntry {
   };
 }
 
-export function registryDoc(key: AskSealKey, entry: PayoutRegistryEntry): SealedDoc<PayoutRegistryEntry> {
-  const picked = pickRegistry(entry as unknown as Record<string, unknown>);
+export function registryDoc(key: AskSealKey, entry: PayoutRegistryEntry): SealedDoc<PayoutRegistryEntry>;
+export function registryDoc(key: AskSealKey, entry: SolanaPayoutRegistryEntry): SealedDoc<SolanaPayoutRegistryEntry>;
+export function registryDoc(key: AskSealKey, entry: AnyPayoutRegistryEntry): SealedDoc<AnyPayoutRegistryEntry>;
+export function registryDoc(key: AskSealKey, entry: AnyPayoutRegistryEntry): SealedDoc<AnyPayoutRegistryEntry> {
+  const picked = pickAnyRegistry(entry as unknown as Record<string, unknown>);
   if (!picked) throw new AskError('seal_write_malformed', 500, 'Refusing to seal a malformed payout registry entry.');
   return sealDoc(key, SEAL_DOMAINS.payout, picked);
 }
 
-/** Odczyt wpisu - identyfikator dokumentu musi wynikac z jego tresci. */
-export function readRegistry(keys: AskSealKeys, docId: string, raw: RawDoc): SealCheck<PayoutRegistryEntry> {
+function readRegistryWith<T extends AnyPayoutRegistryEntry>(
+  pick: (raw: Record<string, unknown>) => T | null,
+  keys: AskSealKeys,
+  docId: string,
+  raw: RawDoc
+): SealCheck<T> {
   if (!raw) return { kind: 'absent' };
-  const picked = pickRegistry(raw);
+  const picked = pick(raw);
   if (!picked) return { kind: 'invalid', reason: 'malformed' };
   const check = verifySealed(keys, SEAL_DOMAINS.payout, picked, raw.mac, raw.kid);
   if (check.kind !== 'valid') return check;
-  if (payoutRegistryId(picked.chainId, picked.txHash, picked.logIndex) !== docId) {
-    return { kind: 'invalid', reason: 'wrong_binding' };
-  }
+  if (payoutRegistryIdFor(picked) !== docId) return { kind: 'invalid', reason: 'wrong_binding' };
   return check;
+}
+
+/**
+ * Odczyt wpisu EVM - identyfikator dokumentu musi wynikac z jego tresci.
+ * Wpis SOL wychodzi tu 'invalid/malformed' (zamknieto) - obie szyny czyta
+ * readAnyRegistry.
+ */
+export function readRegistry(keys: AskSealKeys, docId: string, raw: RawDoc): SealCheck<PayoutRegistryEntry> {
+  return readRegistryWith(pickRegistry, keys, docId, raw);
+}
+
+/** Odczyt wpisu dowolnej szyny (id `solana:<podpis>` albo `<chainId>:<hash>:<log>`). */
+export function readAnyRegistry(keys: AskSealKeys, docId: string, raw: RawDoc): SealCheck<AnyPayoutRegistryEntry> {
+  return readRegistryWith(pickAnyRegistry, keys, docId, raw);
 }
 
 /* ------------------------------------------------------------------ */
@@ -741,6 +1170,146 @@ export function readAnswerer(keys: AskSealKeys, askId: string, author: string, r
 }
 
 /* ------------------------------------------------------------------ */
+/*  POWIAZANIE PORTFELA SOLANY                                         */
+/*  askAnswerContent/_registry/solanaWallets/{evmLower}                */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Jedno konto EVM (sesja SIWE) = jeden portfel Solany. To samo powiazanie
+ * jest platnikiem autora (zamrazanym w stanie nowego Aska) i odbiorca
+ * odpowiadajacego (zamrazanym przy odpowiedzi). Powstaje dopiero po
+ * sprawdzeniu podpisu ed25519 wiadomosci buildSolanaBindingMessage, a podpis
+ * zostaje w dokumencie - wlasciciel moze go zweryfikowac jeszcze raz.
+ *
+ * `issuedAtMs` z challenge'u: nowe powiazanie musi miec wiekszy niz zapisane,
+ * wiec przechwycony stary podpis nie cofnie portfela do poprzedniego.
+ */
+export type SolanaWalletBinding = {
+  v: 1;
+  /** Konto EVM, malymi literami. */
+  evm: string;
+  /** Portfel Solany, base58, wielkosc liter zachowana. */
+  solana: string;
+  issuedAtMs: number;
+  nonce: string;
+  /** Podpis ed25519 wiadomosci powiazania (base58, 64 bajty). */
+  signature: string;
+};
+
+function pickSolanaBinding(raw: Record<string, unknown>): SolanaWalletBinding | null {
+  if (raw.v !== 1) return null;
+  if (!isLowerAddress(raw.evm) || !isSolanaAddress(raw.solana)) return null;
+  if (!(typeof raw.issuedAtMs === 'number' && Number.isSafeInteger(raw.issuedAtMs) && raw.issuedAtMs > 0)) return null;
+  if (!isNonceHex(raw.nonce) || !isSolanaSignature(raw.signature)) return null;
+  return {
+    v: 1,
+    evm: raw.evm,
+    solana: raw.solana,
+    issuedAtMs: raw.issuedAtMs,
+    nonce: raw.nonce,
+    signature: raw.signature,
+  };
+}
+
+/** Powiazanie do zapisu. Adres EVM sprowadzany do malych liter, Solana bez zmian. */
+export function solanaWalletBinding(input: {
+  evm: string;
+  solana: string;
+  issuedAtMs: number;
+  nonce: string;
+  signature: string;
+}): SolanaWalletBinding {
+  const binding = pickSolanaBinding({ v: 1, ...input, evm: lowerAddress(input.evm) });
+  if (!binding) throw new AskError('seal_write_malformed', 500, 'Refusing to build a malformed Solana wallet binding.');
+  return binding;
+}
+
+export function sealSolanaBindingDoc(key: AskSealKey, binding: SolanaWalletBinding): SealedDoc<SolanaWalletBinding> {
+  const picked = pickSolanaBinding(binding as unknown as Record<string, unknown>);
+  if (!picked) throw new AskError('seal_write_malformed', 500, 'Refusing to seal a malformed Solana wallet binding.');
+  return sealDoc(key, SEAL_DOMAINS.solBind, picked);
+}
+
+/** Odczyt powiazania - zwiazany z kontem EVM z identyfikatora dokumentu. */
+export function readSolanaBinding(keys: AskSealKeys, evm: string, raw: RawDoc): SealCheck<SolanaWalletBinding> {
+  if (!raw) return { kind: 'absent' };
+  const picked = pickSolanaBinding(raw);
+  if (!picked) return { kind: 'invalid', reason: 'malformed' };
+  const check = verifySealed(keys, SEAL_DOMAINS.solBind, picked, raw.mac, raw.kid);
+  if (check.kind !== 'valid') return check;
+  if (picked.evm !== lowerAddress(evm)) return { kind: 'invalid', reason: 'wrong_binding' };
+  return check;
+}
+
+/* ------------------------------------------------------------------ */
+/*  ODBIORCA ODPOWIEDZI NA ASKU SOL - asks/{askId}/payees/{answerId}   */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Portfel Solany, na ktory autor Aska ma zaplacic za TE odpowiedz. Zamrazany
+ * przez tx.create (nigdy nie zmieniany) z powiazania odpowiadajacego w chwili
+ * odpowiedzi albo pozniej, gdy powiazal portfel. Zmiana powiazania dziala
+ * tylko na przyszle odpowiedzi - inaczej przejete konto EVM przekierowaloby
+ * wyplaty za juz napisane odpowiedzi.
+ */
+export type AnswerPayee = {
+  v: 1;
+  askId: string;
+  answerId: string;
+  /** Autor odpowiedzi (konto EVM), malymi literami. */
+  answerer: string;
+  /** Portfel Solany odbiorcy, base58. */
+  payee: string;
+  /** Kiedy zamrozono (ms) - do wyswietlania i audytu. */
+  frozenAtMs: number;
+};
+
+function pickPayee(raw: Record<string, unknown>): AnswerPayee | null {
+  if (raw.v !== 1) return null;
+  if (!isDocId(raw.askId) || !isDocId(raw.answerId)) return null;
+  if (!isLowerAddress(raw.answerer) || !isSolanaAddress(raw.payee)) return null;
+  if (!isFiniteNumber(raw.frozenAtMs) || raw.frozenAtMs <= 0) return null;
+  return {
+    v: 1,
+    askId: raw.askId,
+    answerId: raw.answerId,
+    answerer: raw.answerer,
+    payee: raw.payee,
+    frozenAtMs: raw.frozenAtMs,
+  };
+}
+
+/** Odbiorca do zapisu. Konto EVM sprowadzane do malych liter, Solana bez zmian. */
+export function answerPayee(input: {
+  askId: string;
+  answerId: string;
+  answerer: string;
+  payee: string;
+  frozenAtMs: number;
+}): AnswerPayee {
+  const payee = pickPayee({ v: 1, ...input, answerer: lowerAddress(input.answerer) });
+  if (!payee) throw new AskError('seal_write_malformed', 500, 'Refusing to build a malformed answer payee.');
+  return payee;
+}
+
+export function sealPayeeDoc(key: AskSealKey, payee: AnswerPayee): SealedDoc<AnswerPayee> {
+  const picked = pickPayee(payee as unknown as Record<string, unknown>);
+  if (!picked) throw new AskError('seal_write_malformed', 500, 'Refusing to seal a malformed answer payee.');
+  return sealDoc(key, SEAL_DOMAINS.payee, picked);
+}
+
+/** Odczyt odbiorcy - zwiazany z askId i answerId ze SCIEZKI. */
+export function readPayee(keys: AskSealKeys, askId: string, answerId: string, raw: RawDoc): SealCheck<AnswerPayee> {
+  if (!raw) return { kind: 'absent' };
+  const picked = pickPayee(raw);
+  if (!picked) return { kind: 'invalid', reason: 'malformed' };
+  const check = verifySealed(keys, SEAL_DOMAINS.payee, picked, raw.mac, raw.kid);
+  if (check.kind !== 'valid') return check;
+  if (picked.askId !== askId || picked.answerId !== answerId) return { kind: 'invalid', reason: 'wrong_binding' };
+  return check;
+}
+
+/* ------------------------------------------------------------------ */
 /*  WIDOK ASKA DLA TRAS                                                */
 /* ------------------------------------------------------------------ */
 
@@ -769,7 +1338,10 @@ function unitsToUsdc(units: string): number {
 
 /** Widok z samych pol zamrozonych regula update - dla 'unverified' i 'broken'. */
 function frozenView(askId: string, pub: Record<string, any>, trust: 'unverified' | 'broken'): AskView {
-  const base = toAsk(askId, pub);
+  // Bez stanu nie ma szyny SOL: lustro 'SOL/solana' i lamporty przestawi kazda
+  // przegladarka, a regula zamraza tylko `budget`. Mapujemy wiec jak Ask USDC,
+  // zeby toAsk nie doliczyl stawki z niezamrozonych budgetLamports.
+  const base = toAsk(askId, { ...pub, token: 'USDC', network: 'base' });
   return {
     ...base,
     author: base.author.toLowerCase(),
@@ -805,13 +1377,31 @@ export function effectiveAsk(
   }
 
   const s = stateCheck.value;
-  const base = toAsk(askId, doc);
+  // Szyna ze stanu, nie z lustra: toAsk dostaje token/network ze stanu, wiec
+  // pola SOL (lamporty, klaster) pojawiaja sie w widoku tylko przy stanie SOL,
+  // a stan Base z lustrem udajacym SOL zostaje zwyklym Askiem USDC.
+  const base = toAsk(askId, { ...doc, token: s.token, network: s.network });
+  delete base.budgetLamports;
+  delete base.perAnswerLamports;
+  delete base.solanaCluster;
+  const solana = s.solana
+    ? {
+        budgetLamports: s.solana.budgetLamports,
+        perAnswerLamports: s.solana.perAnswerLamports,
+        solanaCluster: s.solana.cluster,
+      }
+    : {};
   return {
     ...base,
+    ...solana,
     author: s.author,
     budget: s.budget,
     seats: s.seats,
-    perAnswer: s.escrow ? unitsToUsdc(s.escrow.perAnswerUnits) : perAnswerFor(s.budget, s.seats),
+    perAnswer: s.solana
+      ? lamportsToSolNumber(s.solana.perAnswerLamports)
+      : s.escrow
+        ? unitsToUsdc(s.escrow.perAnswerUnits)
+        : perAnswerFor(s.budget, s.seats),
     token: s.token,
     network: s.network,
     deadline: s.deadline,
@@ -839,13 +1429,25 @@ export type NewAskStateInput = {
   deadline: number;
   funding: AskFunding;
   escrow: SealedEscrow | null;
+  /** Domyslnie 'usdc-base' - dzisiejsi wolajacy nie musza nic zmieniac. */
+  rail?: AskRail;
+  /**
+   * Wymagane dla rail 'sol-solana'. `budget` (liczba) jest wtedy IGNOROWANY
+   * i liczony z budgetLamports - prawda o kwocie jest jedna.
+   * `payer` MUSI pochodzic z zapieczetowanego powiazania autora, nigdy z ciala zadania.
+   */
+  solana?: { cluster: SolanaClusterName; payer: string; budgetLamports: string };
 };
 
 /**
  * Stan nowego Aska. Rzuca AskError('invalid_ask', 400) przy danych, ktorych
  * nie wolno zapieczetowac - trasa ma je odrzucic wczesniej, to jest bezpiecznik.
+ * Ask SOL: 'escrowed' -> invalid_funding (400), zly platnik/klaster/kwota ->
+ * invalid_ask (400).
  */
 export function newAskState(askId: string, input: NewAskStateInput): SealedAskState {
+  if ((input.rail ?? 'usdc-base') === 'sol-solana') return newSolanaAskState(askId, input);
+  if (input.solana !== undefined) throw new AskError('invalid_ask', 400, 'Solana terms belong only to a SOL Ask.');
   const author = lowerAddress(input.author);
   if (!isDocId(askId)) throw new AskError('invalid_id', 400, 'Invalid Ask id.');
   if (!author) throw new AskError('invalid_ask', 400, 'The Ask author is not an address.');
@@ -876,6 +1478,57 @@ export function newAskState(askId: string, input: NewAskStateInput): SealedAskSt
     resolveTxHash: null,
     expiredTxHash: null,
     expiredLogIndex: null,
+  };
+}
+
+function newSolanaAskState(askId: string, input: NewAskStateInput): SealedAskState {
+  const author = lowerAddress(input.author);
+  if (!isDocId(askId)) throw new AskError('invalid_id', 400, 'Invalid Ask id.');
+  if (!author) throw new AskError('invalid_ask', 400, 'The Ask author is not an address.');
+  if (input.funding !== 'on-resolve' || input.escrow !== null) {
+    throw new AskError('invalid_funding', 400, 'A SOL Ask is paid on accept; it cannot be escrowed.');
+  }
+  if (input.origin !== 'session') throw new AskError('invalid_ask', 400, 'A SOL Ask can only be created from a signed-in session.');
+  if (!Number.isSafeInteger(input.seats) || input.seats < 1 || input.seats > MAX_SEATS) {
+    throw new AskError('invalid_ask', 400, `Seats must be a whole number between 1 and ${MAX_SEATS}.`);
+  }
+  if (!isFiniteNumber(input.deadline) || input.deadline <= 0) throw new AskError('invalid_ask', 400, 'Invalid deadline.');
+  const terms = input.solana;
+  if (!terms || !isSolanaClusterName(terms.cluster)) throw new AskError('invalid_ask', 400, 'Missing Solana cluster.');
+  if (!isSolanaAddress(terms.payer)) throw new AskError('invalid_ask', 400, 'The Solana payer is not a Solana address.');
+  if (!isLamportsString(terms.budgetLamports)) throw new AskError('invalid_ask', 400, 'Invalid budget.');
+  const budget = BigInt(terms.budgetLamports);
+  if (budget <= 0n || budget > MAX_BUDGET_LAMPORTS) {
+    throw new AskError('invalid_ask', 400, `The budget must be more than 0 and at most ${formatLamports(MAX_BUDGET_LAMPORTS)} SOL.`);
+  }
+  const perAnswer = perAnswerLamportsFor(budget, input.seats);
+  if (perAnswer < MIN_PER_ANSWER_LAMPORTS) {
+    throw new AskError('invalid_ask', 400, `Each answer must get at least ${formatLamports(MIN_PER_ANSWER_LAMPORTS)} SOL.`);
+  }
+  return {
+    v: 1,
+    askId,
+    author,
+    funding: 'on-resolve',
+    token: 'SOL',
+    network: 'solana',
+    budget: lamportsToSolNumber(budget),
+    seats: input.seats,
+    deadline: input.deadline,
+    origin: 'session',
+    escrow: null,
+    status: 'open',
+    resolvedAt: null,
+    resolveKind: null,
+    resolveTxHash: null,
+    expiredTxHash: null,
+    expiredLogIndex: null,
+    solana: {
+      cluster: terms.cluster,
+      payer: terms.payer,
+      budgetLamports: budget.toString(),
+      perAnswerLamports: perAnswer.toString(),
+    },
   };
 }
 

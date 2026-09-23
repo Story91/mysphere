@@ -241,6 +241,12 @@ export default function AskClaimPanel({
           and the unused part of your own Ask budgets both land here, and they wait as long as you
           need them to.
         </p>
+        {/* Aski SOL nie maja escrow: wyplata idzie od razu na powiazany portfel
+            Solany. Bez tego zdania ktos czekalby tu na SOL, ktory juz ma. */}
+        <p className="mt-1.5 break-words text-[12px] leading-[1.5] text-soft-ink-faint">
+          SOL Asks never pass through here: an accepted answer is paid straight to the Solana wallet
+          linked to your account.
+        </p>
       </section>
     );
   }

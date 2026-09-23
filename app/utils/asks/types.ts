@@ -94,6 +94,19 @@ export type Ask = {
    * dopiero claim() po stronie odpowiadajacego.
    */
   escrowResolveTxHash?: string | null;
+
+  /* --- POLA ISTOTNE WYLACZNIE DLA ASKA SOL (token 'SOL', network 'solana') --- */
+
+  /**
+   * Budzet w lamportach, dziesietnie. Prawda o kwocie Aska SOL - `budget`
+   * i `perAnswer` (liczby SOL) sa z niej liczone i sluza tylko do wyswietlania
+   * (patrz app/utils/asks/solAmounts.ts).
+   */
+  budgetLamports?: string;
+  /** floor(budgetLamports / seats), dziesietnie - tyle dostaje przyjeta odpowiedz. */
+  perAnswerLamports?: string;
+  /** Klaster Solany zamrozony przy tworzeniu ('devnet' | 'mainnet-beta'). */
+  solanaCluster?: string;
 };
 
 export type AskAnswer = {

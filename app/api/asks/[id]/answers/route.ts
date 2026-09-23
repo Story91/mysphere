@@ -27,6 +27,14 @@
  * ktos odpowiedzial i kiedy; niejawne CO napisal. Te metadane i tak czyta feed
  * klienckim SDK z kolekcji `askAnswers` - ta trasa nic nowego nie odslania.
  *
+ * === ASK SOL (szyna ze STANU, nigdy z lustra) ===
+ * Odpowiedz dostaje dodatkowo: rail 'sol-solana', token/network, solanaCluster,
+ * perAnswerLamports, a AUTOR takze solanaPayer (portfel, z ktorego musi wyjsc
+ * przelew). Kazda odpowiedz: payoutNetwork (z rekordu), payoutAddressBound,
+ * payoutAddress (zamrozony odbiorca - tylko dla autora Aska i autora tej
+ * odpowiedzi, reszta null) i dla autora payoutMemo (dokladne memo przelewu).
+ * Kwote i adres do zaplaty klient bierze STAD. Ask USDC - ksztalt bez zmian.
+ *
  * === DLACZEGO SESJA NIE JEST BEZWZGLEDNIE WYMAGANA ===
  * Rozstrzygniety Ask jest publiczny z definicji - to jest cel calego mechanizmu.
  * Sesja rozstrzyga wylacznie o drogach 2 i 3, czyli o dostepie do tresci JESZCZE
@@ -35,8 +43,11 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
 import { planAnswerThread } from '../../../../utils/asks/askPublicView';
+import { lowerAddress, railOf } from '../../../../utils/asks/askSealCore';
+import { buildAskPayoutMemo } from '../../../../utils/asks/solAmounts';
 import { sessionAddress } from '../../identity';
 import { readAnswerContents } from '../../answerStore';
+import { readPayees, type PayeeSet } from '../../solanaWalletStore';
 import {
   AskError,
   isDocId,
@@ -126,13 +137,49 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     );
   }
 
+  const viewer = sessionAddress(request);
   const plan = planAnswerThread({
     askId,
     view,
     rows,
     acceptances: acceptances.valid,
-    viewer: sessionAddress(request),
+    viewer,
   });
+
+  // Ask SOL - szyna WYLACZNIE ze stanu (view.state istnieje tylko przy wazna
+  // pieczeci). Kwote i adres do zaplaty klient bierze STAD, nigdy z lustra.
+  const solState = view.trust === 'sealed' && view.state && railOf(view.state) === 'sol-solana' ? view.state : null;
+  let payees: PayeeSet | null = null;
+  if (solState) {
+    try {
+      payees = await readPayees(store, askId);
+    } catch (error) {
+      console.error('[api/asks/answers] Odczyt odbiorcow SOL nie powiodl sie:', error);
+      return NextResponse.json(
+        { error: 'Failed to read answers', code: 'answers_unavailable' },
+        { status: 503, headers: NO_STORE_PRIVATE }
+      );
+    }
+  }
+  const viewerLower = lowerAddress(viewer);
+  /**
+   * Pola SOL odpowiedzi. Adres odbiorcy widzi tylko autor Aska (zeby zaplacic)
+   * i autor odpowiedzi (zeby sprawdzic, dokad pojdzie wyplata) - dla reszty
+   * null. Niewazna pieczec odbiorcy = brak adresu (ALARM jest w logu).
+   */
+  const solanaAnswerFields = (answer: (typeof plan.answers)[number]) => {
+    if (!solState || !payees) return {};
+    const payee = payees.valid.get(answer.id) ?? null;
+    const maySeeAddress = plan.viewerIsAuthor || (viewerLower !== null && lowerAddress(answer.author) === viewerLower);
+    return {
+      // Z rekordu przyjecia (answerPayoutFacts), nie z pola lustra.
+      payoutNetwork: answer.payoutNetwork,
+      payoutAddressBound: payee !== null,
+      payoutAddress: maySeeAddress && payee ? payee.payee : null,
+      // isDocId: buildAskPayoutMemo rzuca na id spoza formatu (dokument spoza serwera).
+      ...(plan.viewerIsAuthor && isDocId(answer.id) ? { payoutMemo: buildAskPayoutMemo(askId, answer.id) } : {}),
+    };
+  };
 
   const visibleIds = plan.answers.filter((answer) => answer.visible).map((answer) => answer.id);
   let contents: Map<string, string> | null = new Map();
@@ -157,6 +204,19 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       viewerIsAuthor: plan.viewerIsAuthor,
       // 'sealed' | 'legacy' | 'unverified' - skad pochodzi status i przyjecia.
       trust: plan.trust,
+      // Tylko Ask SOL (brak klucza = USDC na Base, ksztalt jak dotad):
+      // szyna, klaster i stawka w lamportach ze STANU; platnik autora tylko
+      // dla autora (to z niego ma wyjsc przelew - portfel musi sie zgadzac).
+      ...(solState && solState.solana
+        ? {
+            rail: 'sol-solana',
+            token: 'SOL',
+            network: 'solana',
+            solanaCluster: solState.solana.cluster,
+            perAnswerLamports: solState.solana.perAnswerLamports,
+            ...(plan.viewerIsAuthor ? { solanaPayer: solState.solana.payer } : {}),
+          }
+        : {}),
       count: plan.answers.length,
       answers: plan.answers.map((answer) => ({
         id: answer.id,
@@ -173,6 +233,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
         // odpowiedz bez tresci.
         content: answer.visible ? resolvedContents.get(answer.id) ?? null : null,
         sealed: !answer.visible,
+        ...solanaAnswerFields(answer),
       })),
     },
     { headers: NO_STORE_PRIVATE }

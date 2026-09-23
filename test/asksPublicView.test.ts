@@ -197,6 +197,7 @@ describe('askPublicView - answerPayoutFacts', () => {
         payoutTxHash: PAY_TX,
         payoutLogIndex: 7,
         payoutVerified: true,
+        payoutNetwork: 'base',
       });
     }
   });
@@ -208,6 +209,7 @@ describe('askPublicView - answerPayoutFacts', () => {
         payoutTxHash: null,
         payoutLogIndex: null,
         payoutVerified: false,
+        payoutNetwork: null,
       });
     }
   });
@@ -218,12 +220,14 @@ describe('askPublicView - answerPayoutFacts', () => {
       payoutTxHash: FORGED_TX,
       payoutLogIndex: 3,
       payoutVerified: false,
+      payoutNetwork: 'base',
     });
     expect(answerPayoutFacts('legacy', { accepted: 'yes', payoutLogIndex: -1 }, undefined)).to.deep.equal({
       accepted: true,
       payoutTxHash: null,
       payoutLogIndex: null,
       payoutVerified: false,
+      payoutNetwork: 'base',
     });
   });
 });

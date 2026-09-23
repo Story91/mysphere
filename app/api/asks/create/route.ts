@@ -17,6 +17,10 @@
  *       id wybral klient PRZED fund (keccak(id) jest askId na lancuchu).
  *       201 - zapisany, 200 - ponowienie zapisu, ktory juz sie udal,
  *       409 { retryable: true } fund_not_visible - RPC jeszcze nie widzi paragonu.
+ *   { network: 'solana', question, budgetLamports | budget (SOL), seats, durationMs }
+ *       Ask SOL (model A: placone przy akceptacji, nic nie jest blokowane).
+ *       Platnik = powiazany portfel Solany autora (409 solana_wallet_required),
+ *       klaster serwera zamrozony w stanie, 201 jak on-resolve.
  *
  * === PRZEJECIE CUDZEGO ID (dlaczego escrow ma decyzje w transakcji) ===
  * fund() kluczuje depozyt po keccak(msg.sender, askId) i przyjmuje DOWOLNY
@@ -30,13 +34,16 @@
  */
 
 import { NextResponse, type NextRequest } from 'next/server';
+import { SOLANA_CLUSTER } from '../../../basechat/Solana/config/solanaChain';
 import { publicAsk } from '../../../utils/asks/askCreateCore';
 import { AskError, createSealedAsk, openAskStore, type AskStore } from '../askStore';
 import {
   commitEscrowedAsk,
+  commitSolAsk,
   validateAskDraft,
   validateDurationMs,
   validateEscrowFields,
+  validateSolAskDraft,
   type AskDraftFields,
 } from '../draft';
 import { verifyAskFunded } from '../escrowProof';
@@ -115,6 +122,11 @@ export async function POST(request: NextRequest) {
     return json({ error: 'Invalid JSON body', code: 'invalid_body' }, 400);
   }
 
+  // Ask SOL ma wlasna walidacje w lamportach (validateAskDraft liczy centy
+  // USDC i odrzucilby 0.005 SOL jako "ponizej minimum"). Galaz tylko dla
+  // jawnego network 'solana' - kazde inne cialo idzie dokladnie jak dotad.
+  if (body.network === 'solana') return createSol(store, session, body);
+
   const draft = validateAskDraft(body);
   if (!draft.ok) return json(draft.refusal.body, draft.refusal.status);
 
@@ -151,6 +163,55 @@ async function createOnResolve(
     return json({ ask: publicAsk(created.ask), created: true }, 201);
   } catch (error) {
     return errorResponse(error, 'Zapis Aska on-resolve nie powiodl sie');
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  SOL NA SOLANIE: placone przy akceptacji, nic nie jest blokowane    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * { network: 'solana', question, budgetLamports | budget (SOL), seats, durationMs }
+ * 201 { ask, created: true } - ask z lamportami i klastrem, BEZ adresu
+ * platnika (ten widzi tylko autor przez GET /api/asks/[id]/answers).
+ * Tylko 'on-resolve' (model A); x402 zostaje w USDC (POST /api/asks).
+ */
+async function createSol(store: AskStore, session: string, body: Record<string, unknown>) {
+  if (body.funding !== undefined && body.funding !== 'on-resolve') {
+    return json({ error: 'A SOL Ask is paid on accept; it cannot be escrowed.', code: 'invalid_funding' }, 400);
+  }
+  if (body.token !== undefined && body.token !== 'SOL') {
+    return json({ error: "An Ask on Solana pays in SOL; token must be 'SOL'.", code: 'invalid_token' }, 400);
+  }
+  const draft = validateSolAskDraft(body);
+  if (!draft.ok) return json(draft.refusal.body, draft.refusal.status);
+  const duration = validateDurationMs(body.durationMs);
+  if (!duration.ok) return json(duration.refusal.body, duration.refusal.status);
+
+  try {
+    const created = await commitSolAsk(store, {
+      session,
+      draft: draft.value,
+      // Termin z zegara SERWERA - klient podaje tylko czas trwania z listy.
+      deadline: Date.now() + duration.value,
+      // Klaster serwera zamrozony w stanie: accept na innym -> wrong_cluster.
+      cluster: SOLANA_CLUSTER,
+    });
+    const view = created.ask;
+    return json(
+      {
+        ask: {
+          ...publicAsk(view),
+          budgetLamports: view.budgetLamports,
+          perAnswerLamports: view.perAnswerLamports,
+          solanaCluster: view.solanaCluster,
+        },
+        created: true,
+      },
+      201
+    );
+  } catch (error) {
+    return errorResponse(error, 'Zapis Aska SOL nie powiodl sie');
   }
 }
 

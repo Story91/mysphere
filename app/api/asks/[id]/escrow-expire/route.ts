@@ -229,15 +229,22 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       }
 
       // Lustro dla przegladarki: status i hash ze stanu, a nie z zadania.
+      // Szyna lustra ze stanu (escrow jest zawsze USDC na Base).
       const mirror = (state: SealedAskState, stampExpiredAt: boolean) =>
-        mirrorAsk(tx, store, askId, {
-          status: state.status,
-          expiredTxHash: state.expiredTxHash ?? undefined,
-          expiredAt: stampExpiredAt ? store.FieldValue.serverTimestamp() : undefined,
-          funding: 'escrowed',
-          escrowChainId: escrow.chainId,
-          escrowTxHash: escrow.fundTxHash ?? undefined,
-        });
+        mirrorAsk(
+          tx,
+          store,
+          askId,
+          {
+            status: state.status,
+            expiredTxHash: state.expiredTxHash ?? undefined,
+            expiredAt: stampExpiredAt ? store.FieldValue.serverTimestamp() : undefined,
+            funding: 'escrowed',
+            escrowChainId: escrow.chainId,
+            escrowTxHash: escrow.fundTxHash ?? undefined,
+          },
+          state
+        );
 
       if (base.status === 'resolved') {
         // resolve() i settleExpired() zamykaja ten sam klucz i kontrakt

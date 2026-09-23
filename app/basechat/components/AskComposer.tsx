@@ -13,7 +13,18 @@ import { attachVaultContext } from '../../utils/asks/vaultContext';
 import { MAX_QUESTION_LENGTH } from '../../api/asks/pricing';
 import type { VaultFacts, VaultListResult } from '../../utils/morpho/types';
 import AskVaultPicker from './AskVaultPicker';
+import AskSolanaWallet from './AskSolanaWallet';
 import { formatAskMoney } from './AskCard';
+import {
+  MAX_BUDGET_LAMPORTS,
+  MIN_PER_ANSWER_LAMPORTS,
+  formatLamports,
+  lamportsToSolNumber,
+  parseSolToLamports,
+  perAnswerLamportsFor,
+} from '../../utils/asks/solAmounts';
+import { useSolanaAskWallet } from '../../utils/asks/useSolanaAskWallet';
+import type { AskRail } from '../../utils/asks/useCreateAsk';
 
 /**
  * Kompozytor Aska: pytanie, budzet, liczba miejsc, termin.
@@ -50,18 +61,36 @@ import { formatAskMoney } from './AskCard';
  * (patrz `attachVaultContext`). Bez tego propsa formularz wyglada dokladnie tak,
  * jak dotad - i tak samo dziala, gdy odczyt Morpho padnie.
  *
+ * === SZYNA: USDC NA BASE ALBO SOL NA SOLANIE ===
+ * "Pay in" pojawia sie tylko tam, gdzie portfel Solany w ogole istnieje
+ * (useSolanaWallet().available - NIE w miniappie Farcastera). Ask SOL:
+ *   - budzet w SOL, liczony w lamportach (parseSolToLamports) - kwota za
+ *     odpowiedz tez, bo 0.005 SOL po zaokragleniu do centa to nie ta kwota,
+ *   - tylko "placisz przy przyjeciu": escrow SOL nie istnieje,
+ *   - wymaga portfela Solany powiazanego z kontem (ramka AskSolanaWallet),
+ *     bo serwer zamraza go w Asku jako platnika.
+ * Zmiana szyny czysci budzet: "6" w USDC i "6" w SOL to zupelnie inne kwoty,
+ * a formularz od pieniedzy nie moze po cichu przeniesc liczby miedzy nimi.
+ *
  * === GRANICA ===
- * Komponent nie zna ani API, ani portfela, ani kontraktu. Oddaje gotowy
- * `AskDraft` przez `onSubmit` - to wolajacy wysyla approve i fund, i to on
- * decyduje, czy escrow jest w ogole dostepny (`escrowAvailable`).
+ * Komponent nie zna ani API, ani kontraktu. Oddaje gotowy `AskDraft` przez
+ * `onSubmit` - to wolajacy wysyla approve i fund, i to on decyduje, czy escrow
+ * jest w ogole dostepny (`escrowAvailable`). Jedyny wyjatek to portfel Solany:
+ * jego powiazanie (podpis wiadomosci, zero pieniedzy) jest warunkiem wyslania
+ * szkicu SOL, wiec ramka stoi tutaj - inaczej feed i /asks musialyby ja
+ * montowac kazde osobno.
  */
 
 export type AskDraft = {
   question: string;
+  /** Przy SOL: liczba SOL tylko do wyswietlania - prawda jest w `budgetLamports`. */
   budget: number;
   seats: number;
   durationMs: number;
   funding: AskFunding;
+  rail?: AskRail;
+  /** Tylko przy 'sol-solana': budzet w lamportach, dziesietnie. */
+  budgetLamports?: string;
 };
 
 export type AskComposerProps = {
@@ -148,9 +177,31 @@ export default function AskComposer({
    */
   const [funding, setFunding] = useState<AskFunding>(escrowAvailable ? 'escrowed' : 'on-resolve');
 
+  /** Wybrana szyna. USDC domyslnie - to jedyna, ktora dziala wszedzie. */
+  const [rail, setRail] = useState<AskRail>('usdc-base');
+  /**
+   * Portfel Solany i jego powiazanie z kontem. Serwera pytamy dopiero, gdy
+   * ktos wybierze SOL - kompozytor otwiera sie w feedzie i nie ma placic
+   * odczytem za szyne, ktorej nikt nie wybral.
+   */
+  const solWallet = useSolanaAskWallet({ enabled: rail === 'sol-solana' });
+  // Miniapp wykryty po wyborze (albo stos Solany padl) - wracamy na USDC,
+  // zamiast wysylac szkic, ktorego nikt tu nie zaplaci.
+  const effectiveRail: AskRail = solWallet.available ? rail : 'usdc-base';
+  const isSol = effectiveRail === 'sol-solana';
+
   // Escrow zniknal (zmiana sieci w portfelu) - wybor musi za tym pojsc, bo
-  // inaczej przycisk obiecywalby blokade, ktorej nie da sie wykonac.
-  const effectiveFunding: AskFunding = escrowAvailable ? funding : 'on-resolve';
+  // inaczej przycisk obiecywalby blokade, ktorej nie da sie wykonac. SOL nie
+  // ma escrow w ogole.
+  const effectiveFunding: AskFunding = escrowAvailable && !isSol ? funding : 'on-resolve';
+
+  const pickRail = (next: AskRail) => {
+    if (next === rail) return;
+    setRail(next);
+    // Patrz naglowek: kwota nie przechodzi miedzy szynami.
+    setBudgetText('');
+    setFailure(null);
+  };
 
   /**
    * Wstawienie zaczatku. Ustawia CALY szkic naraz - tresc, budzet, miejsca
@@ -166,7 +217,9 @@ export default function AskComposer({
    */
   const applyTemplate = (template: AskTemplate) => {
     setQuestion(template.question);
-    setBudgetText(template.budget.toFixed(2));
+    // Budzety zaczatkow sa w USDC. Przy SOL zostawiamy pole puste - "6.00"
+    // wpisane w SOL byloby kwota, ktorej nikt nie wybral.
+    setBudgetText(isSol ? '' : template.budget.toFixed(2));
     setSeatsText(String(template.seats));
     setDurationMs(template.durationMs);
     setFailure(null);
@@ -178,6 +231,16 @@ export default function AskComposer({
   const perAnswer = useMemo(
     () => (budget === null || seats === null ? 0 : perAnswerFor(budget, seats)),
     [budget, seats]
+  );
+
+  /** Budzet SOL w lamportach. `null` = pole puste albo nie jest kwota SOL. */
+  const budgetLamports = useMemo(() => (isSol ? parseSolToLamports(budgetText) : null), [isSol, budgetText]);
+  const perAnswerLamports = useMemo(
+    () =>
+      budgetLamports === null || seats === null || !Number.isInteger(seats)
+        ? 0n
+        : perAnswerLamportsFor(budgetLamports, seats),
+    [budgetLamports, seats]
   );
 
   /**
@@ -195,18 +258,53 @@ export default function AskComposer({
         ? `With the vault details the question is ${sentLength} characters. Keep it under ${MAX_QUESTION_LENGTH}.`
         : `Keep the question under ${MAX_QUESTION_LENGTH} characters (now ${sentLength}).`;
     }
-    if (budget === null) return 'Set a budget.';
-    if (budget <= 0) return 'The budget has to be more than zero.';
+    if (isSol) {
+      if (budgetText.trim() === '') return 'Set a budget in SOL.';
+      if (budgetLamports === null) return 'Write the budget as a SOL amount, like 0.05 (up to 9 decimals).';
+      if (budgetLamports <= 0n) return 'The budget has to be more than zero.';
+      if (budgetLamports > MAX_BUDGET_LAMPORTS) {
+        return `The budget is capped at ${formatLamports(MAX_BUDGET_LAMPORTS)} SOL.`;
+      }
+    } else {
+      if (budget === null) return 'Set a budget.';
+      if (budget <= 0) return 'The budget has to be more than zero.';
+    }
     if (seats === null || !Number.isInteger(seats)) return 'Seats must be a whole number.';
     if (seats < 1) return 'An Ask needs at least one seat.';
     if (seats > MAX_SEATS) return `${MAX_SEATS} seats is the maximum.`;
+    if (isSol) {
+      if (perAnswerLamports < MIN_PER_ANSWER_LAMPORTS) {
+        return `Each answer would be worth ${formatLamports(perAnswerLamports)} SOL, below the ${formatLamports(
+          MIN_PER_ANSWER_LAMPORTS
+        )} SOL minimum. Raise the budget or cut the seats.`;
+      }
+      // Platnika serwer bierze z powiazania - bez niego zapis i tak padnie.
+      if (!solWallet.binding) {
+        return solWallet.bindingPhase === 'loading'
+          ? 'Checking your linked Solana wallet…'
+          : 'Link a Solana wallet to your account first. It is a free signature.';
+      }
+      return null;
+    }
     if (perAnswer < MIN_PER_ANSWER) {
       return `Each answer would be worth ${formatAskMoney(perAnswer)}, below the ${formatAskMoney(
         MIN_PER_ANSWER
       )} minimum. Raise the budget or cut the seats.`;
     }
     return null;
-  }, [question, vault, budget, seats, perAnswer]);
+  }, [
+    question,
+    vault,
+    budget,
+    seats,
+    perAnswer,
+    isSol,
+    budgetText,
+    budgetLamports,
+    perAnswerLamports,
+    solWallet.binding,
+    solWallet.bindingPhase,
+  ]);
 
   const blocked = disabled || pending || problem !== null;
 
@@ -214,7 +312,8 @@ export default function AskComposer({
     event.preventDefault();
     // Druga bramka obok `disabled` na przycisku: Enter w polu tekstowym potrafi
     // wyslac formularz z pominieciem przycisku.
-    if (blocked || budget === null || seats === null) return;
+    if (blocked || seats === null) return;
+    if (isSol ? budgetLamports === null : budget === null) return;
 
     setPending(true);
     setFailure(null);
@@ -227,10 +326,13 @@ export default function AskComposer({
          * dokladnie `question.trim()` i nic wiecej.
          */
         question: attachVaultContext(question.trim(), vault),
-        budget,
+        // Przy SOL liczba tylko do wyswietlania - serwer liczy z lamportow.
+        budget: isSol && budgetLamports !== null ? lamportsToSolNumber(budgetLamports) : (budget as number),
         seats,
         durationMs,
         funding: effectiveFunding,
+        rail: effectiveRail,
+        ...(isSol && budgetLamports !== null ? { budgetLamports: budgetLamports.toString() } : {}),
       });
       setQuestion('');
       setBudgetText('');
@@ -255,8 +357,11 @@ export default function AskComposer({
   const feePercent =
     typeof escrowFeeBps === 'number' && escrowFeeBps > 0 ? `${escrowFeeBps / 100}%` : null;
 
-  const submitLabel =
-    effectiveFunding === 'escrowed'
+  const submitLabel = isSol
+    ? pending
+      ? 'Posting…'
+      : 'Post SOL ask'
+    : effectiveFunding === 'escrowed'
       ? pending
         ? 'Locking…'
         : budget !== null && budget > 0
@@ -336,14 +441,42 @@ export default function AskComposer({
         />
       )}
 
+      {/* ===== SZYNA =====
+          Tylko tam, gdzie portfel Solany w ogole istnieje. W miniappie
+          Farcastera wybor znika calkiem - opcja, ktorej nie da sie zaplacic,
+          jest gorsza niz jej brak (ta sama zasada co zakladka Solany). */}
+      {solWallet.available && (
+        <fieldset className="mt-4">
+          <legend className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-soft-ink-faint">
+            Pay in
+          </legend>
+          <div className="grid grid-cols-2 gap-1 rounded-pill border border-soft-line bg-soft-sunken p-1" role="radiogroup">
+            <RailChoice
+              active={!isSol}
+              onSelect={() => pickRail('usdc-base')}
+              disabled={pending}
+              token="USDC"
+              network="on Base"
+            />
+            <RailChoice
+              active={isSol}
+              onSelect={() => pickRail('sol-solana')}
+              disabled={pending}
+              token="SOL"
+              network="on Solana"
+            />
+          </div>
+        </fieldset>
+      )}
+
       <div className="mt-3 grid grid-cols-2 gap-3">
         <label className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-soft-ink-faint">
-          Budget
+          {isSol ? 'Budget in SOL' : 'Budget'}
           <input
             value={budgetText}
             onChange={(event) => setBudgetText(event.target.value)}
             inputMode="decimal"
-            placeholder="6.00"
+            placeholder={isSol ? '0.05' : '6.00'}
             className={`mt-1.5 block ${fieldClass} font-normal normal-case tracking-normal tabular-nums`}
           />
         </label>
@@ -392,12 +525,30 @@ export default function AskComposer({
           Per answer
         </span>
         <span className="font-soft-display text-[20px] font-bold tabular-nums text-soft-accent-deep">
-          {formatAskMoney(perAnswer)}
+          {isSol ? `${formatLamports(perAnswerLamports)} SOL` : formatAskMoney(perAnswer)}
         </span>
       </div>
+      {isSol && (
+        // Minimum nazwane ZANIM ktos je przekroczy - 0.005 SOL chroni pierwszy
+        // przelew na puste konto przed odrzuceniem za rent.
+        <p className="mt-1.5 px-1 text-[11px] leading-[1.5] text-soft-ink-faint">
+          At least {formatLamports(MIN_PER_ANSWER_LAMPORTS)} SOL per answer, so the first payment to a new
+          wallet always lands.
+        </p>
+      )}
 
       {/* ================= FINANSOWANIE ================= */}
-      {escrowAvailable ? (
+      {isSol ? (
+        <div className="mt-4 flex flex-col gap-2.5">
+          {/* Zdanie o pieniadzach dla SOL - to samo, ktore potem mowi karta.
+              Nie ma tu wyboru escrow, bo escrow SOL nie istnieje. */}
+          <p className="break-words text-[11.5px] leading-[1.5] text-soft-ink-muted">
+            Paid on accept in SOL. Nothing is locked. You pay each answer you accept from the Solana
+            wallet linked to your account.
+          </p>
+          <AskSolanaWallet wallet={solWallet} purpose="pay" />
+        </div>
+      ) : escrowAvailable ? (
         <fieldset className="mt-4">
           <legend className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-soft-ink-faint">
             The money
@@ -433,7 +584,9 @@ export default function AskComposer({
       <p className="mt-3 text-[11.5px] leading-[1.5] text-soft-ink-faint">
         {effectiveFunding === 'escrowed'
           ? 'Posting sends two transactions: one to approve the USDC, one to lock it. The Ask is only created after the second one is confirmed.'
-          : 'Posting does not move any money.'}{' '}
+          : isSol
+            ? 'Posting does not move any SOL.'
+            : 'Posting does not move any money.'}{' '}
         Let the deadline pass without resolving and your resolve rate drops on the front of every Ask
         you post afterwards.
       </p>
@@ -523,6 +676,42 @@ function FundingChoice({
       <span className="mt-1 block break-words text-[11.5px] leading-[1.5] text-soft-ink-muted">
         {body}
       </span>
+    </button>
+  );
+}
+
+/**
+ * Jedna szyna w przelaczniku "Pay in". Segment w pigulce, a nie dwa osobne
+ * przyciski: to jest wybor jednego z dwoch, a token i siec czyta sie razem
+ * ("SOL on Solana"). Aktywny dostaje biala powierzchnie i morski token -
+ * ten sam akcent Aska co pasek stanu karty; bursztyn zostaje dla kwot.
+ */
+function RailChoice({
+  active,
+  onSelect,
+  disabled,
+  token,
+  network,
+}: {
+  active: boolean;
+  onSelect: () => void;
+  disabled?: boolean;
+  token: string;
+  network: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={active}
+      onClick={onSelect}
+      disabled={disabled}
+      className={`flex min-w-0 items-baseline justify-center gap-1.5 rounded-pill px-3 py-1.5 font-soft-display text-[12.5px] transition-[background-color,box-shadow,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary disabled:cursor-not-allowed disabled:active:scale-100 ${
+        active ? 'bg-soft-surface shadow-chip' : 'hover:bg-soft-surface/60'
+      }`}
+    >
+      <span className={`font-bold ${active ? 'text-soft-ask-deep' : 'text-soft-ink-muted'}`}>{token}</span>
+      <span className={`truncate font-medium ${active ? 'text-soft-ink' : 'text-soft-ink-faint'}`}>{network}</span>
     </button>
   );
 }

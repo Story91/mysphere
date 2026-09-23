@@ -1,6 +1,6 @@
 import 'server-only';
 import { getAdminDb } from '../../utils/auth/firebaseAdmin';
-import { lowerAddress } from '../../utils/asks/askSealCore';
+import { lowerAddress, railOf } from '../../utils/asks/askSealCore';
 import type { AskStatus } from '../../utils/asks/types';
 import {
   ASKS_COLLECTION,
@@ -13,9 +13,11 @@ import {
   askRef,
   contentRef,
   isDocId,
+  readSolanaWalletBinding,
   stateRef,
   type AskStore,
 } from './askStore';
+import { freezePayeeFromBinding } from './solanaWalletStore';
 
 /**
  * Magazyn ZAPIECZETOWANYCH tresci odpowiedzi - kolekcja `askAnswerContent`.
@@ -81,8 +83,21 @@ export type SaveAnswerRefusal =
   | 'already_answered'
   | 'answer_write_failed';
 
+/**
+ * Dodatki tylko dla Aska SOL (na Asku USDC tych kluczy nie ma wcale):
+ * payoutAddressBound - odbiorca zamrozony w tej samej transakcji z powiazania
+ *                      odpowiadajacego; false = wyplata zablokowana, dopoki
+ *                      nie powiaze portfela (POST /api/asks/[id]/payee),
+ * payoutAddressIssue - dlaczego nie zamrozono mimo powiazania.
+ */
+export type SolanaAnswerExtras = {
+  rail: 'sol-solana';
+  payoutAddressBound: boolean;
+  payoutAddressIssue?: 'payee_is_author_wallet' | 'binding_invalid';
+};
+
 export type SaveAnswerResult =
-  | { ok: true; answer: StoredAnswer }
+  | ({ ok: true; answer: StoredAnswer } & Partial<SolanaAnswerExtras>)
   | { ok: false; code: SaveAnswerRefusal; status: number; askStatus?: AskStatus };
 
 const refuse = (code: SaveAnswerRefusal, status: number, askStatus?: AskStatus): SaveAnswerResult => ({
@@ -153,6 +168,13 @@ export async function saveAnswer(
       if (lowerAddress(view.author) === author) return refuse('own_ask', 403);
       if (guardSnap.exists || !earlier.empty) return refuse('already_answered', 409);
 
+      // Ask SOL (szyna ze STANU): powiazanie odpowiadajacego czytamy w tej
+      // samej transakcji - odbiorca zamraza sie razem z odpowiedzia albo wcale.
+      // Odczyt przed pierwszym zapisem (wymog Firestore). Bez powiazania
+      // odpowiedz i tak przechodzi (decyzja wlasciciela), wyplata czeka.
+      const solState = bundle.state && railOf(bundle.state) === 'sol-solana' ? bundle.state : null;
+      const binding = solState ? await readSolanaWalletBinding(store, author, tx) : null;
+
       const answerDoc = store.db.collection(ASK_ANSWERS_COLLECTION).doc();
       const answerId = answerDoc.id;
 
@@ -176,7 +198,30 @@ export async function saveAnswer(
       });
       tx.update(askRef(store, askId), { answerCount: store.FieldValue.increment(1) });
 
-      return { ok: true, answer: { id: answerId, askId, author, createdAt: now } };
+      const answer = { id: answerId, askId, author, createdAt: now };
+      if (!solState) return { ok: true, answer };
+
+      // Niewazne powiazanie nie blokuje odpowiedzi (ALARM jest w logu), ale
+      // nie zamrazamy z niego odbiorcy - to decyzja wlasciciela.
+      if (!binding || binding.kind !== 'valid') {
+        return {
+          ok: true,
+          answer,
+          rail: 'sol-solana',
+          payoutAddressBound: false,
+          ...(binding?.kind === 'invalid' ? { payoutAddressIssue: 'binding_invalid' as const } : {}),
+        };
+      }
+      const frozen = freezePayeeFromBinding(tx, store, {
+        state: solState,
+        answerId,
+        answerer: author,
+        binding: binding.value,
+        nowMs: now,
+      });
+      return frozen.ok
+        ? { ok: true, answer, rail: 'sol-solana', payoutAddressBound: true }
+        : { ok: true, answer, rail: 'sol-solana', payoutAddressBound: false, payoutAddressIssue: frozen.code };
     });
   } catch (error) {
     // Przegrany wyscig (drugi commit straznika) albo awaria Firestore.

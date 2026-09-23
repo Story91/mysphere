@@ -1,5 +1,7 @@
 // Uruchamia testy czystej logiki UI Askow (test/askRailRow.test.ts): linia
-// meta rozstrzygnietego Aska w prawym railu i wspolny format "3h ago".
+// meta rozstrzygnietego Aska w prawym railu i wspolny format "3h ago";
+// oraz klienta Askow SOL (test/askSolanaUi.test.ts): kwoty w lamportach,
+// odznaka szyny, linki eksploratora, powiazanie portfela i straznik bundla.
 //
 // Ten sam runner co scripts/test-solana.cjs i z tego samego powodu: ts-node
 // w trybie CommonJS laduje .ts z app/ bez zmian w kodzie aplikacji. Roznica
@@ -21,7 +23,18 @@ const env = {
 const mocha = path.join(__dirname, '..', 'node_modules', 'mocha', 'bin', 'mocha.js');
 const r = spawnSync(
   process.execPath,
-  [mocha, '-r', 'ts-node/register', '--extension', 'ts', '--extension', 'tsx', 'test/askRailRow.test.ts'],
+  [
+    mocha,
+    '-r',
+    'ts-node/register',
+    '--extension',
+    'ts',
+    '--extension',
+    'tsx',
+    'test/askRailRow.test.ts',
+    // Klient Askow SOL: kwoty, szyna, powiazanie portfela i straznik bundla.
+    'test/askSolanaUi.test.ts',
+  ],
   { stdio: 'inherit', env }
 );
 process.exit(r.status ?? 1);

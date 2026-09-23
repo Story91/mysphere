@@ -54,6 +54,7 @@ import {
   payoutEntryFor,
   payoutRegistryId,
   pickTransfer,
+  railOf,
   readAcceptance,
   readRegistry,
   transferAcceptance,
@@ -152,7 +153,12 @@ async function resolveOnResolveAsk(store: AskStore, askId: string, viewer: strin
 
   // Flaga `accepted` bez rekordu to albo przyjecie sprzed rekordow, albo
   // podrobka z devtools. Rozstrzyga lancuch, nie flaga.
-  const pending = rows.filter((row) => row.raw.accepted === true && !accepted.valid.has(row.id));
+  // Ask SOL (szyna ze STANU) nie ma starego swiata: kazda wyplata od razu
+  // dostaje rekord, wiec lustro `accepted` bez rekordu to zawsze podrobka -
+  // nie weryfikujemy jej (legacyContext liczy centy USDC i odmowilby
+  // invalid_per_answer, blokujac resolve). Liczy sie tylko rekord.
+  const solAsk = railOf(bundle.state) === 'sol-solana';
+  const pending = solAsk ? [] : rows.filter((row) => row.raw.accepted === true && !accepted.valid.has(row.id));
   const planned: PlannedLegacy[] = [];
   const review: string[] = [];
   if (pending.length > 0) {
@@ -315,12 +321,18 @@ async function resolveInTransaction(
 
   writeLegacy(tx, store, bound);
   putState(tx, store, next);
-  mirrorAsk(tx, store, askId, {
-    status: 'resolved',
-    resolvedAt: now,
-    acceptedCount: acceptedIds.size,
-    answerCount: rows.length,
-  });
+  mirrorAsk(
+    tx,
+    store,
+    askId,
+    {
+      status: 'resolved',
+      resolvedAt: now,
+      acceptedCount: acceptedIds.size,
+      answerCount: rows.length,
+    },
+    next
+  );
 
   return { acceptedCount: acceptedIds.size, answerCount: rows.length, seats: next.seats };
 }
