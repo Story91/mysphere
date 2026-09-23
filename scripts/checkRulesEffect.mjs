@@ -25,6 +25,23 @@
  *   askAnswerContent    -> MUSI byc ODMOWA. To jest ta obietnica z /asks.
  *   premiumContent      -> MUSI byc ODMOWA. To jest tresc, za ktora ktos placi.
  *   solanaPostReceipts  -> MUSI byc ODMOWA. Rejestr portfeli do wyplat z Solany.
+ *
+ * === SCIEZKI PIECZECI ASKOW (asks/{id}/sealed|acceptances|answerers,
+ *     askAnswerContent/_registry/payouts) ===
+ * Serwer trzyma tam prawde o Askach: zapieczetowany stan, przyjecia, straznika
+ * "jedna odpowiedz na adres" i rejestr zuzytych wyplat. HMAC chroni je przed
+ * PODROBKA, ale nie przed SKASOWANIEM ani COFNIECIEM - przed tym chronia tylko
+ * reguly. Projekt zaklada, ze te sciezki sa zamkniete JUZ DZIS: 'asks'
+ * i 'askAnswerContent' sa w hasOwnRules, a nierekursywny catch-all
+ * `{collection}/{docId}/{rest=**}` zwraca !hasOwnRules(pierwszy segment).
+ * Odmowa ODCZYTU dowodzi, ze dla tych sciezek dziala wlasnie ta instrukcja
+ * `allow read, write` (innej pasujacej reguly nie ma), wiec zapis tez jest
+ * zamkniety. Id Aska w sondzie jest zmyslone - regula nie patrzy na id,
+ * a sonda niczego nie tworzy.
+ *
+ * Ktorakolwiek z tych sond 'open' = produkcja NIE ma tego catch-alla.
+ * STOP: przed wdrozeniem kodu pieczeci wdroz najpierw czesc firestore.rules
+ * z hasOwnRules i catch-allem - inaczej pieczecie da sie kasowac i cofac.
  */
 import { config } from 'dotenv';
 import { initializeApp } from 'firebase/app';
@@ -41,6 +58,9 @@ const app = initializeApp({
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 });
 const db = getFirestore(app);
+
+/** Zmyslone id Aska do sond podkolekcji - istnienie dokumentu nie ma znaczenia dla regul. */
+const PROBE_ASK_ID = 'probeAskId0000000000';
 
 /** oczekiwanie: 'open' = ma sie udac, 'denied' = ma odmowic */
 const PROBES = [
@@ -60,6 +80,11 @@ const PROBES = [
   // odpowiedzi. Otwarty = kazdy moze go skasowac i wylaczyc platnosci
   // (przekierowac ich nie moze - wpisy niosa HMAC). Patrz receiptRegistry.ts.
   ['solanaPostReceipts', 'denied'],
+  // Pieczecie Askow - patrz naglowek. Sciezka z '/' to podkolekcja.
+  [`asks/${PROBE_ASK_ID}/sealed`, 'denied'],
+  [`asks/${PROBE_ASK_ID}/acceptances`, 'denied'],
+  [`asks/${PROBE_ASK_ID}/answerers`, 'denied'],
+  ['askAnswerContent/_registry/payouts', 'denied'],
 ];
 
 let zle = 0;
@@ -76,7 +101,7 @@ for (const [name, oczekiwane] of PROBES) {
   const ok = wynik === oczekiwane;
   if (!ok) zle += 1;
   console.log(
-    `${ok ? 'OK  ' : 'ZLE '} ${name.padEnd(18)} oczekiwano=${oczekiwane.padEnd(7)} jest=${wynik}`
+    `${ok ? 'OK  ' : 'ZLE '} ${name.padEnd(38)} oczekiwano=${oczekiwane.padEnd(7)} jest=${wynik}`
   );
 }
 

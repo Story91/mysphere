@@ -23,11 +23,9 @@
  */
 
 import { NextResponse, type NextRequest } from 'next/server';
-import { getAsk, hasAnswered } from '../../../utils/asks/asks';
-import { isExpired } from '../../../utils/asks/types';
-import { normalizeAddress } from '../../../utils/monetization/types';
 import { sessionAddress } from '../identity';
-import { isAnswerStoreAvailable, saveAnswer } from '../answerStore';
+import { saveAnswer, type SaveAnswerRefusal } from '../answerStore';
+import { isDocId, openAskStore } from '../askStore';
 import { MAX_ANSWER_LENGTH } from '../pricing';
 
 // getSessionFromCookies uzywa node:crypto, firebase-admin nie dziala na Edge.
@@ -41,8 +39,27 @@ interface AnswerBody {
   content?: unknown;
 }
 
+/**
+ * Odmowy z transakcji zapisu (saveAnswer) -> zdanie dla czlowieka. Status
+ * przychodzi z magazynu; tu jest tylko tresc.
+ */
+const REFUSAL_MESSAGES: Record<SaveAnswerRefusal, string> = {
+  invalid_id: 'Invalid Ask id',
+  invalid_author: 'Your session does not carry a valid wallet address.',
+  ask_not_found: 'Ask not found',
+  seal_invalid: 'This Ask cannot be verified right now, so it is not taking answers. Nothing was saved.',
+  ask_unverified: 'This Ask has not been verified yet, so it is not taking answers.',
+  ask_closed: 'This Ask is no longer taking answers',
+  own_ask: 'You cannot answer your own Ask',
+  already_answered: 'You already answered this Ask',
+  answer_write_failed: 'Failed to store answer',
+};
+
 export async function POST(request: NextRequest) {
-  if (!(await isAnswerStoreAvailable())) {
+  // Magazyn Askow (admin SDK + klucz pieczeci). Bez niego nie zapiszemy tresci
+  // poza zasiegiem klienta ani nie sprawdzimy stanu Aska w transakcji.
+  const store = await openAskStore();
+  if (!store) {
     // Bez konta uslugowego nie da sie zapisac tresci poza zasiegiem klienta.
     // Odmawiamy zamiast zapisac ja tam, gdzie kazdy ja przeczyta - ta sama
     // decyzja co w POST /api/premium.
@@ -82,6 +99,13 @@ export async function POST(request: NextRequest) {
   if (!askId) {
     return NextResponse.json({ error: 'Missing askId' }, { status: 400, headers: NO_STORE_PRIVATE });
   }
+  // Id trafia do admin doc() - 'X/sealed/state' adresowaloby cudzy stan.
+  if (!isDocId(askId)) {
+    return NextResponse.json(
+      { error: 'Invalid Ask id', code: 'invalid_id' },
+      { status: 400, headers: NO_STORE_PRIVATE }
+    );
+  }
   if (!content) {
     return NextResponse.json(
       { error: 'Missing answer content' },
@@ -95,66 +119,28 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let ask;
-  try {
-    ask = await getAsk(askId);
-  } catch (error) {
-    console.error('[api/asks/answers] Odczyt Aska nie powiodl sie:', error);
-    // Nieudany odczyt to NIE jest "nie ma takiego Aska". 404 bylby
-    // oswiadczeniem o nieistnieniu zasobu wydanym w chwili niewiedzy.
+  // WSZYSTKIE kontrole Aska sa w transakcji zapisu (saveAnswer, plan krok 8):
+  //   ask_not_found 404, seal_invalid 503 (pieczec stanu niewazna),
+  //   ask_unverified 409 (flaga wlaczona, Ask bez pieczeci - Aska, ktorego
+  //   serwer nigdy nie zalozyl, nie zbiera odpowiedzi), ask_closed 409 (status
+  //   i termin ZE STANU, gdy Ask jest zapieczetowany), own_ask 403,
+  //   already_answered 409 (straznik asks/{id}/answerers/{adres} + stara
+  //   odpowiedz tego adresu).
+  // Dawne kontrole przed transakcja czytaly dokument klienckim SDK - status,
+  // ktory przegladarka ustawia dowolnie, zamykal Aska na odpowiedzi jednym
+  // updateDoc. Drugi odczyt poza transakcja niczego by tu nie dodal.
+  const saved = await saveAnswer(store, { askId, author, content });
+  if (!saved.ok) {
     return NextResponse.json(
-      { error: 'Failed to read Ask', code: 'ask_unavailable' },
-      { status: 503, headers: NO_STORE_PRIVATE }
+      {
+        error: REFUSAL_MESSAGES[saved.code],
+        code: saved.code,
+        ...(saved.askStatus ? { status: saved.askStatus } : {}),
+      },
+      { status: saved.status, headers: NO_STORE_PRIVATE }
     );
   }
-
-  if (!ask) {
-    return NextResponse.json({ error: 'Ask not found' }, { status: 404, headers: NO_STORE_PRIVATE });
-  }
-
-  if (ask.status !== 'open' || isExpired(ask)) {
-    return NextResponse.json(
-      { error: 'This Ask is no longer taking answers', code: 'ask_closed', status: ask.status },
-      { status: 409, headers: NO_STORE_PRIVATE }
-    );
-  }
-
-  if (normalizeAddress(ask.author) === normalizeAddress(author)) {
-    return NextResponse.json(
-      { error: 'You cannot answer your own Ask', code: 'own_ask' },
-      { status: 403, headers: NO_STORE_PRIVATE }
-    );
-  }
-
-  // Jedna odpowiedz na osobe i na Aska. Bez tego jeden adres zajalby wszystkie
-  // miejsca i budzet rozszedlby sie do jednej kieszeni.
-  let already: boolean;
-  try {
-    already = await hasAnswered(askId, normalizeAddress(author));
-  } catch (error) {
-    console.error('[api/asks/answers] Sprawdzenie dotychczasowej odpowiedzi nie powiodlo sie:', error);
-    // Nie umiemy sprawdzic, wiec nie zapisujemy. Failujemy zamknieto:
-    // przepuszczenie tutaj oznaczaloby duplikaty przy kazdej awarii odczytu.
-    return NextResponse.json(
-      { error: 'Failed to check existing answers', code: 'answers_unavailable' },
-      { status: 503, headers: NO_STORE_PRIVATE }
-    );
-  }
-
-  if (already) {
-    return NextResponse.json(
-      { error: 'You already answered this Ask', code: 'already_answered' },
-      { status: 409, headers: NO_STORE_PRIVATE }
-    );
-  }
-
-  const stored = await saveAnswer({ askId, author, content });
-  if (!stored) {
-    return NextResponse.json(
-      { error: 'Failed to store answer', code: 'answer_write_failed' },
-      { status: 500, headers: NO_STORE_PRIVATE }
-    );
-  }
+  const stored = saved.answer;
 
   return NextResponse.json(
     {

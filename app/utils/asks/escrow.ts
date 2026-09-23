@@ -463,6 +463,22 @@ export const ASK_ESCROW_ABI = [
       { name: 'caller', type: 'address', indexed: true },
     ],
   },
+  {
+    /**
+     * Zwrot wygaslego budzetu (settleExpired). Dopisane dla trasy serwerowej,
+     * ktora zapisuje 'expired' dopiero po znalezieniu TEGO logu z kluczem
+     * tego Aska - zamiast wierzyc hashowi z przegladarki. Ksztalt 1:1
+     * z contracts/AskEscrow.sol (event AskExpired).
+     */
+    type: 'event',
+    name: 'AskExpired',
+    inputs: [
+      { name: 'key', type: 'bytes32', indexed: true },
+      { name: 'author', type: 'address', indexed: true },
+      { name: 'refundToAuthor', type: 'uint256', indexed: false },
+      { name: 'fee', type: 'uint256', indexed: false },
+    ],
+  },
   { type: 'error', name: 'InvalidAmount', inputs: [] },
   { type: 'error', name: 'InvalidSeats', inputs: [] },
   { type: 'error', name: 'DeadlineInPast', inputs: [] },

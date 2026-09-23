@@ -22,7 +22,14 @@
  * zostawia log Transfer, wiec zawsze konczy sie poziomem 'strict'.
  */
 
-import { createPublicClient, http, parseEther, parseUnits, type Hash } from 'viem';
+import {
+  TransactionReceiptNotFoundError,
+  createPublicClient,
+  http,
+  parseEther,
+  parseUnits,
+  type Hash,
+} from 'viem';
 import { base } from 'viem/chains';
 import { MONETIZATION_CHAIN_ID, type MonetizationToken, type PaymentVerificationLevel } from './types';
 
@@ -122,3 +129,139 @@ export async function verifyBasePayment(input: VerifyPaymentInput): Promise<Paym
 }
 
 export const VERIFICATION_CHAIN_ID = MONETIZATION_CHAIN_ID;
+
+/* ------------------------------------------------------------------ */
+/*  SUROWE TRANSFERY USDC - dla wyplat Askow                           */
+/* ------------------------------------------------------------------ */
+
+/**
+ * DOPISANE OBOK verifyBasePayment, NIE ZAMIAST. Tamta funkcja odpowiada na
+ * pytanie "czy jest JAKIS transfer >= kwota na ten adres" i tyle wystarcza
+ * tip-to-unlock. Wyplata za odpowiedz na Aska potrzebuje wiecej: KTO wyslal
+ * (Transfer.from musi byc autorem Aska), KTORY log (jeden log = jedna wyplata,
+ * rejestr zuzytych logow) i KIEDY (blok nie moze byc starszy niz odpowiedz).
+ * Dlatego tu oddajemy wszystkie transfery USDC z transakcji razem z czasem
+ * bloku, a decyzje podejmuje czysta logika w app/utils/asks/askSealCore.ts.
+ * verifyBasePayment zostaje nietkniety - /api/unlock/** dziala jak dotad.
+ */
+
+/** Jeden log Transfer USDC na Base, juz zdekodowany. Adresy malymi literami. */
+export type UsdcTransferLog = {
+  logIndex: number;
+  from: string;
+  to: string;
+  value: bigint;
+};
+
+/** Minimalny ksztalt logu z paragonu viem - tylko pola, ktore czytamy. */
+export type ReceiptLogLike = {
+  address: string;
+  topics: readonly (string | null | undefined)[];
+  data: string;
+  logIndex: number | bigint | null;
+};
+
+/**
+ * Transfery USDC z logow paragonu - CZYSTE, bez RPC, zeby dalo sie to
+ * przetestowac bez lancucha.
+ *
+ * Log przechodzi tylko wtedy, gdy: pochodzi z kontraktu USDC na Base, ma
+ * topic0 Transfer, ma OBA indeksowane adresy i dane daja sie odczytac jako
+ * liczba. Log bez logIndex odpada - bez niego nie da sie zapisac, ktory log
+ * zuzyto, a wtedy ta sama wyplata moglaby posluzyc dwa razy.
+ */
+export function usdcTransfersFromLogs(logs: readonly ReceiptLogLike[]): UsdcTransferLog[] {
+  const out: UsdcTransferLog[] = [];
+  for (const log of logs) {
+    if (typeof log.address !== 'string' || log.address.toLowerCase() !== USDC_BASE_ADDRESS) continue;
+    if (log.topics[0]?.toLowerCase() !== TRANSFER_TOPIC) continue;
+    const fromTopic = log.topics[1];
+    const toTopic = log.topics[2];
+    if (typeof fromTopic !== 'string' || typeof toTopic !== 'string') continue;
+    if (!/^0x[0-9a-fA-F]{64}$/.test(fromTopic) || !/^0x[0-9a-fA-F]{64}$/.test(toTopic)) continue;
+    if (log.logIndex === null || log.logIndex === undefined) continue;
+    const logIndex = Number(log.logIndex);
+    if (!Number.isSafeInteger(logIndex) || logIndex < 0) continue;
+    // Pusty albo nie-hex `data` to nie jest kwota. BigInt('0x') rzuca, a
+    // BigInt('') daje 0 - dlatego najpierw ksztalt, potem liczba.
+    if (typeof log.data !== 'string' || !/^0x[0-9a-fA-F]{1,64}$/.test(log.data)) continue;
+    let value: bigint;
+    try {
+      value = BigInt(log.data);
+    } catch {
+      continue;
+    }
+    out.push({
+      logIndex,
+      from: addressFromTopic(fromTopic),
+      to: addressFromTopic(toTopic),
+      value,
+    });
+  }
+  return out.sort((a, b) => a.logIndex - b.logIndex);
+}
+
+export type UsdcTransfersResult =
+  | {
+      ok: true;
+      blockNumber: bigint;
+      /** Znacznik czasu bloku w SEKUNDACH - tak podaje go lancuch. */
+      blockTimeSec: number;
+      transfers: UsdcTransferLog[];
+    }
+  | {
+      ok: false;
+      /**
+       * tx_not_found - RPC nie zna tej transakcji (jeszcze nie weszla albo hash
+       *                jest zmyslony); klient moze ponowic.
+       * tx_reverted  - transakcja sie cofnela, nikt nie dostal pieniedzy.
+       * rpc_error    - awaria RPC (paragon albo blok). NIE mowi nic o platnosci,
+       *                wiec wolajacy musi to traktowac jak "nie wiem", a nie "nie".
+       */
+      code: 'tx_not_found' | 'tx_reverted' | 'rpc_error';
+      error: string;
+    };
+
+/**
+ * Wszystkie transfery USDC z jednej transakcji na Base plus czas jej bloku.
+ *
+ * Czas bloku jest czescia wyniku, bo wyplata za odpowiedz nie moze byc
+ * STARSZA niz ta odpowiedz - inaczej dowolny stary przelew do tego adresu
+ * (wyplata z gieldy, napiwek) "oplacalby" nowa odpowiedz.
+ */
+export async function readUsdcTransfers(txHash: string): Promise<UsdcTransfersResult> {
+  let receipt;
+  try {
+    receipt = await publicClient.getTransactionReceipt({ hash: txHash as Hash });
+  } catch (error) {
+    if (error instanceof TransactionReceiptNotFoundError) {
+      return {
+        ok: false,
+        code: 'tx_not_found',
+        error: 'Transaction not found on Base yet. Wait for confirmation and retry.',
+      };
+    }
+    console.error('[monetization] readUsdcTransfers: odczyt paragonu nie powiodl sie:', error);
+    return { ok: false, code: 'rpc_error', error: 'Could not read the transaction from Base. Retry in a moment.' };
+  }
+
+  if (receipt.status !== 'success') {
+    return { ok: false, code: 'tx_reverted', error: 'Transaction reverted on-chain - no payment was made.' };
+  }
+
+  let blockTimeSec: number;
+  try {
+    const block = await publicClient.getBlock({ blockNumber: receipt.blockNumber });
+    blockTimeSec = Number(block.timestamp);
+  } catch (error) {
+    console.error('[monetization] readUsdcTransfers: odczyt bloku nie powiodl sie:', error);
+    return { ok: false, code: 'rpc_error', error: 'Could not read the block of this transaction. Retry in a moment.' };
+  }
+
+  return {
+    ok: true,
+    blockNumber: receipt.blockNumber,
+    blockTimeSec,
+    transfers: usdcTransfersFromLogs(receipt.logs),
+  };
+}

@@ -17,9 +17,9 @@ Because sealed work happens before payment, every card also shows the author's p
 
 1. Go to [/asks](/asks), connect your wallet, and choose Ask something.
 2. Set the question, budget, seats and a deadline (6h, 24h, 3d or 7d). Minimum $0.50 per answer, up to 20 seats.
-3. Pick a funding mode. Escrow needs your wallet on Base and runs two prompts: approve the exact budget, then fund to lock it. On-resolve writes the Ask with no on-chain step.
+3. Pick a funding mode. Either way, if you are not signed in yet, your wallet first asks for a free sign-in signature (no transaction, no gas); the server writes the Ask for the signed-in wallet. Escrow then needs your wallet on Base and runs two prompts: approve the exact budget, then fund to lock it. On-resolve writes the Ask with no on-chain step.
 4. Others answer sealed. One answer per wallet, up to 5,000 characters, and never on your own Ask. You (the author) sign in, open the answers, and pick winners.
-5. Resolve. On-resolve pays each accepted answer by transfer. Escrow closes all seats in one `resolve` transaction that assigns balances; before the deadline that transaction must fill every seat, after the deadline you can award fewer.
+5. Resolve. On-resolve pays each accepted answer by transfer, and paying the last seat closes the Ask by itself and unseals every answer. Escrow closes all seats in one `resolve` transaction that assigns balances; before the deadline that transaction must fill every seat, after the deadline you can award fewer.
 6. Collect. Escrow payouts and any returned budget wait in the contract until the recipient claims them from [the Money tab](/asks?tab=money). There's no deadline to collect.
 
 ## How it flows

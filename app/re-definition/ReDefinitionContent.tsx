@@ -2,6 +2,20 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 // @ts-ignore - config CommonJS wspoldzielony z next.config.js
 import { DISABLED_ROUTES } from '@/config/routeStatus';
+// Etykieta sieci Arc z TEGO SAMEGO przelacznika, ktory wybiera kontrakt postow:
+// bez NEXT_PUBLIC_ARC_POST_CONTRACT_MAINNET posty ida na testnet i wiersz
+// "Feed and posts" ma to powiedziec sam, bez recznej poprawki przy wdrozeniu.
+import { ARC_NETWORK_LABEL } from '@/app/basechat/Arc/contracts/ArcPostContract';
+// Ten sam przelacznik co na /how (kroki 02 i 03): bez
+// NEXT_PUBLIC_SOLANA_CLUSTER=mainnet-beta posty z Solany ida na devnet, a trasy
+// Blinkow odpowiadaja na produkcji 503 (blinksDisabled w actionHeaders.ts).
+// Sprawdzone 2026-09-23: produkcja odpowiadala wlasnie tak (naglowek devnetu,
+// 503). Wiersze o SOL-u czytaja wiec ten przelacznik, zamiast twierdzic "live"
+// o linku, ktory na tym deploymencie nie dziala. Bez web3.js - czysty config.
+import { IS_SOLANA_MAINNET, SOLANA_NETWORK_LABEL } from '@/app/basechat/Solana/config/solanaChain';
+
+/** Dopisek do wierszy SOL-a na deploymencie z devnetem. */
+const SOL_OFF_HERE = ' This deployment runs Solana on devnet, so none of this moves real SOL here.';
 
 /**
  * Metadane zakladki Re-Definition.
@@ -163,6 +177,16 @@ const SHOW_READ_FURTHER = false;
  * PRZEWIDZIANY adres tokena SPHERE (0xB2000...2476) celowo NIE jest
  * wierszem: eth_getCode zwraca 0x, tokena nie ma. Tabela wymienia kod,
  * nie przepowiednie.
+ * AKTUALIZACJA: token wystartowal 2026-09-01 pod tym adresem, ale to token
+ * protokolu B20 bez wlasnego bajtkodu EVM, wiec getCode dalej zwraca 0x
+ * i adres dalej nie jest wierszem - stoi w nocie grupy $SPHERE.
+ *
+ * === SOLANA: ZADNEGO WIERSZA, CELOWO ===
+ * Na Solanie nie wdrozylismy niczego. Posty, napiwki w SOL i platne
+ * odpowiedzi pisza memo przez systemowy Memo Program (v2), Proof of Bags
+ * dokleja wywolanie Memo v1 z kontem tokenowym, a SOL idzie zwyklym
+ * przelewem System Program. Nota grupy "Not ours" mowi to wprost, zeby nikt
+ * nie szukal tu "kontraktu Solany". Adresy programow: solanaChain.ts.
  *
  * NIE DOPISUJ TU NICZEGO BEZ URUCHOMIENIA scripts/verifyOnchainInventory.js
  * (a dla grup Startpad/$SPHERE: bez wlasnego odczytu z lancucha jak wyzej).
@@ -263,18 +287,23 @@ const CONTRACT_GROUPS: { title: string; note: string; rows: ContractRow[] }[] = 
         line: 'Runs every Startpad launch and every curve trade on Base: a 1% trading fee, up to 70% of it to the creator, both immutable. It holds the ETH of every curve that has not closed yet.',
         explorer: 'https://basescan.org/address/0xCF541A7EcE881945833ff1680dFc067C5Dd4cE2D',
       },
+      // Vault i hook na Base: do 2026-09-23 oba wiersze mowily "nic nie
+      // graduowalo", w sprzecznosci z wierszami $SPHERE nizej. Odczyt z lancucha
+      // z 2026-09-09 (docs/LAUNCHPAD-STAN.md, "$SPHERE - stan faktyczny"):
+      // SPHERE w stanie Graduated, pozycja vaulta pelnozakresowa, auto-buyback
+      // z oplat hooka spalil 13,86 mln sztuk - czyli hook oplate pobiera.
       {
         what: 'Liquidity vault',
         chain: 'Base',
         address: '0x6108aDCb176D2A4A6283A06bb0Dd468b86A6AB63',
-        line: 'Will hold the locked LP position of every graduated token forever; only the fees it earns can ever leave. No token has graduated on Base yet, so it holds nothing today.',
+        line: 'Holds the locked LP position of every graduated token forever, $SPHERE\'s included; only the fees it earns can ever leave.',
         explorer: 'https://basescan.org/address/0x6108aDCb176D2A4A6283A06bb0Dd468b86A6AB63',
       },
       {
         what: 'Launch hook',
         chain: 'Base',
         address: '0x71028Ea6999e2c415b46cc022ED0A9fDca2e2044',
-        line: 'The Uniswap v4 hook that takes the 1% fee on every pool swap after graduation. With no graduation on Base yet, it has never collected one.',
+        line: 'The Uniswap v4 hook that takes the 1% fee on every pool swap after graduation. It has been taking it on $SPHERE\'s pool since that token graduated.',
         explorer: 'https://basescan.org/address/0x71028Ea6999e2c415b46cc022ED0A9fDca2e2044',
       },
       {
@@ -343,7 +372,7 @@ const CONTRACT_GROUPS: { title: string; note: string; rows: ContractRow[] }[] = 
   },
   {
     title: 'Not ours, but money moves through them',
-    note: 'Tokens and one name resolver. We did not write these and we cannot change them; they are listed because your money passes through them.',
+    note: 'Tokens and one name resolver. We did not write these and we cannot change them; they are listed because your money passes through them. Solana has no row because nothing of ours is deployed there: posts, SOL tips and paid replies write a memo through Solana\'s own Memo Program (MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr), Proof of Bags adds a call to its older v1 (Memo1UhkJRfHyvLMcVucJwxXeuD728EqVDDwQDxFMNo), and the SOL moves as a plain transfer.',
     rows: [
       {
         what: 'USDC',
@@ -682,6 +711,24 @@ function AskCard() {
  * zywo - to jest `live`. Sam token NIE istnieje: pod przewidzianym adresem
  * getCode zwraca 0x i zadna data startu nie jest ustalona - to jest
  * `planned`. Jeden wiersz `live` klamalby w gore, jeden `planned` w dol.
+ * AKTUALIZACJA: token wystartowal 2026-09-01 i zgraduowal (odczyt z lancucha
+ * 2026-09-09, docs/LAUNCHPAD-STAN.md), wiec oba wiersze sa `live`. Do
+ * 2026-09-23 "Startpad on real money" i wiersz tokena dalej mowily "nic nie
+ * zgraduowalo" / "handluje na krzywej" - sprzecznie z wierszem "Startpad:
+ * launch a token" na tej samej stronie.
+ *
+ * === SOLANA (2026-09-23): TRZY NOWE WIERSZE I DWA POPRAWIONE ===
+ * "Feed and posts" mowil "seven chains"; sieci postowania jest dziewiec.
+ * "Tips" i "Tip receipts" mowily o kazdym napiwku, a napiwek w SOL z linku
+ * nie zostawia u nas nic: nie ma dokumentu w `tips`, strony /tip, wiersza
+ * na Paid ani w Money. Nowe wiersze: Proof of Bags, platne odpowiedzi,
+ * karta na X. Dwie rzeczy, ktore musza w nich zostac, dopoki sa prawda:
+ *  - memo posta niesie adres PODPISUJACEGO portfela Solany, nie adres
+ *    logowania EVM (buildPostMemo w solanaChain.ts). Portfele laczy nasza
+ *    strona posta, nie lancuch;
+ *  - nikt spoza zespolu nie zaplacil jeszcze na mainnecie ani napiwku, ani
+ *    odpowiedzi, Proof of Bags jest sprawdzony tylko symulacja, a
+ *    mysphere.fun nie ma w rejestrze Dialecta (stan 2026-09-23).
  *
  * === LICZBY 187 / 184 064 SA DATOWANE, BO NIKT ICH NIE ODSWIEZA ===
  * Nota i tresc podaja przy nich date (polowa sierpnia 2026, ostatnie zlozenie
@@ -709,12 +756,40 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
   {
     name: 'Feed and posts',
     status: 'live',
-    note: 'Post across seven chains, with comments and likes. Every post has its own page and its own share card.',
+    note: `Post across nine networks: Base, Camp, Linea, Celo, Ethereum, World Chain, Robinhood Chain, ${ARC_NETWORK_LABEL} and ${SOLANA_NETWORK_LABEL}, with comments and likes. Every post has its own page and its own share card. On Solana the author is still your EVM profile: a Solana wallet (Phantom, Solflare or Backpack) pays the fee, about 0.000005 SOL, and signs a memo carrying its own address and the first 280 bytes of the post. That memo is public and permanent. It does not carry your EVM address, but the post shows here under your profile, so anyone who looks can tie that wallet to you. Our server saves a Solana post only after it has read the transaction back, which is why you sign in first. Inside Farcaster mini apps there is no Solana tab.`,
   },
   {
     name: 'Tips',
     status: 'live',
-    note: 'ETH and USDC. A tip is recorded only after the receipt confirms the transfer landed.',
+    note:
+      'On the eight EVM networks (Arc on its testnet): ETH and USDC, plus CELO, WLD, LINEA, CAMP and USDG where those networks use them. A tip is recorded only after the receipt confirms the transfer landed. Under Solana posts, SOL tips go from a link (/blink/tip/ plus the post id) straight to the wallet that signed the post, and we record nothing about them: they are not on Paid or in Money, and the Solana transaction is the whole record. Nobody outside the team has paid one on mainnet yet.' +
+      (IS_SOLANA_MAINNET ? '' : SOL_OFF_HERE),
+  },
+  {
+    name: 'Proof of Bags',
+    status: 'live',
+    note: 'A Solana post that names a token, by its mint address or a pump.fun, Birdeye, Jupiter or Solscan link (DexScreener only when the link carries the token rather than the trading pair), records in its own transaction how much of that token the posting wallet held, and any explorer shows it. Only the wallet\'s standard token account for that token is read. The line under the post compares that balance with the wallet today: "still holds all of it", "wallet up N% since" or "wallet down N% since", "wallet now holds none". It says wallet and never sold, because moving tokens to your own cold wallet looks exactly the same. Checked by simulation against mainnet; no real post has carried one yet.',
+  },
+  {
+    name: 'Paid replies from a link',
+    // 'wired' na devnecie: kod jest, ale wiersz "Paid replies on." pod postem
+    // sie nie renderuje, a trasa na produkcji odpowiada 503 - patrz import.
+    status: IS_SOLANA_MAINNET ? 'live' : 'wired',
+    note:
+      'Under a Solana post, anyone can answer and pay its author in one transaction: /blink/reply/ plus the post id, at least 0.001 SOL, up to 280 bytes of text.' +
+      (IS_SOLANA_MAINNET ? ' Every Solana post in the feed carries that link, with Share on X and Copy link.' : '') +
+      ' Our server reads the transaction back from Solana before it saves the reply, and takes the text from the transaction, not from the request. The reply shows under the post as "paid reply" with its amount, linked to that transaction. The SOL goes to the wallet that signed the post, which our server recorded when the post was written; it is not an address the author picked for payouts. Only Solana posts have this, because only there do we know a Solana wallet for the author. The replier has no profile here, only a short Solana address that opens the explorer. The text stays on Solana for good; the post\'s author or an admin can remove the reply here, and the SOL stays with the author. Nothing notifies the author, and none of it is on Paid or in Money. Nobody outside the team has paid one on mainnet yet.' +
+      (IS_SOLANA_MAINNET ? '' : SOL_OFF_HERE),
+  },
+  {
+    name: 'A card that opens inside X',
+    status: 'wired',
+    note:
+      (IS_SOLANA_MAINNET
+        ? 'Tips and paid replies are published as Solana Actions at /actions.json, and our own /blink pages run them today in any browser with a Solana wallet.'
+        : 'Tips and paid replies are published as Solana Actions at /actions.json, and our own /blink pages run them in any browser with a Solana wallet.' +
+          SOL_OFF_HERE) +
+      ' X draws them as a card only for people who turned Blinks on in Phantom or Backpack, and only for sites in Dialect\'s Actions Registry. mysphere.fun is not in it (checked 23 September 2026), so on X the link shows as an ordinary link preview and opens our page.',
   },
   {
     name: 'Basename identity',
@@ -734,7 +809,7 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
   {
     name: 'Tip receipts',
     status: 'live',
-    note: 'Every tip gets a page and a share card carrying the amount, both names and the transaction.',
+    note: 'Every tip made in the app gets a page and a share card carrying the amount, both names and the transaction. SOL tips under Solana posts get neither here: their record is the Solana transaction.',
   },
   {
     name: 'The money timeline',
@@ -844,7 +919,7 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
   {
     name: 'Startpad on real money',
     status: 'live',
-    note: 'Live on Base mainnet since 11 August 2026, and on Robinhood Chain with the same stack and plain ERC-20 tokens. The contracts have no owner and no admin functions, so a bug is irreversible and nobody could hand the ETH back. The external audit was deferred by the owner in favor of a harder internal adversarial review and real Base-mainnet fork tests; that raised risk is named here on purpose. No token has graduated on either real-money network yet; the only full live graduation so far ran on a testnet.',
+    note: 'Live on Base mainnet since 11 August 2026, and on Robinhood Chain with the same stack and plain ERC-20 tokens. The contracts have no owner and no admin functions, so a bug is irreversible and nobody could hand the ETH back. The external audit was deferred by the owner in favor of a harder internal adversarial review and real Base-mainnet fork tests; that raised risk is named here on purpose. On Base, $SPHERE has graduated with real money; before it, the only full live graduation had run on a testnet.',
   },
   {
     name: '$SPHERE: the contracts, deployed',
@@ -854,7 +929,7 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
   {
     name: '$SPHERE: the token',
     status: 'live',
-    note: 'Launched 1 September 2026 through the escrow (block 50749275), at exactly the address that was published in advance - the same one the escrow had baked in. Fixed supply of 1,000,000,000, trading on the public curve like any other Startpad token; the treasury dev-buy (~6.2% of supply) sits in the vesting lock, whose clock starts around 7 September 2026 with a 30-day cliff and a linear year after that. Verify the launch transaction and the vesting balance on-chain before believing this page, same as always.',
+    note: 'Launched 1 September 2026 through the escrow (block 50749275), at exactly the address that was published in advance - the same one the escrow had baked in. Fixed supply of 1,000,000,000. It started on the public curve like any other Startpad token, filled it and graduated, and now trades in its own Uniswap v4 pool; the treasury dev-buy (~6.2% of supply) sits in the vesting lock, whose clock starts around 7 September 2026 with a 30-day cliff and a linear year after that. Verify the launch transaction and the vesting balance on-chain before believing this page, same as always.',
   },
 ];
 
@@ -994,12 +1069,19 @@ export default function ReDefinitionContent() {
                 mainnecie, tokena nie ma). Wzmianka o escrow "zero zdarzen,
                 balans zero" wyzej opisuje stan z dnia pisania - od tamtej
                 pory budzet zostal zablokowany z aplikacji na mainnecie
-                (commity 2bc5781, 1bd728b) i tresci strony to podaja. */}
+                (commity 2bc5781, 1bd728b) i tresci strony to podaja.
+
+                === AKTUALIZACJA 2026-09-23 ===
+                "Runs today" dostalo Solane: post (memo) i napiwek w SOL pod
+                postem z Solany. Napiwek w SOL tylko przy IS_SOLANA_MAINNET -
+                na devnecie trasa odpowiada na produkcji 503 (patrz import
+                u gory). To, ze nikt spoza zespolu jeszcze nie zaplacil w SOL,
+                mowia wiersze tabeli nizej. */}
             <dl className="mt-9 grid gap-y-4 border-t border-soft-line/70 pt-6 sm:grid-cols-3 sm:gap-x-6">
               {[
                 {
                   t: 'Runs today',
-                  d: 'Post onchain. Tip in USDC. Ask a question with a budget, lock it in escrow, and pay for the answers you accept. Somebody already has. /money adds up what you are owed and hands you the button.',
+                  d: `Post onchain, Solana included. ${IS_SOLANA_MAINNET ? 'Tip in USDC, or in SOL under a Solana post.' : 'Tip in USDC.'} Ask a question with a budget, lock it in escrow, and pay for the answers you accept. Somebody already has. /money adds up what you are owed and hands you the button.`,
                 },
                 {
                   t: 'Being built',
@@ -1250,8 +1332,8 @@ export default function ReDefinitionContent() {
           <H2>A receipt spreads. A screenshot does not.</H2>
           <State tone="live">Running today. Every line below is checkable onchain</State>
           <P>
-            Every tip already has its own page and its own share card: the amount, both names,
-            the transaction. Paste it anywhere and the preview shows the number before anyone
+            Every tip made in the app already has its own page and its own share card: the
+            amount, both names, the transaction. Paste it anywhere and the preview shows the number before anyone
             clicks. <Hi>Every number on it can be checked</Hi>: open the explorer and hold it
             against the chain.
           </P>
@@ -1523,7 +1605,9 @@ export default function ReDefinitionContent() {
                 <h3 className="mb-1 font-soft-display text-[15px] font-semibold uppercase tracking-[0.14em] text-soft-ink-faint">
                   {group.title}
                 </h3>
-                <p className="mb-4 text-[13.5px] leading-[1.6] text-soft-ink-soft">{group.note}</p>
+                {/* break-words: nota "Not ours" niesie adresy programow Solany
+                    (44 znaki bez spacji) - bez tego rozpychaly strone na telefonie. */}
+                <p className="mb-4 break-words text-[13.5px] leading-[1.6] text-soft-ink-soft">{group.note}</p>
 
                 <div className="border-t border-soft-line/70">
                   {group.rows.map((row) => (

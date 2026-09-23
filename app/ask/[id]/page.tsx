@@ -2,7 +2,13 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getAskForShare, shortAskAuthor } from '../../utils/asks/getAskForShare';
-import { formatAskMoney } from '../../basechat/components/AskCard';
+import {
+  formatShareMoney,
+  shareFundingNote,
+  shareSeatsLabel,
+  shareStateLine,
+  shareTakesAnswers,
+} from '../../utils/asks/askPublicView';
 import ShareAskActions from './ShareAskActions';
 
 /**
@@ -35,23 +41,25 @@ import ShareAskActions from './ShareAskActions';
  * Pisanie odpowiedzi, otwieranie zapieczetowanych i rozstrzyganie mieszkaja na
  * /asks, bo wymagaja portfela i podpisu; ta strona prowadzi tam przyciskiem,
  * zamiast dublowac tamten panel.
+ *
+ * ===========================================================================
+ * TYLKO SPRAWDZONE ZDANIA O PIENIADZACH (plan, krok 12)
+ * ===========================================================================
+ * Status i escrow pochodza z widoku magazynu (getAskForShare), a zdania
+ * sklada app/utils/asks/askPublicView.ts: "Settled" tylko ze stanu
+ * zapieczetowanego, "locked in an escrow contract" i link do depozytu tylko
+ * z warunkow escrow w pieczeci. Bez pieczeci albo bez magazynu strona mowi
+ * neutralnie i nie zaprasza do odpowiedzi, ktorej trasa i tak by nie przyjela.
  */
 
 export const revalidate = 60;
 
 type Props = { params: { id: string } };
 
-/** Jedno zdanie o stanie - to samo slownictwo co na karcie w feedzie. */
-function stateLine(status: string, deadline: number, seatsLeft: number): string {
-  if (status === 'resolved') return 'Settled: the budget has been paid out.';
-  if (status === 'expired') return 'Closed without a payout.';
-  if (deadline <= Date.now()) return 'Past its deadline, waiting on the author.';
-  return seatsLeft > 0 ? `${seatsLeft} of the seats are still open.` : 'Every seat is taken.';
-}
-
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const ask = await getAskForShare(params.id);
-  if (!ask) return { title: 'Ask not found' };
+  const share = await getAskForShare(params.id);
+  if (!share) return { title: 'Ask not found' };
+  const { ask } = share;
 
   /**
    * Tytul niesie KWOTE ZA ODPOWIEDZ, a nie budzet.
@@ -60,12 +68,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
    * liczba autora. Ta sama zasada rzadzi karta w feedzie, gdzie `per answer`
    * jest najwiekszym drukiem w formularzu.
    */
-  const money = formatAskMoney(ask.perAnswer, ask.token);
+  const money = formatShareMoney(ask.perAnswer, ask.token);
   const question = ask.question.length > 90 ? `${ask.question.slice(0, 87)}…` : ask.question;
 
   return {
     title: `${money} for an answer: ${question}`,
-    description: `A question with a budget on MySphere. ${formatAskMoney(
+    description: `A question with a budget on MySphere. ${formatShareMoney(
       ask.budget,
       ask.token
     )} across ${ask.seats} ${ask.seats === 1 ? 'seat' : 'seats'}. Answers stay sealed until the author resolves.`,
@@ -78,11 +86,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function AskPage({ params }: Props) {
-  const ask = await getAskForShare(params.id);
-  if (!ask) notFound();
+  const share = await getAskForShare(params.id);
+  if (!share) notFound();
 
-  const seatsLeft = Math.max(0, ask.seats - ask.acceptedCount);
-  const open = ask.status === 'open' && ask.deadline > Date.now() && seatsLeft > 0;
+  const { ask } = share;
+  const now = Date.now();
+  const open = shareTakesAnswers(share, now);
+  const funding = shareFundingNote(share);
 
   return (
     <div className="min-h-screen bg-soft-bg px-4 pb-24 pt-6 font-soft sm:pt-10">
@@ -112,7 +122,7 @@ export default async function AskPage({ params }: Props) {
                 Per answer
               </dt>
               <dd className="font-soft-display text-[19px] font-bold tabular-nums text-soft-accent-deep">
-                {formatAskMoney(ask.perAnswer, ask.token)}
+                {formatShareMoney(ask.perAnswer, ask.token)}
               </dd>
             </div>
             <div>
@@ -120,15 +130,17 @@ export default async function AskPage({ params }: Props) {
                 Budget
               </dt>
               <dd className="font-soft-display text-[19px] font-bold tabular-nums text-soft-accent-deep">
-                {formatAskMoney(ask.budget, ask.token)}
+                {formatShareMoney(ask.budget, ask.token)}
               </dd>
             </div>
             <div>
               <dt className="text-[11px] font-semibold uppercase tracking-[0.1em] text-soft-ink-faint">
                 Seats
               </dt>
+              {/* "2 of 3" tylko, gdy zajete miejsca znamy (rekordy przyjec albo
+                  Ask sprzed pieczeci); inaczej sama liczba miejsc. */}
               <dd className="font-soft-display text-[19px] font-bold tabular-nums text-soft-ink">
-                {ask.acceptedCount} of {ask.seats}
+                {shareSeatsLabel(share)}
               </dd>
             </div>
             <div>
@@ -142,25 +154,29 @@ export default async function AskPage({ params }: Props) {
           </dl>
 
           <p className="mt-4 text-[13px] leading-[1.55] text-soft-ink-muted">
-            {stateLine(ask.status, ask.deadline, seatsLeft)}{' '}
-            {ask.funding === 'escrowed' ? (
+            {shareStateLine(share, now)}{' '}
+            {funding.kind === 'escrow' ? (
               <>
                 The budget is locked in an escrow contract on Base, out of the author&apos;s reach.
-                {ask.escrowTxHash ? (
+                {funding.href ? (
                   <>
                     {' '}
                     <a
-                      href={`https://basescan.org/tx/${ask.escrowTxHash}`}
+                      href={funding.href}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="font-semibold text-soft-primary-deep underline underline-offset-2"
                     >
-                      Check the deposit
+                      {funding.linkLabel}
                     </a>
                     .
                   </>
                 ) : null}
               </>
+            ) : funding.kind === 'escrow-unverified' ? (
+              // Dokument mowi 'escrowed', ale pieczeci nie ma - hash z dokumentu
+              // mogla wpisac przegladarka, wiec go nie linkujemy.
+              <>The author says the budget is locked in escrow on Base. That deposit has not been verified yet.</>
             ) : (
               <>Nothing is locked: the author pays out of their own wallet on resolve.</>
             )}
@@ -177,7 +193,7 @@ export default async function AskPage({ params }: Props) {
             </Link>
           )}
 
-          <ShareAskActions askId={ask.id} perAnswer={formatAskMoney(ask.perAnswer, ask.token)} />
+          <ShareAskActions askId={ask.id} perAnswer={formatShareMoney(ask.perAnswer, ask.token)} />
         </article>
 
         <p className="mt-4 px-1 text-[11.5px] leading-[1.5] text-soft-ink-faint">

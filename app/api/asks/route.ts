@@ -39,14 +39,14 @@ import { ExactEvmScheme } from '@x402/evm/exact/server';
 // na runtime nodejs - tu, w trasie, ma wszystkie API, ktorych brakowalo mu
 // w Edge.
 import { NetworkRoutedFacilitatorClient } from '../../utils/x402/facilitators';
-import { createAsk, getOpenAsks } from '../../utils/asks/asks';
+import { getOpenAsks } from '../../utils/asks/asks';
 import {
   ASK_DURATIONS,
   MAX_SEATS,
   MIN_PER_ANSWER,
-  perAnswerFor,
 } from '../../utils/asks/types';
-import { normalizeAddress } from '../../utils/monetization/types';
+import { AskError, createSealedAsk, openAskStore } from './askStore';
+import { validateAskDraft, validateDurationMs } from './draft';
 import { getRequester } from './identity';
 import {
   ASKS_MAX_PAGE_SIZE,
@@ -61,6 +61,7 @@ import {
   getPayToAddress,
   isAskPaymentEnforced,
 } from './pricing';
+import { listOpenAsks } from './askPublicRead';
 
 /**
  * ===== OFERTA PLATNOSCI: KILKA SIECI W JEDNEJ ODPOWIEDZI 402 =====
@@ -175,9 +176,14 @@ export async function GET(request: NextRequest) {
       ? Math.min(Math.floor(parsedLimit), ASKS_MAX_PAGE_SIZE)
       : ASKS_PAGE_SIZE;
 
-  const { asks, failed } = await getOpenAsks(limit);
+  // Lista sprawdzona z pieczeciami (plan, krok 12): status i escrow z widoku
+  // magazynu, nie z dokumentu, ktory zapisuje kazda przegladarka. Pozycje
+  // 'broken', 'unverified' (flaga wlaczona) i zamkniete wedlug pieczeci
+  // wypadaja. Bez magazynu - kliencki odczyt jak dotad, ale kazda pozycja
+  // jest 'unchecked' i nie ma escrowVerified (neutralnie, bez zmyslania).
+  const listing = await listOpenAsks(limit, getOpenAsks);
 
-  if (failed) {
+  if (!listing.ok) {
     // AWARIA I PUSTKA TO NIE TO SAMO ZDANIE. Pusta lista przy nieudanym
     // odczycie mowilaby "nikt o nic nie pyta" - a to jest oskarzenie
     // postawione w chwili, gdy nie udalo sie tego sprawdzic.
@@ -193,8 +199,22 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json(
     {
-      asks,
-      count: asks.length,
+      // Ksztalt pozycji jak dotad plus `trust` i `escrowVerified`. Hashe escrow
+      // sa null, gdy escrow nie pochodzi z pieczeci.
+      asks: listing.asks,
+      count: listing.asks.length,
+      verification: listing.checked
+        ? {
+            checked: true,
+            note:
+              'Status, funding and escrow terms come from server-sealed records for Asks with trust "sealed". ' +
+              'Asks with trust "legacy" predate sealing: funding is what their document declares, escrowVerified is false and escrow hashes are null.',
+          }
+        : {
+            checked: false,
+            note:
+              'Seal verification is unavailable on this deployment right now, so status and funding below are what each Ask document says, not verified facts.',
+          },
       payment: paymentInfo(),
       limits: {
         maxQuestionLength: MAX_QUESTION_LENGTH,
@@ -213,15 +233,6 @@ export async function GET(request: NextRequest) {
 /* ------------------------------------------------------------------ */
 /* POST - zalozenie Aska                                               */
 /* ------------------------------------------------------------------ */
-
-interface CreateBody {
-  question?: unknown;
-  budget?: unknown;
-  seats?: unknown;
-  durationMs?: unknown;
-}
-
-const ALLOWED_DURATIONS = new Set<number>(ASK_DURATIONS.map((duration) => duration.ms));
 
 // Zwracany typ podany JAWNIE. Bez tego TypeScript wnioskuje go z pierwszej
 // galezi unii (odpowiedz bledu) i withX402 odrzuca handler, ktory potrafi
@@ -245,73 +256,62 @@ async function handlePost(request: NextRequest): Promise<NextResponse<unknown>> 
     );
   }
 
-  let body: CreateBody;
+  let body: Record<string, unknown>;
   try {
-    body = (await request.json()) as CreateBody;
+    const parsed = (await request.json()) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('not an object');
+    body = parsed as Record<string, unknown>;
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400, headers: NO_STORE });
   }
 
-  const question = typeof body.question === 'string' ? body.question.trim() : '';
-  if (!question) {
-    return NextResponse.json({ error: 'Missing question' }, { status: 400, headers: NO_STORE });
+  // Walidacja wspolna z POST /api/asks/create (draft.ts) - te same zdania,
+  // ten sam prog stawki. Kazda odmowa to 400, wiec withX402 niczego nie
+  // rozlicza.
+  const draft = validateAskDraft(body);
+  if (!draft.ok) {
+    return NextResponse.json(draft.refusal.body, { status: draft.refusal.status, headers: NO_STORE });
   }
-  if (question.length > MAX_QUESTION_LENGTH) {
+  const duration = validateDurationMs(body.durationMs);
+  if (!duration.ok) {
+    return NextResponse.json(duration.refusal.body, { status: duration.refusal.status, headers: NO_STORE });
+  }
+  const { question, budget, seats, perAnswer } = draft.value;
+  const durationMs = duration.value;
+
+  // Zapis przez admin SDK razem z zapieczetowanym stanem. Bez magazynu (brak
+  // konta uslugowego albo klucza pieczeci) odmawiamy 503 - withX402 rozlicza
+  // tylko przy statusie < 400, wiec agent nie placi za Aska, ktorego nie ma.
+  // Zapis klienckim SDK nie wraca: po wdrozeniu regul przegladarka (i ta
+  // trasa, gdyby dalej go uzywala) nie moze juz pisac do `asks`.
+  const store = await openAskStore();
+  if (!store) {
     return NextResponse.json(
-      { error: `Question is limited to ${MAX_QUESTION_LENGTH} characters` },
-      { status: 400, headers: NO_STORE }
+      { error: 'Asks cannot be created on this deployment right now. Nothing was charged.', code: 'store_unavailable' },
+      { status: 503, headers: NO_STORE_PRIVATE }
     );
   }
 
-  const budget = typeof body.budget === 'number' ? body.budget : Number(body.budget);
-  if (!Number.isFinite(budget) || budget <= 0) {
-    return NextResponse.json({ error: 'Invalid budget' }, { status: 400, headers: NO_STORE });
-  }
-
-  const seats = typeof body.seats === 'number' ? body.seats : Number(body.seats);
-  if (!Number.isInteger(seats) || seats < 1 || seats > MAX_SEATS) {
-    return NextResponse.json(
-      { error: `Seats must be a whole number between 1 and ${MAX_SEATS}` },
-      { status: 400, headers: NO_STORE }
-    );
-  }
-
-  const durationMs = typeof body.durationMs === 'number' ? body.durationMs : Number(body.durationMs);
-  if (!ALLOWED_DURATIONS.has(durationMs)) {
-    // Zamkniety zbior, a nie dowolna liczba: termin krotszy niz godzina nie daje
-    // szans na odpowiedz, a dowolnie dlugi zamraza `resolve rate` autora.
-    return NextResponse.json(
-      {
-        error: 'Invalid duration',
-        allowed: ASK_DURATIONS.map((duration) => ({ label: duration.label, ms: duration.ms })),
-      },
-      { status: 400, headers: NO_STORE }
-    );
-  }
-
-  // Kwota ponizej progu jest gestem, nie zaplata - i to jest jedyne miejsce,
-  // ktore moze tego pilnowac po stronie serwera.
-  const perAnswer = perAnswerFor(budget, seats);
-  if (perAnswer < MIN_PER_ANSWER) {
-    return NextResponse.json(
-      {
-        error: `Each seat must be worth at least ${MIN_PER_ANSWER} - this budget gives ${perAnswer} per answer`,
-        code: 'per_answer_too_low',
-      },
-      { status: 400, headers: NO_STORE }
-    );
-  }
-
-  let id: string;
+  let created: Awaited<ReturnType<typeof createSealedAsk>>;
   try {
-    id = await createAsk({
-      author: normalizeAddress(requester.address),
+    created = await createSealedAsk(store, {
+      author: requester.address,
+      // Skad tozsamosc - zapieczetowane w stanie, zeby bylo wiadomo, czy
+      // autora potwierdzila sesja, czy podpis platnosci.
+      origin: requester.via,
       question,
       budget,
       seats,
-      durationMs,
+      // Termin z zegara SERWERA - agent podaje tylko czas trwania z listy.
+      deadline: Date.now() + durationMs,
     });
   } catch (error) {
+    if (error instanceof AskError && error.status < 500) {
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: error.status, headers: NO_STORE_PRIVATE }
+      );
+    }
     console.error('[api/asks] Zapis Aska nie powiodl sie:', error);
     // TEN KOMENTARZ MOWIL DOKLADNIE ODWROTNIE, NIZ ROBI KOD. Stalo tu, ze
     // platnosc rozliczylo middleware jeszcze przed startem trasy, wiec ten blad
@@ -329,16 +329,18 @@ async function handlePost(request: NextRequest): Promise<NextResponse<unknown>> 
 
   return NextResponse.json(
     {
-      id,
-      author: normalizeAddress(requester.address),
+      id: created.askId,
+      author: created.state.author,
       identityVia: requester.via,
       question,
-      budget,
-      seats,
+      budget: created.state.budget,
+      seats: created.state.seats,
       perAnswer,
       status: 'open',
       funding: 'on-resolve',
-      deadline: Date.now() + durationMs,
+      // Termin ZAPISANY, nie policzony drugi raz - drugi Date.now() rozjezdzal
+      // sie z dokumentem o czas zapisu.
+      deadline: created.state.deadline,
     },
     { status: 201, headers: NO_STORE_PRIVATE }
   );

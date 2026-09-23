@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { HandCoins, Lock, PenLine } from 'lucide-react';
 import { useAccount, useChainId, useConfig, usePublicClient, useSwitchChain } from 'wagmi';
@@ -11,21 +11,18 @@ import AskClaimPanel from '../basechat/components/AskClaimPanel';
 import AskComposer, { type AskDraft } from '../basechat/components/AskComposer';
 import { usePaymentFlow } from '../components/monetization/usePaymentFlow';
 import useSiweAuth from '../utils/auth/useSiweAuth';
-import { createAsk, getOpenAsks, getResolvedAsks, getResolveRate, newAskId } from '../utils/asks/asks';
-import { perAnswerFor, type Ask, type ResolveRate } from '../utils/asks/types';
+import { getOpenAsks, getResolvedAsks, getResolveRate } from '../utils/asks/asks';
+import { type Ask, type ResolveRate } from '../utils/asks/types';
+import { useCreateAsk } from '../utils/asks/useCreateAsk';
 import { loadListedVaults } from '../utils/asks/listedVaults';
 import {
   RESOLVE_GRACE_MS,
   describeEscrowError,
-  escrowFeeBps,
-  fundAsk,
-  isEscrowAvailable,
   perAnswerToUnits,
   readEscrow,
   resolveAskOnchain,
   unitsToAmount,
   type EscrowState,
-  type FundPhase,
 } from '../utils/asks/escrow';
 import { authorIdentityMismatch, sealedAnswerNotice } from '../utils/asks/visibility';
 import { normalizeAddress } from '../utils/monetization/types';
@@ -42,10 +39,10 @@ import { MAX_ANSWER_LENGTH } from '../api/asks/pricing';
  * Do tej pory /asks bylo slepym zaulkiem: lista, do ktorej nie dalo sie nic
  * dodac ani nic z nia zrobic. `AskComposer` nie byl nigdzie zamontowany,
  * `AskCard` dostawal karte bez handlera (wiec przycisk renderowal sie jako
- * null), a `acceptAnswer` i `resolveAsk` nie mialy ani jednego wywolania w
- * calym repo. Teraz pelna droga stoi tutaj:
+ * null), a dawne klienckie funkcje przyjecia i rozstrzygniecia nie mialy ani
+ * jednego wywolania w calym repo. Teraz pelna droga stoi tutaj:
  *
- *   zaloz Aska        -> createAsk(), klienckim SDK, jak zwykly post
+ *   zaloz Aska        -> POST /api/asks/create    (sesja SIWE, przez useCreateAsk)
  *   odpowiedz         -> POST /api/asks/answers   (sesja SIWE, tresc zapieczetowana)
  *   przyjmij          -> przelew z portfela + POST /api/asks/[id]/accept
  *   zamknij           -> POST /api/asks/[id]/resolve
@@ -54,7 +51,8 @@ import { MAX_ANSWER_LENGTH } from '../api/asks/pricing';
  * Od podpiecia kontraktu AskEscrow autor ma wybor, ktory zmienia CALA prawa
  * polowe tej listy:
  *
- *   zaloz z escrow    -> approve + fund NA LANCUCHU, dopiero potem createAsk()
+ *   zaloz z escrow    -> approve + fund NA LANCUCHU, dopiero potem POST
+ *                        /api/asks/create (serwer sprawdza log AskFunded)
  *   rozstrzygnij      -> resolve() z lista zwyciezcow + POST .../escrow-resolve
  *   odbior            -> claim() przez odpowiadajacego (AskClaimPanel)
  *
@@ -63,7 +61,7 @@ import { MAX_ANSWER_LENGTH } from '../api/asks/pricing';
  * dopiero przy odbiorze. Dwie mechaniki nie mieszaja sie na jednym Asku -
  * decyduje pole `funding`, ustawione raz przy zakladaniu.
  *
- * === DLACZEGO ZAKLADANIE NIE IDZIE PRZEZ POST /api/asks ===
+ * === DLACZEGO ZAKLADANIE IDZIE PRZEZ /api/asks/create, A NIE POST /api/asks ===
  * Tamta trasa jest dla AGENTOW: stoi za bramka x402 i wymaga podpisanej
  * autoryzacji EIP-3009 na tokenie, ktory poda odpowiedz 402 - dzis USDG na
  * Robinhood Chain, NIE USDC (patrz api/asks/pricing.ts). Czlowiek w
@@ -107,18 +105,6 @@ const EXPLORER_TX = 'https://basescan.org/tx/';
  */
 const ESCROW_CHAIN_ID = base.id;
 
-/**
- * Co powiedziec przy kazdym etapie blokowania budzetu.
- *
- * Escrow to dwa okna portfela pod rzad. Bez nazwania ich drugie okno wyglada
- * jak awaria albo jak proba pobrania pieniedzy drugi raz.
- */
-const FUND_PHASE_NOTES: Record<FundPhase, string> = {
-  'checking-allowance': 'Checking how much USDC the escrow contract may take…',
-  approving: 'Approve the exact budget in your wallet. This does not move it yet.',
-  funding: 'Now confirm the deposit. This is the transaction that locks the money.',
-};
-
 type Phase = 'loading' | 'ready' | 'failed';
 
 /** Komunikat bledu z API, bez wywracania sie na odpowiedzi, ktore nie sa JSON-em. */
@@ -135,30 +121,20 @@ async function readApiError(response: Response, fallback: string): Promise<strin
 export default function AsksPage() {
   const { address: walletAddress } = useAccount();
   const { address: sessionAddress, isAuthenticated, signIn } = useSiweAuth();
-  const chainId = useChainId();
-  // Klient przypiety do Base, a nie do "aktualnej" sieci: gdyby portfel siedzial
-  // gdzie indziej, odczyt allowance i paragon szlyby na lancuch, na ktorym
-  // kontraktu nie ma - i wygladaloby to jak awaria, a nie jak zla siec.
-  const publicClient = usePublicClient({ chainId: ESCROW_CHAIN_ID });
   /**
-   * Konfiguracja, a nie `useWalletClient()`.
-   *
-   * Klient z hooka jest zamrozony w domkinieciu w chwili tworzenia handlera,
-   * wiec po `switchChainAsync` wskazywalby WCIAZ na poprzedni lancuch i viem
-   * odrzucalby podpis z ChainMismatchError - tuz po tym, jak uzytkownik
-   * zaakceptowal zmiane sieci. `getWalletClient(config, { chainId })` pobiera
-   * klienta swiezo i zawsze pod wlasciwa siec.
+   * Cala sciezka zakladania (SIWE -> approve -> fund -> kwit -> zapis przez
+   * serwer) stoi w jednym hooku, wspolnym z feedem. Druga kopia tej sekwencji
+   * zyla tu inline i pisala do Firestore klienckim SDK - to jej juz nie ma.
    */
-  const config = useConfig();
-  const { switchChainAsync } = useSwitchChain();
+  const askFlow = useCreateAsk();
 
   /**
    * Kim jest patrzacy.
    *
    * Sesja SIWE ma pierwszenstwo, bo to ONA jest tozsamoscia dla tras
    * serwerowych - adres z wagmi mowi tylko, jaki portfel jest podlaczony.
-   * Do zalozenia Aska wystarczy portfel (zapis idzie klienckim SDK), ale do
-   * odpowiadania i przyjmowania potrzebna jest juz sesja.
+   * Zalozenie, odpowiedz i przyjecie ida przez trasy serwera, wiec kazde
+   * z nich wymaga sesji (useCreateAsk prosi o podpis przed pieniedzmi).
    */
   const viewer = (sessionAddress ?? walletAddress ?? '').toLowerCase() || null;
 
@@ -176,18 +152,10 @@ export default function AsksPage() {
   const [rates, setRates] = useState<Record<string, ResolveRate>>({});
   const [attempt, setAttempt] = useState(0);
 
-  /** Aski zalozone W TEJ SESJI - patrz komentarz przy `handleCreate`. */
+  /** Aski zalozone W TEJ SESJI - patrz komentarz przy `pushCreated`. */
   const [created, setCreated] = useState<Ask[]>([]);
   const [composerOpen, setComposerOpen] = useState(false);
   const [openAskId, setOpenAskId] = useState<string | null>(null);
-  /**
-   * Co sie wlasnie dzieje przy blokowaniu budzetu.
-   *
-   * Escrow to DWIE transakcje i dwa okna portfela. Bez tej linii czlowiek widzi
-   * przycisk "Locking…" i drugie okno podpisu bez zadnego wyjasnienia, skad sie
-   * wzielo - a to jest moment, w ktorym wychodza prawdziwe pieniadze.
-   */
-  const [fundNote, setFundNote] = useState<string | null>(null);
 
   const retry = useCallback(() => {
     setPhase('loading');
@@ -248,213 +216,36 @@ export default function AsksPage() {
   }, [attempt]);
 
   /**
-   * Zalozenie Aska.
-   *
-   * Autorem jest PODLACZONY PORTFEL, nigdy adres wpisany w formularzu - ten sam
-   * powod, dla ktorego trasy serwerowe czytaja tozsamosc z sesji, a nie z ciala
-   * zadania. `resolve rate` musi dotyczyc tego, kto naprawde zalozyl Aska.
+   * Dokladanie swiezo zalozonego Aska do listy "Posted from this device".
    *
    * NOWY ASK ZOSTAJE NA EKRANIE, nawet gdy lista sie nie wczytala. Odswiezenie
    * listy nie jest tu wiarygodne: `getOpenAsks` wymaga indeksu zlozonego, ktory
    * czeka jeszcze na `firebase deploy` (firestore.indexes.json), wiec probowanie
    * "przeladuj i zobacz swoj Ask" skonczyloby sie ekranem awarii tuz po udanym
    * zapisie. Trzymamy wiec to, co WIEMY, ze powstalo - bez zgadywania reszty.
-   */
-  /**
-   * Dokladanie swiezo zalozonego Aska do listy "Posted from this device".
    *
-   * Wyciagniete z `handleCreate`, bo obie sciezki (escrow i bez) konczyly sie
-   * tym samym dwudziestolinijkowym literalem, a rozjazd miedzy nimi znaczylby
-   * karte pokazujaca co innego niz to, co zapisano.
+   * Karta dostaje Aska z ODPOWIEDZI SERWERA, a nie zlozonego tu ze szkicu:
+   * termin, kwoty i escrow sa te, ktore serwer zapieczetowal (przy escrow -
+   * z logu fund), wiec karta nie moze obiecac czegos innego niz zapis.
    */
-  const pushCreated = useCallback(
-    (input: {
-      id: string;
-      author: string;
-      question: string;
-      budget: number;
-      seats: number;
-      perAnswer: number;
-      deadlineMs: number;
-      funding: Ask['funding'];
-      escrowTxHash: string | null;
-    }) => {
-      setCreated((previous) => [
-        {
-          id: input.id,
-          author: input.author,
-          question: input.question,
-          budget: input.budget,
-          seats: input.seats,
-          perAnswer: input.perAnswer,
-          // Te dwie wartosci sa domyslne w `createAsk` - gdy tam sie zmienia,
-          // zmieniaja sie i tutaj, bo karta ma pokazywac to, co zapisano.
-          token: 'USDC',
-          network: 'base',
-          deadline: input.deadlineMs,
-          createdAt: Date.now(),
-          status: 'open',
-          funding: input.funding,
-          answerCount: 0,
-          acceptedCount: 0,
-          escrowTxHash: input.escrowTxHash,
-          escrowChainId: input.funding === 'escrowed' ? ESCROW_CHAIN_ID : null,
-        },
-        ...previous,
-      ]);
-      setComposerOpen(false);
-      setOpenAskId(input.id);
-    },
-    []
-  );
+  const pushCreated = useCallback((ask: Ask) => {
+    setCreated((previous) => [ask, ...previous.filter((existing) => existing.id !== ask.id)]);
+    setComposerOpen(false);
+    setOpenAskId(ask.id);
+  }, []);
 
+  /**
+   * Zalozenie Aska. Autor, kolejnosc (SIWE przed pieniedzmi, fund przed
+   * zapisem) i zapamietany depozyt siedza w useCreateAsk. Rzucony blad wraca
+   * do AskComposer, ktory pokazuje go nad przyciskiem i nie czysci formularza.
+   */
+  const submitAsk = askFlow.submit;
   const handleCreate = useCallback(
     async (draft: AskDraft) => {
-      if (!walletAddress) {
-        throw new Error('Connect your wallet to post an Ask.');
-      }
-
-      const author = normalizeAddress(walletAddress);
-      const perAnswer = perAnswerFor(draft.budget, draft.seats);
-      /**
-       * Termin liczony RAZ i uzyty w obu miejscach - w kontrakcie i w
-       * dokumencie. Policzony dwa razy rozjechalby sie o czas approve i fund.
-       */
-      const deadlineMs = Date.now() + draft.durationMs;
-
-      let escrowTxHash: string | null = null;
-
-      /* ---------------- ESCROW: LANCUCH PRZED FIRESTORE ---------------- */
-      if (draft.funding === 'escrowed') {
-        setFundNote(null);
-
-        // Portfel musi byc na sieci, na ktorej stoi kontrakt. Pytamy o zmiane
-        // ZANIM cokolwiek podpiszemy - odmowa konczy sie tu, bez transakcji.
-        if (chainId !== ESCROW_CHAIN_ID) {
-          try {
-            // switchChainAsync, nie switchChain: wariant synchroniczny nie
-            // odrzuca obietnicy, wiec odmowa przechodzilaby jako sukces.
-            await switchChainAsync({ chainId: ESCROW_CHAIN_ID });
-          } catch {
-            throw new Error(
-              'Escrow lives on Base and your wallet stayed on another network. Nothing was charged.'
-            );
-          }
-        }
-
-        if (!publicClient) {
-          throw new Error('We could not reach Base to check the escrow. Nothing was charged. Try again.');
-        }
-
-        let signer;
-        try {
-          signer = await getWalletClient(config, { chainId: ESCROW_CHAIN_ID });
-        } catch {
-          throw new Error('Your wallet is not ready to sign on Base. Nothing was charged. Try again.');
-        }
-
-        // Identyfikator nadany PRZED transakcja: to on jest askId na lancuchu.
-        // Dokument pod nim powstanie dopiero, gdy pieniadze beda juz zablokowane.
-        const reservedId = newAskId();
-
-        try {
-          const result = await fundAsk({
-            reader: publicClient,
-            signer,
-            chainId: ESCROW_CHAIN_ID,
-            author,
-            askDocId: reservedId,
-            perAnswer,
-            seats: draft.seats,
-            deadlineMs,
-            onPhase: (phase: FundPhase) => setFundNote(FUND_PHASE_NOTES[phase]),
-          });
-          escrowTxHash = result.fundTxHash;
-        } catch (error) {
-          console.error('[asks] Zablokowanie budzetu nie powiodlo sie:', error);
-          setFundNote(null);
-          // Surowy revert nie jest komunikatem - patrz describeEscrowError.
-          throw new Error(describeEscrowError(error));
-        }
-
-        setFundNote('Budget locked. Writing the Ask…');
-
-        let id: string;
-        try {
-          id = await createAsk({
-            id: reservedId,
-            author,
-            question: draft.question,
-            budget: draft.budget,
-            seats: draft.seats,
-            durationMs: draft.durationMs,
-            deadlineMs,
-            funding: 'escrowed',
-            escrowTxHash,
-            escrowChainId: ESCROW_CHAIN_ID,
-          });
-        } catch (error) {
-          console.error('[asks] Zapis Aska po zablokowaniu budzetu nie powiodl sie:', error);
-          setFundNote(null);
-          // NAJGORSZY MOMENT TEJ SCIEZKI: pieniadze SA JUZ na kontrakcie, a
-          // dokumentu nie ma. Milczenie zostawiloby czlowieka z zablokowana
-          // kwota i bez zadnego sladu - dlatego podajemy hash i mowimy, ze
-          // srodki nie przepadly.
-          throw new Error(
-            `Your budget is locked in escrow (${escrowTxHash}) but writing the Ask failed. ` +
-              'Keep that transaction hash - the money is in the contract and comes back to you ' +
-              '48 hours after the deadline, minus the fee. Nothing was lost.'
-          );
-        }
-
-        setFundNote(null);
-        pushCreated({
-          id,
-          author,
-          question: draft.question,
-          budget: draft.budget,
-          seats: draft.seats,
-          perAnswer,
-          deadlineMs,
-          funding: 'escrowed',
-          escrowTxHash,
-        });
-        return;
-      }
-
-      /* ---------------- BEZ ESCROW: jak dotad ---------------- */
-      let id: string;
-      try {
-        id = await createAsk({
-          author,
-          question: draft.question,
-          budget: draft.budget,
-          seats: draft.seats,
-          durationMs: draft.durationMs,
-          deadlineMs,
-        });
-      } catch (error) {
-        console.error('[asks] Zalozenie Aska nie powiodlo sie:', error);
-        // Surowy komunikat Firestore nie jest zdaniem dla czlowieka. Mowimy
-        // jednak wprost to, co najwazniejsze: nic nie zostalo pobrane.
-        throw new Error('The Ask was not created. Nothing was charged. Try again.');
-      }
-
-      pushCreated({
-        id,
-        author,
-        question: draft.question,
-        budget: draft.budget,
-        seats: draft.seats,
-        perAnswer,
-        deadlineMs,
-        funding: 'on-resolve',
-        escrowTxHash: null,
-      });
+      const ask = await submitAsk(draft);
+      pushCreated(ask);
     },
-    // pushCreated jest stabilny (useCallback bez zaleznosci), wiec nie musi tu byc.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [walletAddress, chainId, publicClient, config, switchChainAsync]
+    [submitAsk, pushCreated]
   );
 
   /** Zmiana licznikow/statusu po odpowiedzi, przyjeciu albo rozstrzygnieciu. */
@@ -467,17 +258,6 @@ export default function AsksPage() {
 
   const createdIds = new Set(created.map((ask) => ask.id));
   const listed = asks.filter((ask) => !createdIds.has(ask.id));
-
-  /**
-   * Czy w ogole mozna zalozyc Aska z escrow.
-   *
-   * Dwa warunki i oba sa twarde: musi istniec wdrozenie na Base (pliki
-   * deployments/) i musi byc podlaczony portfel, ktory to podpisze. Pokazanie
-   * wyboru bez ktoregokolwiek z nich konczyloby sie surowym bledem PO klikinieciu
-   * w przycisk obiecujacy zablokowanie budzetu.
-   */
-  const escrowAvailable = isEscrowAvailable(ESCROW_CHAIN_ID) && !!walletAddress;
-  const feeBps = useMemo(() => escrowFeeBps(ESCROW_CHAIN_ID), []);
 
   const renderAsk = (ask: Ask) => {
     const isAuthor = viewer !== null && normalizeAddress(ask.author) === viewer;
@@ -582,16 +362,14 @@ export default function AsksPage() {
             <AskComposer
               onSubmit={handleCreate}
               onCancel={() => setComposerOpen(false)}
-              disabled={!walletAddress}
+              disabled={!askFlow.walletConnected}
               disabledReason="Connect your wallet to post an Ask."
-              escrowAvailable={escrowAvailable}
-              escrowUnavailableReason={
-                walletAddress
-                  ? 'Escrow is not available on this network, so this Ask holds nothing up front.'
-                  : 'Connect your wallet to lock a budget in escrow.'
-              }
-              escrowFeeBps={feeBps}
-              progressNote={fundNote}
+              // Wdrozenie escrow na Base + podlaczony portfel - te same dwa
+              // warunki co w feedzie, bo licza je w jednym miejscu (hook).
+              escrowAvailable={askFlow.escrowAvailable}
+              escrowUnavailableReason={askFlow.escrowUnavailableReason}
+              escrowFeeBps={askFlow.feeBps}
+              progressNote={askFlow.progressNote}
               // Skarbiec wybierany Z LISTY, nie wklejany z palca - adres
               // z literowka daje Aska o czyms, czego nie ma. Odczyt idzie przez
               // wlasna trase (wspolny cache), a jego awaria nie blokuje
@@ -949,10 +727,17 @@ function AskThread({
         );
       }
 
-      const data = (await response.json()) as { acceptedCount?: unknown };
-      if (typeof data.acceptedCount === 'number') {
-        onPatch(ask.id, { acceptedCount: data.acceptedCount });
+      const data = (await response.json()) as { acceptedCount?: unknown; status?: unknown };
+      const patch: Partial<Ask> = {};
+      if (typeof data.acceptedCount === 'number') patch.acceptedCount = data.acceptedCount;
+      // Ostatnie oplacone miejsce zamyka Aska po stronie serwera (auto-full).
+      // Bez tego karta zostawalaby "open" z przyciskiem Resolve, ktory
+      // odpowiedzialby 409 already_resolved.
+      if (data.status === 'resolved') {
+        patch.status = 'resolved';
+        patch.resolvedAt = Date.now();
       }
+      if (Object.keys(patch).length > 0) onPatch(ask.id, patch);
       if (mountedRef.current) {
         setProof(null);
         setRecordError(null);
@@ -1473,6 +1258,11 @@ function AskThread({
                           ? payLabel
                           : `Pay ${formatAskMoney(ask.perAnswer, ask.token)} and accept`}
                       </button>
+                    )}
+                    {seatsLeft === 1 && (
+                      <p className="mt-1.5 break-words text-[11.5px] leading-[1.5] text-soft-ink-faint">
+                        Paying this last seat closes the Ask and unseals every answer.
+                      </p>
                     )}
                     {payingId === answer.id && payment.error && (
                       <p

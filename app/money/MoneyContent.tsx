@@ -30,7 +30,6 @@ import { formatAmount, formatReceived } from '../utils/tips/getLeaderboard';
 import { getIdentities, type Identity } from '../utils/identity/getIdentities';
 import { getSlicedAddress } from '../utils/identity/resolver';
 import type { TokenAmounts } from '../utils/asks/types';
-import { expireAsk } from '../utils/asks/asks';
 
 /**
  * TWOJE PIENIADZE TUTAJ - tresc zakladki "Money" na /money.
@@ -994,6 +993,59 @@ function LockedAskRow({
   );
 }
 
+/** Ile razy ponawiamy zapis wygasniecia, gdy serwer nie widzi jeszcze transakcji. */
+const EXPIRY_RECORD_RETRIES = 5;
+const EXPIRY_RETRY_STEP_MS = 1500;
+
+/**
+ * Oznaczenie Aska jako wygaslego przez serwer, po udanym settleExpired.
+ *
+ * Trasa nie wymaga sesji (settleExpired moze wyslac kazdy) - dowodem jest
+ * log AskExpired w paragonie, ktory serwer czyta sam. Ponawiamy tylko to, co
+ * trasa sama nazywa chwilowym (`retryable`: 409 tx_not_found - portfel
+ * potwierdzil transakcje, ale RPC serwera jeszcze jej nie widzi - oraz awarie
+ * RPC) i bledy sieci. Ponowienie jest bezpieczne: ten sam hash na juz
+ * wygaslym Asku daje 200. Kazda inna odmowa jest ostateczna i leci do konsoli.
+ */
+async function recordEscrowExpiry(askDocId: string, txHash: string): Promise<void> {
+  const wait = (retry: number) =>
+    new Promise<void>((resolve) => setTimeout(resolve, EXPIRY_RETRY_STEP_MS * (retry + 1)));
+
+  for (let retry = 0; ; retry += 1) {
+    let response: Response;
+    try {
+      response = await fetch(`/api/asks/${encodeURIComponent(askDocId)}/escrow-expire`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ txHash }),
+      });
+    } catch (networkError) {
+      if (retry >= EXPIRY_RECORD_RETRIES) throw networkError;
+      await wait(retry);
+      continue;
+    }
+    if (response.ok) return;
+
+    let code: string | null = null;
+    let retryable = false;
+    try {
+      const data = (await response.json()) as { code?: unknown; retryable?: unknown };
+      code = typeof data.code === 'string' ? data.code : null;
+      retryable = data.retryable === true;
+    } catch {
+      // odpowiedz bez JSON - zostaje sam status
+    }
+
+    const transient = retryable || (response.status === 409 && code === 'tx_not_found');
+    if (transient && retry < EXPIRY_RECORD_RETRIES) {
+      await wait(retry);
+      continue;
+    }
+    throw new Error(`escrow-expire answered ${response.status}${code ? ` (${code})` : ''}`);
+  }
+}
+
 /**
  * Przycisk zwrotu. Wlasny stan na wiersz, bo kazdy Ask to osobna transakcja
  * i osobna mozliwa porazka - jeden wspolny komunikat bledu na cala liste
@@ -1057,22 +1109,24 @@ function RecoverButton({
        * ktorych juz nikt nie moze przyjac. `'expired'` bylo czytane w czterech
        * miejscach i nie zapisywane w zadnym.
        *
-       * Zapis idzie PO kwicie i niesie hash, bo "wygasl" to zdanie o cudzych
-       * pieniadzach i musi miec pokrycie (patrz expireAsk).
+       * Zapis robi SERWER (POST /api/asks/{id}/escrow-expire): sam czyta
+       * paragon i log AskExpired tego Aska, zanim cokolwiek oznaczy. Wczesniej
+       * przegladarka pisala 'expired' sama, z dowolnym hashem - a to potrafila
+       * kazda przegladarka, dla kazdego otwartego Aska.
        *
-       * Nieudany zapis NIE przewraca odzyskania - transakcja juz przeszla
-       * i pieniadze wrocily. Byloby klamstwem pokazac blad tam, gdzie sukces
-       * jest na lancuchu; zamiast tego zostawiamy slad w konsoli, a paragon
-       * z hashem i tak lezy nizej.
+       * Idzie W TLE, po kwicie: RPC serwera bywa kilka sekund za portfelem
+       * (409 tx_not_found), wiec zapis ponawia sie przez kilkanascie sekund,
+       * a czlowiek nie ma czekac na to z zablokowanym przyciskiem - pieniadze
+       * juz wrocily. Nieudany zapis NIE przewraca odzyskania: byloby klamstwem
+       * pokazac blad tam, gdzie sukces jest na lancuchu. Zostaje slad
+       * w konsoli, a paragon z hashem i tak lezy nizej.
        */
-      try {
-        await expireAsk(askDocId, txHash);
-      } catch (writeError) {
+      void recordEscrowExpiry(askDocId, txHash).catch((writeError) => {
         console.error(
           '[money] Zwrot przeszedl na lancuchu, ale oznaczenie Aska jako wygasly nie:',
           writeError
         );
-      }
+      });
 
       if (!mountedRef.current) return;
       onSettled(askDocId, txHash);

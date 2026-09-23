@@ -352,165 +352,78 @@ service cloud.firestore {
     // ========================================================================
     // ASKI - pytanie z budzetem, liczba miejsc i terminem
     // ========================================================================
-    // Samo pytanie jest JAWNE od poczatku. Zapieczetowane sa ODPOWIEDZI, i to
-    // one maja tu trzy osobne reguly (patrz dwie sekcje nizej).
+    // Samo pytanie jest JAWNE od poczatku. Zapieczetowane sa ODPOWIEDZI.
     //
-    // Najwazniejsze, czego te reguly pilnuja: `budget`, `seats` i `deadline` sa
-    // NIEZMIENNE po utworzeniu. Ask, ktoremu mozna obnizyc budzet albo cofnac
-    // termin po tym, jak ktos juz napisal odpowiedz, zamienia caly mechanizm w
-    // darmowa prace - a to jest dokladnie ryzyko, ktore Ask przenosi na
-    // piszacego (app/utils/asks/types.ts).
+    // CZYTA KAZDY, PISZE WYLACZNIE SERWER. firebase-admin omija reguly, wiec
+    // `if false` nie blokuje zadnej trasy - blokuje przegladarke.
+    //
+    // `request.auth` jest tu ZAWSZE null (naglowek pliku), wiec zadna regula
+    // nie odrozni autora Aska od obcego. Poprzednie `create`/`update`
+    // pilnowaly ksztaltu i dlatego wpuszczaly kazdego: 'resolved' z konsoli
+    // odpieczetowywal odpowiedzi, 'expired' psul cudzy resolve rate,
+    // `funding: 'escrowed'` dawalo sie wpisac bez depozytu, a acceptedCount,
+    // token, network i escrowChainId blokowaly wyplaty. Kazda zmiana idzie
+    // teraz przez trase, ktora sprawdza sesje SIWE albo lancuch:
+    //   POST /api/asks/create               zalozenie (escrowed: log AskFunded)
+    //   POST /api/asks                      zalozenie przez agenta (x402)
+    //   POST /api/asks/answers              answerCount
+    //   POST /api/asks/[id]/accept          acceptedCount, samo-domkniecie
+    //   POST /api/asks/[id]/resolve         'resolved' (on-resolve)
+    //   POST /api/asks/[id]/escrow-resolve  'resolved' (log AskResolved)
+    //   POST /api/asks/[id]/escrow-expire   'expired'  (log AskExpired)
+    //
+    // Pola tego dokumentu sa KOPIA dla przegladarki. Prawda, na ktorej serwer
+    // podejmuje decyzje, lezy pod asks/{askId}/sealed/state,
+    // asks/{askId}/acceptances/{answerId} i asks/{askId}/answerers/{adres}
+    // (app/api/asks/askStore.ts), z HMAC.
     match /asks/{askId} {
-      function isAddr(v) {
-        return v is string && v.matches('^0x[0-9a-fA-F]{40}$');
-      }
-
-      // Feed czyta Aski tak samo jak posty.
       allow read: if true;
+      allow create, update, delete: if false;
+    }
 
-      allow create: if isAddr(request.resource.data.author)
-                    && request.resource.data.question is string
-                    && request.resource.data.question.size() > 0
-                    && request.resource.data.question.size() <= 500
-                    && request.resource.data.budget is number
-                    && request.resource.data.budget > 0
-                    && request.resource.data.seats is int
-                    && request.resource.data.seats >= 1
-                    && request.resource.data.seats <= 20
-                    && request.resource.data.perAnswer is number
-                    && request.resource.data.token is string
-                    && request.resource.data.network is string
-                    // Termin w przeszlosci daje Aska martwego w chwili narodzin.
-                    && request.resource.data.deadline is number
-                    && request.resource.data.deadline > request.time.toMillis()
-                    && request.resource.data.status == 'open'
-                    // DWA WARIANTY FINANSOWANIA I ANI JEDNEGO WIECEJ.
-                    //
-                    // 'on-resolve' - autor placi z wlasnego portfela przy
-                    //    przyjmowaniu; nic nie jest zablokowane i karta ma to
-                    //    mowic wprost.
-                    // 'escrowed'   - budzet lezy na kontrakcie AskEscrow.
-                    //    WYMAGAMY hasha transakcji `fund`. Bez niego slowo
-                    //    "escrowed" w dokumencie jest obietnica bez pokrycia
-                    //    wpisana wprost do bazy - a regula jest ostatnim
-                    //    miejscem, ktorego nie da sie ominac inna sciezka zapisu.
-                    //
-                    // CZEGO TA REGULA NIE SPRAWDZA: czy pod tym hashem naprawde
-                    // lezy transakcja `fund` na wlasciwa kwote. Firestore nie
-                    // czyta lancucha. Sprawdza to klient przed zapisem
-                    // (app/utils/asks/escrow.ts) i moze sprawdzic kazdy przez
-                    // publiczny odczyt escrowFor(author, askId).
-                    && ((request.resource.data.funding == 'on-resolve')
-                        || (request.resource.data.funding == 'escrowed'
-                            && request.resource.data.escrowTxHash is string
-                            && request.resource.data.escrowTxHash.size() == 66))
-                    && request.resource.data.answerCount == 0
-                    && request.resource.data.acceptedCount == 0;
-
-      allow update: if request.resource.data.author == resource.data.author
-                    && request.resource.data.question == resource.data.question
-                    && request.resource.data.budget == resource.data.budget
-                    && request.resource.data.seats == resource.data.seats
-                    && request.resource.data.deadline == resource.data.deadline
-                    && request.resource.data.funding == resource.data.funding
-                    // Liczniki tylko w gore i nigdy ponad liczbe miejsc.
-                    && request.resource.data.answerCount is number
-                    && request.resource.data.answerCount >= resource.data.answerCount
-                    && request.resource.data.acceptedCount is number
-                    && request.resource.data.acceptedCount >= resource.data.acceptedCount
-                    && request.resource.data.acceptedCount <= resource.data.seats
-                    // Rozstrzygniecie jest jednokierunkowe: Ask raz zamkniety
-                    // nie moze wrocic do `open`, bo `resolve rate` autora
-                    // przestalby cokolwiek znaczyc.
-                    && (resource.data.status != 'resolved'
-                        || request.resource.data.status == 'resolved')
-                    // WYGASNIECIE TAK SAMO JEDNOKIERUNKOWE.
-                    // Bez tego Ask oznaczony jako porzucony dalo sie cofnac do
-                    // 'open' i wyczyscic sobie wskaznik rozstrzygalnosci -
-                    // czyli dokladnie ta liczbe, ktora ma pokazywac, ze ktos
-                    // zebral cudza prace i nie zaplacil.
-                    && (resource.data.status != 'expired'
-                        || request.resource.data.status == 'expired')
-                    // "WYGASL" TO ZDANIE O PIENIADZACH I WYMAGA DOWODU.
-                    //
-                    // Znaczy: budzet wrocil z kontraktu do autora, pomniejszony
-                    // o oplate. Bez hasha byloby to nasze slowo o cudzych
-                    // srodkach - ten sam problem, ktory przy zakladaniu Aska
-                    // rozwiazuje `escrowTxHash`, i to samo lekarstwo.
-                    //
-                    // Wymagane WYLACZNIE przy `funding == 'escrowed'`: przy
-                    // 'on-resolve' nic nie bylo zablokowane, wiec nie ma
-                    // transakcji zwrotu, ktora mogla by byc dowodem, i zadanie
-                    // hasha uniemozliwiloby oznaczenie takiego Aska w ogole.
-                    && (request.resource.data.status != 'expired'
-                        || resource.data.funding != 'escrowed'
-                        || (request.resource.data.expiredTxHash is string
-                            && request.resource.data.expiredTxHash.size() == 66));
-
-      // Skasowany Ask to skasowana historia rozstrzygalnosci.
-      allow delete: if false;
+    // Wszystko pod Askiem - tylko serwer. Te sama odmowe daje regula ogolna
+    // na dole ('asks' jest w hasOwnRules); tu stoi wprost, zeby nie zalezala
+    // od ksztaltu tamtej reguly. W rules_version 2 `{rest=**}` pasuje tez do
+    // zera segmentow, czyli do samego asks/{askId} - `if false` niczego tam
+    // nie odbiera, bo reguly sie sumuja.
+    match /asks/{askId}/{rest=**} {
+      allow read, write: if false;
     }
 
     // ========================================================================
     // METADANE ODPOWIEDZI - jawne jest TO, ZE ktos odpowiedzial
     // ========================================================================
-    // Karta ma pokazywac "7 answers sealed until resolve", wiec liczba i autorzy
-    // sa publiczni. Sama tresc mieszka gdzie indziej (sekcja nizej).
-    //
-    // TWORZY JE WYLACZNIE SERWER (POST /api/asks/answers). Klient nie ma jak
-    // zapisac odpowiedzi poprawnie, bo tresc musi w tym samym kroku trafic do
-    // `askAnswerContent`, gdzie przegladarka nie siega. Dopuszczenie zapisu
-    // z klienta dawaloby metadane bez tresci - odpowiedz widoczna w liczniku
-    // i pusta przy rozstrzygnieciu.
+    // Tworzy je POST /api/asks/answers; pola przyjecia dopisuja accept,
+    // escrow-resolve i resolve kluczem administracyjnym, po sprawdzeniu
+    // przelewu na lancuchu. Poprzednia regula `update` wpuszczala kazda
+    // przegladarke z dowolnym 66-znakowym "hashem wyplaty" i dowolna kwota.
+    // Te pola sa KOPIA - rekord przyjecia lezy pod asks/{askId}/acceptances.
     match /askAnswers/{answerId} {
       allow read: if true;
+      allow create, update, delete: if false;
+    }
 
-      allow create, delete: if false;
-
-      // Jedyna zmiana dopuszczalna z przegladarki: przyjecie odpowiedzi wraz
-      // z DOWODEM wyplaty. Bez hasha "przyjeta" jest samym slowem, a caly
-      // produkt stoi na tym, ze kwoty da sie sprawdzic (patrz acceptAnswer).
-      allow update: if request.resource.data.askId == resource.data.askId
-                    && request.resource.data.author == resource.data.author
-                    && request.resource.data.createdAt == resource.data.createdAt
-                    && resource.data.accepted == false
-                    && request.resource.data.accepted == true
-                    && request.resource.data.payoutTxHash is string
-                    && request.resource.data.payoutTxHash.size() == 66;
+    match /askAnswers/{answerId}/{rest=**} {
+      allow read, write: if false;
     }
 
     // ========================================================================
     // TRESC ODPOWIEDZI - przegladarka nie ma tu wstepu WCALE
     // ========================================================================
-    // Druga kolekcja w tym pliku zamknieta calkowicie, z tego samego powodu co
-    // `premiumContent`: feed czyta Firestore klienckim SDK, wiec dopoki tresc
-    // siedzi w dokumencie odpowiedzi, kazdy widzi ja w ruchu sieciowym. Zaslona
-    // w UI to nie zapieczetowanie. Manifest obiecuje, ze odpowiedzi sa "sealed
-    // until you resolve: nobody can read what anyone else wrote, so nobody can
-    // rewrite it slightly and take a seat with it" - a tego nie da sie dotrzymac
-    // po stronie klienta.
-    //
-    // Czyta i pisze wylacznie serwer klientem administracyjnym (firebase-admin),
-    // ktory reguly omija z definicji. Wydaje ja GET /api/asks/{id}/answers po
-    // sprawdzeniu jednego z trzech warunkow: Ask jest `resolved`, pytajacy jest
+    // Czyta i pisze wylacznie serwer (firebase-admin). Wydaje ja
+    // GET /api/asks/{id}/answers, gdy: Ask ma ZAPIECZETOWANY przez serwer stan
+    // 'resolved' (sam status w dokumencie nie wystarcza), pytajacy jest
     // autorem Aska, albo pyta o wlasna odpowiedz.
     //
-    // ---------------------------------------------------------------------
-    // UWAGA, KTORA MUSI TU STAC: `if false` DZIS NIE WYSTARCZA
-    // ---------------------------------------------------------------------
-    // Na koncu tego pliku stoi `match /{document=**} { allow read, write: if
-    // true; }`. Firestore przyznaje dostep, gdy pozwala JAKAKOLWIEK pasujaca
-    // regula, a rekursywny wildcard pasuje do KAZDEGO dokumentu w bazie -
-    // takze do `askAnswerContent` i do `premiumContent`. Naglowek tego pliku
-    // mowi, ze "sciezki sa rozlaczne"; z regula `{document=**}` rozlaczne nie
-    // sa. Dopoki tam stoi, obie te kolekcje sa czytelne dla przegladarki mimo
-    // `if false`.
-    //
-    // Zamkniecie wymaga zawezenia tamtej reguly do wyliczonej listy istniejacych
-    // kolekcji (posts, users, comments, likes, tips, ...), czyli zmiany, ktora
-    // dotyka calej dzialajacej aplikacji i nie miesci sie w tej zmianie. Do tego
-    // czasu jedyna realna bramka na tresci odpowiedzi jest trasa serwerowa.
+    // Pod askAnswerContent/_registry/payouts/{chainId:txHash:logIndex} lezy
+    // rejestr wykorzystanych wyplat - jeden log Transfer/SeatAwarded przyjmuje
+    // najwyzej jedna odpowiedz. Dokument '_registry' nie istnieje, a trasy
+    // odrzucaja identyfikatory z '_'.
     match /askAnswerContent/{answerId} {
+      allow read, write: if false;
+    }
+
+    match /askAnswerContent/{answerId}/{rest=**} {
       allow read, write: if false;
     }
 

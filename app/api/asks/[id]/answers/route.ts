@@ -2,7 +2,7 @@
  * GET /api/asks/[id]/answers - metadane odpowiedzi zawsze, TRESCI warunkowo.
  *
  * === TRZY DROGI DO TRESCI I ANI JEDNEJ WIECEJ ===
- *   1. Ask jest `resolved`      - pieczec pada, bo autor juz wybral
+ *   1. Ask jest rozstrzygniety - pieczec pada, bo autor juz wybral
  *   2. pytajacy jest AUTOREM Aska - musi przeczytac, zeby wybrac
  *   3. pytajacy pyta o WLASNA odpowiedz - to jego wlasny tekst
  *
@@ -10,6 +10,17 @@
  * zapieczetowana" - nigdy "pusta". Ta roznica jest w typie AskAnswer i musi
  * przetrwac az do JSON-a, bo na niej stoi cala obietnica: "nobody can read what
  * anyone else wrote, so nobody can rewrite it slightly and take a seat with it".
+ *
+ * === SKAD WIEMY, ZE ASK JEST ROZSTRZYGNIETY (plan, krok 8) ===
+ * Do 2026-09-23 wystarczalo `status: 'resolved'` w dokumencie asks/{id} - pole,
+ * ktore dzis zapisuje kazda przegladarka. Jedno updateDoc z devtools odslanialo
+ * wszystkie zapieczetowane odpowiedzi kazdemu. Teraz decyzje podejmuje
+ * app/utils/asks/askPublicView.ts na widoku z magazynu (admin SDK):
+ *   - Ask zapieczetowany  - tylko stan 'resolved' z wazna pieczecia,
+ *   - Ask sprzed pieczeci - przy wylaczonej fladze jak dotad (do resealu),
+ *                           przy wlaczonej - nigdy.
+ * Tak samo "przyjeta": przy Asku zapieczetowanym wylacznie z rekordu przyjecia
+ * (asks/{id}/acceptances), a nie z flagi `accepted`, ktora da sie przestawic.
  *
  * === DLACZEGO METADANE SA JAWNE ===
  * Karta Aska ma pokazywac "7 answers sealed until resolve". Jawne jest TO, ZE
@@ -23,10 +34,21 @@
  */
 
 import { NextResponse, type NextRequest } from 'next/server';
-import { getAnswerMeta, getAsk } from '../../../../utils/asks/asks';
-import { normalizeAddress } from '../../../../utils/monetization/types';
+import { planAnswerThread } from '../../../../utils/asks/askPublicView';
 import { sessionAddress } from '../../identity';
 import { readAnswerContents } from '../../answerStore';
+import {
+  AskError,
+  isDocId,
+  openAskStore,
+  readAcceptances,
+  readAnswerRows,
+  readAskBundle,
+  usableView,
+  type AcceptanceSet,
+  type AnswerRow,
+  type AskView,
+} from '../../askStore';
 
 // getSessionFromCookies uzywa node:crypto, firebase-admin nie dziala na Edge.
 export const runtime = 'nodejs';
@@ -40,15 +62,40 @@ export const dynamic = 'force-dynamic';
 const NO_STORE_PRIVATE = { 'Cache-Control': 'no-store, private' } as const;
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
-  const askId = params.id?.trim();
+  const askId = typeof params.id === 'string' ? params.id.trim() : '';
   if (!askId) {
     return NextResponse.json({ error: 'Missing Ask id' }, { status: 400, headers: NO_STORE_PRIVATE });
   }
+  // Id trafia do admin doc() - 'X/sealed/state' adresowaloby cudzy stan.
+  if (!isDocId(askId)) {
+    return NextResponse.json(
+      { error: 'Invalid Ask id', code: 'invalid_id' },
+      { status: 400, headers: NO_STORE_PRIVATE }
+    );
+  }
 
-  let ask;
+  // Bez magazynu (admin SDK + klucz pieczeci) nie odroznimy prawdziwego
+  // rozstrzygniecia od podrobionego - wiec nie odslaniamy niczego.
+  const store = await openAskStore();
+  if (!store) {
+    return NextResponse.json(
+      { error: 'Sealed answer storage is not configured on this deployment.', code: 'store_unavailable' },
+      { status: 503, headers: NO_STORE_PRIVATE }
+    );
+  }
+
+  let view: AskView;
   try {
-    ask = await getAsk(askId);
+    view = usableView(await readAskBundle(store, askId));
   } catch (error) {
+    if (error instanceof AskError) {
+      // ask_not_found 404, seal_invalid 503 (pieczec stanu niewazna - ALARM
+      // jest juz w logu; nic nie odslaniamy i niczego nie nadpisujemy).
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: error.status, headers: NO_STORE_PRIVATE }
+      );
+    }
     console.error('[api/asks/answers] Odczyt Aska nie powiodl sie:', error);
     return NextResponse.json(
       { error: 'Failed to read Ask', code: 'ask_unavailable' },
@@ -56,13 +103,10 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     );
   }
 
-  if (!ask) {
-    return NextResponse.json({ error: 'Ask not found' }, { status: 404, headers: NO_STORE_PRIVATE });
-  }
-
-  let answers;
+  let rows: AnswerRow[];
+  let acceptances: AcceptanceSet;
   try {
-    answers = await getAnswerMeta(askId);
+    [rows, acceptances] = await Promise.all([readAnswerRows(store, askId), readAcceptances(store, askId)]);
   } catch (error) {
     console.error('[api/asks/answers] Odczyt odpowiedzi nie powiodl sie:', error);
     // Pusta lista przy nieudanym odczycie mowilaby autorowi "nikt nie
@@ -73,55 +117,63 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     );
   }
 
-  const viewer = sessionAddress(request);
-  const viewerAddress = viewer ? normalizeAddress(viewer) : null;
-  const isAskAuthor = viewerAddress !== null && normalizeAddress(ask.author) === viewerAddress;
-  const isResolved = ask.status === 'resolved';
+  if (acceptances.invalid.length > 0) {
+    // Rekord przyjecia z niewazna pieczecia: nie wiemy, ktore odpowiedzi sa
+    // naprawde oplacone. "Nieprzyjeta" zaprosiloby autora do drugiej wyplaty.
+    return NextResponse.json(
+      { error: 'This Ask cannot be verified right now. Nothing was changed.', code: 'seal_invalid' },
+      { status: 503, headers: NO_STORE_PRIVATE }
+    );
+  }
 
-  const unsealed = answers.filter(
-    (answer) =>
-      isResolved || isAskAuthor || (viewerAddress !== null && normalizeAddress(answer.author) === viewerAddress)
-  );
+  const plan = planAnswerThread({
+    askId,
+    view,
+    rows,
+    acceptances: acceptances.valid,
+    viewer: sessionAddress(request),
+  });
 
+  const visibleIds = plan.answers.filter((answer) => answer.visible).map((answer) => answer.id);
   let contents: Map<string, string> | null = new Map();
-  if (unsealed.length > 0) {
-    contents = await readAnswerContents(unsealed.map((answer) => answer.id));
+  if (visibleIds.length > 0) {
+    contents = await readAnswerContents(visibleIds);
     if (contents === null) {
-      // Magazyn nieskonfigurowany albo odczyt padl. Wydanie listy z samymi
-      // `null` wygladaloby jak "odpowiedzi sa puste" - i autor Aska
-      // rozstrzygnalby na podstawie nieprawdy.
+      // Odczyt padl. Wydanie listy z samymi `null` wygladaloby jak "odpowiedzi
+      // sa puste" - i autor Aska rozstrzygnalby na podstawie nieprawdy.
       return NextResponse.json(
         { error: 'Failed to read sealed answers', code: 'content_unavailable' },
         { status: 503, headers: NO_STORE_PRIVATE }
       );
     }
   }
-
-  const unsealedIds = new Set(unsealed.map((answer) => answer.id));
   const resolvedContents = contents;
 
   return NextResponse.json(
     {
       askId,
-      status: ask.status,
-      resolved: isResolved,
-      viewerIsAuthor: isAskAuthor,
-      count: answers.length,
-      answers: answers.map((answer) => {
-        const visible = unsealedIds.has(answer.id);
-        return {
-          id: answer.id,
-          askId,
-          author: answer.author,
-          createdAt: answer.createdAt,
-          accepted: answer.accepted,
-          payoutTxHash: answer.payoutTxHash,
-          // null = zapieczetowana. Nigdy "" - pusty string czytaloby sie jak
-          // odpowiedz bez tresci.
-          content: visible ? resolvedContents.get(answer.id) ?? null : null,
-          sealed: !visible,
-        };
-      }),
+      status: plan.status,
+      resolved: plan.resolved,
+      viewerIsAuthor: plan.viewerIsAuthor,
+      // 'sealed' | 'legacy' | 'unverified' - skad pochodzi status i przyjecia.
+      trust: plan.trust,
+      count: plan.answers.length,
+      answers: plan.answers.map((answer) => ({
+        id: answer.id,
+        askId,
+        author: answer.author,
+        createdAt: answer.createdAt,
+        accepted: answer.accepted,
+        payoutTxHash: answer.payoutTxHash,
+        payoutLogIndex: answer.payoutLogIndex,
+        // true tylko z rekordu przyjecia zapisanego przez serwer po dowodzie
+        // z lancucha; false przy Asku sprzed pieczeci = "tak mowi dokument".
+        payoutVerified: answer.payoutVerified,
+        // null = zapieczetowana. Nigdy "" - pusty string czytalby sie jak
+        // odpowiedz bez tresci.
+        content: answer.visible ? resolvedContents.get(answer.id) ?? null : null,
+        sealed: !answer.visible,
+      })),
     },
     { headers: NO_STORE_PRIVATE }
   );

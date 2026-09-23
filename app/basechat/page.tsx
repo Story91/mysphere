@@ -741,7 +741,9 @@ function BaseChatContent() {
   const handleCreateAskFromFeed = useCallback(
     async (draft: AskDraft) => {
       const created = await askFlow.submit(draft);
-      setAsksCreatedHere((previous) => [created, ...previous]);
+      // Ten sam Ask moze wrocic drugi raz (dokonczony zapis depozytu) - bez
+      // filtra pas pokazalby go podwojnie.
+      setAsksCreatedHere((previous) => [created, ...previous.filter((existing) => existing.id !== created.id)]);
 
       /**
        * ===== PAS NAD FEEDEM MA SIE DOWIEDZIEC, ZE COS DOSZLO =====

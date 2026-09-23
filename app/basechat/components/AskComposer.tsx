@@ -10,6 +10,7 @@ import {
 } from '../../utils/asks/types';
 import { ASK_TEMPLATES_SAFE, type AskTemplate } from '../../utils/asks/templates';
 import { attachVaultContext } from '../../utils/asks/vaultContext';
+import { MAX_QUESTION_LENGTH } from '../../api/asks/pricing';
 import type { VaultFacts, VaultListResult } from '../../utils/morpho/types';
 import AskVaultPicker from './AskVaultPicker';
 import { formatAskMoney } from './AskCard';
@@ -186,6 +187,14 @@ export default function AskComposer({
    */
   const problem = useMemo<string | null>(() => {
     if (question.trim() === '') return 'Write the question first.';
+    // Liczymy to, co naprawde pojdzie do serwera (z migawka skarbca) - serwer
+    // odrzuca dluzsze, a przy escrow dopiero po zablokowaniu budzetu.
+    const sentLength = attachVaultContext(question.trim(), vault).trim().length;
+    if (sentLength > MAX_QUESTION_LENGTH) {
+      return vault
+        ? `With the vault details the question is ${sentLength} characters. Keep it under ${MAX_QUESTION_LENGTH}.`
+        : `Keep the question under ${MAX_QUESTION_LENGTH} characters (now ${sentLength}).`;
+    }
     if (budget === null) return 'Set a budget.';
     if (budget <= 0) return 'The budget has to be more than zero.';
     if (seats === null || !Number.isInteger(seats)) return 'Seats must be a whole number.';
@@ -197,7 +206,7 @@ export default function AskComposer({
       )} minimum. Raise the budget or cut the seats.`;
     }
     return null;
-  }, [question, budget, seats, perAnswer]);
+  }, [question, vault, budget, seats, perAnswer]);
 
   const blocked = disabled || pending || problem !== null;
 

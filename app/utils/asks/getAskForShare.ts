@@ -1,11 +1,14 @@
+import { cache } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
+import { readAskShare } from '../../api/asks/askPublicRead';
 import { getPublicDb as getDb } from '../publicFirestore';
-import { toMillis } from '../firestoreTime';
-import { perAnswerFor, type Ask } from './types';
+import { toAsk } from './askMapping';
+import { shareUnchecked, type AskShare } from './askPublicView';
+import { isDocId } from './askSealCore';
 
 /**
  * Odczyt POJEDYNCZEGO Aska po stronie serwera - na potrzeby udostepnialnej
- * trasy /ask/[id] i generowanej dla niej karty OG.
+ * trasy /ask/[id] i jej metadanych (podglad linku).
  *
  * ===========================================================================
  * PO CO TA TRASA W OGOLE POWSTALA
@@ -20,17 +23,24 @@ import { perAnswerFor, type Ask } from './types';
  * tylko wtedy, gdy da sie go wkleic.
  *
  * ===========================================================================
- * DLACZEGO OSOBNY PLIK, A NIE asks.ts
+ * SKAD DANE (plan, krok 12)
  * ===========================================================================
- * `asks.ts` jest modulem KLIENCKIM: ciagnie kliencki SDK, cache w localStorage
- * i logike kompozytora. Tutaj potrzebny jest jeden odczyt wykonywany na
- * serwerze, wiec bierzemy minimalny zestaw - dokladnie tak, jak
- * `getPostForShare.ts` robi to dla postow.
+ * Strona jest publiczna i czytaja ja crawlery, wiec nie moze powtarzac
+ * niesprawdzonych zdan o pieniadzach. Dokument asks/{id} zapisuje dzis kazda
+ * przegladarka: `status: 'resolved'` dawal "Settled: the budget has been paid
+ * out.", a `funding: 'escrowed'` z dowolnym hashem - "locked in an escrow
+ * contract" z linkiem do "depozytu".
  *
- * Mapowanie jest CELOWO takie samo jak `toAsk` w asks.ts, razem z liczeniem
- * `perAnswer` z budzetu i miejsc zamiast czytania zapisanego pola. Gdyby te
- * dwa mapowania sie rozjechaly, ta sama karta pokazywalaby inna kwote
- * w feedzie i po wklejeniu linku.
+ * Dlatego najpierw magazyn Askow (admin SDK, pieczecie) przez
+ * app/api/asks/askPublicRead.ts - osobny modul z 'server-only', zeby zaden
+ * pakiet kliencki nie wciagnal admin SDK. Z niego status i escrow sa prawda
+ * (Ask zapieczetowany) albo dzisiejsza semantyka sprzed pieczeci ('legacy').
+ * Gdy magazyn jest niedostepny (brak konta uslugowego, awaria), strona MUSI
+ * sie dalej renderowac: czytamy sam dokument klienckim SDK i oznaczamy go
+ * 'unchecked' - strona mowi wtedy neutralnie (askPublicView.ts).
+ *
+ * Mapowanie dokumentu to toAsk z askMapping.ts - to samo co w feedzie, wiec
+ * ta sama karta nie pokaze innej kwoty w feedzie i po wklejeniu linku.
  *
  * To sa dane PUBLICZNE: tresc pytania, budzet i termin widzi kazdy
  * w feedzie. Zapieczetowane sa ODPOWIEDZI, a tych ten odczyt nie dotyka.
@@ -38,39 +48,28 @@ import { perAnswerFor, type Ask } from './types';
 
 const ASKS = 'asks';
 
-export async function getAskForShare(askId: string): Promise<Ask | null> {
-  const id = askId?.trim();
-  if (!id) return null;
+export type { AskShare };
+
+/**
+ * Ask do strony udostepniania albo null (404).
+ *
+ * `cache` z Reacta: generateMetadata i sama strona pytaja o tego samego Aska
+ * w jednym renderze - bez tego kazde wejscie robiloby odczyty podwojnie.
+ */
+export const getAskForShare = cache(async (askId: string): Promise<AskShare | null> => {
+  const id = typeof askId === 'string' ? askId.trim() : '';
+  // Scisle id: to samo, co przyjmuja trasy Askow. Id spoza tego ksztaltu
+  // powstaja tylko z zapisu z przegladarki i nie da sie ich obsluzyc.
+  if (!isDocId(id)) return null;
+
+  const verified = await readAskShare(id);
+  if (verified.kind === 'ok') return verified.share;
+  if (verified.kind === 'missing') return null;
 
   try {
     const snapshot = await getDoc(doc(getDb(), ASKS, id));
     if (!snapshot.exists()) return null;
-
-    const data = snapshot.data() as Record<string, any>;
-    const budget = Number(data.budget) || 0;
-    const seats = Number(data.seats) || 0;
-
-    return {
-      id: snapshot.id,
-      author: typeof data.author === 'string' ? data.author : '',
-      question: typeof data.question === 'string' ? data.question : '',
-      budget,
-      seats,
-      perAnswer: perAnswerFor(budget, seats),
-      token: typeof data.token === 'string' ? data.token : 'USDC',
-      network: typeof data.network === 'string' ? data.network : 'base',
-      deadline: toMillis(data.deadline),
-      createdAt: toMillis(data.createdAt),
-      status: data.status === 'resolved' || data.status === 'expired' ? data.status : 'open',
-      funding: data.funding === 'escrowed' ? 'escrowed' : 'on-resolve',
-      answerCount: Number(data.answerCount) || 0,
-      acceptedCount: Number(data.acceptedCount) || 0,
-      resolvedAt: data.resolvedAt ? toMillis(data.resolvedAt) : undefined,
-      escrowTxHash: typeof data.escrowTxHash === 'string' ? data.escrowTxHash : null,
-      escrowChainId: typeof data.escrowChainId === 'number' ? data.escrowChainId : null,
-      escrowResolveTxHash:
-        typeof data.escrowResolveTxHash === 'string' ? data.escrowResolveTxHash : null,
-    };
+    return shareUnchecked(toAsk(snapshot.id, snapshot.data() as Record<string, any>));
   } catch (error) {
     // `null` znaczy tu "nie mamy czego pokazac" i wolajacy robi z tego 404.
     // Rzucenie wywalaloby cala trase, a nieudany odczyt jednego dokumentu nie
@@ -78,7 +77,7 @@ export async function getAskForShare(askId: string): Promise<Ask | null> {
     console.error('[ask-share] Odczyt Aska nie powiodl sie:', error);
     return null;
   }
-}
+});
 
 /** Skrot adresu dla naglowka. Ten sam ksztalt co przy postach. */
 export function shortAskAuthor(address: string): string {

@@ -1,29 +1,27 @@
 import {
   collection,
   doc,
-  addDoc,
   getDoc,
   getDocs,
-  setDoc,
-  updateDoc,
   query,
   where,
   orderBy,
   limit as fsLimit,
-  increment,
-  serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase';
-import { toMillis } from '../firestoreTime';
 import {
   ASKS_COLLECTION,
   ASK_ANSWERS_COLLECTION,
   type Ask,
   type AskAnswer,
   type ResolveRate,
-  perAnswerFor,
 } from './types';
 import { getAskAuthorStats } from './userStats';
+import { toAnswerMeta, toAsk } from './askMapping';
+
+// Mapowanie mieszka w askMapping.ts, bo potrzebuje go tez serwer (askStore)
+// bez klienckiego SDK. Re-eksport zostawia dotychczasowe importy w spokoju.
+export { toAnswerMeta, toAsk };
 
 /**
  * Warstwa danych Aska.
@@ -46,6 +44,19 @@ import { getAskAuthorStats } from './userStats';
  *
  * Ten plik NIE zapisuje tresci odpowiedzi. Robi to trasa serwerowa, bo klient
  * do tamtej kolekcji nie ma dostepu ani do zapisu, ani do odczytu.
+ *
+ * === TEN PLIK JUZ NICZEGO NIE ZAPISUJE ===
+ * Zostaly same odczyty i newAskId. Zalozenie, przyjecie, rozstrzygniecie
+ * i wygasniecie Aska ida wylacznie przez trasy serwera (admin SDK +
+ * zapieczetowany stan w asks/{id}/sealed/state):
+ *   zalozenie      POST /api/asks/create      (useCreateAsk) i POST /api/asks (x402)
+ *   przyjecie      POST /api/asks/[id]/accept
+ *   rozstrzygniecie POST /api/asks/[id]/resolve, .../escrow-resolve
+ *   wygasniecie    POST /api/asks/[id]/escrow-expire (MoneyContent)
+ * Dawne createAsk/acceptAnswer/resolveAsk/expireAsk pisaly klienckim SDK
+ * pola, ktore kazda przegladarka mogla podrobic (autor bez dowodu, 'escrowed'
+ * z dowolnym hashem, 'expired' cudzego Aska) - dlatego zniknely, a nie
+ * zostaly "na wszelki wypadek". Po wdrozeniu regul i tak by nie przeszly.
  */
 
 // Nazwy kolekcji stoja w types.ts - czyta je stamtad takze czytnik statystyk
@@ -53,129 +64,17 @@ import { getAskAuthorStats } from './userStats';
 const ASKS = ASKS_COLLECTION;
 const ASK_ANSWERS = ASK_ANSWERS_COLLECTION;
 
-/** Mapowanie dokumentu na Aska. Znaczniki przez toMillis - patrz firestoreTime. */
-function toAsk(id: string, data: Record<string, any>): Ask {
-  const budget = Number(data.budget) || 0;
-  const seats = Number(data.seats) || 0;
-  return {
-    id,
-    author: typeof data.author === 'string' ? data.author : '',
-    question: typeof data.question === 'string' ? data.question : '',
-    budget,
-    seats,
-    // Liczymy z budzetu i miejsc, a nie czytamy zapisanej wartosci: gdyby
-    // kiedys rozjechala sie z budzetem, karta obiecywalaby inna kwote, niz
-    // wyplaci rozstrzygniecie.
-    perAnswer: perAnswerFor(budget, seats),
-    token: typeof data.token === 'string' ? data.token : 'USDC',
-    network: typeof data.network === 'string' ? data.network : 'base',
-    deadline: toMillis(data.deadline),
-    createdAt: toMillis(data.createdAt),
-    status: data.status === 'resolved' || data.status === 'expired' ? data.status : 'open',
-    funding: data.funding === 'escrowed' ? 'escrowed' : 'on-resolve',
-    answerCount: Number(data.answerCount) || 0,
-    acceptedCount: Number(data.acceptedCount) || 0,
-    resolvedAt: data.resolvedAt ? toMillis(data.resolvedAt) : undefined,
-    escrowTxHash: typeof data.escrowTxHash === 'string' ? data.escrowTxHash : null,
-    escrowChainId: typeof data.escrowChainId === 'number' ? data.escrowChainId : null,
-    escrowResolveTxHash:
-      typeof data.escrowResolveTxHash === 'string' ? data.escrowResolveTxHash : null,
-  };
-}
-
-export type CreateAskInput = {
-  author: string;
-  question: string;
-  budget: number;
-  seats: number;
-  durationMs: number;
-  token?: string;
-  network?: string;
-  /**
-   * Identyfikator nadany Z GORY przez `newAskId`.
-   *
-   * Potrzebny WYLACZNIE dla escrow i to jest jedyny powod, dla ktorego istnieje:
-   * kontrakt kluczuje escrow po (autor, askId), wiec askId musi byc znany PRZED
-   * transakcja - a transakcja idzie PRZED zapisem. Bez tego dokument powstalby
-   * pierwszy i przez chwile obiecywalby zablokowane srodki, ktorych jeszcze nie ma.
-   */
-  id?: string;
-  /**
-   * Termin PODANY WPROST, w milisekundach.
-   *
-   * Przy escrow ta sama liczba musi trafic do kontraktu i do dokumentu. Liczona
-   * dwa razy z `Date.now() + durationMs` rozjechalaby sie o czas approve i fund,
-   * czyli o kilkanascie sekund - a karta obiecywalaby wtedy inny termin niz ten,
-   * ktorego pilnuje lancuch.
-   */
-  deadlineMs?: number;
-  funding?: 'on-resolve' | 'escrowed';
-  /** Hash `fund`. WYMAGANY przy funding: 'escrowed' - patrz nizej. */
-  escrowTxHash?: string;
-  escrowChainId?: number;
-};
-
 /**
  * Nadaje identyfikator dokumentu NIE ZAPISUJAC go.
  *
  * Firestore generuje identyfikatory lokalnie, wiec `doc(collection(...))` jest
  * darmowy i nie tworzy dokumentu. Dzieki temu escrow moze pojsc na lancuch pod
- * ostatecznym identyfikatorem, a Firestore dostaje zapis dopiero, gdy pieniadze
- * naprawde leza.
+ * ostatecznym identyfikatorem, a zapis (POST /api/asks/create, przez serwer)
+ * idzie dopiero, gdy pieniadze naprawde leza. Serwer przyjmuje tylko ten format
+ * (20 znakow alfanumerycznych - isEscrowAskId w askCreateCore.ts).
  */
 export function newAskId(): string {
   return doc(collection(db, ASKS)).id;
-}
-
-/** @returns identyfikator utworzonego Aska. */
-export async function createAsk(input: CreateAskInput): Promise<string> {
-  const seats = Math.max(1, Math.floor(input.seats));
-  const budget = Math.max(0, input.budget);
-  const funding = input.funding ?? 'on-resolve';
-
-  // Zapisanie 'escrowed' bez hasha `fund` byloby obietnica bez pokrycia wpisana
-  // wprost do bazy - dokladnie tym, czego pole `funding` ma pilnowac. Bramka
-  // stoi TUTAJ, a nie tylko w UI, zeby zadna druga sciezka zapisu jej nie ominela.
-  if (funding === 'escrowed' && !input.escrowTxHash) {
-    throw new Error('An escrowed Ask cannot be recorded without the funding transaction hash.');
-  }
-
-  const payload = {
-    author: input.author,
-    question: input.question.trim(),
-    budget,
-    seats,
-    perAnswer: perAnswerFor(budget, seats),
-    token: input.token ?? 'USDC',
-    network: input.network ?? 'base',
-    // Termin liczony OD TERAZ po stronie klienta, chyba ze wolajacy poda go
-    // wprost (escrow - patrz `deadlineMs`). Swiadome uproszczenie:
-    // serverTimestamp() nie da sie dodac przesuniecia, a rozjazd zegara rzedu
-    // sekund nie ma tu znaczenia przy terminach liczonych w godzinach.
-    deadline: input.deadlineMs ?? Date.now() + input.durationMs,
-    createdAt: serverTimestamp(),
-    status: 'open',
-    funding,
-    answerCount: 0,
-    acceptedCount: 0,
-    ...(funding === 'escrowed'
-      ? {
-          escrowTxHash: input.escrowTxHash,
-          escrowChainId: input.escrowChainId ?? null,
-        }
-      : {}),
-  };
-
-  if (input.id) {
-    // setDoc pod znanym identyfikatorem - ten sam, ktory posluzyl za askId na
-    // lancuchu. addDoc nadalby wlasny i escrow wisialby pod kluczem, do ktorego
-    // zaden dokument by nie prowadzil.
-    await setDoc(doc(db, ASKS, input.id), payload);
-    return input.id;
-  }
-
-  const ref = await addDoc(collection(db, ASKS), payload);
-  return ref.id;
 }
 
 export async function getAsk(id: string): Promise<Ask | null> {
@@ -257,29 +156,6 @@ export async function getResolvedAsks(max = 10): Promise<AsksResult> {
   }
 }
 
-/**
- * Odpowiedzi BEZ TRESCI - metadane, ktore wolno pokazac kazdemu.
- *
- * Liczba odpowiedzi jest jawna celowo: karta ma pokazywac "7 answers sealed
- * until resolve". Jawne jest TO, ZE ktos odpowiedzial; niejawne CO napisal.
- */
-function toAnswerMeta(id: string, data: Record<string, any>): AskAnswer {
-  return {
-    id,
-    askId: typeof data.askId === 'string' ? data.askId : '',
-    author: typeof data.author === 'string' ? data.author : '',
-    createdAt: toMillis(data.createdAt),
-    content: null, // zapieczetowane - tresc wydaje wylacznie trasa serwerowa
-    accepted: Boolean(data.accepted),
-    payoutTxHash: typeof data.payoutTxHash === 'string' ? data.payoutTxHash : null,
-    // Kwota zapisana w chwili przyjecia. `null` znaczy "nie wiadomo ile",
-    // a nie "zero" - patrz komentarz przy tych polach w types.ts.
-    payoutAmount: typeof data.payoutAmount === 'number' ? data.payoutAmount : null,
-    payoutToken: typeof data.payoutToken === 'string' ? data.payoutToken : null,
-    payoutNetwork: typeof data.payoutNetwork === 'string' ? data.payoutNetwork : null,
-  };
-}
-
 export async function getAnswerMeta(askId: string): Promise<AskAnswer[]> {
   // fsLimit(200) to bezpiecznik, nie regula biznesowa: Ask ma najwyzej 20
   // miejsc, wiec 200 odpowiedzi to wielokrotny zapas - limit chroni tylko
@@ -325,192 +201,6 @@ export async function hasAnswered(askId: string, author: string): Promise<boolea
     )
   );
   return !snapshot.empty;
-}
-
-/** Ile i w czym wyplacono za jedna przyjeta odpowiedz. */
-export type AnswerPayout = {
-  amount: number;
-  token: string;
-  network: string;
-};
-
-/**
- * Oznacza odpowiedz jako przyjeta i zapisuje DOWOD wyplaty.
- *
- * `payoutTxHash` jest WYMAGANY. Bez niego "przyjeta" jest samym slowem, a caly
- * produkt stoi na tym, ze kwoty da sie sprawdzic. Wolane dopiero PO tym, jak
- * przelew wszedl na lancuch - nigdy przed.
- *
- * === CO DOPISUJE POZA HASHEM I PO CO ===
- * Razem z przyjeciem zapisujemy KWOTE, TOKEN i SIEC wyplaty. Bez tego statystyki
- * odpowiadajacego ("ile zarobil, per token") wymagalyby doczytania Aska do
- * kazdej przyjetej odpowiedzi - zlaczenia, ktorego koszt rosnie z liczba
- * przyjec. Drugi powod jest wazniejszy: zapisana stawka jest TA, ktora
- * obowiazywala przy przyjeciu, i zostaje przy odpowiedzi na stale.
- *
- * `payout` wolno pominac - wtedy funkcja doczytuje Aska sama (jeden odczyt) i
- * bierze stawke z niego. Wolajacy, ktory Aska juz ma w rece (a musi go miec,
- * zeby wiedziec, ile przelac), oszczedza ten odczyt, podajac wartosci wprost.
- *
- * Gdy odczyt Aska sie nie uda, przyjecie i tak zostaje zapisane: przelew juz
- * poszedl na lancuch i odmowa zapisu byla by strata dowodu. Odpowiedz ladzie
- * wtedy w `acceptedWithoutAmount` - "nie wiadomo ile", nie "zero".
- */
-export async function acceptAnswer(
-  askId: string,
-  answerId: string,
-  payoutTxHash: string,
-  payout?: AnswerPayout
-): Promise<void> {
-  if (!payoutTxHash) throw new Error('acceptAnswer wymaga hasha wyplaty');
-
-  let recorded: AnswerPayout | null = payout ?? null;
-  if (!recorded) {
-    try {
-      const ask = await getAsk(askId);
-      if (ask) recorded = { amount: ask.perAnswer, token: ask.token, network: ask.network };
-    } catch (error) {
-      console.error('[asks] Nie udalo sie odczytac stawki Aska przy przyjmowaniu:', error);
-    }
-  }
-
-  await updateDoc(doc(db, ASK_ANSWERS, answerId), {
-    accepted: true,
-    payoutTxHash,
-    acceptedAt: serverTimestamp(),
-    // Zapisujemy tylko wtedy, gdy naprawde wiemy ile. Zero udawaloby wyplate,
-    // ktorej wysokosci nie znamy.
-    ...(recorded && recorded.amount > 0
-      ? {
-          payoutAmount: recorded.amount,
-          payoutToken: recorded.token,
-          payoutNetwork: recorded.network,
-        }
-      : {}),
-  });
-
-  // ===================================================================
-  // OSTATNIE OPLACONE MIEJSCE ZAMYKA ASKA SAM
-  // ===================================================================
-  // Zgloszenie wlasciciela: "settles 0 of 2, a 2 sa resolved, bo zaplacilem
-  // za najlepsze odpowiedzi". Sprawdzone w bazie - mial racje i to byl blad
-  // dzialajacy na jego niekorzysc:
-  //
-  //   status=open  seats=1  acceptedCount=1   <- kazde miejsce oplacone
-  //   status=open  seats=1  acceptedCount=1   <- to samo
-  //
-  // Obie przyjete odpowiedzi mialy hash wyplaty. Autor zaplacil w CALOSCI,
-  // a jego publiczny wskaznik rozstrzygalnosci pokazywal, ze porzucil dwa
-  // Aski - bo `resolve` bylo osobnym, drugim klikiem, o ktorym nikt nie
-  // powiedzial, ze jest konieczny.
-  //
-  // Panel mowil doslownie "1 of 1 seats paid" i obok trzymal czynny przycisk
-  // "Resolve this Ask". Gdy wszystkie miejsca sa oplacone, nie ma juz CZEGO
-  // rozstrzygac: nie ma wolnego miejsca, nie ma decyzji do podjecia. Drugi
-  // klik nie niosl informacji, a jego pominiecie kosztowalo reputacje.
-  //
-  // TYLKO DLA 'on-resolve'. Przy escrow `resolve` jest wywolaniem NA
-  // KONTRAKCIE, ktore dopiero rozdziela pieniadze - zamkniecie samego
-  // dokumentu twierdziloby, ze wyplacono, podczas gdy budzet dalej lezy
-  // zablokowany. Tam drugi krok jest prawdziwym krokiem i zostaje.
-  const zamkniete = await zamknijGdyWszystkieMiejscaOplacone(askId);
-
-  if (!zamkniete) {
-    await updateDoc(doc(db, ASKS, askId), {
-      acceptedCount: increment(1),
-    });
-  }
-}
-
-/**
- * Podbija licznik przyjec i - jesli to bylo ostatnie miejsce - zamyka Aska
- * w TYM SAMYM zapisie.
- *
- * Jeden `updateDoc` zamiast dwoch nie jest optymalizacja, tylko poprawnoscia:
- * dwa osobne zapisy zostawialyby okno, w ktorym Ask ma komplet oplaconych
- * miejsc i status `open`, czyli dokladnie ten stan, ktory naprawiamy.
- *
- * Zwraca `false`, gdy nie dalo sie odczytac Aska - wtedy wolajacy robi sam
- * goly increment. Nieudany odczyt NIE MOZE kosztowac zapisu przyjecia:
- * przelew juz poszedl na lancuch.
- */
-async function zamknijGdyWszystkieMiejscaOplacone(askId: string): Promise<boolean> {
-  let ask: Ask | null = null;
-  try {
-    ask = await getAsk(askId);
-  } catch (error) {
-    console.error('[asks] Nie udalo sie sprawdzic, czy Ask domyka sie sam:', error);
-    return false;
-  }
-  if (!ask) return false;
-
-  const poTym = (ask.acceptedCount ?? 0) + 1;
-  const komplet = ask.seats > 0 && poTym >= ask.seats;
-  const samoDomkniecie = komplet && ask.funding === 'on-resolve' && ask.status === 'open';
-
-  await updateDoc(doc(db, ASKS, askId), {
-    acceptedCount: increment(1),
-    ...(samoDomkniecie ? { status: 'resolved', resolvedAt: Date.now() } : {}),
-  });
-
-  return true;
-}
-
-/**
- * Zamyka Aska. Wolane, gdy autor skonczyl przyjmowac odpowiedzi.
- *
- * `escrowResolveTxHash` podaje sciezka escrow: to hash transakcji `resolve` na
- * kontrakcie, czyli moment, w ktorym budzet przestal byc autora. Dla wariantu
- * 'on-resolve' zostaje pusty - tam dowodem sa hashe przy poszczegolnych
- * odpowiedziach, bo kazda byla osobnym przelewem.
- */
-export async function resolveAsk(askId: string, escrowResolveTxHash?: string): Promise<void> {
-  await updateDoc(doc(db, ASKS, askId), {
-    status: 'resolved',
-    resolvedAt: serverTimestamp(),
-    ...(escrowResolveTxHash ? { escrowResolveTxHash } : {}),
-  });
-}
-
-/**
- * Ask wygasl: termin minal, autor nie rozstrzygnal, budzet wrocil z kontraktu.
- *
- * ===========================================================================
- * DLACZEGO TO W OGOLE POWSTALO
- * ===========================================================================
- * `status: 'expired'` bylo CZYTANE w czterech miejscach (ten plik, userStats,
- * getMoneyLedger, AskCard), a NIE BYLO ZAPISYWANE NIGDZIE. Kontrakt oddawal
- * pieniadze przez `settleExpired`, a dokument dalej mowil "open" - Ask stal na
- * /asks z odliczaniem po terminie i wygladal, jakby czekal na odpowiedzi,
- * ktorych nikt juz nie moze przyjac. Lancuch wiedzial, baza nie.
- *
- * ===========================================================================
- * DLACZEGO HASH JEST WYMAGANY, A NIE OPCJONALNY
- * ===========================================================================
- * Inaczej niz przy `resolveAsk`, gdzie hash jest dodatkiem. "Wygasl" to zdanie
- * o PIENIADZACH: mowi, ze budzet wrocil do autora pomniejszony o oplate. Bez
- * dowodu byloby to nasze slowo o cudzych srodkach - dokladnie ten sam problem,
- * ktory przy zakladaniu Aska rozwiazuje `escrowTxHash`. Regula Firestore tez
- * tego pilnuje: przy `status == 'expired'` wymaga hasha dlugosci 66 znakow.
- * Sama regula nie czyta lancucha, ale kazdy czytelnik moze - i wlasnie o to
- * chodzi.
- *
- * Wolane DOPIERO po potwierdzeniu transakcji. Zapis przed kwitem oznaczalby
- * Aska jako wygasly na podstawie zamiaru, a nie faktu.
- */
-export async function expireAsk(askId: string, settleTxHash: string): Promise<void> {
-  const hash = settleTxHash.trim();
-  if (!/^0x[0-9a-fA-F]{64}$/.test(hash)) {
-    // Rzucamy, zamiast zapisywac bez dowodu. Nieoznaczony Ask jest mniej
-    // szkodliwy niz oznaczony klamliwie: pierwszy tylko wisi, drugi twierdzi,
-    // ze pieniadze wrocily.
-    throw new Error('expireAsk wymaga hasha potwierdzonej transakcji settleExpired.');
-  }
-  await updateDoc(doc(db, ASKS, askId), {
-    status: 'expired',
-    expiredAt: serverTimestamp(),
-    expiredTxHash: hash,
-  });
 }
 
 /**

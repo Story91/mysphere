@@ -4,7 +4,7 @@
  * === BRAMKA ===
  * Dwa warunki, oba konieczne:
  *   1. wazna, PODPISANA sesja SIWE (httpOnly cookie, HMAC),
- *   2. adres z tej sesji rowny ADMIN_ADDRESS z app/utils/firebase.ts.
+ *   2. adres z tej sesji rowny ADMIN_ADDRESS (sprawdza app/api/admin/isAdmin.ts).
  *
  * Adres NIE moze pochodzic z ciala zadania, z naglowka ani z query - tylko
  * z sesji, ktorej podpis serwer sam wystawil po weryfikacji podpisu portfela
@@ -29,8 +29,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
-import { ADMIN_ADDRESS } from '../../../utils/firebase';
-import { getSessionFromCookies } from '../../../utils/auth/session';
+import { isAdminRequest } from '../isAdmin';
 import { OPS_TIMINGS, collectOpsReport, type RefreshScope } from '../../../utils/ops/collect';
 
 // getSessionFromCookies uzywa node:crypto; collect.ts wola RPC.
@@ -44,17 +43,8 @@ export const dynamic = 'force-dynamic';
  */
 const NO_STORE = { 'Cache-Control': 'no-store, private' } as const;
 
-function isAdminRequest(request: NextRequest): boolean {
-  try {
-    const session = getSessionFromCookies(request.cookies);
-    if (!session) return false;
-    return session.address.toLowerCase() === ADMIN_ADDRESS.toLowerCase();
-  } catch {
-    // Najczestszy powod: brak AUTH_SESSION_SECRET. Failujemy zamknieto -
-    // blad konfiguracji ma znaczyc "nie admin", nigdy "admin".
-    return false;
-  }
-}
+// Bramka admina (sesja SIWE == ADMIN_ADDRESS) mieszka w ../isAdmin.ts -
+// ta sama dla wszystkich tras admina.
 
 function parseScope(request: NextRequest): RefreshScope {
   const raw = request.nextUrl.searchParams.get('refresh');

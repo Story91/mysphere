@@ -1,6 +1,21 @@
 import 'server-only';
 import { getAdminDb } from '../../utils/auth/firebaseAdmin';
-import { normalizeAddress } from '../../utils/monetization/types';
+import { lowerAddress } from '../../utils/asks/askSealCore';
+import type { AskStatus } from '../../utils/asks/types';
+import {
+  ASKS_COLLECTION,
+  ASK_ANSWERS_COLLECTION,
+  ASK_ANSWER_CONTENT_COLLECTION,
+  answerRef,
+  answererGuardDoc,
+  answererRef,
+  askBundleFromSnapshots,
+  askRef,
+  contentRef,
+  isDocId,
+  stateRef,
+  type AskStore,
+} from './askStore';
 
 /**
  * Magazyn ZAPIECZETOWANYCH tresci odpowiedzi - kolekcja `askAnswerContent`.
@@ -29,9 +44,9 @@ import { normalizeAddress } from '../../utils/monetization/types';
  * ale sama nie wystarcza - patrz komentarz w firestore.rules.
  */
 
-export const ASK_ANSWER_CONTENT_COLLECTION = 'askAnswerContent';
-export const ASK_ANSWERS_COLLECTION = 'askAnswers';
-export const ASKS_COLLECTION = 'asks';
+// Nazwy kolekcji zyja teraz w askStore.ts (jedno miejsce po stronie serwera);
+// re-eksport zostawia dotychczasowe importy w spokoju.
+export { ASK_ANSWER_CONTENT_COLLECTION, ASK_ANSWERS_COLLECTION, ASKS_COLLECTION };
 
 /** Czy magazyn w ogole dziala. Bez konta uslugowego nie da sie nic zapisac. */
 export async function isAnswerStoreAvailable(): Promise<boolean> {
@@ -46,80 +61,129 @@ export type StoredAnswer = {
 };
 
 /**
- * Zapisuje odpowiedz: NAJPIERW tresc do zapieczetowanej kolekcji, POTEM
- * metadane i licznik.
+ * Dlaczego odpowiedz nie zostala zapisana. `status` to gotowy kod HTTP.
  *
- * Kolejnosc nie jest kosmetyczna. Odwrotna dawalaby odpowiedz widoczna w
- * liczniku i pusta w srodku - dokladnie ten sam blad, przed ktorym broni sie
- * /api/premium ("paywall nad pustka"). Tu byloby gorzej: autor Aska zobaczylby
- * "7 answers sealed" i przy rozstrzygnieciu nie zastal nic.
- *
- * NIE sprawdza uprawnien - wolajacy musi wczesniej potwierdzic tozsamosc,
- * stan Aska i to, ze ten adres jeszcze nie odpowiadal.
- *
- * @returns metadane zapisanej odpowiedzi albo null, gdy zapis sie nie udal.
+ * already_answered - ten adres juz odpowiedzial (straznik albo stara odpowiedz),
+ * ask_closed       - Ask nie jest otwarty albo minal termin (`askStatus`),
+ * own_ask          - autor odpowiada na wlasnego Aska,
+ * ask_unverified   - Ask bez pieczeci przy wlaczonej fladze ASK_SEALS_ENFORCED,
+ * seal_invalid     - pieczec stanu niewazna (503, nic nie zapisujemy),
+ * answer_write_failed - transakcja sie nie powiodla; nic nie zostalo zapisane.
  */
-export async function saveAnswer(input: {
-  askId: string;
-  author: string;
-  content: string;
-}): Promise<StoredAnswer | null> {
-  const db = await getAdminDb();
-  if (!db) return null;
+export type SaveAnswerRefusal =
+  | 'invalid_id'
+  | 'invalid_author'
+  | 'ask_not_found'
+  | 'seal_invalid'
+  | 'ask_unverified'
+  | 'ask_closed'
+  | 'own_ask'
+  | 'already_answered'
+  | 'answer_write_failed';
 
-  const ref = db.collection(ASK_ANSWERS_COLLECTION).doc();
-  const now = Date.now();
-  const author = normalizeAddress(input.author);
+export type SaveAnswerResult =
+  | { ok: true; answer: StoredAnswer }
+  | { ok: false; code: SaveAnswerRefusal; status: number; askStatus?: AskStatus };
+
+const refuse = (code: SaveAnswerRefusal, status: number, askStatus?: AskStatus): SaveAnswerResult => ({
+  ok: false,
+  code,
+  status,
+  ...(askStatus ? { askStatus } : {}),
+});
+
+/**
+ * Zapisuje odpowiedz w JEDNEJ transakcji Firestore.
+ *
+ * === DLACZEGO TRANSAKCJA, A NIE TRZY ZAPISY ===
+ * Poprzednia wersja pisala tresc, potem metadane, potem licznik - osobno,
+ * a stan Aska i "czy juz odpowiadal" sprawdzala trasa PRZED zapisem,
+ * klienckim odczytem. Miedzy sprawdzeniem a zapisem Ask mogl zostac
+ * rozstrzygniety (odpowiedz ladowala po odpieczetowaniu, gdy wszyscy juz
+ * czytaja cudze tresci), a dwie rownolegle karty tego samego portfela
+ * przechodzily obie. Teraz stan, termin, autor i duplikat sa sprawdzane
+ * W TEJ SAMEJ transakcji, ktora zapisuje:
+ *   odczyty: asks/{id}, asks/{id}/sealed/state, asks/{id}/answerers/{adres}
+ *            + zapytanie o stara odpowiedz tego adresu (sprzed straznika),
+ *   zapisy:  straznik (tx.create - drugi commit tego adresu sie wywroci),
+ *            tresc, metadane, licznik odpowiedzi.
+ * Wszystko albo nic, wiec sprzatanie osieroconej tresci nie jest juz potrzebne.
+ *
+ * Stan Aska czytamy przez askBundleFromSnapshots: Ask zapieczetowany bierze
+ * status i termin ze stanu (lustro moze klamac), Ask bez stanu - z dokumentu
+ * jak dotad ('legacy') albo odmawia ('unverified' przy wlaczonej fladze).
+ *
+ * `author` MUSI pochodzic z podpisanej sesji - ta funkcja nie sprawdza
+ * tozsamosci, tylko prawo tego adresu do odpowiedzi.
+ */
+export async function saveAnswer(
+  store: AskStore,
+  input: { askId: string; author: string; content: string }
+): Promise<SaveAnswerResult> {
+  if (!isDocId(input.askId)) return refuse('invalid_id', 400);
+  const author = lowerAddress(input.author);
+  if (!author) return refuse('invalid_author', 400);
+  const askId = input.askId;
 
   try {
-    await db.collection(ASK_ANSWER_CONTENT_COLLECTION).doc(ref.id).set({
-      answerId: ref.id,
-      askId: input.askId,
-      author,
-      content: input.content,
-      createdAt: now,
-      updatedAt: now,
+    return await store.db.runTransaction(async (tx): Promise<SaveAnswerResult> => {
+      const [askSnap, stateSnap, guardSnap] = await tx.getAll(
+        askRef(store, askId),
+        stateRef(store, askId),
+        answererRef(store, askId, author)
+      );
+      // Odpowiedzi sprzed straznika: ten sam warunek co dawne hasAnswered.
+      const earlier = await tx.get(
+        store.db
+          .collection(ASK_ANSWERS_COLLECTION)
+          .where('askId', '==', askId)
+          .where('author', '==', author)
+          .limit(1)
+      );
+
+      const bundle = askBundleFromSnapshots(store, askId, askSnap, stateSnap);
+      const view = bundle.view;
+      // Bez publicznego dokumentu nie ma czego pokazac ani czego liczyc.
+      if (!bundle.exists || !bundle.pub || !view) return refuse('ask_not_found', 404);
+      if (view.trust === 'broken') return refuse('seal_invalid', 503);
+      if (view.trust === 'unverified') return refuse('ask_unverified', 409);
+
+      const now = Date.now();
+      if (view.status !== 'open' || view.deadline <= now) return refuse('ask_closed', 409, view.status);
+      if (lowerAddress(view.author) === author) return refuse('own_ask', 403);
+      if (guardSnap.exists || !earlier.empty) return refuse('already_answered', 409);
+
+      const answerDoc = store.db.collection(ASK_ANSWERS_COLLECTION).doc();
+      const answerId = answerDoc.id;
+
+      tx.create(answererRef(store, askId, author), {
+        ...answererGuardDoc(store, { v: 1, askId, author, answerId, createdAt: now }),
+      });
+      tx.create(contentRef(store, answerId), {
+        answerId,
+        askId,
+        author,
+        content: input.content,
+        createdAt: now,
+        updatedAt: now,
+      });
+      tx.create(answerRef(store, answerId), {
+        askId,
+        author,
+        createdAt: now,
+        accepted: false,
+        payoutTxHash: null,
+      });
+      tx.update(askRef(store, askId), { answerCount: store.FieldValue.increment(1) });
+
+      return { ok: true, answer: { id: answerId, askId, author, createdAt: now } };
     });
   } catch (error) {
-    console.error('[asks/answerStore] Zapis tresci odpowiedzi nie powiodl sie:', error);
-    return null;
+    // Przegrany wyscig (drugi commit straznika) albo awaria Firestore.
+    // Nic nie zostalo zapisane - transakcja jest atomowa.
+    console.error('[asks/answerStore] Transakcja zapisu odpowiedzi nie powiodla sie:', error);
+    return refuse('answer_write_failed', 500);
   }
-
-  try {
-    await ref.set({
-      askId: input.askId,
-      author,
-      createdAt: now,
-      accepted: false,
-      payoutTxHash: null,
-    });
-  } catch (error) {
-    console.error('[asks/answerStore] Zapis metadanych odpowiedzi nie powiodl sie:', error);
-    // Tresc bez metadanych jest niewidoczna dla kogokolwiek - sierota, ale nie
-    // klamstwo. Sprzatamy ja, zeby nie zostawiac cudzego tekstu w bazie po
-    // zapisie, ktory sie nie udal.
-    try {
-      await db.collection(ASK_ANSWER_CONTENT_COLLECTION).doc(ref.id).delete();
-    } catch (cleanupError) {
-      console.error('[asks/answerStore] Sprzatanie osieroconej tresci nie powiodlo sie:', cleanupError);
-    }
-    return null;
-  }
-
-  try {
-    const { FieldValue } = await import('firebase-admin/firestore');
-    await db
-      .collection(ASKS_COLLECTION)
-      .doc(input.askId)
-      .update({ answerCount: FieldValue.increment(1) });
-  } catch (error) {
-    // Licznik to informacja, nie tresc. Rozjechany licznik jest bledem
-    // kosmetycznym; odrzucenie odpowiedzi, ktora juz lezy w bazie, byloby
-    // strata czyjejs pracy. Logujemy i idziemy dalej.
-    console.error('[asks/answerStore] Nie udalo sie podbic licznika odpowiedzi:', error);
-  }
-
-  return { id: ref.id, askId: input.askId, author, createdAt: now };
 }
 
 /**
