@@ -95,20 +95,33 @@ const MINIAPP_EMBED = JSON.stringify({
  * miejsce rozni sie od pozostalych.
  *
  * Teza MySphere jest jedna: OSIA CZASU SA PIENIADZE, nie tresc. Opis mowi wiec
- * dokladnie to i tylko to, co dziala DZIS: posty, napiwki w ETH i USDC oraz
- * rynek Askow - budzet, zapieczetowane odpowiedzi, wyplata z hashem. Zadnej
- * liczby uzytkownikow, zadnego czasu przyszlego.
+ * dokladnie to i tylko to, co dziala DZIS: posty, napiwki oraz rynek Askow -
+ * budzet, zapieczetowane odpowiedzi, wyplata z hashem. Zadnej liczby
+ * uzytkownikow, zadnego czasu przyszlego.
+ *
+ * Napiwki NIE sa "w ETH i USDC" - tak stalo do 23.09.2026 i bylo prawda tylko
+ * na Base. TipNetworkConfig.ts: Celo i Camp tipuja wylacznie CELO i CAMP,
+ * World i Linea dokladaja WLD i LINEA, Robinhood USDG, Arc USDC. Stad "ETH,
+ * USDC or the chain's own token".
  *
  * === DLACZEGO DWIE ROZNE LICZBY SIECI ===
  * Bo to sa dwie rozne listy i od wejscia Solany juz sie nie pokrywaja.
  *
  * POSTOWANIE - dziewiec, z app/basechat/soft/SoftStoryRail.tsx (SOFT_NETWORKS):
- * Base, Camp, Linea, Celo, Ethereum, World, Robinhood, Arc, Solana.
+ * Base, Camp, Linea, Celo, Ethereum, World, Robinhood, Arc, Solana. Arc postuje
+ * na testnecie, dopoki nie ma NEXT_PUBLIC_ARC_POST_CONTRACT_MAINNET
+ * (ArcPostContract.ts) - /how mowi to wprost, ten opis juz nie ma miejsca.
  *
- * NAPIWKI - osiem, z `TipNetworkType` w app/utils/firebase.ts: Base, Ethereum,
- * Celo, World, Linea, Camp, Robinhood, Arc. Solany tam NIE MA i nie wolno jej
- * doliczyc: napiwki dotykaja pieniedzy, escrow i kwitow weryfikowanych po
- * stronie serwera, a na Solanie dziala dzis wylacznie postowanie.
+ * NAPIWKI W APLIKACJI - osiem, z `TipNetworkType` w app/utils/firebase.ts:
+ * Base, Ethereum, Celo, World, Linea, Camp, Robinhood, Arc. Solany tam NIE MA
+ * i nie wolno jej doliczyc. Napiwek w SOL istnieje, ale POZA ta lista: pod
+ * postem z Solany ida z linku (/blink/tip/<id>, a platna odpowiedz z
+ * /blink/reply/<id>, obie jako Solana Actions), SOL leci prosto na portfel,
+ * ktory podpisal post, i nic z tego nie trafia do kolekcji `tips` - ani na
+ * Paid, ani do /money. Zapisem jest sama transakcja na Solanie. Dlatego opis
+ * mowi o osmiu sieciach napiwkow i nie dopisuje SOL-a: to inna sciezka,
+ * inny zapis, a na produkcji dziala tylko z mainnetem Solany (blinksDisabled
+ * w app/api/actions/actionHeaders.ts).
  *
  * Do 22.09.2026 stalo tu jedno zdanie o "seven networks" i bylo juz falszywe -
  * Arc doszedl jako osmy i nikt tej notki nie poprawil. Stad rozbicie na dwie
@@ -124,7 +137,7 @@ const MINIAPP_EMBED = JSON.stringify({
  * gdzie da sie go bronic.
  */
 const APP_DESCRIPTION =
-  'Post across nine networks and tip in ETH or USDC on eight of them. Open an Ask with a budget, collect sealed answers, and pay the ones you pick - every Ask payout carries a transaction hash anyone can open.';
+  "Post across nine networks and tip on eight of them in ETH, USDC or the chain's own token. Open an Ask with a budget, collect sealed answers, and pay the ones you pick - every Ask payout carries a transaction hash anyone can open.";
 
 /**
  * Jeden tytul dla <title>, og:title i twitter:title.

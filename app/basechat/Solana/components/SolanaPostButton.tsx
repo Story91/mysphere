@@ -9,7 +9,7 @@
  * tylko na innym stacku portfela:
  *
  *   EVM                      Solana
- *   useAccount()             useWallet()
+ *   useAccount()             useSolanaWallet().signer
  *   switchChain()            (nie istnieje - klaster ustala provider)
  *   writeContract()          sendTransaction()
  *   waitForReceipt()         confirmTransaction()
@@ -25,11 +25,16 @@
  * sesja jest - inaczej uzytkownik zaplacilby za kwit posta, ktorego serwer
  * potem nie zapisze. Z tego samego powodu ID posta powstaje tutaj: memo musi
  * je niesc, zeby transakcji nie dalo sie podpiac pod inny post.
+ *
+ * Portfel Solany przychodzi ze WSPOLNEGO gospodarza aplikacji
+ * (useSolanaWallet), a nie z lokalnego WalletProvidera - ten sam stan widzi
+ * nawigacja. Brak podlaczonego konta nie otwiera juz slepo wyboru portfela:
+ * najpierw probujemy konta Solany tego samego portfela, na ktorym stoi strona
+ * EVM (MetaMask -> MetaMask, Phantom -> Phantom), a wybor portfela dopiero,
+ * gdy pary nie ma.
  */
 
 import { useCallback, useMemo, useState } from 'react';
-import { useConnection, useWallet } from '@solana/wallet-adapter-react';
-import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js';
 // Jawny import z 'buffer', a NIE globalny `Buffer`: w bundlu przegladarkowym
 // Next.js nie definiuje globalnego Buffera, wiec `Buffer.from(...)` wywalaloby
@@ -37,9 +42,11 @@ import { PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js'
 // Pakiet 'buffer' i tak lezy w node_modules jako zaleznosc @solana/web3.js.
 import { Buffer } from 'buffer';
 import { toast } from 'react-hot-toast';
-import { useAccount } from 'wagmi';
+import { useAccount, useConnect } from 'wagmi';
 import { useAutoReset } from '../../../components/useTxFeedback';
 import { useSiweAuth } from '../../../utils/auth/useSiweAuth';
+import { useSolanaWallet } from '../../../components/solana/SolanaWalletHost';
+import { findEvmTwin } from '../../../components/solana/solanaWalletNav';
 import type { ChainPostButtonProps } from '../../chainPosting/types';
 import {
   MEMO_PROGRAM_ADDRESS,
@@ -104,10 +111,12 @@ export default function SolanaPostButton({
   disabled = false,
   onPostAdded,
 }: ChainPostButtonProps) {
-  const { connection } = useConnection();
-  const { publicKey, sendTransaction, connected } = useWallet();
-  const { setVisible } = useWalletModal();
-  const { address: evmAddress } = useAccount();
+  const solana = useSolanaWallet();
+  const signer = solana.signer;
+  const connected = !!signer;
+  const { connectPreferred } = solana;
+  const { address: evmAddress, connector } = useAccount();
+  const { connectors, connect: connectEvm } = useConnect();
   const { address: sessionAddress, signIn } = useSiweAuth();
 
   const [isTransacting, setIsTransacting] = useState(false);
@@ -137,20 +146,48 @@ export default function SolanaPostButton({
   const handleSend = useCallback(async () => {
     if (disabled || isTransacting) return;
 
-    // Brak portfela Solany - otwieramy wybor portfela zamiast cichego nic.
-    // To odpowiednik "przelacz siec" z przycisku EVM: pierwsze klikniecie
-    // przygotowuje portfel, drugie wysyla transakcje.
-    if (!connected || !publicKey) {
-      setVisible(true);
+    // Brak portfela Solany - podpinamy konto Solany tego samego portfela co
+    // strona EVM, a bez pary otwieramy wybor portfela. To odpowiednik
+    // "przelacz siec" z przycisku EVM: pierwsze klikniecie przygotowuje
+    // portfel, drugie wysyla transakcje.
+    if (!signer) {
+      connectPreferred(connector?.name ?? null);
       return;
     }
+    const { publicKey, connection, sendTransaction } = signer;
 
     if (!content.trim()) return;
 
     // Post zapisuje sie pod profilem EVM, a serwer bierze autora z sesji SIWE.
     // Oba warunki sprawdzamy PRZED podpisem transakcji, nie po.
     if (!evmAddress) {
-      toast.error('Connect your main (EVM) wallet first - your Solana post is saved under that profile.');
+      // Konto Solany jest, profilu EVM nie ma (np. odmowa strony EVM przy
+      // podwojnym laczeniu w modalu portfela). Ten sam portfel zwykle ma
+      // strone EVM (Phantom, MetaMask) - prosimy o nia od razu, w tym samym
+      // kliknieciu, bo portfele z popupem blokuja okna otwarte po przerwie.
+      // Bez pary (Solflare, Backpack) mowimy, gdzie podlaczyc portfel EVM.
+      const twin = findEvmTwin(
+        connectors.filter((candidate) => candidate.id !== 'injected'),
+        solana.walletName
+      );
+      if (twin) {
+        connectEvm(
+          { connector: twin },
+          {
+            onSuccess: () => toast.success(`${twin.name} connected on Ethereum. Press Post again to publish.`),
+            onError: (connectError) => {
+              if (isUserRejection(connectError)) {
+                toast(`${twin.name}: Ethereum side not connected. Your Solana post is saved under that profile, so it is needed to post.`);
+              } else {
+                toast.error(`Could not connect ${twin.name} (Ethereum): ${connectError.message.slice(0, 120)}`);
+              }
+            },
+          }
+        );
+        toast(`Your Solana post is saved under your ${twin.name} Ethereum profile - approve it in the wallet.`);
+        return;
+      }
+      toast.error('Connect your main (EVM) wallet first with Connect wallet in the top bar - your Solana post is saved under that profile.');
       return;
     }
 
@@ -263,13 +300,14 @@ export default function SolanaPostButton({
   }, [
     disabled,
     isTransacting,
-    connected,
-    publicKey,
+    signer,
     content,
-    connection,
-    sendTransaction,
     handleSuccess,
-    setVisible,
+    connectPreferred,
+    connector,
+    connectors,
+    connectEvm,
+    solana.walletName,
     evmAddress,
     sessionAddress,
     signIn,
@@ -318,7 +356,16 @@ export default function SolanaPostButton({
       type="button"
       // Etykieta zastepuje widoczny tekst dla czytnika ekranu - w trakcie
       // transakcji musi mowic "Processing", inaczej niewidomy nie wie, ze trwa.
-      aria-label={isTransacting ? 'Processing' : connected ? `Post on ${SOLANA_NETWORK_LABEL}` : 'Connect a Solana wallet'}
+      aria-label={
+        isTransacting
+          ? 'Processing'
+          : connected
+            ? `Post on ${SOLANA_NETWORK_LABEL}`
+            : solana.connecting
+              ? 'Connecting Solana wallet'
+              : 'Connect a Solana wallet'
+      }
+      title={connected ? undefined : 'Connect a Solana wallet'}
       className={`flex items-center justify-center px-3 py-0.5 sm:px-4 sm:py-0.5 rounded-lg transition-all duration-300 font-medium text-xs sm:text-sm h-[32px] ${
         connected
           ? 'bg-gradient-to-r from-[#9945FF] to-[#14F195] text-white hover:opacity-90 border border-[#9945FF]'

@@ -1,6 +1,18 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import ReDefinitionContent, { RE_DEFINITION_METADATA } from '../re-definition/ReDefinitionContent';
+// Oba importy sa bez web3.js i bez 'use client' - czytaja tylko zmienne
+// srodowiskowe, wiec strona dalej nie wysyla ani kilobajta JS-a.
+import { IS_SOLANA_MAINNET } from '../basechat/Solana/config/solanaChain';
+import { ARC_CHAIN_ID } from '../basechat/Arc/contracts/ArcPostContract';
+import { arcMainnet } from '../startpad/arcChain';
+
+/**
+ * Posty na Arc ida na testnet, dopoki wlasciciel nie ustawi
+ * NEXT_PUBLIC_ARC_POST_CONTRACT_MAINNET (ArcPostContract.ts). Krok 02 liczy
+ * dziewiec sieci, wiec musi powiedziec, ktora z nich jest testowa.
+ */
+const ARC_POSTS_ON_MAINNET = ARC_CHAIN_ID === arcMainnet.id;
 
 /**
  * /how - instrukcja obslugi produktu dla czlowieka, ktory wlasnie wszedl.
@@ -25,19 +37,30 @@ import ReDefinitionContent, { RE_DEFINITION_METADATA } from '../re-definition/Re
  * nawet jako zapowiedz. Zapowiedzi sa na /re-definition, w tabeli ze statusami.
  *
  * === "DZIALA" TO NIE TO SAMO CO "KTOS PRZEZ TO PRZESZEDL" ===
- * Dwa kroki opisuja rzeczy, ktore dzialaja i przez ktore NIKT jeszcze nie
- * przeszedl, i kazdy musi to mowic W SWOIM KROKU, a nie w gwiazdce na dole:
+ * Kilka krokow opisuje rzeczy, ktore dzialaja i przez ktore NIKT (albo nikt
+ * spoza zespolu) jeszcze nie przeszedl, i kazdy musi to mowic W SWOIM KROKU,
+ * a nie w gwiazdce na dole:
  *
+ *   krok 02 (Proof of Bags)  Sprawdzone symulacja na mainnecie Solany
+ *                     (2026-09-23), ale zaden prawdziwy post jeszcze go nie
+ *                     niosl.
+ *   krok 03 (SOL)     Napiwki w SOL i platne odpowiedzi z X dzialaja na
+ *                     mainnecie, ale na 2026-09-23 nikt spoza zespolu nie
+ *                     zaplacil ani jednego. Karta na X wymaga wpisu w
+ *                     rejestrze Dialecta, ktorego mysphere.fun nie ma.
  *   krok 07 (zwrot)   settleExpired ma przycisk na /money (page.tsx wola
  *                     settleExpiredAsk), ale ta noga nie przeszla na zadnej
  *                     prawdziwej sieci - wymaga terminu + 48h, czego nie da
  *                     sie przewinac. Jedyny dowod to test jednostkowy.
- *   krok 09 (graduacja)  Pelna sciezka launch -> pula -> wyplaty przeszla
- *                     na sieciach testowych (Sepolia; na Arc testnecie jeden
- *                     token graduowal do zywej puli v4). Na Base mainnet skan
- *                     eth_getLogs z 2026-09-01, kompletny od bloku wdrozenia
- *                     do glowy lancucha, pokazal 8 zdarzen Launched i 0
- *                     Graduated - nikt nie graduowal naprawde.
+ *   krok 12 (perpsy)  Uzasadnienie stoi przy STEPS[11].
+ *
+ * Krok 09 (graduacja) z tej listy wypadl: $SPHERE graduowal na Base mainnet
+ * i jego pula v4 dziala, wiec krok mowi teraz "to wyjatek", a nie "nikt".
+ *
+ * Kroki 02 i 03 czytaja IS_SOLANA_MAINNET: na deploymencie z devnetem trasy
+ * Blinkow odpowiadaja 503 (actionHeaders.ts, blinksDisabled), a wiersz pod
+ * postem sie nie renderuje (SolanaBlinkShare), wiec tekst o SOL znika razem
+ * z nimi zamiast obiecywac cos, czego nie da sie kliknac.
  *
  * Krok 05 (escrow) z tej listy wypadl 2026-09-01: budzet zostal zablokowany
  * w kontrakcie z tej apki na Base mainnet (commity 2bc5781 i 1bd728b,
@@ -104,11 +127,15 @@ export function generateMetadata({ searchParams }: { searchParams: SearchParams 
     };
   }
 
+  // SOL w opisie tylko tam, gdzie krok 03 go pokazuje - patrz naglowek pliku.
+  const tipAndReply = IS_SOLANA_MAINNET
+    ? 'tip in USDC or SOL, reply to a Solana post with SOL'
+    : 'tip in USDC';
+
   return {
     // Marke doklada `title.template` z layoutu glownego.
     title: 'How it works',
-    description:
-      'What you can do on MySphere today: post onchain, tip in USDC, sell part of a post, ask a question with a budget, launch a token on the Startpad curve, collect what you are owed, and look up what a vault curator changed.',
+    description: `What you can do on MySphere today: post on nine networks, ${tipAndReply}, sell part of a post, ask a question with a budget, launch a token on the Startpad curve, collect what you are owed, and look up what a vault curator changed.`,
     openGraph: {
       title: 'How MySphere works',
       description:
@@ -121,7 +148,7 @@ export function generateMetadata({ searchParams }: { searchParams: SearchParams 
 /* ------------------------------------------------------------------ */
 
 /**
- * === JEDENASCIE KROKOW W JEDNYM MIEJSCU ===
+ * === DWANASCIE KROKOW W JEDNYM MIEJSCU ===
  *
  * Tytul, numer i CENA kazdego kroku sa tu, a nie w JSX-ie ponizej, z jednego
  * powodu: skorowidz na gorze strony i naglowek samego kroku musza podawac to
@@ -154,14 +181,19 @@ const STEPS: StepMeta[] = [
     id: 'post',
     title: 'Write a post that lands onchain',
     cost: 'Gas only',
-    note: 'Cheap on Base, usually under a cent',
+    note: 'Usually under a cent on Base · About 0.000005 SOL on Solana',
   },
   {
     n: '03',
     id: 'tip',
     title: 'Pay someone for a post you liked',
     cost: 'Your choice of amount',
-    note: 'USDC on Base, or the native token elsewhere',
+    // TipNetworkConfig.ts: Celo i Camp tipuja tylko wlasnym tokenem, World i
+    // Linea dokladaja WLD i LINEA, Robinhood USDG. Stad "own tokens", a nie
+    // "ETH or USDC" - to drugie bylo prawda tylko na Base.
+    note: IS_SOLANA_MAINNET
+      ? "USDC or ETH on Base, each chain's own tokens on the other EVM ones, SOL under Solana posts"
+      : "USDC or ETH on Base, each chain's own tokens on the other EVM ones",
   },
   {
     n: '04',
@@ -476,23 +508,70 @@ function HowContent() {
           {/* ---------------------------------------------------------- */}
           <Step meta={STEPS[1]}>
             <P lead>
-              Write, pick a network, post. The text is written to a contract, so
-              the post has a transaction behind it that anyone can open. It is
-              more than a row in our database.
+              Write, pick a network, post. On the EVM chains the text is written
+              to a contract; on Solana the first 280 bytes go into a memo.
+              Either way the post has a transaction behind it that anyone can
+              open, so it is more than a row in our database.
             </P>
             <P>
-              Nine chains are wired: <Hi>Base</Hi>, Arc, Robinhood Chain, Camp,
-              Linea, Celo, Ethereum, World Chain and <Hi>Solana</Hi>. Same feed,
-              same profile whichever you pick. If you own a <Hi>.base.eth</Hi>{' '}
-              name, you show up under it instead of a hex address.
+              Nine chains are wired: <Hi>Base</Hi>,{' '}
+              {ARC_POSTS_ON_MAINNET ? 'Arc' : 'Arc (on its testnet)'}, Robinhood
+              Chain, Camp, Linea, Celo, Ethereum, World Chain and{' '}
+              <Hi>Solana</Hi>. Same feed, same profile whichever you pick. If
+              you own a <Hi>.base.eth</Hi> name, you show up under it instead of
+              a hex address.
             </P>
-            <P>
-              Solana is the odd one out: it is not an EVM chain, so it needs its
-              own wallet (Phantom and friends) next to the one you signed in
-              with. You stay the same author either way &mdash; the Solana wallet
-              only signs the receipt. Its posts land on <Hi>devnet</Hi> until
-              mainnet is switched on.
-            </P>
+            {/* Tresc memo: mysphere:post|v2|<postId>|<adres Solany>|<280 B tekstu>
+                (solanaChain.ts, buildPostMemo). Srodkowe pole to PODPISUJACY
+                portfel Solany, nie adres z logowania - adres EVM na Solane nie
+                trafia. Oba portfele wiaze dopiero nasz zapis posta. */}
+            {IS_SOLANA_MAINNET ? (
+              <P>
+                Solana is the odd one out: it is not an EVM chain, so it needs
+                its own wallet (Phantom, Solflare or Backpack) next to the one
+                you signed in with, and you have to be signed in first; the
+                button asks before anything is sent. You stay the same author
+                either way. The Solana wallet pays the fee, about 0.000005 SOL,
+                and signs the receipt, and our server checks that transaction on
+                Solana before it saves the post. The receipt is a memo holding
+                the post&apos;s id, that Solana wallet&apos;s address and the
+                first 280 bytes of the post. It is{' '}
+                <Hi>public and permanent</Hi>. The chain never sees your sign-in
+                address, but this site shows the post under it, so anyone who
+                looks can tie the two wallets together. Inside a Farcaster mini
+                app there is no Solana tab: those apps give you an EVM wallet
+                and nothing else.
+              </P>
+            ) : (
+              <P>
+                Solana is the odd one out: it is not an EVM chain, so it needs
+                its own wallet (Phantom, Solflare or Backpack) next to the one
+                you signed in with. You stay the same author either way &mdash;
+                the Solana wallet only signs the receipt. On this deployment its
+                posts land on <Hi>devnet</Hi>, Solana&apos;s test network.
+              </P>
+            )}
+            {IS_SOLANA_MAINNET && (
+              <P>
+                <Hi>Proof of Bags.</Hi> If a Solana post names a token, by its
+                address or through a pump.fun, Birdeye, Jupiter or Solscan link
+                (a DexScreener link counts only when it holds the token&apos;s
+                address, not the trading pair&apos;s), the same transaction
+                records how much of it your Solana wallet held at that moment,
+                for up to three tokens. It reads the wallet&apos;s standard
+                account for that token; tokens kept anywhere else are not
+                counted. Any Solana explorer shows the balance. Under the post,
+                a line compares it with what the wallet holds now:{' '}
+                <Hi>still holds all of it</Hi>, <Hi>wallet up</Hi> or{' '}
+                <Hi>wallet down</Hi> by a percentage since,{' '}
+                <Hi>wallet now holds none</Hi>, or, if it held none when you
+                posted, <Hi>posted with no</Hi> followed by the token. It says
+                wallet and never sold, because
+                moving tokens to your own cold wallet looks exactly the same.
+                This has been checked by simulating posts against Solana
+                mainnet. No real post has carried one yet.
+              </P>
+            )}
             <Go href="/basechat">Open the feed</Go>
           </Step>
 
@@ -504,10 +583,62 @@ function HowContent() {
               can open.
             </P>
             <P>
-              Every tip that settles shows up on <Hi>Paid</Hi>, a public
-              timeline of money that moved between two people. Names and
-              faces on both ends, and a transaction on every line.
+              Every tip that settles in the app, on the eight EVM networks,
+              shows up on <Hi>Paid</Hi>, a public timeline of money that moved
+              between two people. Names and faces on both ends, and a
+              transaction on every line.
             </P>
+            {/* SOL tylko na mainnecie - patrz naglowek pliku. Kwoty z kodu:
+                app/api/actions/tip/[postId]/route.ts (0.01/0.05/0.25, min 0.001)
+                i replyCore.ts (0.001/0.01/0.05, min 1 000 000 lamportow, 280 B).
+                "Nikt spoza zespolu" to stan na 2026-09-23 - zmienic, gdy
+                pierwszy obcy napiwek albo odpowiedz przejdzie na mainnecie. */}
+            {IS_SOLANA_MAINNET && (
+              <>
+                <P>
+                  Posts written on Solana also take tips in <Hi>SOL</Hi>, from
+                  their own link: <Hi>/blink/tip/</Hi> plus the post id, which
+                  the post&apos;s own page links as <Hi>just tip</Hi>. Pick
+                  0.01, 0.05 or 0.25 SOL, or type any amount from 0.001.
+                  The SOL goes straight to the Solana wallet that signed the
+                  post, which our server recorded when it saved the post. It is
+                  not an address the author picked for payouts.
+                </P>
+                <P>
+                  <Hi>Reply from X with SOL.</Hi> The author has nothing to
+                  switch on. Under every Solana post in the feed there is a
+                  line, <Hi>Paid replies on</Hi>, with <Hi>Share on X</Hi>,
+                  which opens a new X post carrying the post&apos;s reply link
+                  (<Hi>/blink/reply/</Hi> plus the post id), and{' '}
+                  <Hi>Copy link</Hi>; the post&apos;s own page links it too.
+                  Someone on X who opens it writes a reply of up to 280 bytes and
+                  picks a tip for the author, <Hi>0.001 SOL</Hi> at least (0.001,
+                  0.01 or 0.05), and both go out in one Solana transaction, the
+                  SOL to the wallet that signed the post. Our server reads that
+                  transaction back from Solana and only then saves the reply
+                  under the post, marked <Hi>paid reply</Hi> with its amount and
+                  a link to the transaction. The text is taken from the
+                  transaction itself, so it is public on Solana and stays there.
+                </P>
+                <P>
+                  On X, a link like this can open as a card with the reply box
+                  and the button inside the post. That takes two things. The
+                  reader needs Blinks turned on: in the Phantom or Backpack
+                  browser extension, open its settings and switch on the option
+                  named Blinks or Solana Actions. And the site has to
+                  be listed in Dialect&apos;s Actions Registry, which MySphere
+                  is not (checked 23 September 2026). So on X everyone sees a
+                  plain link, and it opens our page, which works in any browser
+                  with a Solana wallet.
+                </P>
+                <P>
+                  SOL tips and paid replies are not on Paid or in Money. The
+                  Solana transaction is their record. Both work on Solana
+                  mainnet, and <Hi>nobody outside the team has paid one</Hi>{' '}
+                  there so far.
+                </P>
+              </>
+            )}
             <Go href="/asks?tab=paid">See what people paid each other</Go>
           </Step>
 
@@ -848,6 +979,13 @@ function HowContent() {
             not come back, and a payment does not reverse. That is what makes
             the numbers here worth anything, and it is also the part that
             deserves a second of thought before you press the button.
+          </P>
+          <P>
+            On Solana the receipt holds your Solana wallet&apos;s address, the
+            first 280 bytes of the post and, if you named a token, what that
+            wallet held of it.
+            {IS_SOLANA_MAINNET && ' A paid reply puts its whole text there too.'}{' '}
+            Editing or deleting the post here changes none of that.
           </P>
           </div>
         </section>

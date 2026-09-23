@@ -50,6 +50,7 @@
     "launchpad:env": "ts-node scripts/launchpad/printEnv.ts",
     "test:perps-math": "node scripts/test-perps-math.cjs",
     "test:solana": "node scripts/test-solana.cjs",
+    "test:solana-wallet-nav": "node scripts/test-solana-wallet-nav.cjs",
     "test:startpad-ticker": "node scripts/test-startpad-ticker.cjs",
     "test:gooey-nav": "node scripts/test-gooey-nav.cjs",
     "test:asks-ui": "node scripts/test-asks-ui.cjs",

@@ -7,8 +7,8 @@
   "miniapp": {
     "version": "1",
     "name": "MySphere",
-    "subtitle": "Build, grow, own your Sphere",
-    "description": "Build, grow, and own your digital Sphere.",
+    "subtitle": "Where the timeline is money",
+    "description": "Post on eight EVM networks and tip authors in ETH, USDC and other tokens. Open an Ask with a budget and pay the answers you pick.",
     "screenshotUrls": [
       "https://mysphere.fun/frame-v2.png",
       "https://mysphere.fun/SphereWhite.png"
@@ -21,9 +21,9 @@
     "primaryCategory": "social",
     "tags": ["web3", "base", "social", "onchain", "creator"],
     "heroImageUrl": "https://mysphere.fun/SphereWhite.png",
-    "tagline": "Create and get rewarded",
+    "tagline": "Ask. Answer. Get paid.",
     "ogTitle": "MySphere - Social on Base",
-    "ogDescription": "Build, grow, and own your digital Sphere. Create and monetize content on Base.",
+    "ogDescription": "Post on eight EVM networks, tip authors, and pay for the answers you pick.",
     "ogImageUrl": "https://mysphere.fun/SphereWhite.png"
   },
   "baseBuilder": {

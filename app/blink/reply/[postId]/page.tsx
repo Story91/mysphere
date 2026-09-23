@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getPostForShare, shortAddress } from '../../../utils/posts/getPostForShare';
+import { REPLY_MIN_LAMPORTS } from '../../../basechat/Solana/replies/replyCore';
 import BlinkReplyClient from './BlinkReplyClient';
 
 /**
@@ -29,10 +30,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const post = await getPostForShare(params.postId).catch(() => null);
   if (!post) return { title: 'Post not found' };
   const author = post.authorName || shortAddress(post.author);
+  const title = `Reply to ${author}`;
+  // Opis mowi, co robi strona - tresc posta niesie juz obrazek karty.
+  const description = `Reply and tip the author in one Solana transaction, ${Number(REPLY_MIN_LAMPORTS) / 1e9} SOL at least.`;
+  const image = `${SITE}/post/${post.id}/opengraph-image`;
   return {
-    title: `Reply to ${author}`,
-    description: post.content.slice(0, 160),
-    openGraph: { images: [`${SITE}/post/${post.id}/opengraph-image`] },
+    title,
+    description,
+    // Kanoniczny jest /post - ten sam post zyje tez pod /blink/tip i tutaj.
+    alternates: { canonical: `https://mysphere.fun/post/${post.id}` },
+    openGraph: { title: `${title} on MySphere`, description, type: 'article', images: [image] },
+    // Bez wlasnego `twitter` X dziedziczyl tytul i opis strony glownej
+    // z app/layout.tsx - link wklejony na X opisywal serwis, nie odpowiedz.
+    twitter: { card: 'summary_large_image', title: `${title} on MySphere`, description, images: [image] },
   };
 }
 

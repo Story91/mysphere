@@ -3,7 +3,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import { getPostCommentsForShare, getPostForShare, getPostTipTotals, shortAddress } from '../../utils/posts/getPostForShare';
-import { SOLANA_EXPLORER_SUFFIX } from '../../basechat/Solana/config/solanaChain';
+import { SOLANA_EXPLORER_SUFFIX, solanaExplorerTxUrl } from '../../basechat/Solana/config/solanaChain';
+import { isSolanaSignature, REPLY_MIN_LAMPORTS } from '../../basechat/Solana/replies/replyCore';
 import { blinksDisabled } from '../../api/actions/actionHeaders';
 import SharePostActions from './SharePostActions';
 
@@ -95,6 +96,12 @@ export default async function PostPage({ params }: Props) {
     )
     .join(' + ');
 
+  // Kwit posta z Solany: podpis transakcji z memo posta. Sprawdzamy format
+  // (64 bajty base58), zeby nie budowac linku do eksploratora z byle czego.
+  const isSolanaPost = post.network === 'solana' && !!post.txHash;
+  const solanaReceipt = isSolanaPost && isSolanaSignature(post.txHash) ? post.txHash : null;
+  const replyMinSol = Number(REPLY_MIN_LAMPORTS) / 1e9;
+
   return (
     <main className="min-h-screen bg-soft-bg px-4 py-10 font-soft sm:px-6">
       <div className="mx-auto max-w-[600px]">
@@ -136,7 +143,27 @@ export default async function PostPage({ params }: Props) {
           <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-soft-line pt-4 font-soft text-[13px] tabular-nums text-soft-ink-soft">
             <span>{post.likes} likes</span>
             <span>{post.commentCount} comments</span>
-            {post.network && <span className="capitalize">on {post.network}</span>}
+            {post.network && (
+              <span>
+                <span className="capitalize">on {post.network}</span>
+                {/* Link do kwitu tylko dla Solany: tam kwitem jest memo z trescia
+                    posta, a eksplorator jest jeden. Posty EVM maja kwit w feedzie. */}
+                {solanaReceipt && (
+                  <>
+                    {' · '}
+                    <a
+                      href={solanaExplorerTxUrl(solanaReceipt)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="The Solana transaction whose memo carries this post"
+                      className="font-semibold text-soft-primary-deep underline-offset-2 hover:underline"
+                    >
+                      receipt
+                    </a>
+                  </>
+                )}
+              </span>
+            )}
 
             {/* Kwota stoi na koncu i jest jedynym mocnym kolorem - to jedyna
                 liczba na tej stronie, ktorej nie da sie nabic. */}
@@ -186,18 +213,29 @@ export default async function PostPage({ params }: Props) {
         {/* Bez linku, gdy Blinki sa na tym deploymencie wylaczone (prod na
             devnecie): obie trasy odpowiedzialyby wtedy 503, a czlowiek
             szykowalby odpowiedz, ktorej nie da sie oplacic. */}
-        {post.network === 'solana' && !blinksDisabled() && (
-          <p className="mt-4 text-center font-soft text-[13px] text-soft-ink-soft">
-            This post was written on Solana.{' '}
-            <Link href={`/blink/reply/${post.id}`} className="font-semibold text-soft-primary-deep underline underline-offset-2">
-              Reply and tip the author
-            </Link>{' '}
-            or{' '}
-            <Link href={`/blink/tip/${post.id}`} className="font-semibold text-soft-primary-deep underline underline-offset-2">
-              just tip
-            </Link>
-            .
-          </p>
+        {isSolanaPost && !blinksDisabled() && (
+          <div className="mt-4 text-center font-soft">
+            <p className="text-[13px] text-soft-ink-soft">
+              This post was written on Solana.{' '}
+              <Link href={`/blink/reply/${post.id}`} className="font-semibold text-soft-primary-deep underline underline-offset-2">
+                Reply and tip the author
+              </Link>{' '}
+              (from {replyMinSol} SOL) or{' '}
+              <Link href={`/blink/tip/${post.id}`} className="font-semibold text-soft-primary-deep underline underline-offset-2">
+                just tip
+              </Link>
+              .
+            </p>
+            {/* Stan na 23.09.2026: mysphere.fun NIE jest w Dialect Actions
+                Registry, wiec karty z przyciskiem w X nie widzi nikt. Po
+                wpisie do rejestru to zdanie trzeba zmienic. */}
+            <p className="mx-auto mt-1.5 max-w-[52ch] text-[12px] leading-relaxed text-soft-ink-faint">
+              On X these links show a normal preview. A card with a pay button needs Blinks turned on in
+              Phantom or Backpack and a listing in Dialect&apos;s registry, which MySphere does not have
+              yet. The pages work in any browser with a Solana wallet.
+              {tipLine && ' SOL tips are not counted in the tip total above; each one is its own Solana transaction.'}
+            </p>
+          </div>
         )}
 
         <SharePostActions postId={post.id} authorName={author} />

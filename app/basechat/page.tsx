@@ -65,6 +65,7 @@ import { LAUNCHPAD_CHAIN, type LaunchpadToken } from '../startpad/config';
 import { buildShareUrl } from '../startpad/shareText';
 import { suggestCoinFromPost } from './coinFromPost';
 import FeedAskRail, { ASKS_RAIL_CACHE_KEY } from './components/FeedAskRail';
+import WhatsNewCard from './components/WhatsNewCard';
 // Zakladanie Aska Z FEEDU. Kompozytor i karta sa te same, ktore stoja na
 // /asks - drugi formularz dotykajacy pieniedzy bylby drugim miejscem, w
 // ktorym trzeba naprawiac ten sam blad. Sciezka approve -> fund -> kwit ->
@@ -4877,6 +4878,12 @@ function BaseChatContent() {
                       kolumnowym - `xl:hidden` pilnuje, zeby Aski nie byly na
                       ekranie dwa razy naraz. Ponizej 1152px i na telefonie
                       wszystko zostaje tak, jak bylo. */}
+                  {/* Karta "co nowego" (Solana z kwitami). Jedna kopia na
+                      kazdej szerokosci - stoi w kolumnie feedu, nie w prawej.
+                      Tylko tam, gdzie jest zakladka Solany: w miniappie
+                      Farcastera reklamowalaby cos, czego nie da sie uzyc.
+                      Uzasadnienie i zamykanie: naglowek WhatsNewCard.tsx. */}
+                  {!showMyFeed && showSolanaTab && <WhatsNewCard className="mb-4" />}
                   {!showMyFeed && (
                     <FeedAskRail viewer={address ?? null} className="mb-4 xl:hidden" />
                   )}

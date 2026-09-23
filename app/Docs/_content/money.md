@@ -15,7 +15,7 @@ The Money tab answers four questions, in this order:
 
 Below those sections the page also states what your Asks without escrow owe for the answers you accepted. Those are paid straight from your wallet, so that line is a sum, not a list of hashes.
 
-The Paid tab is public and shared. It shows a receipt-style tape of tips that settled onchain, plus a ranking of who has been paid most. The ranking covers the last 7 days when there is enough recent activity and falls back to all time otherwise; the header above it says which window you are looking at. The data behind the tab is cached for an hour.
+The Paid tab is public and shared. It shows a receipt-style tape of tips that settled onchain, plus a ranking of who has been paid most. The ranking covers the last 7 days when there is enough recent activity and falls back to all time otherwise; the header above it says which window you are looking at. The data behind the tab is cached for an hour. SOL tips and paid replies under Solana posts appear on neither tab: they go straight to the Solana wallet that signed the post, MySphere does not record them, and the Solana transaction is their only record (see [Solana: bags, tips & replies](/Docs/solana)).
 
 ## How to use it
 

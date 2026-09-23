@@ -24,7 +24,13 @@ export const DOC_PAGES: DocPage[] = [
   {
     slug: 'feed',
     title: 'Feed, posts & tips',
-    blurb: 'Post onchain, tip in ETH or USDC, and sell part of a post.',
+    blurb: 'Post on nine networks, tip the author, and sell part of a post.',
+    group: 'Modules',
+  },
+  {
+    slug: 'solana',
+    title: 'Solana: bags, tips & replies',
+    blurb: 'Posting on Solana, Proof of Bags, and tips and paid replies in SOL from a link.',
     group: 'Modules',
   },
   {

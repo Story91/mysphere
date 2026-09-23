@@ -2,8 +2,12 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useConnect, type Connector } from 'wagmi';
+import { useRouter } from 'next/navigation';
+import { toast } from 'react-hot-toast';
+import { useAccount, useConnect, type Connector } from 'wagmi';
 import { isUserRejection } from '../../utils/auth/useSiweAuth';
+import { useSolanaWallet } from '../solana/SolanaWalletHost';
+import { SOLANA_ROUTE, evmRowLabel, findEvmTwin, isOnSolanaTab } from '../solana/solanaWalletNav';
 
 /**
  * Wybor portfela. Zastepuje modal z <ConnectWallet> OnchainKit.
@@ -27,6 +31,24 @@ import { isUserRejection } from '../../utils/auth/useSiweAuth';
  * wzgledem headera i modal ladowal na srodku belki zamiast ekranu. Rozmycie
  * zniklo wraz z ciemnym szklem, ale portal zostaje: powod z kontekstem
  * stackingu jest niezalezny i nadal aktualny.
+ *
+ * DWIE SEKCJE: EVM I SOLANA (od 23.09.2026). Zgloszenie wlasciciela: "Phantom
+ * w nawigacji laczy sie z eth zamiast z solana". Phantom i MetaMask oglaszaja
+ * sie dwa razy - przez EIP-6963 (Ethereum) i przez Wallet Standard (Solana) -
+ * a ta lista znala tylko pierwsze ogloszenie, wiec "Phantom" zawsze znaczyl
+ * Ethereum. Teraz wiersze EVM portfeli wielolancuchowych maja dopisek
+ * "Ethereum & Base", a osobna sekcja Solany laczy konto Solany, przelacza
+ * nawigacje na Solane i przenosi na jej zakladke. Nazwy i ikony portfeli
+ * Solany pochodza z lekkiego wykrywania Wallet Standard - modal nie laduje
+ * stosu Solany, dopoki ktos go nie wybierze.
+ *
+ * SEKCJA SOLANY TYLKO TAM, GDZIE MA SENS (prop `solana`). Modal otwieraja tez
+ * /join (polecenia), /money i panel zlecen perpsow na Arc. Tam wybor
+ * "Phantom (Solana)" przenosil na /basechat?network=solana i zrywal
+ * onboarding albo zlecenie, a Solana na tych stronach nic nie znaczy.
+ * Domyslnie 'off', wiec kazdy stary i przyszly wywolujacy zostaje przy EVM;
+ * sekcje wlaczaja jawnie nawigacja (WalletButton) i feed przed logowaniem
+ * (MockFeed).
  */
 
 /**
@@ -51,11 +73,17 @@ const CONNECTOR_META: Record<string, { label: string; hint?: string; icon: strin
 export default function ConnectModal({
   isOpen,
   onClose,
+  solana: solanaSection = 'off',
 }: {
   isOpen: boolean;
   onClose: () => void;
+  /** 'navigate': sekcja Solany, a wybor przenosi na zakladke Solany. 'off': tylko EVM. */
+  solana?: 'navigate' | 'off';
 }) {
-  const { connectors, connect, status, error, variables } = useConnect();
+  const { connectors, connect, connectAsync, status, error, variables } = useConnect();
+  const { isConnected: isEvmConnected } = useAccount();
+  const solana = useSolanaWallet();
+  const router = useRouter();
   const dialogRef = useRef<HTMLDivElement>(null);
 
   /**
@@ -180,6 +208,135 @@ export default function ConnectModal({
     );
   };
 
+  const showSolana = solanaSection === 'navigate' && solana.available;
+  const solanaNames = showSolana ? solana.discoveredWallets.map((wallet) => wallet.name) : [];
+  // Kto jest juz w trybie Solany albo na jej zakladce, przyszedl po Solane -
+  // dostaje jej sekcje NA GORZE. Inaczej przy kilku rozszerzeniach "Phantom
+  // (Solana)" lezal pod krawedzia przewijanej listy, a pierwszym "Phantom" na
+  // ekranie byl znowu wiersz Ethereum - dokladnie ten blad ze zgloszenia.
+  // Modal renderuje sie tylko po stronie klienta (`mounted`), wiec odczyt
+  // window.location nie grozi rozjazdem hydracji.
+  const solanaFirst =
+    showSolana && (solana.mode === 'solana' || isOnSolanaTab(window.location.pathname, window.location.search));
+
+  /**
+   * Wybor portfela w sekcji Solany.
+   *
+   * Konto Solany sluzy tylko do podpisu kwitu - profil, sesja SIWE i autor
+   * posta stoja na adresie EVM. Dlatego, gdy strona EVM nie jest jeszcze
+   * podlaczona, a ten sam portfel ma konektor wagmi (Phantom, MetaMask),
+   * laczymy ja tez. Kolejnosc: najpierw EVM - jego wywolanie musi zostac w
+   * tym samym kliknieciu (portfele z popupem blokuja okna otwarte po
+   * przerwie), potem Solana, zeby portfel nie dostal dwoch prosb naraz.
+   * Rozszerzenia Solany nie potrzebuja gestu, wiec moga poczekac.
+   */
+  const handleSolanaPick = (walletName: string | null) => {
+    const twin = !isEvmConnected && walletName ? findEvmTwin(visibleConnectors, walletName) : null;
+    const connectSolana = () => (walletName ? solana.connectWallet(walletName) : solana.openPicker());
+
+    solana.setMode('solana');
+    // Stos Solany zaczyna sie ladowac juz teraz, rownolegle z prosba EVM.
+    solana.ensureLoaded();
+    router.push(SOLANA_ROUTE);
+    onClose();
+
+    if (!twin) {
+      connectSolana();
+      return;
+    }
+    // connectAsync, a nie connect z callbackiem: modal zaraz sie zamyka, a
+    // callbacki przekazane do mutate() nie odpalaja po odmontowaniu
+    // komponentu (react-query). Obietnica rozwiazuje sie zawsze.
+    connectAsync({ connector: twin })
+      .catch((connectError: unknown) => {
+        if (isUserRejection(connectError)) {
+          // Obietnica "zapytamy pozniej" jest prawdziwa: przycisk posta na
+          // Solanie bez adresu EVM sam laczy strone EVM tego samego portfela.
+          toast(`${twin.name}: Ethereum side not connected. Your posts are saved under it, so posting on Solana will ask for it again.`);
+        } else {
+          const message = connectError instanceof Error ? connectError.message : String(connectError);
+          toast.error(`Could not connect ${twin.name} (Ethereum): ${message.slice(0, 120)}`);
+        }
+      })
+      .finally(connectSolana);
+  };
+
+  // Sekcja Solany jako zmienna: stoi pod lista EVM albo nad nia (solanaFirst).
+  const solanaBlock = showSolana ? (
+    <section
+      aria-labelledby="connect-modal-solana"
+      className={solanaFirst ? 'mb-1 border-b border-soft-line pb-1' : 'mt-1 border-t border-soft-line pt-1'}
+    >
+      <h3
+        id="connect-modal-solana"
+        className="px-5 pb-1 pt-3 font-soft-display text-[11px] font-bold uppercase tracking-wide text-soft-ink-faint"
+      >
+        Solana
+      </h3>
+      {!isEvmConnected && (
+        <p className="px-5 pb-2 font-soft text-[11px] leading-snug text-soft-ink-soft">
+          Your profile lives on the wallet&apos;s Ethereum address, so it may ask twice: once for Ethereum, once for Solana.
+        </p>
+      )}
+      {solana.discoveredWallets.length > 0 ? (
+        solana.discoveredWallets.map((wallet) => {
+          const isLinked = solana.connected && solana.walletName === wallet.name;
+          const hasTwin = !isEvmConnected && !!findEvmTwin(visibleConnectors, wallet.name);
+          return (
+            <button
+              key={`solana-${wallet.name}`}
+              type="button"
+              disabled={status === 'pending'}
+              onClick={() => handleSolanaPick(wallet.name)}
+              className="flex w-full items-center gap-3 px-5 py-3 text-left transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-inset"
+            >
+              {wallet.icon ? (
+                // eslint-disable-next-line @next/next/no-img-element -- data URI od portfela
+                <img src={wallet.icon} alt="" className="h-5 w-5 shrink-0 rounded" />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element -- znak Solany z public/
+                <img src="/solana.svg" alt="" className="h-5 w-5 shrink-0 rounded" />
+              )}
+              <span className="flex-1">
+                <span className="block font-soft-display text-[13px] font-bold text-soft-ink">
+                  {wallet.name} · Solana
+                </span>
+                <span className="block font-soft text-[11px] text-soft-ink-soft">
+                  {isLinked
+                    ? 'Connected'
+                    : hasTwin
+                      ? 'Solana account + Ethereum profile'
+                      : 'Solana account'}
+                </span>
+              </span>
+            </button>
+          );
+        })
+      ) : (
+        // Nic nie oglosilo sie przez Wallet Standard (np. telefon bez
+        // rozszerzen). Wiersz i tak prowadzi dalej: wybor portfela
+        // wallet-adaptera zna jeszcze Mobile Wallet Adapter, a gdy nie
+        // ma zupelnie niczego, uzytkownik dostaje komunikat, co
+        // zainstalowac - nie martwy przycisk.
+        <button
+          type="button"
+          disabled={status === 'pending'}
+          onClick={() => handleSolanaPick(null)}
+          className="flex w-full items-center gap-3 px-5 py-3 text-left transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-inset"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element -- znak Solany z public/ */}
+          <img src="/solana.svg" alt="" className="h-5 w-5 shrink-0 rounded" />
+          <span className="flex-1">
+            <span className="block font-soft-display text-[13px] font-bold text-soft-ink">Solana wallet</span>
+            <span className="block font-soft text-[11px] text-soft-ink-soft">
+              Phantom, MetaMask, Solflare, Backpack
+            </span>
+          </span>
+        </button>
+      )}
+    </section>
+  ) : null;
+
   return createPortal(
     <div
       ref={dialogRef}
@@ -221,6 +378,12 @@ export default function ConnectModal({
         </div>
 
         <div className="max-h-[60vh] overflow-y-auto py-1">
+          {solanaFirst && solanaBlock}
+          {showSolana && (
+            <h3 className="px-5 pb-1 pt-3 font-soft-display text-[11px] font-bold uppercase tracking-wide text-soft-ink-faint">
+              Ethereum &amp; Base
+            </h3>
+          )}
           {visibleConnectors.map((connector) => {
             const meta = CONNECTOR_META[connector.id];
             const isPending = status === 'pending';
@@ -252,7 +415,10 @@ export default function ConnectModal({
                 )}
                 <span className="flex-1">
                   <span className="block font-soft-display text-[13px] font-bold text-soft-ink">
-                    {meta?.label ?? connector.name}
+                    {/* Dopisek sieci tylko przy portfelach, ktore maja tez konto
+                        Solany - inaczej "Phantom" tu i "Phantom" w sekcji Solany
+                        wygladaja identycznie. */}
+                    {evmRowLabel(meta?.label ?? connector.name, solanaNames)}
                   </span>
                   {isConnecting ? (
                     <span className="block font-soft text-[11px] text-soft-ink-soft">Check your wallet…</span>
@@ -265,6 +431,8 @@ export default function ConnectModal({
               </button>
             );
           })}
+
+          {!solanaFirst && solanaBlock}
         </div>
 
         {/* Odmowa w portfelu NIE jest bledem. Zamkniecie okna portfela albo

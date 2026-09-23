@@ -23,8 +23,9 @@ import BlinkTipClient from './BlinkTipClient';
  * wiekszosci odbiorcow.
  *
  * Ta strona jest wiec wariantem awaryjnym, ktory ma dzialac zawsze: pokazuje
- * post, mowi wprost, na ktory adres idzie napiwek, i SAMA wykonuje akcje
- * portfelem Solany (TipPanel).
+ * post, mowi, ze napiwek idzie na portfel, ktory podpisal post (samego
+ * adresu nie drukuje - pokazuje go karta akcji, GET /api/actions/tip), i SAMA
+ * wykonuje akcje portfelem Solany (TipPanel).
  *
  * Do 23.09.2026 wykonanie oddawalismy interstycjalowi dial.to (Dialect).
  * Wlasciciel kliknal i trafil na Vercelowe "DEPLOYMENT_PAUSED" pod adresem
@@ -44,12 +45,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!post) return { title: 'Post not found' };
 
   const author = post.authorName || shortAddress(post.author);
+  const title = `Tip ${author} on Solana`;
+  // Opis mowi, co robi strona - tresc posta niesie juz obrazek karty.
+  const description = 'Tip the author in SOL. It goes to the Solana wallet that signed this post.';
+  const image = `${SITE}/post/${post.id}/opengraph-image`;
   return {
-    title: `Tip ${author} on Solana`,
-    description: post.content.slice(0, 160),
-    openGraph: {
-      images: [`${SITE}/post/${post.id}/opengraph-image`],
-    },
+    title,
+    description,
+    // Ten sam post zyje pod trzema adresami (/post, /blink/tip, /blink/reply).
+    // Kanoniczny jest /post - tak jak /tip i /u wskazuja same siebie.
+    alternates: { canonical: `https://mysphere.fun/post/${post.id}` },
+    openGraph: { title, description, type: 'article', images: [image] },
+    // Bez wlasnego `twitter` X dziedziczyl tytul i opis strony glownej
+    // z app/layout.tsx - link wklejony na X opisywal serwis, nie napiwek.
+    twitter: { card: 'summary_large_image', title, description, images: [image] },
   };
 }
 
@@ -70,10 +79,13 @@ export default async function BlinkTipPage({ params }: Props) {
       {isSolanaPost ? (
         <>
           <BlinkTipClient postId={post.id} />
+          {/* Do 23.09.2026 stalo tu, ze u osob z Blinkami link "otwiera sie jako
+              karta w feedzie". Nieprawda, dopoki mysphere.fun nie ma w Dialect
+              Actions Registry (sprawdzone 23.09.2026: nie ma) - karta nie
+              rysuje sie nikomu. Zdanie o karcie wraca dopiero po wpisie. */}
           <p className="text-center text-sm text-soft-ink-muted">
-            The tip goes to the wallet that signed this post on {SOLANA_NETWORK_LABEL}. If you have
-            Blinks turned on in Phantom or Backpack, this link also opens as a card directly in your
-            feed.
+            The tip goes to the wallet that signed this post on {SOLANA_NETWORK_LABEL}. MySphere does
+            not record it: the Solana transaction is its only receipt.
           </p>
         </>
       ) : (

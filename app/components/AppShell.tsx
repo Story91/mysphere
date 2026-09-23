@@ -7,6 +7,7 @@ import MobileBottomNav from './MobileBottomNav';
 import { ThemeProvider } from '../context/ThemeContext';
 import { Providers } from '../providers';
 import SessionPrompt from './auth/SessionPrompt';
+import { SolanaWalletHost } from './solana/SolanaWalletHost';
 import { installMerkleProxy } from '../utils/merkleProxy';
 
 /**
@@ -27,6 +28,11 @@ import { installMerkleProxy } from '../utils/merkleProxy';
  * Czego tu NIE MA i byc nie powinno: bramki blokujacej render dzieci do czasu
  * hydracji. Poszczegolne komponenty czytajace window/localStorage maja same
  * uzywac <ClientOnly>, zamiast wstrzymywac cala aplikacje.
+ *
+ * SolanaWalletHost stoi tutaj, bo z portfela Solany czytaja jednoczesnie
+ * nawigacja (przelacznik sieci, przycisk portfela) i composer w basechacie -
+ * jeden stan dla obu. Sam gospodarz jest maly; stos Solany doklada sie
+ * leniwie dopiero na zadanie (patrz naglowek SolanaWalletHost).
  */
 export default function AppShell({ children }: { children: React.ReactNode }) {
 
@@ -37,6 +43,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider>
       <Providers>
+        <SolanaWalletHost>
         <Navigation />
         <main className="w-full">{children}</main>
         {/* Dolny pasek dla tras spoza feedu. Stoi TUTAJ, a nie w stronach:
@@ -103,6 +110,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             },
           }}
         />
+        </SolanaWalletHost>
       </Providers>
     </ThemeProvider>
   );

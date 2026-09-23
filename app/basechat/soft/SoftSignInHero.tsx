@@ -238,8 +238,13 @@ export default function SoftSignInHero({
         className="soft-hero-rise mx-auto mb-7 max-w-[36ch] text-[13.5px] font-semibold leading-[1.55] text-white/80 lg:mx-0 lg:max-w-[46ch] lg:text-[14.5px]"
         style={{ ['--rise-delay' as string]: '120ms' }}
       >
-        Here the only score is one that cost somebody money, and every tip settles onchain
-        with a hash anyone can open.
+        {/* Do 23.09.2026 stalo tu "every tip settles onchain with a hash
+            anyone can open". Hash ma 18 z 189 napiwkow (patrz notka przy
+            APP_DESCRIPTION w app/layout.tsx), a napiwkow w SOL aplikacja nie
+            zapisuje wcale. Zostaje sama mechanika, prawdziwa dla kazdego
+            napiwku: przelew z portfela do portfela na jawnym lancuchu. */}
+        Here the only score is one that cost somebody money, and a tip goes wallet to wallet
+        on a chain anyone can read.
       </p>
 
       {/* Wezly na kole sa dla oka. Czytnik ekranu dostaje te sama liste

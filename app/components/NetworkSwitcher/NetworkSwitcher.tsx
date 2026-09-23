@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { toast } from 'react-hot-toast';
 import { useAccount, useSwitchChain, useChainId } from 'wagmi';
 import { base } from 'viem/chains';
 import { baseCampChain } from '@/app/contracts/BaseCampPostContract';
@@ -14,6 +15,14 @@ import { ethereumChain } from '@/app/basechat/ETH/config/EthereumNetworkConfig';
 import { worldChain } from '@/app/basechat/World/config/WorldChainNetworkConfig';
 import { robinhoodChain } from '@/app/basechat/Robinhood/config/RobinhoodNetworkConfig';
 import { arcMainnet } from '@/app/startpad/arcChain';
+import { useSolanaWallet } from '@/app/components/solana/SolanaWalletHost';
+import {
+  SOLANA_ROUTE,
+  evmExitRoute,
+  isOnSolanaTab,
+  shortSolanaAddress,
+  switcherRowState,
+} from '@/app/components/solana/solanaWalletNav';
 
 // Definicja sieci z polskimi komentarzami
 // Definition of networks with Polish comments
@@ -24,6 +33,7 @@ const baseEntry = {
   iconUrl: '/logotypy/Base_basemark_blue.png', // Ikona dla sieci Base
   color: '#0052FF',
   bgWhite: false,
+  postingKey: 'base', // Zakladka composera w basechacie (?network=) - patrz evmExitRoute
 } as const;
 
 
@@ -35,6 +45,7 @@ const campMainnetEntry = {
   color: '#FF6B35',
   disabled: !ENABLE_CAMP_MAINNET,
   bgWhite: true, // Białe tło pod logo, żeby było czytelne
+  postingKey: 'basecamp',
 } as const;
 
 const lineaEntry = {
@@ -44,6 +55,7 @@ const lineaEntry = {
   iconUrl: '/Logomark Blue BG.svg', // Ikona dla sieci Linea
   color: '#000000',
   bgWhite: false,
+  postingKey: 'linea',
 } as const;
 
 const celoEntry = {
@@ -54,6 +66,7 @@ const celoEntry = {
   color: '#FCFF52',
   bgWhite: false, // Czarne tło
   bgBlack: true, // Czarne tło dla Celo
+  postingKey: 'celo',
 } as const;
 
 const ethereumEntry = {
@@ -63,6 +76,7 @@ const ethereumEntry = {
   iconUrl: '/ethlogo.png', // Logo Ethereum
   color: '#627EEA',
   bgWhite: false,
+  postingKey: 'ethereum',
 } as const;
 
 const worldChainEntry = {
@@ -72,6 +86,7 @@ const worldChainEntry = {
   iconUrl: '/logotypy/world-symbol-dark.svg', // Ikona dla sieci World Chain
   color: '#8B5CF6',
   bgWhite: true, // Białe tło dla World Chain
+  postingKey: 'worldchain',
 } as const;
 
 const robinhoodEntry = {
@@ -81,6 +96,7 @@ const robinhoodEntry = {
   iconUrl: '/robin.webp', // Oficjalne logo Robinhooda
   color: '#00C805', // Firmowa zielen Robinhooda
   bgWhite: false,
+  postingKey: 'robinhood',
 } as const;
 
 /**
@@ -105,6 +121,7 @@ const arcEntry = {
   iconUrl: '/arc.jpg', // Oficjalny znak Arc, dostarczony przez wlasciciela
   color: '#4D9AF0',
   bgWhite: false,
+  postingKey: 'arc',
 } as const;
 
 /**
@@ -118,8 +135,16 @@ const arcEntry = {
  * najgorszy mozliwy wariant: przycisk, ktory wyglada na dzialajacy.
  *
  * Zamiast tego `href` prowadzi do zakladki Solany w basechacie, gdzie stoi
- * jej wlasny portfel i wlasna sciezka transakcyjna. Obsluge rozdziela
- * `handleNetworkPick` nizej.
+ * jej wlasna sciezka transakcyjna. Obsluge rozdziela `handleNetworkPick` nizej.
+ *
+ * OD 23.09.2026 WYBOR SOLANY TAKZE PODPINA KONTO SOLANY. Samo przeniesienie
+ * na zakladke bylo polowa roboty: wlasciciel zglosil, ze w MetaMasku (ktory
+ * ma dzis konto Solany) "nie da sie przelaczyc na solane", a Phantom
+ * podlaczony w nawigacji siedzial na Ethereum. Teraz klikniecie laczy konto
+ * Solany TEGO SAMEGO portfela, na ktorym stoi strona EVM (MetaMask ->
+ * MetaMask, Phantom -> Phantom), a bez pary otwiera wybor portfela Solany.
+ * Po podlaczeniu pastylka pokazuje Solane i skrot adresu, takze po
+ * przeladowaniu (tryb w localStorage, patrz SolanaWalletHost).
  *
  * Znak jest tym samym plikiem, ktorego uzywa pasek sieci w feedzie
  * (SOFT_NETWORKS) - jedno zrodlo na cala aplikacje, zeby Solana nie miala
@@ -129,7 +154,7 @@ const solanaEntry = {
   id: 'solana',
   name: 'Solana',
   shortName: 'SOL',
-  href: '/basechat?network=solana',
+  href: SOLANA_ROUTE,
   iconUrl: '/solana.svg',
   color: '#9945FF',
   bgWhite: false,
@@ -160,6 +185,11 @@ type Network = (typeof networks)[number];
 /** Wpis, ktory przenosi na inna trase zamiast przelaczac lancuch w portfelu. */
 function networkHref(network: Network): string | null {
   return 'href' in network ? network.href : null;
+}
+
+/** Zakladka composera w basechacie odpowiadajaca tej sieci (wartosc ?network=). */
+function networkPostingKey(network: Network): string | null {
+  return 'postingKey' in network ? network.postingKey : null;
 }
 
 /** Adres pliku znaku sieci albo null, gdy wpis go nie ma (patrz `arcEntry`). */
@@ -204,20 +234,40 @@ function isNetworkDisabled(network: Network): boolean {
 export function NetworkSwitcher() {
   const { switchChain } = useSwitchChain();
   const router = useRouter();
+  // Tylko po to, zeby przelacznik przerysowal sie po nawigacji - stan
+  // "czy composer stoi na zakladce Solany" czytamy z window.location nizej.
+  const pathname = usePathname();
   const chainId = useChainId();
-  const { isConnected } = useAccount();
+  const { isConnected, connector } = useAccount();
+  const solana = useSolanaWallet();
   const [isOpen, setIsOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
-  // Aktywna siec WYNIKA z chainId, wiec jest wyliczana, a nie trzymana w stanie.
-  // Wczesniej stan i efekt gonily sie o jeden render: pierwsza klatka po zmianie
-  // sieci rysowala jeszcze poprzednie logo.
+  // Solana jest biezaca siecia, gdy uzytkownik ja wybral I konto Solany jest
+  // podlaczone (albo wlasnie wraca po przeladowaniu) - patrz resolveNavSelection.
+  const onSolana = solana.navSelection === 'solana';
+  const solanaShort = shortSolanaAddress(solana.address);
+  // Uzytkownik wybral Solane i portfel wlasnie pyta o zgode. Pastylka zostaje
+  // wtedy na sieci EVM (konta jeszcze nie ma), wiec bez tej flagi przez caly
+  // czas otwartego okna portfela przelacznik nie mowil, ze cokolwiek sie dzieje.
+  const solanaPending = solana.mode === 'solana' && solana.connecting && !onSolana;
+
+  // Aktywna siec WYNIKA z chainId (albo z trybu Solany), wiec jest wyliczana,
+  // a nie trzymana w stanie. Wczesniej stan i efekt gonily sie o jeden render:
+  // pierwsza klatka po zmianie sieci rysowala jeszcze poprzednie logo.
   // Domyslnie Base, gdy portfel siedzi na nieobslugiwanej sieci.
   const activeNetwork: Network = useMemo(
-    () => networks.find((net) => net.id === chainId) ?? networks[0],
-    [chainId]
+    () => (onSolana ? solanaEntry : networks.find((net) => net.id === chainId) ?? networks[0]),
+    [chainId, onSolana]
   );
+  // Skrot adresu Solany w nazwie dostepnej: przy dwoch portfelach naraz
+  // "Solana" bez adresu nie mowi, KTORE konto jest podpiete.
+  const activeLabel = onSolana && solanaShort
+    ? `${activeNetwork.name} (${solanaShort})`
+    : solanaPending
+      ? `${activeNetwork.name}, connecting Solana`
+      : activeNetwork.name;
 
   // Zamyka menu po kliknięciu poza komponentem albo klawiszem Escape.
   useEffect(() => {
@@ -242,26 +292,59 @@ export function NetworkSwitcher() {
     };
   }, [isOpen]);
 
-  // Nie renderuj komponentu, jeśli portfel nie jest połączony
-  // Do not render the component if the wallet is not connected
-  if (!isConnected) {
+  // Nie renderuj komponentu, jesli zaden portfel nie jest polaczony. Samo
+  // konto Solany (portfel bez strony EVM, np. Solflare) tez sie liczy.
+  if (!isConnected && !onSolana) {
     return null;
   }
 
   const handleNetworkPick = (network: Network) => {
     const href = networkHref(network);
     if (href) {
-      // Siec spoza EVM - nie ma czego przelaczac w portfelu, wiec przenosimy
-      // uzytkownika tam, gdzie ta siec faktycznie dziala.
+      // Siec spoza EVM - nie ma czego przelaczac w wagmi, wiec przenosimy
+      // uzytkownika tam, gdzie ta siec faktycznie dziala, i podpinamy konto
+      // Solany portfela, na ktorym stoi strona EVM. W miniappie Farcastera
+      // connectPreferred nic nie robi - zostaje samo przeniesienie, jak dotad.
       router.push(href);
+      solana.connectPreferred(connector?.name ?? null);
       setIsOpen(false);
       return;
     }
-    if (switchChain) {
+    // Podlaczone jest samo konto Solany (Solflare, albo odmowa strony EVM).
+    // Wyjscie z trybu Solany schowaloby caly przelacznik (patrz warunek
+    // wyzej), a sieci EVM i tak nie ma na czym wlaczyc - wiec zostajemy na
+    // Solanie i mowimy, czego brakuje, zamiast cicho nic nie zrobic.
+    if (!isConnected) {
+      toast(`Connect an Ethereum wallet to use ${network.name}. Use Connect wallet in the top bar.`);
+      setIsOpen(false);
+      return;
+    }
+    // Wybor sieci EVM konczy tryb Solany.
+    solana.setMode('evm');
+    if (typeof window !== 'undefined') {
+      // Composer stoi na zakladce Solany - przestawiamy go na wybrana siec,
+      // zeby pastylka i formularz pod nia nie mowily dwoch roznych rzeczy.
+      // Bez warunku "konto Solany podlaczone": po odmowie w portfelu Solany
+      // composer zostaje na zakladce Solany, a to byla wtedy jedyna droga
+      // wyjscia. Poza ta zakladka evmExitRoute zwraca null.
+      const exit = evmExitRoute(window.location.pathname, window.location.search, networkPostingKey(network));
+      if (exit) router.replace(exit);
+    }
+    // Ten sam lancuch co w portfelu (np. Base po wyjsciu z Solany) nie
+    // wymaga prosby do portfela - wystarczyla zmiana trybu.
+    if (switchChain && network.id !== chainId) {
       switchChain({ chainId: network.id as number });
     }
     setIsOpen(false);
   };
+
+  // Czytane tylko przy otwartym menu, czyli wylacznie po stronie klienta -
+  // zamkniete menu na serwerze i w pierwszym renderze nie zalezy od adresu.
+  // `pathname` w warunku wiaze wynik z nawigacja Next.js.
+  const onSolanaTab =
+    isOpen && !!pathname && typeof window !== 'undefined'
+      ? isOnSolanaTab(window.location.pathname, window.location.search)
+      : false;
 
   return (
     <div className="relative" ref={wrapperRef}>
@@ -272,7 +355,9 @@ export function NetworkSwitcher() {
         onClick={() => setIsOpen((open) => !open)}
         aria-expanded={isOpen}
         aria-haspopup="true"
-        aria-label={`Switch network, currently ${activeNetwork.name}`}
+        aria-label={`Switch network, currently ${activeLabel}`}
+        aria-busy={solanaPending || undefined}
+        title={onSolana && solanaShort ? `Solana account ${solanaShort}` : solanaPending ? 'Connecting Solana…' : undefined}
         className="flex items-center gap-2 px-3 py-2 bg-soft-surface hover:bg-soft-sunken rounded-pill border border-soft-line hover:border-soft-line-strong transition-[background-color,border-color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface"
       >
         {activeNetwork.id === base.id ? (
@@ -324,7 +409,19 @@ export function NetworkSwitcher() {
           <div className="p-2">
             {networks.map((network) => {
               const isDisabled = isNetworkDisabled(network);
-              const isCurrent = network.id === chainId;
+              // Podlaczone konto Solany dostaje skrot adresu pod nazwa: widac,
+              // ze wybor Solany nie poprosi o nic, tylko przelaczy widok.
+              const isSolanaRow = network.id === solanaEntry.id;
+              const { current: isCurrent, disabled: isRowDisabled } = switcherRowState({
+                isSolanaRow,
+                hasHref: !!networkHref(network),
+                locked: isDisabled,
+                onSolana,
+                onSolanaTab,
+                chainMatches: network.id === chainId,
+              });
+              const rowAddress = isSolanaRow && solana.connected ? solanaShort : '';
+              const rowPending = isSolanaRow && solanaPending;
 
               return (
               <button
@@ -336,10 +433,19 @@ export function NetworkSwitcher() {
                     ? 'bg-soft-sunken text-soft-ink'
                     : 'text-soft-ink-muted hover:bg-soft-sunken hover:text-soft-ink'
                 }`}
-                disabled={isCurrent || isDisabled}
+                disabled={isRowDisabled}
                 aria-current={isCurrent ? 'true' : undefined}
-                aria-label={isDisabled ? `${network.name} (locked)` : network.name}
-                title={isDisabled ? 'Locked' : undefined}
+                aria-busy={rowPending || undefined}
+                aria-label={
+                  isDisabled
+                    ? `${network.name} (locked)`
+                    : rowAddress
+                      ? `${network.name} (connected as ${rowAddress})`
+                      : rowPending
+                        ? `${network.name} (connecting)`
+                        : network.name
+                }
+                title={isDisabled ? 'Locked' : rowAddress ? `Solana account ${rowAddress}` : undefined}
               >
                 {network.id === base.id ? (
                   <div className="bg-white rounded-lg p-1.5 flex items-center justify-center flex-shrink-0">
@@ -371,6 +477,11 @@ export function NetworkSwitcher() {
                     <div className="font-soft-display font-bold text-sm truncate">
                       {network.name}
                     </div>
+                    {(rowAddress || rowPending) && (
+                      <div aria-hidden="true" className="font-soft text-[11px] tabular-nums text-soft-ink-faint truncate">
+                        {rowAddress || 'Check your wallet…'}
+                      </div>
+                    )}
                   </div>
                 )}
                 {/* Kłódka dla zablokowanych */}

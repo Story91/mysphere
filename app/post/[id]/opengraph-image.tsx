@@ -1,6 +1,7 @@
 import { ImageResponse } from 'next/og';
 import { getPostForShare, getPostTipTotals, shortAddress } from '../../utils/posts/getPostForShare';
 import { ogFonts, DISPLAY_FAMILY, BODY_FAMILY } from '../../components/og/fonts';
+import { SOLANA_NETWORK_LABEL } from '../../basechat/Solana/config/solanaChain';
 
 /**
  * Karta OG generowana per post.
@@ -95,6 +96,11 @@ export default async function Image({ params }: { params: { id: string } }) {
   // Tresc przycieta tak, zeby zmiescila sie bez lamania layoutu obrazka.
   const raw = post?.content?.trim() ?? '';
   const content = raw.length > 220 ? `${raw.slice(0, 220)}…` : raw || 'Post on MySphere';
+  // Ta karta jest tez podgladem linkow /blink/tip i /blink/reply wklejanych
+  // na X - czytajacy ma wiedziec, ze post jest z Solany, zanim kliknie.
+  // Sumy SOL-a celowo brak: napiwkow w SOL nic u nas nie zapisuje, a kwota
+  // w stopce liczy wylacznie napiwki z kolekcji `tips` (sieci EVM).
+  const isSolana = post?.network === 'solana';
 
   return new ImageResponse(
     (
@@ -173,7 +179,12 @@ export default async function Image({ params }: { params: { id: string } }) {
             color: '#6B6486', // --soft-ink-muted, 4.8:1 - AA takze w miniaturze
           }}
         >
-          <div style={{ display: 'flex' }}>{author}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ display: 'flex' }}>{author}</div>
+            {/* Cichy podpis sieci w kolorze autora - to nie kwota (pomarancz)
+                ani stan (zielen), tylko informacja, gdzie lezy kwit. */}
+            {isSolana && <div style={{ display: 'flex' }}>{`· on ${SOLANA_NETWORK_LABEL}`}</div>}
+          </div>
           {post && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '28px' }}>
               {/* Kwota idzie PRZED lajkami i na pomaranczu. To jedyna liczba na

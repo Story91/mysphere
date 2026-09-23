@@ -14,6 +14,10 @@
 > zdarzeń na kontrakcie), a 187 rozliczonych płatności to napiwki, nie zapłata za zamówioną pracę.
 >
 > Materiał do postów z tego okresu: [`POSTY-SOCIAL.md`](POSTY-SOCIAL.md).
+>
+> **Stan sieci na 23.09.2026:** 9 do postowania (doszły Arc i Solana), 8 do napiwków w aplikacji
+> (bez Solany — napiwek w SOL istnieje tylko jako Blink i nie jest zapisywany). Szczegóły:
+> [`AUDYT.md`](AUDYT.md), [`docs/SOLANA-INTEGRACJA.md`](docs/SOLANA-INTEGRACJA.md).
 
 # MySphere — status prac
 

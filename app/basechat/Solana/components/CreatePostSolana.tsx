@@ -8,31 +8,27 @@
  * przez wagmi. Cala reszta - media, Spotify, zapis do Firestore, zdarzenie
  * `newPost` - to ten sam `ChainCreatePost`, ktorego uzywa szesc sieci EVM.
  *
- * `dynamic(..., { ssr: false })` na obu importach Solany jest tu rdzeniem, a
- * nie ozdoba:
- *  - bez `ssr: false` wallet-adapter probuje siegnac po `window` podczas
- *    renderu serwerowego i wywala build,
- *  - dzieki dynamicznemu importowi ~200 pakietow stacku Solany laduje sie
- *    dopiero po wejsciu na te zakladke. Kto zostaje na Base, nie pobiera ich
- *    wcale.
+ * `dynamic(..., { ssr: false })` na przycisku jest tu rdzeniem, a nie ozdoba:
+ *  - bez `ssr: false` web3.js probuje siegnac po `window` podczas renderu
+ *    serwerowego i wywala build,
+ *  - dzieki dynamicznemu importowi stos Solany laduje sie dopiero po wejsciu
+ *    na te zakladke. Kto zostaje na Base, nie pobiera go wcale.
+ *
+ * PORTFEL NIE JEST JUZ TUTAJ. Do 23.09.2026 ta zakladka owijala sie wlasnym
+ * WalletProviderem, wiec portfel podlaczony w nawigacji i portfel composera
+ * byly dwoma niezaleznymi stanami. Teraz przycisk czyta wspolny portfel
+ * aplikacji (useSolanaWallet z SolanaWalletHost): podlaczenie Solany w
+ * nawigacji od razu przygotowuje composer i odwrotnie.
  */
 
 import dynamic from 'next/dynamic';
-import type { ComponentType } from 'react';
+import { useEffect, type ComponentType } from 'react';
 import ChainCreatePost from '../../chainPosting/ChainCreatePost';
 import type { ChainCreatePostProps } from '../../chainPosting/ChainCreatePost';
 import type { ChainPostButtonProps } from '../../chainPosting/types';
 import { useIsFarcasterMiniApp } from '../../../hooks/useIsFarcasterMiniApp';
+import { useSolanaWallet } from '../../../components/solana/SolanaWalletHost';
 import { SOLANA_POSTING } from '../config/SolanaPostingConfig';
-
-const SolanaWalletProvider = dynamic(() => import('./SolanaWalletProvider'), {
-  ssr: false,
-  loading: () => (
-    <div className="rounded-2xl border border-soft-line bg-soft-surface p-4 text-sm text-soft-ink-muted">
-      Loading Solana wallet...
-    </div>
-  ),
-});
 
 const SolanaPostButton = dynamic(() => import('./SolanaPostButton'), {
   ssr: false,
@@ -42,6 +38,14 @@ type Props = Omit<ChainCreatePostProps, 'config' | 'PostButton'>;
 
 export default function CreatePostSolana(props: Props) {
   const isFarcasterMiniApp = useIsFarcasterMiniApp();
+  const { ensureLoaded } = useSolanaWallet();
+
+  // Otwarta zakladka Solany to sygnal, ze stos portfela bedzie zaraz potrzebny:
+  // ladujemy go juz teraz, zeby pierwsze klikniecie "polacz" nie czekalo na
+  // pobranie kodu. Samo zaladowanie niczego nie podlacza i o nic nie pyta.
+  useEffect(() => {
+    if (isFarcasterMiniApp === false) ensureLoaded();
+  }, [isFarcasterMiniApp, ensureLoaded]);
 
   /**
    * Zakladka Solany jest w miniappie ukryta, ale deep link /basechat?network=solana
@@ -71,9 +75,5 @@ export default function CreatePostSolana(props: Props) {
     return null;
   }
 
-  return (
-    <SolanaWalletProvider>
-      <ChainCreatePost {...props} config={SOLANA_POSTING} PostButton={SolanaPostButton} />
-    </SolanaWalletProvider>
-  );
+  return <ChainCreatePost {...props} config={SOLANA_POSTING} PostButton={SolanaPostButton} />;
 }

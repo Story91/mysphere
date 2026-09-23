@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAccount, useDisconnect, useBalance } from 'wagmi';
 import { base } from 'viem/chains';
 import Avatar from '../identity/Avatar';
@@ -9,6 +10,8 @@ import Name from '../identity/Name';
 import Address from '../identity/Address';
 import ConnectModal from './ConnectModal';
 import { useFundingUrl } from '../Navigation/useFundingUrl';
+import { useSolanaWallet } from '../solana/SolanaWalletHost';
+import { SOLANA_ROUTE, shortSolanaAddress } from '../solana/solanaWalletNav';
 
 /**
  * Przycisk portfela: logowanie + menu po zalogowaniu.
@@ -64,8 +67,10 @@ function ExternalMark() {
 }
 
 export default function WalletButton() {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, connector } = useAccount();
   const { disconnect } = useDisconnect();
+  const solana = useSolanaWallet();
+  const router = useRouter();
   const { data: balance } = useBalance({ address, chainId: base.id, query: { enabled: !!address } });
   const fundingUrl = useFundingUrl();
 
@@ -99,16 +104,50 @@ export default function WalletButton() {
   }, [isMenuOpen]);
 
   if (!isConnected || !address) {
+    const connectButton = (
+      <button
+        type="button"
+        onClick={() => setIsModalOpen(true)}
+        className="rounded-pill bg-soft-primary px-4 py-2 font-soft-display text-[13px] font-bold text-white shadow-chip transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface"
+      >
+        Connect wallet
+      </button>
+    );
+    const modal = <ConnectModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} solana="navigate" />;
+
+    // Samo konto Solany, bez strony EVM: Solflare/Backpack (nie maja EVM),
+    // odmowa strony EVM przy podwojnym laczeniu albo "Disconnect" EVM przy
+    // zostawionej Solanie. Menu ponizej istnieje tylko z portfelem EVM, wiec
+    // bez tego znacznika podpietego konta Solany nie bylo widac nigdzie w
+    // nawigacji i nie dalo sie go odpiac.
+    if (solana.connected) {
+      const short = shortSolanaAddress(solana.address);
+      return (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => solana.disconnect()}
+            aria-label={`Disconnect Solana account ${short}`}
+            title={`Solana ${short} - click to disconnect`}
+            className="group flex items-center gap-1.5 rounded-pill border border-soft-line bg-soft-surface px-2.5 py-2 font-soft-display text-[12px] font-bold tabular-nums text-soft-ink transition-[background-color,border-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:border-soft-line-strong hover:bg-soft-sunken active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element -- znak Solany z public/ */}
+            <img src="/solana.svg" alt="" className="h-4 w-4 shrink-0" />
+            <span className="hidden sm:inline">{short}</span>
+            <svg aria-hidden="true" className="h-3 w-3 text-soft-ink-faint group-hover:text-soft-ink" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+              <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
+            </svg>
+          </button>
+          {connectButton}
+          {modal}
+        </div>
+      );
+    }
+
     return (
       <>
-        <button
-          type="button"
-          onClick={() => setIsModalOpen(true)}
-          className="rounded-pill bg-soft-primary px-4 py-2 font-soft-display text-[13px] font-bold text-white shadow-chip transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-primary-deep active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface"
-        >
-          Connect wallet
-        </button>
-        <ConnectModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+        {connectButton}
+        {modal}
       </>
     );
   }
@@ -195,6 +234,40 @@ export default function WalletButton() {
               <ExternalMark />
             </Link>
 
+            {/* Konto Solany obok EVM. Bez tego wiersza jedynym miejscem, gdzie
+                bylo widac podpiete konto Solany (i jedynym, gdzie dalo sie je
+                odpiac), byl composer w basechacie. Wiersz dziala tak samo jak
+                wybor Solany w przelaczniku sieci: konto Solany TEGO SAMEGO
+                portfela, a bez pary - wybor portfela. W miniappie Farcastera
+                Solany nie ma, wiec wiersza tez nie. */}
+            {solana.available && (
+              <button
+                type="button"
+                onClick={() => {
+                  router.push(SOLANA_ROUTE);
+                  if (solana.connected) solana.setMode('solana');
+                  else solana.connectPreferred(connector?.name ?? null);
+                  setIsMenuOpen(false);
+                }}
+                className={ROW}
+                aria-label={
+                  solana.connected
+                    ? `Solana account ${shortSolanaAddress(solana.address)}, open Solana`
+                    : 'Connect Solana account'
+                }
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element -- znak Solany z public/ */}
+                <img src="/solana.svg" alt="" className="h-4 w-4 shrink-0" />
+                <span className="flex-1 text-left">
+                  {solana.connected
+                    ? `Solana · ${shortSolanaAddress(solana.address)}`
+                    : solana.connecting
+                      ? 'Connecting Solana…'
+                      : 'Connect Solana account'}
+                </span>
+              </button>
+            )}
+
             {/* Onramp wymaga session tokenu z /api/onramp/session-token. Gdy go
                 nie ma (brak kluczy CDP albo odmowa Coinbase), nie pokazujemy
                 martwego wiersza. */}
@@ -230,6 +303,23 @@ export default function WalletButton() {
               </Icon>
               <span className="flex-1 text-left">Disconnect</span>
             </button>
+            {/* Odpiecie Solany osobno: "Disconnect" wyzej rozlacza strone EVM
+                (profil), a konto Solany jest drugim, niezaleznym polaczeniem
+                w tym samym portfelu. */}
+            {solana.connected && (
+              <button
+                type="button"
+                onClick={() => {
+                  solana.disconnect();
+                  setIsMenuOpen(false);
+                }}
+                className={ROW}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element -- znak Solany z public/ */}
+                <img src="/solana.svg" alt="" className="h-4 w-4 shrink-0 opacity-70" />
+                <span className="flex-1 text-left">Disconnect Solana</span>
+              </button>
+            )}
           </div>
         </div>
       )}

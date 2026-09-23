@@ -196,7 +196,8 @@ const MockFeed = () => {
         signedInAs={isAuthenticated && sessionAddress ? shortenAddress(sessionAddress) : null}
       />
 
-      <ConnectModal isOpen={isWalletModalOpen} onClose={() => setIsWalletModalOpen(false)} />
+      {/* Feed przed logowaniem prowadzi tez na Solane - sekcja Solany wlaczona jawnie (domyslnie modal jest tylko EVM). */}
+      <ConnectModal isOpen={isWalletModalOpen} onClose={() => setIsWalletModalOpen(false)} solana="navigate" />
 
     </div>
   );
