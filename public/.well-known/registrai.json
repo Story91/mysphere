@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "claim": {
+    "builder": "0xd4885a5aa53446843cabcde1f35de9b4e906030e",
+    "source": "domain:mysphere.fun",
+    "deployers": [
+      "0xd4885a5aa53446843cabcde1f35de9b4e906030e"
+    ],
+    "country": "PL",
+    "chain": 5042,
+    "issued": "2026-09-25"
+  },
+  "signatures": {
+    "builder": "0xcc0204747517d71527b628b1a44ae25d711ebd61e5c53dc0d3532a6d1fab28c63b37d9c67fba7a6396073dd2260d3819457160e4b902554378e0d722aea051ff1c",
+    "deployers": {}
+  }
+}
