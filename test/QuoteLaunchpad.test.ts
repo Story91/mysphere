@@ -403,7 +403,7 @@ for (const orientation of ['quote-currency0', 'quote-currency1'] as const) {
       await (await probe.doSwap(key, { zeroForOne: quoteIs0, amountSpecified: -buyIn, sqrtPriceLimitX96: quoteIs0 ? MIN_SQRT + 1n : MAX_SQRT - 1n })).wait();
       const pendingTok = await hook.pendingToken(tokenAddr);
       expect(pendingTok).to.be.greaterThan(0n);
-      expect(await hook.pendingQuote(tokenAddr)).to.equal(0n);
+      expect(await hook.pendingEth(tokenAddr)).to.equal(0n);
       const bought = await token.balanceOf(probeAddr);
       // Oplata = ceil(1% z wyjscia brutto): wyjscie netto + oplata = brutto.
       expect(pendingTok).to.equal(((bought + pendingTok) * 100n + 9_999n) / 10_000n);
@@ -411,29 +411,29 @@ for (const orientation of ['quote-currency0', 'quote-currency1'] as const) {
       // SPRZEDAZ polowy tokena, exactInput. Niepodane = QUOTE -> oplata w QUOTE.
       const sellIn = bought / 2n;
       await (await probe.doSwap(key, { zeroForOne: !quoteIs0, amountSpecified: -sellIn, sqrtPriceLimitX96: quoteIs0 ? MAX_SQRT - 1n : MIN_SQRT + 1n })).wait();
-      const pendingQ = await hook.pendingQuote(tokenAddr);
+      const pendingQ = await hook.pendingEth(tokenAddr);
       expect(pendingQ).to.be.greaterThan(0n);
 
       // Podzial 30/70 i odbior w QUOTE i tokenie.
       await (await hook.connect(carol).settle(tokenAddr)).wait();
       const protoQ = (pendingQ * PROTOCOL_SHARE_BPS) / 10_000n;
-      expect(await hook.claimableQuote(treasury.address)).to.equal(protoQ);
-      expect(await hook.claimableQuote(creator.address)).to.equal(pendingQ - protoQ);
+      expect(await hook.claimableEth(treasury.address)).to.equal(protoQ);
+      expect(await hook.claimableEth(creator.address)).to.equal(pendingQ - protoQ);
       const creatorTok = pendingTok - (pendingTok * PROTOCOL_SHARE_BPS) / 10_000n;
       expect(await hook.claimableToken(tokenAddr, creator.address)).to.equal(creatorTok);
 
       const qBefore = await quote.balanceOf(creator.address);
-      await (await hook.connect(carol).claimQuoteFor(creator.address)).wait();
+      await (await hook.connect(carol).claimEthFor(creator.address)).wait();
       expect(await quote.balanceOf(creator.address)).to.equal(qBefore + pendingQ - protoQ);
       await (await hook.connect(creator).claimToken(tokenAddr)).wait();
       expect(await hook.claimableToken(tokenAddr, creator.address)).to.equal(0n);
 
       // Oplaty LP pozycji vaulta: harvest -> 30/70 w QUOTE i tokenie.
       await (await vault.connect(carol).harvest(tokenAddr)).wait();
-      const lpQ = await vault.claimableQuote(creator.address);
+      const lpQ = await vault.claimableEth(creator.address);
       const lpT = await vault.claimableToken(tokenAddr, creator.address);
       expect(lpQ > 0n || lpT > 0n).to.equal(true);
-      if (lpQ > 0n) await (await vault.connect(creator).claimQuote()).wait();
+      if (lpQ > 0n) await (await vault.connect(creator).claimEth()).wait();
     });
 
     it('exactOutput: oplata hooka z WEJSCIA (waluta niepodana), wymieniajacy placi o nia wiecej', async function () {
@@ -452,7 +452,7 @@ for (const orientation of ['quote-currency0', 'quote-currency1'] as const) {
       const out = 1_000_000n * 10n ** 18n;
       await (await probe.doSwap(key, { zeroForOne: quoteIs0, amountSpecified: out, sqrtPriceLimitX96: quoteIs0 ? MIN_SQRT + 1n : MAX_SQRT - 1n })).wait();
       expect(await token.balanceOf(probeAddr)).to.equal(out);
-      const fee = await hook.pendingQuote(tokenAddr);
+      const fee = await hook.pendingEth(tokenAddr);
       expect(fee).to.be.greaterThan(0n);
       expect(await hook.pendingToken(tokenAddr)).to.equal(0n);
       // Zaplacone = wejscie puli + oplata; oplata = ceil(1% wejscia puli).
@@ -476,7 +476,7 @@ for (const orientation of ['quote-currency0', 'quote-currency1'] as const) {
       await (await probe.doSwap(key, { zeroForOne: !quoteIs0, amountSpecified: -sellIn, sqrtPriceLimitX96: quoteIs0 ? MAX_SQRT - 1n : MIN_SQRT + 1n })).wait();
       await (await hook.settle(tokenAddr)).wait();
 
-      const pendingBB = await hook.pendingBuybackQuote(tokenAddr);
+      const pendingBB = await hook.pendingBuybackEth(tokenAddr);
       expect(pendingBB).to.be.greaterThan(0n);
       const deadBefore = await token.balanceOf(DEAD);
       const rc = await (await hook.connect(carol).executeBuyback(tokenAddr, 1n, await deadline())).wait();
@@ -485,7 +485,7 @@ for (const orientation of ['quote-currency0', 'quote-currency1'] as const) {
       expect(ev.args.ethIn <= pendingBB).to.equal(true);
       expect(await token.balanceOf(DEAD)).to.equal(deadBefore + ev.args.tokensBought);
       // Reszta (przy czesciowej wymianie) wraca do kolejki, nic nie znika.
-      expect(await hook.pendingBuybackQuote(tokenAddr)).to.equal(pendingBB - ev.args.ethIn);
+      expect(await hook.pendingBuybackEth(tokenAddr)).to.equal(pendingBB - ev.args.ethIn);
     });
 
     it('brama: obcy nie otworzy puli z naszym hookiem', async function () {

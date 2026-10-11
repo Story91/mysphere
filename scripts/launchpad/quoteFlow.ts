@@ -108,16 +108,16 @@ async function main() {
     await waitBalance(token, probeAddr, 1n);
     const got = await token.balanceOf(probeAddr);
     await (await probe.doSwap(key, { zeroForOne: !quoteIs0, amountSpecified: -(got / 2n), sqrtPriceLimitX96: quoteIs0 ? MAX_SQRT - 1n : MIN_SQRT + 1n })).wait();
-    console.log("4. swapy: kupiono", ethers.formatEther(got), "oplata hooka QUOTE", fmt(await hook.pendingQuote(tokenAddr)), "token", ethers.formatEther(await hook.pendingToken(tokenAddr)));
+    console.log("4. swapy: kupiono", ethers.formatEther(got), "oplata hooka QUOTE", fmt(await hook.pendingEth(tokenAddr)), "token", ethers.formatEther(await hook.pendingToken(tokenAddr)));
 
     // 5. SETTLE + ODBIOR + HARVEST
     await (await hook.settle(tokenAddr)).wait();
-    const claimQ = await hook.claimableQuote(me.address);
-    if (claimQ > 0n) await (await hook.claimQuote()).wait();
+    const claimQ = await hook.claimableEth(me.address);
+    if (claimQ > 0n) await (await hook.claimEth()).wait();
     await (await vault.harvest(tokenAddr)).wait();
     const padClaim = await pad.claimable(me.address);
     if (padClaim > 0n) await (await pad.claim()).wait();
-    console.log("5. odebrano z hooka", fmt(claimQ), "z krzywej", fmt(padClaim), "LP do odbioru", fmt(await vault.claimableQuote(me.address)));
+    console.log("5. odebrano z hooka", fmt(claimQ), "z krzywej", fmt(padClaim), "LP do odbioru", fmt(await vault.claimableEth(me.address)));
   }
 
   const tokenAddr = process.env.FLOW_TOKEN ? ethers.getAddress(process.env.FLOW_TOKEN) : await curveSteps();

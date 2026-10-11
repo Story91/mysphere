@@ -123,15 +123,15 @@ describe('Launchpad Q - fork Base mainnet z prawdziwym USDC i PoolManagerem', fu
     expect(bought).to.be.greaterThan(0n);
     await (await probe.doSwap(key, { zeroForOne: !quoteIs0, amountSpecified: -(bought / 2n), sqrtPriceLimitX96: quoteIs0 ? MAX_SQRT - 1n : MIN_SQRT + 1n })).wait();
     expect(await hook.pendingToken(tokenAddr)).to.be.greaterThan(0n);
-    expect(await hook.pendingQuote(tokenAddr)).to.be.greaterThan(0n);
+    expect(await hook.pendingEth(tokenAddr)).to.be.greaterThan(0n);
 
     await (await hook.settle(tokenAddr)).wait();
     const before = await usdc.balanceOf(treasury.address);
-    await (await hook.claimQuoteFor(treasury.address)).wait();
+    await (await hook.claimEthFor(treasury.address)).wait();
     expect(await usdc.balanceOf(treasury.address)).to.be.greaterThan(before);
 
     // Buyback z dzialki tworcy (20%) w USDC - prawdziwa pula, prawdziwy PoolManager.
-    if ((await hook.pendingBuybackQuote(tokenAddr)) > 0n) {
+    if ((await hook.pendingBuybackEth(tokenAddr)) > 0n) {
       await (await hook.executeBuyback(tokenAddr, 1n, deadline)).wait();
       expect(await hook.buybackTokens(tokenAddr)).to.be.greaterThan(0n);
     }

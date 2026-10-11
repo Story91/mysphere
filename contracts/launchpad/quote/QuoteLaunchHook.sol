@@ -28,6 +28,11 @@ interface IQuoteVaultView {
  * 3. BUYBACK idzie QUOTE -> token. Gdy QUOTE jest currency1, to jest `oneForZero`
  *    i cena v4 (amount1/amount0) ROSNIE, wiec granica ceny lezy POWYZEJ spotu.
  *
+ * NAZWY FUNKCJI I ZDARZEN JAK W WERSJI ETH (`pendingEth`, `claimableEth`,
+ * `claimEth`, `pendingBuybackEth`...). "Eth" znaczy tu "jednostki QUOTE". Front
+ * czyta i wyplaca przez to samo ABI co przy launchpadzie ETH - jedna sciezka
+ * kodu zamiast dwoch, ktore rozjada sie przy pierwszej zmianie.
+ *
  * Flagi adresu te same co w wersji ETH (0x2044) - importowane, nie przepisane.
  * `QUOTE` jest argumentem konstruktora, wiec wchodzi do kodu tworzacego: kazde
  * aktywo wymaga osobnego kopania salta.
@@ -60,13 +65,13 @@ contract QuoteLaunchHook {
     /*  STAN                                                                   */
     /* ====================================================================== */
 
-    mapping(address => uint256) public pendingQuote;
+    mapping(address => uint256) public pendingEth;
     mapping(address => uint256) public pendingToken;
     mapping(address => uint16) public buybackBps;
-    mapping(address => uint256) public pendingBuybackQuote;
+    mapping(address => uint256) public pendingBuybackEth;
     mapping(address => uint256) public buybackTokens;
 
-    mapping(address => uint256) public claimableQuote;
+    mapping(address => uint256) public claimableEth;
     mapping(address => mapping(address => uint256)) public claimableToken;
 
     /* ====================================================================== */
@@ -211,7 +216,7 @@ contract QuoteLaunchHook {
 
         bool inQuote = currency == QUOTE;
         if (inQuote) {
-            pendingQuote[token] += fee;
+            pendingEth[token] += fee;
         } else {
             pendingToken[token] += fee;
         }
@@ -230,10 +235,10 @@ contract QuoteLaunchHook {
         returns (uint256 tokensOut)
     {
         if (block.timestamp > deadline) revert Expired();
-        uint256 quoteIn = pendingBuybackQuote[token];
+        uint256 quoteIn = pendingBuybackEth[token];
         if (quoteIn == 0) revert NothingToBuyback();
 
-        pendingBuybackQuote[token] = 0;
+        pendingBuybackEth[token] = 0;
         _buybackAction = 1;
         _buybackToken = token;
         _buybackQuote = quoteIn;
@@ -248,7 +253,7 @@ contract QuoteLaunchHook {
         (tokensOut, spent) = abi.decode(ret, (uint256, uint256));
         if (tokensOut < minTokensOut) revert Slippage();
         // Wymiana z granica ceny bywa czesciowa - reszta wraca do kolejki buybacku.
-        if (spent < quoteIn) pendingBuybackQuote[token] += quoteIn - spent;
+        if (spent < quoteIn) pendingBuybackEth[token] += quoteIn - spent;
         buybackTokens[token] += tokensOut;
         _safeTransfer(token, DEAD, tokensOut);
         emit AutoBuyback(token, spent, tokensOut, msg.sender);
@@ -310,7 +315,7 @@ contract QuoteLaunchHook {
 
     /** Bezuprawnieniowe - patrz `B20LaunchHook.settle`. Buyback tylko z dzialki tworcy w QUOTE. */
     function settle(address token) external nonReentrant {
-        uint256 q = pendingQuote[token];
+        uint256 q = pendingEth[token];
         uint256 tok = pendingToken[token];
         if (q == 0 && tok == 0) revert NothingToSettle();
 
@@ -320,7 +325,7 @@ contract QuoteLaunchHook {
         // na adres zerowy bez drogi powrotu.
         if (creator == address(0)) revert UnknownToken();
 
-        pendingQuote[token] = 0;
+        pendingEth[token] = 0;
         pendingToken[token] = 0;
 
         uint256 protoQuote = FullMath.mulDivDown(q, PROTOCOL_SHARE_BPS, 10_000);
@@ -330,23 +335,23 @@ contract QuoteLaunchHook {
         uint256 creatorGrossQuote = q - protoQuote;
         uint256 buybackCut = FullMath.mulDivDown(creatorGrossQuote, buybackBps[token], 10_000);
         uint256 creatorQuote = creatorGrossQuote - buybackCut;
-        if (buybackCut != 0) pendingBuybackQuote[token] += buybackCut;
+        if (buybackCut != 0) pendingBuybackEth[token] += buybackCut;
 
-        if (protoQuote != 0) claimableQuote[FEE_RECIPIENT] += protoQuote;
-        if (creatorQuote != 0) claimableQuote[creator] += creatorQuote;
+        if (protoQuote != 0) claimableEth[FEE_RECIPIENT] += protoQuote;
+        if (creatorQuote != 0) claimableEth[creator] += creatorQuote;
         if (protoTok != 0) claimableToken[token][FEE_RECIPIENT] += protoTok;
         if (creatorTok != 0) claimableToken[token][creator] += creatorTok;
 
         emit HookFeeSettled(token, protoQuote, creatorQuote, buybackCut, protoTok, creatorTok);
     }
 
-    function claimQuote() external {
-        _payoutQuote(msg.sender);
+    function claimEth() external {
+        _payoutEth(msg.sender);
     }
 
     /** Wyplata cudzego salda, zawsze DO wlasciciela - kierunek zaszyty w kodzie. */
-    function claimQuoteFor(address account) external {
-        _payoutQuote(account);
+    function claimEthFor(address account) external {
+        _payoutEth(account);
     }
 
     function claimToken(address token) external {
@@ -357,10 +362,10 @@ contract QuoteLaunchHook {
         _payoutToken(token, account);
     }
 
-    function _payoutQuote(address account) private nonReentrant {
-        uint256 amount = claimableQuote[account];
+    function _payoutEth(address account) private nonReentrant {
+        uint256 amount = claimableEth[account];
         if (amount == 0) revert NothingToClaim();
-        claimableQuote[account] = 0;
+        claimableEth[account] = 0;
         emit Claimed(account, QUOTE, amount, msg.sender);
         _safeTransfer(QUOTE, account, amount);
     }

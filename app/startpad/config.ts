@@ -169,20 +169,36 @@ const baseMainnetEntry: LaunchpadNetwork = {
   label: 'Base B20',
   testnet: false,
   tokenStandard: 'b20',
-  launchpad:
-    (process.env.NEXT_PUBLIC_LAUNCHPAD_BASE_ADDRESS as `0x${string}` | undefined) ??
-    '0xCF541A7EcE881945833ff1680dFc067C5Dd4cE2D',
-  vault:
-    (process.env.NEXT_PUBLIC_LIQUIDITY_VAULT_BASE_ADDRESS as `0x${string}` | undefined) ??
-    '0x6108aDCb176D2A4A6283A06bb0Dd468b86A6AB63',
-  hook:
-    (process.env.NEXT_PUBLIC_LAUNCH_HOOK_BASE_ADDRESS as `0x${string}` | undefined) ??
-    '0x71028Ea6999e2c415b46cc022ED0A9fDca2e2044',
-  tokenFactory:
-    (process.env.NEXT_PUBLIC_B20_TOKEN_FACTORY_BASE_ADDRESS as `0x${string}` | undefined) ??
-    '0xEC7db55Bc081289820097703B3A66003092844D1',
+  // v2 (2026-10-11): ten sam CurveLaunchpad z fabryka B20TokenFactoryV2.
+  // Od hardforku Cobalt (2026-09-30) v1 nie startuje tokenow (WrongVariant) -
+  // memory b20-cobalt-launch-outage. Adresy LITERALNIE: zmienne
+  // NEXT_PUBLIC_*_BASE_* na Vercelu wskazuja v1 i opisuja teraz wpis legacy.
+  version: 2,
+  launchpad: '0xb5C71DE0B6b2280A7b05ECDdd9F22a895A5E243e',
+  vault: '0x019098A6e1377ABE2a40faF5643EE1cC5459AFF3',
+  hook: '0xE0BCc49d92bF9e928F7010C1e5884E146bA92044',
+  tokenFactory: '0xF1DAd68f9B0b00A80E993286419AD03e9380e7B0',
   poolManager: '0x498581fF718922c3f8e6A244956aF099B2652b2b',
-  deployBlock: BigInt(process.env.NEXT_PUBLIC_LAUNCHPAD_BASE_DEPLOY_BLOCK ?? '49843030'),
+  deployBlock: 52474833n,
+  legacy: [
+    {
+      // v1 z 2026-08-11 - krzywe, ktore nie awansowaly, i salda oplat zyja tu na zawsze.
+      version: 1,
+      launchpad:
+        (process.env.NEXT_PUBLIC_LAUNCHPAD_BASE_ADDRESS as `0x${string}` | undefined) ??
+        '0xCF541A7EcE881945833ff1680dFc067C5Dd4cE2D',
+      vault:
+        (process.env.NEXT_PUBLIC_LIQUIDITY_VAULT_BASE_ADDRESS as `0x${string}` | undefined) ??
+        '0x6108aDCb176D2A4A6283A06bb0Dd468b86A6AB63',
+      hook:
+        (process.env.NEXT_PUBLIC_LAUNCH_HOOK_BASE_ADDRESS as `0x${string}` | undefined) ??
+        '0x71028Ea6999e2c415b46cc022ED0A9fDca2e2044',
+      tokenFactory:
+        (process.env.NEXT_PUBLIC_B20_TOKEN_FACTORY_BASE_ADDRESS as `0x${string}` | undefined) ??
+        '0xEC7db55Bc081289820097703B3A66003092844D1',
+      deployBlock: BigInt(process.env.NEXT_PUBLIC_LAUNCHPAD_BASE_DEPLOY_BLOCK ?? '49843030'),
+    },
+  ],
   // Wdrozenie sprzed parametryzacji skali - dawna stala kontraktu.
   rVirt: 0.75,
   explorerUrl: 'https://basescan.org',

@@ -78,7 +78,7 @@ contract QuoteLiquidityVault is IUnlockCallback {
     mapping(address => bool) public seeded;
     mapping(address => address) public creatorOf;
 
-    mapping(address => uint256) public claimableQuote;
+    mapping(address => uint256) public claimableEth;
     mapping(address => mapping(address => uint256)) public claimableToken;
 
     /** amount0/amount1 w kolejnosci PULI, `ethDust` = pyl QUOTE (sygnatura jak w wersji ETH). */
@@ -97,7 +97,8 @@ contract QuoteLiquidityVault is IUnlockCallback {
     event Harvested(address indexed token, bytes32 indexed poolId, address indexed caller, uint256 fee0, uint256 fee1);
     /** `ethAmount` = kwota w QUOTE. */
     event LpFeeAccrued(address indexed token, address indexed account, uint256 ethAmount, uint256 tokenAmount);
-    event QuoteClaimed(address indexed account, uint256 amount, address indexed caller);
+    /** Kwota w QUOTE - nazwa i sygnatura jak w `LiquidityVault`, zeby front mial jedno ABI. */
+    event EthClaimed(address indexed account, uint256 amount, address indexed caller);
     event TokenClaimed(address indexed token, address indexed account, uint256 amount, address indexed caller);
 
     error ZeroAddress();
@@ -294,8 +295,8 @@ contract QuoteLiquidityVault is IUnlockCallback {
         uint256 creatorQuote = feeQuote - protoQuote;
         uint256 creatorTok = feeTok - protoTok;
 
-        if (protoQuote != 0) claimableQuote[FEE_RECIPIENT] += protoQuote;
-        if (creatorQuote != 0) claimableQuote[creator] += creatorQuote;
+        if (protoQuote != 0) claimableEth[FEE_RECIPIENT] += protoQuote;
+        if (creatorQuote != 0) claimableEth[creator] += creatorQuote;
         if (protoTok != 0) claimableToken[token][FEE_RECIPIENT] += protoTok;
         if (creatorTok != 0) claimableToken[token][creator] += creatorTok;
 
@@ -383,12 +384,12 @@ contract QuoteLiquidityVault is IUnlockCallback {
     /*  ODBIOR                                                                 */
     /* ---------------------------------------------------------------------- */
 
-    function claimQuote() external {
-        _payoutQuote(msg.sender);
+    function claimEth() external {
+        _payoutEth(msg.sender);
     }
 
-    function claimQuoteFor(address account) external {
-        _payoutQuote(account);
+    function claimEthFor(address account) external {
+        _payoutEth(account);
     }
 
     function claimToken(address token) external {
@@ -399,11 +400,11 @@ contract QuoteLiquidityVault is IUnlockCallback {
         _payoutToken(token, account);
     }
 
-    function _payoutQuote(address account) private nonReentrant {
-        uint256 amount = claimableQuote[account];
+    function _payoutEth(address account) private nonReentrant {
+        uint256 amount = claimableEth[account];
         if (amount == 0) revert NothingToClaim();
-        claimableQuote[account] = 0;
-        emit QuoteClaimed(account, amount, msg.sender);
+        claimableEth[account] = 0;
+        emit EthClaimed(account, amount, msg.sender);
         _safeTransfer(QUOTE, account, amount);
     }
 
