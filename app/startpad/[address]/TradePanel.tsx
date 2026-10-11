@@ -46,6 +46,7 @@ import { quoteBuyLocal, quoteDrifts, quoteSellLocal } from './curveQuote';
 import { hasPool } from './poolPrice';
 import PoolTradeBox from './PoolTradeBox';
 import { canonicalPoolKey, V4_BY_CHAIN, v4QuoterAbi } from './v4Swap';
+import { encodeTradeMessage, messageByteLength, TRADE_MESSAGE_MAX_BYTES } from './tradeMessage';
 
 /**
  * Panel handlu NA STRONIE tokena - koniec z odsylaniem do boardu. Wzorce
@@ -55,6 +56,13 @@ import { canonicalPoolKey, V4_BY_CHAIN, v4QuoterAbi } from './v4Swap';
 
 const FIELD =
   'w-full rounded-xl border border-sp-shade/10 bg-sp-surface px-3.5 py-3 text-[14px] text-sp-ink outline-none transition-colors placeholder:text-sp-shade/35 focus:border-sp-brand';
+
+/** Limit liczy bajty, nie znaki - wklejony dlugi tekst przycinamy po znakach, az sie zmiesci. */
+function clampMessage(text: string): string {
+  let chars = Array.from(text);
+  while (chars.length > 0 && messageByteLength(chars.join('')) > TRADE_MESSAGE_MAX_BYTES) chars = chars.slice(0, -1);
+  return chars.join('');
+}
 
 type Side = 'buy' | 'sell';
 type Busy = 'buy' | 'approve' | 'sell' | 'graduate' | 'settle' | 'harvest' | 'claim' | 'buyback' | null;
@@ -82,6 +90,7 @@ export default function TradePanel({
 
   const [side, setSide] = useState<Side>('buy');
   const [buyAmount, setBuyAmount] = useState('0.05');
+  const [buyMessage, setBuyMessage] = useState('');
   const [sellAmount, setSellAmount] = useState('');
   const [busy, setBusy] = useState<Busy>(null);
   const [notice, setNotice] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
@@ -326,6 +335,9 @@ export default function TradePanel({
         account,
       });
       void request;
+      // Wiadomosc jedzie za argumentami ABI - kontrakt jej nie czyta, kupno
+      // jest tym samym kupnem. Opis formatu w tradeMessage.ts.
+      const dataSuffix = encodeTradeMessage(buyMessage) ?? undefined;
       const hash = await walletClient.writeContract({
         address: LAUNCHPAD_ADDRESS as Address,
         abi: launchpadAbi,
@@ -334,10 +346,12 @@ export default function TradePanel({
         value,
         chain: LAUNCHPAD_CHAIN,
         account,
+        dataSuffix,
       });
       const receipt = await readClient.waitForTransactionReceipt({ hash });
       if (receipt.status !== 'success') throw new Error('The buy transaction reverted.');
-      setNotice({ kind: 'success', text: `Buy confirmed. ${hash.slice(0, 10)}...` });
+      setNotice({ kind: 'success', text: `Buy confirmed${dataSuffix ? ' with your message' : ''}. ${hash.slice(0, 10)}...` });
+      if (dataSuffix) setBuyMessage('');
       onAfterTx();
     } catch (cause) {
       fail(cause);
@@ -705,6 +719,26 @@ export default function TradePanel({
                   Max
                 </button>
               </div>
+              <div className="mt-3 flex items-end justify-between">
+                <label htmlFor="buy-message" className="text-[12px] font-extrabold text-sp-ink">
+                  Say something <span className="font-bold text-sp-shade/40">(optional)</span>
+                </label>
+                <span className={`text-[10.5px] font-bold ${messageByteLength(buyMessage) >= TRADE_MESSAGE_MAX_BYTES ? 'text-sp-down-deep' : 'text-sp-shade/40'}`}>
+                  {messageByteLength(buyMessage)}/{TRADE_MESSAGE_MAX_BYTES}
+                </span>
+              </div>
+              <input
+                id="buy-message"
+                value={buyMessage}
+                onChange={(event) => setBuyMessage(clampMessage(event.target.value))}
+                placeholder="gm, lfg, wen 1m..."
+                maxLength={TRADE_MESSAGE_MAX_BYTES}
+                autoComplete="off"
+                className={`${FIELD} mt-2`}
+              />
+              <p className="mt-1.5 text-[10.5px] leading-[1.4] text-sp-shade/45">
+                Saved onchain with your buy and shown in Trades. Links and addresses are hidden.
+              </p>
               <div className="mt-3 space-y-1 rounded-xl bg-sp-sunken p-3 text-[11px]">
                 <div className="flex items-center justify-between">
                   <span className="text-sp-shade/50">You receive</span>

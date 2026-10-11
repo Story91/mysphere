@@ -44,6 +44,8 @@ import {
   type TokenProfileView,
   type TradeEntry,
 } from './detailShared';
+import { displayTradeMessage } from './tradeMessage';
+import { useTradeMessages } from './useTradeMessages';
 
 const FIELD =
   'w-full rounded-xl border border-sp-shade/10 bg-sp-surface px-3.5 py-3 text-[14px] text-sp-ink outline-none placeholder:text-sp-shade/35 focus:border-soft-primary';
@@ -179,6 +181,8 @@ export default function DetailTabs({
   // pod reka (zdarzenia na zywo, dociagana historia), wiec numer strony musi
   // sam sie miescic w tym, ile stron jest TERAZ.
   const tradePage = pageSlice(newestFirst, page, PAGE_SIZE);
+  // Tylko kupna z krzywej moga niesc wiadomosc - sprzedaz i swapy w puli jej nie maja.
+  const messages = useTradeMessages(tradePage.rows.map((trade) => (trade.kind === 'buy' ? trade.txHash : null)));
 
   const loadingRow = historyLoading && trades.length === 0 && (
     <div className="flex items-center justify-center gap-2 px-5 py-10 text-[12px] text-sp-shade/45">
@@ -249,7 +253,7 @@ export default function DetailTabs({
                 </div>
                 <div className="divide-y divide-sp-shade/5">
                   {tradePage.rows.map((trade) => (
-                    <div key={trade.id} className="grid grid-cols-[90px_70px_1fr_110px_110px_110px_44px] items-center gap-2 px-4 py-2.5 text-[12px] sm:px-5">
+                    <div key={trade.id} className="grid grid-cols-[90px_70px_1fr_110px_110px_110px_44px] items-center gap-x-2 gap-y-1 px-4 py-2.5 text-[12px] sm:px-5">
                       <span className="text-[11px] text-sp-shade/45">{timeAgo(trade.ts)}</span>
                       <span className={`inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase ${trade.kind === 'buy' ? 'bg-sp-up-soft text-sp-up' : 'bg-sp-down-soft text-sp-down-deep'}`}>
                         {trade.kind === 'buy' ? <ArrowUpRight className="h-3 w-3" aria-hidden="true" /> : <ArrowDownRight className="h-3 w-3" aria-hidden="true" />}
@@ -267,6 +271,12 @@ export default function DetailTabs({
                         </a>
                       ) : (
                         <span />
+                      )}
+                      {/* Wiadomosc w osobnej linii pod wierszem - w kolumnie konta miala kilka znakow. */}
+                      {trade.txHash && messages.has(trade.txHash.toLowerCase()) && (
+                        <p className="col-span-6 col-start-2 truncate text-[11.5px] italic text-sp-shade/65" title={displayTradeMessage(messages.get(trade.txHash.toLowerCase())!)}>
+                          “{displayTradeMessage(messages.get(trade.txHash.toLowerCase())!)}”
+                        </p>
                       )}
                     </div>
                   ))}
