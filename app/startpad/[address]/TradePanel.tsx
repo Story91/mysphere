@@ -26,6 +26,9 @@ import {
   launchpadAbi,
   LIQUIDITY_VAULT_ADDRESS,
   liquidityVaultAbi,
+  ETH_USDC_POOL,
+  PERP_ZAP_ADDRESS,
+  perpZapAbi,
   QUOTE_ASSET,
   quoteLaunchpadAbi,
 } from '../config';
@@ -108,6 +111,7 @@ function MessageField({
 }
 
 type Side = 'buy' | 'sell';
+type ZapPoolKey = { currency0: Address; currency1: Address; fee: number; tickSpacing: number; hooks: Address };
 type Busy = 'buy' | 'approve' | 'sell' | 'graduate' | 'settle' | 'harvest' | 'claim' | 'buyback' | null;
 type ClaimSource = 'launch' | 'hookEth' | 'hookToken' | 'vaultEth' | 'vaultToken';
 
@@ -147,6 +151,15 @@ export default function TradePanel({
   const [sellQuote, setSellQuote] = useState<{ ethOut: bigint; fee: bigint } | null>(null);
   const [ethBalance, setEthBalance] = useState<bigint | null>(null);
   const [slippageBps, setSlippageBps] = useState<number>(DEFAULT_SLIPPAGE_BPS);
+  // Rynek Q z zapem: kupno za ETH (ETH -> USDC -> perp -> mem jedna transakcja)
+  // albo bezposrednio perpem. Domyslnie ETH - wiekszosc ludzi perpa nie ma.
+  const [payWith, setPayWith] = useState<'eth' | 'quote'>(PERP_ZAP_ADDRESS ? 'eth' : 'quote');
+  const payEth = PERP_ZAP_ADDRESS !== null && payWith === 'eth';
+  const payLabel = payEth ? 'ETH' : NATIVE_SYMBOL;
+  const [nativeBalance, setNativeBalance] = useState<bigint | null>(null);
+  const [perpPoolKey, setPerpPoolKey] = useState<ZapPoolKey | null>(null);
+  const [zapQuote, setZapQuote] = useState<{ perpIn: bigint; tokensOut: bigint } | null>(null);
+  const [zapQuoteError, setZapQuoteError] = useState<string | null>(null);
   /**
    * Czy lokalnemu podgladowi wolno jeszcze wierzyc.
    *
@@ -202,6 +215,88 @@ export default function TradePanel({
     };
     // `busy` w zaleznosciach celowo: po kazdej transakcji saldo sie zmienia.
   }, [readClient, account, busy]);
+
+  // Klucz puli Flash dla perpa tego rynku (druga noga zapa) - z naszej trasy,
+  // ktora bierze go z API Flash. Zap sam sprawdza, ze pula laczy USDC z perpem.
+  useEffect(() => {
+    if (!PERP_ZAP_ADDRESS || !QUOTE_ASSET) return;
+    const perp = QUOTE_ASSET.address.toLowerCase();
+    let cancelled = false;
+    fetch(`/api/launchpad/perps?chainId=${LAUNCHPAD_CHAIN.id}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body: { perps?: Array<{ address: string; poolKey: ZapPoolKey | null }> } | null) => {
+        const key = body?.perps?.find((p) => p.address.toLowerCase() === perp)?.poolKey ?? null;
+        if (!cancelled) setPerpPoolKey(key);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!readClient || !account || !PERP_ZAP_ADDRESS) {
+      setNativeBalance(null);
+      return;
+    }
+    let cancelled = false;
+    readClient
+      .getBalance({ address: account })
+      .then((value) => {
+        if (!cancelled) setNativeBalance(value);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [readClient, account, busy]);
+
+  // Podglad kupna za ETH: symulacja SAMEGO zapa z portfela kupujacego - daje
+  // dokladnie to, co da transakcja (obie pule i krzywa naraz), bez osobnych
+  // kwotowan. Wymaga portfela z tym ETH; bez niego podgladu nie ma.
+  useEffect(() => {
+    setZapQuote(null);
+    setZapQuoteError(null);
+    if (!payEth || !readClient || !onCurve || !account || !perpPoolKey || !PERP_ZAP_ADDRESS) return;
+    const value = toWei(buyAmount);
+    if (value === null || value === 0n) return;
+    if (nativeBalance !== null && value > nativeBalance) {
+      setZapQuoteError(`Your wallet holds ${fmtEth(nativeBalance, 4)} ETH.`);
+      return;
+    }
+    let cancelled = false;
+    const zap = PERP_ZAP_ADDRESS;
+    const timer = window.setTimeout(() => {
+      readClient
+        .simulateContract({
+          address: zap,
+          abi: perpZapAbi,
+          functionName: 'buyWithEth',
+          args: [
+            core.deployment.launchpad as Address,
+            core.token,
+            ETH_USDC_POOL,
+            perpPoolKey,
+            1n,
+            1n,
+            BigInt(Math.floor(Date.now() / 1000) + 900),
+            account,
+          ],
+          value,
+          account,
+        })
+        .then(({ result }) => {
+          if (!cancelled) setZapQuote({ perpIn: result[0], tokensOut: result[1] });
+        })
+        .catch((cause) => {
+          if (!cancelled) setZapQuoteError(tradeErrorMessage(cause));
+        });
+    }, 400);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [payEth, readClient, onCurve, account, perpPoolKey, buyAmount, nativeBalance, core.token, core.deployment.launchpad]);
 
   // Podglad kupna. Krotki debounce, zeby nie strzelac odczytem na kazda litere.
   // Flaga `cancelled` obejmuje takze odpowiedz W LOCIE: samo skasowanie timera
@@ -367,7 +462,11 @@ export default function TradePanel({
     }
     const value = toWei(buyAmount);
     if (value === null || value === 0n) {
-      setNotice({ kind: 'error', text: `Enter an ${NATIVE_SYMBOL} amount greater than zero, written as a decimal number.` });
+      setNotice({ kind: 'error', text: `Enter an ${payLabel} amount greater than zero, written as a decimal number.` });
+      return;
+    }
+    if (payEth) {
+      await buyWithEth(value);
       return;
     }
     // Rynek Q: kupno to przelew perpa z portfela. Bez salda kontrakt rewertuje
@@ -429,6 +528,73 @@ export default function TradePanel({
       const receipt = await readClient.waitForTransactionReceipt({ hash });
       if (receipt.status !== 'success') throw new Error('The buy transaction reverted.');
       setNotice({ kind: 'success', text: `Buy confirmed${dataSuffix ? ' with your message' : ''}. ${hash.slice(0, 10)}...` });
+      if (dataSuffix) {
+        setShareable({ kind: 'buy', text: tradeMessage });
+        setTradeMessage('');
+      }
+      onAfterTx();
+    } catch (cause) {
+      fail(cause);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /** Kupno za ETH przez PerpBuyZap: jedna transakcja, bez zgod, mem prosto na portfel. */
+  const buyWithEth = async (value: bigint) => {
+    if (!account || !walletClient || !readClient || !PERP_ZAP_ADDRESS) return;
+    if (!perpPoolKey) {
+      setNotice({ kind: 'error', text: `The ETH route to ${NATIVE_SYMBOL} is still loading. Try again in a moment.` });
+      return;
+    }
+    if (nativeBalance !== null && value > nativeBalance) {
+      setNotice({ kind: 'error', text: `Your wallet holds ${fmtEth(nativeBalance, 4)} ETH, less than ${fmtEth(value, 4)} ETH plus gas.` });
+      return;
+    }
+    if (!(await ensureChain())) return;
+    setBusy('buy');
+    setNotice(null);
+    setShareable(null);
+    try {
+      const deadline = BigInt(Math.floor(Date.now() / 1000) + 900);
+      const zapCall = {
+        address: PERP_ZAP_ADDRESS,
+        abi: perpZapAbi,
+        functionName: 'buyWithEth' as const,
+        value,
+        account,
+      };
+      const launchpad = core.deployment.launchpad as Address;
+      // Swieza wycena calej trasy tuz przed podpisem; poslizg na obu nogach.
+      const { result } = await readClient.simulateContract({
+        ...zapCall,
+        args: [launchpad, core.token, ETH_USDC_POOL, perpPoolKey, 1n, 1n, deadline, account],
+      });
+      const minPerpOut = applySlippage(result[0], slippageBps);
+      const minTokensOut = applySlippage(result[1], slippageBps);
+      const args = [
+        launchpad,
+        core.token,
+        ETH_USDC_POOL,
+        perpPoolKey,
+        minPerpOut > 0n ? minPerpOut : 1n,
+        minTokensOut > 0n ? minTokensOut : 1n,
+        deadline,
+        account,
+      ] as const;
+      const gas = await readClient.estimateContractGas({ ...zapCall, args }).catch(() => undefined);
+      const dataSuffix = encodeTradeMessage(tradeMessage) ?? undefined;
+      const hash = await walletClient.writeContract({
+        ...zapCall,
+        args,
+        chain: LAUNCHPAD_CHAIN,
+        dataSuffix,
+        // Hook Flash zuzywa kilka milionow gazu; portfele licza ciasno - zapas 20%.
+        ...(gas ? { gas: (gas * 120n) / 100n } : {}),
+      });
+      const receipt = await readClient.waitForTransactionReceipt({ hash });
+      if (receipt.status !== 'success') throw new Error('The buy transaction reverted.');
+      setNotice({ kind: 'success', text: `Bought with ETH${dataSuffix ? ' and your message' : ''}. ${hash.slice(0, 10)}...` });
       if (dataSuffix) {
         setShareable({ kind: 'buy', text: tradeMessage });
         setTradeMessage('');
@@ -656,7 +822,11 @@ export default function TradePanel({
   // panelu na tablicy - rezerwa 0,005 ETH byla wieksza niz cale saldo malego
   // portfela i kazdy procent wpisywal ZERO. Uzasadnienie przy `GAS_RESERVE_WEI`.
   // Na rynku Q gaz placi sie w ETH, a kupuje aktywem pary - rezerwy nie ma.
-  const spendable = QUOTE_ASSET ? (ethBalance ?? 0n) : spendableEth(ethBalance, GAS_RESERVE_WEI);
+  const spendable = payEth
+    ? spendableEth(nativeBalance, GAS_RESERVE_WEI)
+    : QUOTE_ASSET
+      ? (ethBalance ?? 0n)
+      : spendableEth(ethBalance, GAS_RESERVE_WEI);
 
   const setBuyPct = (pct: bigint) => {
     if (spendable <= 0n) return;
@@ -791,9 +961,28 @@ export default function TradePanel({
 
           {side === 'buy' && onCurve ? (
             <>
+              {PERP_ZAP_ADDRESS && (
+                <div className="mt-4 flex items-center gap-1 rounded-full bg-sp-sunken p-1 text-[11px] font-extrabold" role="tablist" aria-label="Pay with">
+                  {(['eth', 'quote'] as const).map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      role="tab"
+                      aria-selected={payWith === option}
+                      onClick={() => setPayWith(option)}
+                      className={`flex-1 rounded-full px-3 py-1.5 transition-colors ${payWith === option ? 'bg-sp-surface text-sp-ink shadow-sm' : 'text-sp-shade/50 hover:text-sp-ink'}`}
+                    >
+                      Pay with {option === 'eth' ? 'ETH' : NATIVE_SYMBOL}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="mt-4 flex items-end justify-between">
-                <span className="text-[12px] font-extrabold text-sp-ink">{NATIVE_SYMBOL} amount</span>
-                {ethBalance !== null && (
+                <span className="text-[12px] font-extrabold text-sp-ink">{payLabel} amount</span>
+                {payEth && nativeBalance !== null && (
+                  <span className="text-[11px] text-sp-shade/45">Balance {fmtEth(nativeBalance, 4)} ETH</span>
+                )}
+                {!payEth && ethBalance !== null && (
                   <span className="text-[11px] text-sp-shade/45">
                     Balance {fmtEth(ethBalance, 4)} {NATIVE_SYMBOL}
                     {QUOTE_ASSET && (
@@ -808,8 +997,8 @@ export default function TradePanel({
                 )}
               </div>
               <div className="relative mt-2">
-                <input inputMode="decimal" value={buyAmount} onChange={(event) => setBuyAmount(event.target.value)} className={`${FIELD} pr-14`} aria-label={`${NATIVE_SYMBOL} amount to spend`} />
-                <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[12px] font-extrabold text-sp-shade/40">{NATIVE_SYMBOL}</span>
+                <input inputMode="decimal" value={buyAmount} onChange={(event) => setBuyAmount(event.target.value)} className={`${FIELD} pr-14`} aria-label={`${payLabel} amount to spend`} />
+                <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[12px] font-extrabold text-sp-shade/40">{payLabel}</span>
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {([25n, 50n, 100n] as const).map((pct) => (
@@ -822,6 +1011,28 @@ export default function TradePanel({
                 </button>
               </div>
               <MessageField value={tradeMessage} onChange={setTradeMessage} placeholder="gm, lfg, wen 1m..." label="Say something" />
+              {payEth ? (
+                <div className="mt-3 space-y-1 rounded-xl bg-sp-sunken p-3 text-[11px]">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sp-shade/50">You receive</span>
+                    <span className="font-extrabold text-sp-ink">
+                      {zapQuote ? `~${fmtTokens(zapQuote.tokensOut, decimals)} ${core.symbol}` : '--'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sp-shade/50">Route</span>
+                    <span className="font-bold text-sp-shade/60">
+                      ETH → USDC → {zapQuote ? `${fmtEth(zapQuote.perpIn, 4)} ` : ''}
+                      {NATIVE_SYMBOL} → {core.symbol}
+                    </span>
+                  </div>
+                  {zapQuoteError && <p className="pt-1 text-[10.5px] font-bold text-sp-down-deep">{zapQuoteError}</p>}
+                  <p className="pt-1 text-[10.5px] leading-[1.4] text-sp-shade/45">
+                    One transaction, no approvals: your ETH buys {NATIVE_SYMBOL} on Flash, which buys {core.symbol} on the curve. If the curve fills, the
+                    unused {NATIVE_SYMBOL} comes back to your wallet.
+                  </p>
+                </div>
+              ) : (
               <div className="mt-3 space-y-1 rounded-xl bg-sp-sunken p-3 text-[11px]">
                 <div className="flex items-center justify-between">
                   <span className="text-sp-shade/50">You receive</span>
@@ -841,6 +1052,7 @@ export default function TradePanel({
                   </div>
                 )}
               </div>
+              )}
               <button
                 type="button"
                 disabled={busy === 'buy' || !isConnected}

@@ -29,6 +29,7 @@ type FlashItem = {
   currentLeverageWad?: string;
   targetLeverageWad?: string;
   marketCapUsd?: number;
+  poolKey?: { currency0: string; currency1: string; fee: number; tickSpacing: number; hooks: string };
 };
 
 let cached: { at: number; byToken: Map<string, FlashItem> } | null = null;
@@ -79,6 +80,9 @@ export async function GET(request: NextRequest) {
       marketCapUsd: typeof f?.marketCapUsd === 'number' ? f.marketCapUsd : null,
       launchpad: m.launchpad,
       rVirt: m.rVirt,
+      // Pula Flash USDC/perp - druga noga zapa ETH -> perp (PerpBuyZap sprawdza,
+      // ze laczy USDC z QUOTE launchpada, wiec zly klucz konczy sie rewertem).
+      poolKey: f?.poolKey ?? null,
     };
   });
 

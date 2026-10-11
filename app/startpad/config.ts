@@ -848,6 +848,51 @@ export const ACTIVE_LAUNCHPAD_NETWORK = resolveActiveNetwork();
 /** Aktywo pary aktywnego rynku Q albo null (rynek ETH). */
 export const QUOTE_ASSET: QuoteAsset | null = ACTIVE_LAUNCHPAD_NETWORK.quote ?? null;
 export const ACTIVE_MARKET_ID: string | null = ACTIVE_LAUNCHPAD_NETWORK.marketId ?? null;
+
+/**
+ * PerpBuyZap (contracts/launchpad/quote/PerpBuyZap.sol): kupno mema z rynku Q
+ * za ETH w jednej transakcji, ETH -> USDC -> perp (pula Flash) -> buyFor.
+ * Jeden zap na siec, dla wszystkich rynkow perpow. Brak wpisu = brak opcji ETH.
+ */
+const PERP_ZAP_BY_CHAIN: Record<number, `0x${string}` | undefined> = {};
+export const PERP_ZAP_ADDRESS: `0x${string}` | null =
+  QUOTE_ASSET ? PERP_ZAP_BY_CHAIN[ACTIVE_LAUNCHPAD_NETWORK.chain.id] ?? null : null;
+/** Bezhakowa pula natywne ETH/USDC v4 na Base (fee 500, tickSpacing 10) - pierwszy krok zapa. */
+export const ETH_USDC_POOL = {
+  currency0: '0x0000000000000000000000000000000000000000',
+  currency1: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+  fee: 500,
+  tickSpacing: 10,
+  hooks: '0x0000000000000000000000000000000000000000',
+} as const;
+const zapPoolKeyComponents = [
+  { name: 'currency0', type: 'address' },
+  { name: 'currency1', type: 'address' },
+  { name: 'fee', type: 'uint24' },
+  { name: 'tickSpacing', type: 'int24' },
+  { name: 'hooks', type: 'address' },
+] as const;
+export const perpZapAbi = [
+  {
+    type: 'function',
+    name: 'buyWithEth',
+    stateMutability: 'payable',
+    inputs: [
+      { name: 'launchpad', type: 'address' },
+      { name: 'token', type: 'address' },
+      { name: 'ethPool', type: 'tuple', components: zapPoolKeyComponents },
+      { name: 'perpPool', type: 'tuple', components: zapPoolKeyComponents },
+      { name: 'minPerpOut', type: 'uint256' },
+      { name: 'minTokensOut', type: 'uint256' },
+      { name: 'deadline', type: 'uint256' },
+      { name: 'recipient', type: 'address' },
+    ],
+    outputs: [
+      { name: 'perpIn', type: 'uint256' },
+      { name: 'tokensOut', type: 'uint256' },
+    ],
+  },
+] as const;
 /** Parametr zapytania dla tras serwera (`&m=...`) - pusty na rynku ETH. */
 export const MARKET_QUERY = ACTIVE_MARKET_ID ? `&m=${encodeURIComponent(ACTIVE_MARKET_ID)}` : '';
 
