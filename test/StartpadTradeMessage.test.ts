@@ -9,6 +9,13 @@ const {
   encodeTradeMessage,
   decodeTradeMessage,
   displayTradeMessage,
+  messageTier,
+  buildMessageShareText,
+  pickPinnedMessage,
+  genesisBuys,
+  PIN_SECONDS,
+  GENESIS_SIZE,
+  txHashFromFeedId,
 } = require('../app/startpad/[address]/tradeMessage');
 
 /**
@@ -140,5 +147,81 @@ describe('startpad trade message', () => {
   it('does not decode random calldata that happens to contain the marker without a valid body', () => {
     const noise = toHex(new Uint8Array([0x73, 0x70, 0x68, 0x72, 0x01, 0x00, 0x41]));
     expect(decodeTradeMessage(concat([buyCalldata(), noise]))).to.equal(null);
+  });
+
+  describe('tiers', () => {
+    const TARGET = 3n * 10n ** 18n; // 3 ETH, prog awansu na Base
+
+    it('scales with the graduation target, not fixed ETH', () => {
+      expect(messageTier(10n ** 16n, TARGET)).to.equal('normal'); // 0.01
+      expect(messageTier(10n ** 17n, TARGET)).to.equal('loud'); // 0.1 = 1/30
+      expect(messageTier(5n * 10n ** 17n, TARGET)).to.equal('whale'); // 0.5 = 1/6
+      // Arc: ta sama czesc progu w innych jednostkach daje ten sam poziom
+      expect(messageTier(500n, 3000n)).to.equal('whale');
+    });
+  });
+
+  describe('share text', () => {
+    it('quotes the message and hides links in it', () => {
+      expect(buildMessageShareText({ symbol: 'SAUSAGES', message: 'lfg 🚀', kind: 'buy' })).to.include('$SAUSAGES').and.include('“lfg 🚀”');
+      expect(buildMessageShareText({ symbol: 'X', message: 'go to scam.xyz', kind: 'buy' })).to.not.include('scam.xyz');
+      expect(buildMessageShareText({ symbol: 'X', message: 'thanks for the ride', kind: 'sell' })).to.include('“thanks for the ride”');
+    });
+  });
+
+  describe('pinned and genesis', () => {
+    const TARGET = 3n * 10n ** 18n;
+    const trade = (n: number, kind: 'buy' | 'sell', eth: bigint, ts: number) => ({
+      id: `0x${String(n).padStart(64, '0')}-0`,
+      kind,
+      account: '0x0000000000000000000000000000000000000001',
+      eth,
+      tokens: 1n,
+      priceWei: 1n,
+      ethReserveAfter: 1n,
+      block: BigInt(n),
+      logIndex: 0,
+      ts,
+      txHash: `0x${String(n).padStart(64, '0')}`,
+    });
+    const WHALE = 6n * 10n ** 17n;
+
+    it('pins the newest whale buy with a message from the last hour', () => {
+      const now = 1_000_000;
+      const trades = [trade(1, 'buy', WHALE, now - 100), trade(2, 'buy', WHALE, now - 50), trade(3, 'buy', 10n ** 15n, now - 10)];
+      const messages = new Map([
+        [trades[0].txHash, 'older whale'],
+        [trades[1].txHash, 'newer whale'],
+        [trades[2].txHash, 'small fry'],
+      ]);
+      expect(pickPinnedMessage(trades, messages, TARGET, now)?.text).to.equal('newer whale');
+    });
+
+    it('does not pin after the window, without a message, or for sells', () => {
+      const now = 1_000_000;
+      const old = [trade(1, 'buy', WHALE, now - PIN_SECONDS - 1)];
+      expect(pickPinnedMessage(old, new Map([[old[0].txHash, 'hi']]), TARGET, now)).to.equal(null);
+      const silent = [trade(2, 'buy', WHALE, now - 10)];
+      expect(pickPinnedMessage(silent, new Map(), TARGET, now)).to.equal(null);
+      const sell = [trade(3, 'sell', WHALE, now - 10)];
+      expect(pickPinnedMessage(sell, new Map([[sell[0].txHash, 'bye']]), TARGET, now)).to.equal(null);
+    });
+
+    it('takes the first buys, oldest first, skipping sells', () => {
+      const trades = [trade(1, 'buy', 1n, 1), trade(2, 'sell', 1n, 2), ...Array.from({ length: 12 }, (_, i) => trade(10 + i, 'buy', 1n, 10 + i))];
+      const first = genesisBuys(trades);
+      expect(first).to.have.length(GENESIS_SIZE);
+      expect(first[0].block).to.equal(1n);
+      expect(first.every((t: { kind: string }) => t.kind === 'buy')).to.equal(true);
+    });
+  });
+
+  it('reads the tx hash only from buy and sell feed ids', () => {
+    const h = '0x' + 'ab'.repeat(32);
+    expect(txHashFromFeedId(`${h}-buy`)).to.equal(h);
+    expect(txHashFromFeedId(`${h.toUpperCase().replace('0X', '0x')}-sell`)).to.equal(h);
+    expect(txHashFromFeedId(`${h}-launch`)).to.equal(null);
+    expect(txHashFromFeedId(`${h}-swap-3`)).to.equal(null);
+    expect(txHashFromFeedId(`${h}-pending`)).to.equal(null);
   });
 });

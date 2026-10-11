@@ -97,6 +97,8 @@ import ShareToken from './ShareToken';
 import StartpadFooter from './StartpadFooter';
 import { LifecycleGuide, STATE_HINT } from './LifecycleGuide';
 import { formatUsd, useEthUsd } from './useEthUsd';
+import { displayTradeMessage, txHashFromFeedId } from './[address]/tradeMessage';
+import { useTradeMessages } from './[address]/useTradeMessages';
 
 const FIELD =
   'w-full rounded-xl border border-sp-shade/10 bg-sp-surface px-3.5 py-3 text-[14px] text-sp-ink outline-none transition-colors placeholder:text-sp-shade/35 focus:border-sp-brand';
@@ -786,6 +788,7 @@ function ActivityTicker({ events }: { events: ActivityItem[] }) {
   // (`lp-ticker-in`), a istniejace chipy zostaja (ten sam key = brak reanimacji).
   // overflow-x-auto: gdy sie nie miesci, mozna przewinac recznie.
   const items = events.slice(0, 20);
+  const messages = useTradeMessages(items.map((event) => txHashFromFeedId(event.id)));
   return (
     <div className="-mx-4 overflow-x-auto border-b border-sp-shade/10 bg-sp-surface sm:-mx-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Live Startpad events">
       <div className="flex min-h-[38px] w-max items-center gap-1.5 px-2 py-1.5">
@@ -803,6 +806,15 @@ function ActivityTicker({ events }: { events: ActivityItem[] }) {
               <span className={`block text-[9px] font-bold ${event.tone === 'sell' ? 'text-sp-down-deep' : event.tone === 'buy' ? 'text-sp-up' : event.tone === 'graduate' ? 'text-sp-up' : 'text-sp-brand-deep'}`}>
                 {event.pending ? `${event.label} · pending` : event.label}
               </span>
+              {(() => {
+                const hash = txHashFromFeedId(event.id);
+                const text = hash ? messages.get(hash) : undefined;
+                return text ? (
+                  <span className="block max-w-[180px] truncate text-[9.5px] font-semibold italic text-sp-shade/60" title={displayTradeMessage(text)}>
+                    “{displayTradeMessage(text)}”
+                  </span>
+                ) : null;
+              })()}
             </span>
           </div>
         )) : <span className="px-2 text-[10px] font-bold uppercase tracking-[0.08em] text-sp-shade/35">Listening for live Startpad events...</span>}

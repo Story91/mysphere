@@ -9,6 +9,7 @@ import {
   ChevronRight,
   ExternalLink,
   ImagePlus,
+  Pin,
   RefreshCw,
   Users,
 } from 'lucide-react';
@@ -37,6 +38,7 @@ import {
   priceToNumber,
   short,
   SUPPLY_WEI,
+  targetWeiFor,
   timeAgo,
   usdSuffix,
   type CoreState,
@@ -44,7 +46,7 @@ import {
   type TokenProfileView,
   type TradeEntry,
 } from './detailShared';
-import { displayTradeMessage } from './tradeMessage';
+import { displayTradeMessage, genesisBuys, messageTier, pickPinnedMessage, PIN_SECONDS, type MessageTier } from './tradeMessage';
 import { useTradeMessages } from './useTradeMessages';
 
 const FIELD =
@@ -181,8 +183,25 @@ export default function DetailTabs({
   // pod reka (zdarzenia na zywo, dociagana historia), wiec numer strony musi
   // sam sie miescic w tym, ile stron jest TERAZ.
   const tradePage = pageSlice(newestFirst, page, PAGE_SIZE);
-  // Tylko kupna z krzywej moga niesc wiadomosc - sprzedaz i swapy w puli jej nie maja.
-  const messages = useTradeMessages(tradePage.rows.map((trade) => (trade.kind === 'buy' ? trade.txHash : null)));
+
+  // Wiadomosci: widoczna strona + pierwsze kupna (sciana) + kandydaci do
+  // przypiecia (kupna wielorybow z ostatniej godziny). Jedno wywolanie hooka,
+  // wiec jedna kolejka zapytan i jedna pamiec.
+  const targetWei = targetWeiFor(LAUNCHPAD_CHAIN.id);
+  const nowSec = Math.floor(Date.now() / 1000);
+  // Sciana tylko przy pelnej historii - inaczej "pierwsi" bylyby po prostu najstarsi z tego, co zdazylismy wczytac.
+  const genesis = historyComplete ? genesisBuys(trades) : [];
+  const pinCandidates = newestFirst.filter(
+    (trade) => trade.kind === 'buy' && nowSec - trade.ts <= PIN_SECONDS && messageTier(trade.eth, targetWei) === 'whale'
+  );
+  const messages = useTradeMessages([
+    ...tradePage.rows.map((trade) => trade.txHash),
+    ...genesis.map((trade) => trade.txHash),
+    ...pinCandidates.map((trade) => trade.txHash),
+  ]);
+  const messageOf = (trade: TradeEntry) => (trade.txHash ? messages.get(trade.txHash.toLowerCase()) ?? null : null);
+  const pinned = pickPinnedMessage(pinCandidates, messages, targetWei, nowSec);
+  const genesisWithMessages = genesis.filter((trade) => messageOf(trade));
 
   const loadingRow = historyLoading && trades.length === 0 && (
     <div className="flex items-center justify-center gap-2 px-5 py-10 text-[12px] text-sp-shade/45">
@@ -236,6 +255,32 @@ export default function DetailTabs({
           {!historyLoading && newestFirst.length === 0 && !historyError && (
             <div className="px-5 py-10 text-center text-[12px] text-sp-shade/45">No trades yet. The first buy will show up here within seconds.</div>
           )}
+          {pinned && (
+            <div className="flex items-start gap-2.5 border-b border-sp-brand/40 bg-sp-brand-soft px-4 py-3 sm:px-5">
+              <Pin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sp-brand" aria-hidden="true" />
+              <div className="min-w-0">
+                <p className="break-words text-[13px] font-extrabold text-sp-ink">“{displayTradeMessage(pinned.text)}”</p>
+                <p className="mt-0.5 text-[10.5px] font-bold text-sp-shade/50">
+                  {short(pinned.trade.account)} · bought {fmtEth(pinned.trade.eth, 3)} {NATIVE_SYMBOL} · {timeAgo(pinned.trade.ts)} · pinned for an hour
+                </p>
+              </div>
+            </div>
+          )}
+          {genesisWithMessages.length > 0 && (
+            <div className="border-b border-sp-shade/10 px-4 py-3 sm:px-5">
+              <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/40">Genesis wall · first {genesis.length} buyers</p>
+              <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+                {genesisWithMessages.map((trade) => (
+                  <div key={trade.id} className="w-[180px] shrink-0 rounded-xl border border-sp-shade/10 bg-sp-sunken px-3 py-2">
+                    <p className="line-clamp-2 break-words text-[11.5px] italic text-sp-ink">“{displayTradeMessage(messageOf(trade)!)}”</p>
+                    <p className="mt-1 text-[10px] font-bold text-sp-shade/45">
+                      #{genesis.indexOf(trade) + 1} · {short(trade.account)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {newestFirst.length > 0 && (
             <div className="overflow-x-auto">
               <div className="min-w-[680px]">
@@ -273,10 +318,12 @@ export default function DetailTabs({
                         <span />
                       )}
                       {/* Wiadomosc w osobnej linii pod wierszem - w kolumnie konta miala kilka znakow. */}
-                      {trade.txHash && messages.has(trade.txHash.toLowerCase()) && (
-                        <p className="col-span-6 col-start-2 truncate text-[11.5px] italic text-sp-shade/65" title={displayTradeMessage(messages.get(trade.txHash.toLowerCase())!)}>
-                          “{displayTradeMessage(messages.get(trade.txHash.toLowerCase())!)}”
-                        </p>
+                      {messageOf(trade) && (
+                        <TradeMessageLine
+                          text={messageOf(trade)!}
+                          tier={trade.kind === 'buy' ? messageTier(trade.eth, targetWei) : 'normal'}
+                          isDev={trade.account.toLowerCase() === core.creator.toLowerCase()}
+                        />
                       )}
                     </div>
                   ))}
@@ -488,6 +535,25 @@ export default function DetailTabs({
  * pochodzi od obcego tworcy i moze nie wstac - pusta dziura przy kazdym
  * wierszu wygladalaby na blad interfejsu, kolorowy inicjal nie.
  */
+const TIER_CLASS: Record<MessageTier, string> = {
+  normal: 'text-[11.5px] italic text-sp-shade/65',
+  loud: 'text-[12px] font-extrabold italic text-sp-ink',
+  whale: 'w-fit max-w-full rounded-lg border border-sp-brand bg-sp-brand-soft px-2 py-0.5 text-[12.5px] font-extrabold text-sp-brand-deep',
+};
+
+/** Linia wiadomosci pod wierszem transakcji. Wieksze kupno, wieksza scena. */
+function TradeMessageLine({ text, tier, isDev }: { text: string; tier: MessageTier; isDev: boolean }) {
+  const shown = displayTradeMessage(text);
+  return (
+    <p className={`col-span-6 col-start-2 flex min-w-0 items-center gap-1.5 ${TIER_CLASS[tier]}`} title={shown}>
+      {isDev && (
+        <span className="shrink-0 rounded-full bg-soft-primary px-1.5 py-px text-[9px] font-extrabold uppercase not-italic tracking-wide text-sp-on-brand">dev</span>
+      )}
+      <span className="truncate">“{shown}”</span>
+    </p>
+  );
+}
+
 function SymbolGlyph({ url, symbol }: { url: string | null; symbol: string }) {
   return (
     <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full bg-soft-primary text-[8px] font-extrabold leading-none text-sp-on-brand">

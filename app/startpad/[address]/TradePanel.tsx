@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   ExternalLink,
   Layers3,
+  Share2,
   ShieldCheck,
   Sparkles,
 } from 'lucide-react';
@@ -46,7 +47,8 @@ import { quoteBuyLocal, quoteDrifts, quoteSellLocal } from './curveQuote';
 import { hasPool } from './poolPrice';
 import PoolTradeBox from './PoolTradeBox';
 import { canonicalPoolKey, V4_BY_CHAIN, v4QuoterAbi } from './v4Swap';
-import { encodeTradeMessage, messageByteLength, TRADE_MESSAGE_MAX_BYTES } from './tradeMessage';
+import { buildMessageShareText, encodeTradeMessage, messageByteLength, TRADE_MESSAGE_MAX_BYTES } from './tradeMessage';
+import { buildShareUrl, safeSymbol, shareIntentUrl } from '../shareText';
 
 /**
  * Panel handlu NA STRONIE tokena - koniec z odsylaniem do boardu. Wzorce
@@ -62,6 +64,45 @@ function clampMessage(text: string): string {
   let chars = Array.from(text);
   while (chars.length > 0 && messageByteLength(chars.join('')) > TRADE_MESSAGE_MAX_BYTES) chars = chars.slice(0, -1);
   return chars.join('');
+}
+
+/** Pole wiadomosci - to samo przy kupnie i przy sprzedazy, rozni sie tylko etykieta. */
+function MessageField({
+  value,
+  onChange,
+  placeholder,
+  label,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  placeholder: string;
+  label: string;
+}) {
+  const bytes = messageByteLength(value);
+  return (
+    <>
+      <div className="mt-3 flex items-end justify-between">
+        <label htmlFor="trade-message" className="text-[12px] font-extrabold text-sp-ink">
+          {label} <span className="font-bold text-sp-shade/40">(optional)</span>
+        </label>
+        <span className={`text-[10.5px] font-bold ${bytes >= TRADE_MESSAGE_MAX_BYTES ? 'text-sp-down-deep' : 'text-sp-shade/40'}`}>
+          {bytes}/{TRADE_MESSAGE_MAX_BYTES}
+        </span>
+      </div>
+      <input
+        id="trade-message"
+        value={value}
+        onChange={(event) => onChange(clampMessage(event.target.value))}
+        placeholder={placeholder}
+        maxLength={TRADE_MESSAGE_MAX_BYTES}
+        autoComplete="off"
+        className={`${FIELD} mt-2`}
+      />
+      <p className="mt-1.5 text-[10.5px] leading-[1.4] text-sp-shade/45">
+        Saved onchain with your trade and shown in Trades. Links and addresses are hidden.
+      </p>
+    </>
+  );
 }
 
 type Side = 'buy' | 'sell';
@@ -90,7 +131,10 @@ export default function TradePanel({
 
   const [side, setSide] = useState<Side>('buy');
   const [buyAmount, setBuyAmount] = useState('0.05');
-  const [buyMessage, setBuyMessage] = useState('');
+  // Jedno pole dla kupna i sprzedazy - przelaczenie strony nie kasuje tego, co ktos juz napisal.
+  const [tradeMessage, setTradeMessage] = useState('');
+  /** Ostatnia transakcja z wiadomoscia - do przycisku "Share on X" pod komunikatem. */
+  const [shareable, setShareable] = useState<{ kind: 'buy' | 'sell'; text: string } | null>(null);
   const [sellAmount, setSellAmount] = useState('');
   const [busy, setBusy] = useState<Busy>(null);
   const [notice, setNotice] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
@@ -320,6 +364,7 @@ export default function TradePanel({
     if (!(await ensureChain())) return;
     setBusy('buy');
     setNotice(null);
+    setShareable(null);
     try {
       const quote = await readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'quoteBuy', args: [core.token, value] });
       const minTokensOut = applySlippage(quote[0], slippageBps);
@@ -337,7 +382,7 @@ export default function TradePanel({
       void request;
       // Wiadomosc jedzie za argumentami ABI - kontrakt jej nie czyta, kupno
       // jest tym samym kupnem. Opis formatu w tradeMessage.ts.
-      const dataSuffix = encodeTradeMessage(buyMessage) ?? undefined;
+      const dataSuffix = encodeTradeMessage(tradeMessage) ?? undefined;
       const hash = await walletClient.writeContract({
         address: LAUNCHPAD_ADDRESS as Address,
         abi: launchpadAbi,
@@ -351,7 +396,10 @@ export default function TradePanel({
       const receipt = await readClient.waitForTransactionReceipt({ hash });
       if (receipt.status !== 'success') throw new Error('The buy transaction reverted.');
       setNotice({ kind: 'success', text: `Buy confirmed${dataSuffix ? ' with your message' : ''}. ${hash.slice(0, 10)}...` });
-      if (dataSuffix) setBuyMessage('');
+      if (dataSuffix) {
+        setShareable({ kind: 'buy', text: tradeMessage });
+        setTradeMessage('');
+      }
       onAfterTx();
     } catch (cause) {
       fail(cause);
@@ -378,6 +426,7 @@ export default function TradePanel({
     }
     if (!(await ensureChain())) return;
     setNotice(null);
+    setShareable(null);
     try {
       if (!(await ensureAllowance(amount))) return;
       setBusy('sell');
@@ -390,6 +439,8 @@ export default function TradePanel({
         args: [core.token, amount, minEthOut, BigInt(Math.floor(Date.now() / 1000) + 900)],
         account,
       });
+      // Notka na pozegnanie - ten sam dopisek co przy kupnie, `sell` tez go nie czyta.
+      const dataSuffix = encodeTradeMessage(tradeMessage) ?? undefined;
       const hash = await walletClient.writeContract({
         address: LAUNCHPAD_ADDRESS as Address,
         abi: launchpadAbi,
@@ -397,11 +448,16 @@ export default function TradePanel({
         args: [core.token, amount, minEthOut, BigInt(Math.floor(Date.now() / 1000) + 900)],
         chain: LAUNCHPAD_CHAIN,
         account,
+        dataSuffix,
       });
       const receipt = await readClient.waitForTransactionReceipt({ hash });
       if (receipt.status !== 'success') throw new Error('The sell transaction reverted.');
       setSellAmount('');
-      setNotice({ kind: 'success', text: `Sell confirmed. ${hash.slice(0, 10)}...` });
+      setNotice({ kind: 'success', text: `Sell confirmed${dataSuffix ? ' with your note' : ''}. ${hash.slice(0, 10)}...` });
+      if (dataSuffix) {
+        setShareable({ kind: 'sell', text: tradeMessage });
+        setTradeMessage('');
+      }
       onAfterTx();
     } catch (cause) {
       fail(cause);
@@ -719,26 +775,7 @@ export default function TradePanel({
                   Max
                 </button>
               </div>
-              <div className="mt-3 flex items-end justify-between">
-                <label htmlFor="buy-message" className="text-[12px] font-extrabold text-sp-ink">
-                  Say something <span className="font-bold text-sp-shade/40">(optional)</span>
-                </label>
-                <span className={`text-[10.5px] font-bold ${messageByteLength(buyMessage) >= TRADE_MESSAGE_MAX_BYTES ? 'text-sp-down-deep' : 'text-sp-shade/40'}`}>
-                  {messageByteLength(buyMessage)}/{TRADE_MESSAGE_MAX_BYTES}
-                </span>
-              </div>
-              <input
-                id="buy-message"
-                value={buyMessage}
-                onChange={(event) => setBuyMessage(clampMessage(event.target.value))}
-                placeholder="gm, lfg, wen 1m..."
-                maxLength={TRADE_MESSAGE_MAX_BYTES}
-                autoComplete="off"
-                className={`${FIELD} mt-2`}
-              />
-              <p className="mt-1.5 text-[10.5px] leading-[1.4] text-sp-shade/45">
-                Saved onchain with your buy and shown in Trades. Links and addresses are hidden.
-              </p>
+              <MessageField value={tradeMessage} onChange={setTradeMessage} placeholder="gm, lfg, wen 1m..." label="Say something" />
               <div className="mt-3 space-y-1 rounded-xl bg-sp-sunken p-3 text-[11px]">
                 <div className="flex items-center justify-between">
                   <span className="text-sp-shade/50">You receive</span>
@@ -788,6 +825,7 @@ export default function TradePanel({
                   Max
                 </button>
               </div>
+              <MessageField value={tradeMessage} onChange={setTradeMessage} placeholder="thanks for the ride, see you at 10x..." label="Leave a note" />
               <div className="mt-3 space-y-1 rounded-xl bg-sp-sunken p-3 text-[11px]">
                 <div className="flex items-center justify-between">
                   <span className="text-sp-shade/50">You receive</span>
@@ -983,7 +1021,21 @@ export default function TradePanel({
       {notice && (
         <div className={`mt-4 flex items-start gap-2 rounded-xl border px-3 py-2.5 text-[11.5px] ${notice.kind === 'success' ? 'border-sp-up-line bg-sp-up-soft text-sp-up' : 'border-sp-down-line bg-sp-down-soft text-sp-down-deep'}`}>
           <span className="mt-0.5">{notice.kind === 'success' ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />}</span>
-          <span className="min-w-0 break-words">{notice.text}</span>
+          <span className="min-w-0 flex-1 break-words">{notice.text}</span>
+          {notice.kind === 'success' && shareable && (
+            <a
+              href={shareIntentUrl('x', {
+                text: buildMessageShareText({ symbol: safeSymbol(core.symbol), message: shareable.text, kind: shareable.kind }),
+                url: buildShareUrl({ address: core.token, chainId: LAUNCHPAD_CHAIN.id }),
+              })}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex shrink-0 items-center gap-1 rounded-full bg-sp-ink px-2.5 py-1 text-[10.5px] font-extrabold text-white hover:opacity-90"
+            >
+              <Share2 className="h-3 w-3" aria-hidden="true" />
+              Share on X
+            </a>
+          )}
         </div>
       )}
     </section>

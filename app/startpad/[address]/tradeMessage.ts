@@ -114,3 +114,83 @@ export function displayTradeMessage(text: string): string {
   if (ADDRESS.test(text)) return '[address hidden]';
   return text;
 }
+
+/* ======================================================================== */
+/*  Scena dla wiadomosci: poziomy, przypiecie, sciana pierwszych kupujacych   */
+/* ======================================================================== */
+
+/**
+ * Wiekszy zakup, wieksza scena. Progi to czesci progu awansu krzywej, nie
+ * stale ETH - na Arc jednostka natywna to USDC i "0,5" znaczyloby co innego.
+ * Na Base (prog 3 ETH): glosna od 0,1 ETH, wieloryb od 0,5 ETH.
+ */
+export type MessageTier = 'normal' | 'loud' | 'whale';
+
+export function messageTier(eth: bigint, targetWei: bigint): MessageTier {
+  if (targetWei <= 0n) return 'normal';
+  if (eth * 6n >= targetWei) return 'whale';
+  if (eth * 30n >= targetWei) return 'loud';
+  return 'normal';
+}
+
+/** Tekst na X po kupnie albo sprzedazy z wiadomoscia. Symbol ma byc juz oczyszczony. */
+export function buildMessageShareText(input: { symbol: string; message: string; kind: 'buy' | 'sell' }): string {
+  const quote = `“${displayTradeMessage(input.message)}”`;
+  return input.kind === 'buy'
+    ? `I aped $${input.symbol} and left a message onchain: ${quote} 🧾`
+    : `Sold some $${input.symbol} and left a note onchain on the way out: ${quote} 🧾`;
+}
+
+/** Jak dlugo wiadomosc wieloryba wisi przypieta nad tabela. */
+export const PIN_SECONDS = 3600;
+
+type MessageTrade = {
+  kind: 'buy' | 'sell';
+  eth: bigint;
+  ts: number;
+  txHash: string | null;
+  account: string;
+};
+
+/** Najnowsze kupno wieloryba z wiadomoscia z ostatniej godziny albo null. */
+export function pickPinnedMessage<T extends MessageTrade>(
+  trades: ReadonlyArray<T>,
+  messages: ReadonlyMap<string, string>,
+  targetWei: bigint,
+  nowSec: number
+): { trade: T; text: string } | null {
+  let best: { trade: T; text: string } | null = null;
+  for (const trade of trades) {
+    if (trade.kind !== 'buy' || !trade.txHash) continue;
+    if (nowSec - trade.ts > PIN_SECONDS) continue;
+    if (messageTier(trade.eth, targetWei) !== 'whale') continue;
+    const text = messages.get(trade.txHash) ?? messages.get(trade.txHash.toLowerCase());
+    if (!text) continue;
+    if (!best || trade.ts >= best.trade.ts) best = { trade, text };
+  }
+  return best;
+}
+
+/** Ilu pierwszych kupujacych trafia na sciane. */
+export const GENESIS_SIZE = 10;
+
+/** Pierwsze kupna w kolejnosci od najstarszego. Wejscie: historia od najstarszego. */
+export function genesisBuys<T extends { kind: 'buy' | 'sell' }>(tradesOldestFirst: ReadonlyArray<T>): T[] {
+  const out: T[] = [];
+  for (const trade of tradesOldestFirst) {
+    if (trade.kind !== 'buy') continue;
+    out.push(trade);
+    if (out.length === GENESIS_SIZE) break;
+  }
+  return out;
+}
+
+/**
+ * Hash transakcji z identyfikatora wpisu paska tablicy (`${hash}-buy`,
+ * `${hash}-sell` - boardScan.ts). Inne wpisy (start, swap w puli, pending)
+ * wiadomosci nie niosa, wiec dostaja null i nie kosztuja zapytania.
+ */
+export function txHashFromFeedId(id: string): string | null {
+  const match = /^(0x[0-9a-fA-F]{64})-(buy|sell)$/.exec(id);
+  return match ? match[1].toLowerCase() : null;
+}
