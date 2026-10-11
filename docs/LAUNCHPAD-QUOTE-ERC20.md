@@ -71,6 +71,11 @@ Niewymuszalne kodem - do sprawdzenia przed wdrozeniem:
   zablokuje adres krzywej/vaulta/hooka/PoolManagera, handel stoi. Nikt nie traci salda
   ksiegowego, ale wyjsc sie nie da do odwieszenia. Do pokazania w UI.
 
+- **polityka "executor" (hardfork Denim, data nieznana)**: emitent akcji B20 moze ograniczyc,
+  ktore kontrakty wolno wywolywac `transferFrom`/przenosic tokeny. Jesli nasze kontrakty albo
+  PoolManager nie beda na liscie, para z ta akcja stanie. Przed wlaczeniem akcji jako QUOTE
+  sprawdzic polityki emitenta (Coinbase) dla zakresu executor.
+
 ### 2.6 Kupno: kwota zamiast `msg.value`, plus `buyFor` i permit
 
 - `buy(token, quoteIn, minTokensOut, deadline)` - placi i dostaje `msg.sender`;
@@ -96,6 +101,18 @@ Rezerwa krzywej w tokenie z dzwignia waha sie podwojnie i moze zostac zlikwidowa
 liczy w jednostkach QUOTE, wiec matematyka i wyplacalnosc sie nie psuja - ale wartosc
 rezerwy w dolarach moze spasc do zera, a prog awansu (w jednostkach perpa) moze stac sie
 nieosiagalny w praktyce. To ryzyko posiadacza, do pokazania w UI. Kontrakt go nie ogranicza.
+
+## 2.9 Wdrozenie testowe i przebieg na zywo (2026-10-11)
+
+Base Sepolia, USDC Circle (`0x036CbD53842c5426634e7929541eC2318f3dCF7e`), R_VIRT 2.5 USDC (prog 10 USDC),
+fabryka `B20TokenFactoryV2` `0xC2855687d5234C64D816a763d1513B4484Db72Ed`:
+
+- launchpad `0xD012Afb6E08B0DA44f9041bA3d277EA727F9389b`, vault `0xBcaE808a6a2d95e2f0544b7967d246f27F292F36`,
+  hook `0x5b054c4F9Df1ad18C499Fc493983B216186B2044` (zapis: scripts/output/launchpad-q-usdc-base-sepolia.json);
+- token `0xb200000000000000000000a1A9Acf1CF968C5f99` (prawdziwy B20 po Cobalcie): start, kupno do progu,
+  awans (9.70 USDC + 155.2M tokenow do puli, 44.8M na DEAD), swap w obie strony, oplata hooka w tokenie
+  i w USDC (1246 jedn.), settle 373/699/174 - wszystko zgodne z testami.
+- Wczesniejsze wdrozenie z fabryka v1 (`0xbcB13EA7...2100`) jest martwe - start odbija sie od `WrongVariant()`.
 
 ## 3. Fazy
 
