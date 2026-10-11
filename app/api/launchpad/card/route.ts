@@ -3,6 +3,7 @@ import { list } from '@vercel/blob';
 import { createPublicClient, http, type Address } from 'viem';
 import { base, baseSepolia } from 'viem/chains';
 import { erc20Abi, LAUNCHPAD_NETWORKS, launchpadAbi } from '../../../startpad/config';
+import { findTokenLaunch } from '../../../startpad/deployments';
 import { SUPPLY_TOKENS, WEI } from '../../../startpad/[address]/detailShared';
 import { pickTokenImage } from '../../../startpad/metadata';
 import { getProfiles, tokenDocId } from '../profileStore';
@@ -110,20 +111,18 @@ export async function GET(request: NextRequest) {
 
     let creator: Address;
     let stateIndex: number;
+    let pad: Address;
     try {
-      const launch = (await client.readContract({
-        address: net.launchpad as Address,
-        abi: launchpadAbi,
-        functionName: 'launchOf',
-        args: [token],
-      })) as readonly [Address, number, bigint, bigint, number, `0x${string}`];
-      creator = launch[0];
-      stateIndex = Number(launch[1]);
+      // Kazde wdrozenie sieci po kolei - token zyje w tym, ktore go wystartowalo.
+      const found = await findTokenLaunch(client, net, token);
+      if (!found) continue;
+      creator = found.launch[0];
+      stateIndex = Number(found.launch[1]);
+      pad = found.dep.launchpad as Address;
     } catch {
-      // Ten launchpad tokena nie zna albo odczyt padl - probujemy nastepna siec.
+      // Odczyt padl - probujemy nastepna siec.
       continue;
     }
-    if (stateIndex === 0) continue;
 
     // Nazwa i symbol Z LANCUCHA, nigdy z bazy: to jest tresc pokazywana obok
     // ceny, a baza jest warstwa edytowalna. Ta sama zasada, co w tokenliscie.
@@ -131,7 +130,7 @@ export async function GET(request: NextRequest) {
       client.readContract({ address: token, abi: erc20Abi, functionName: 'name' }).catch(() => null),
       client.readContract({ address: token, abi: erc20Abi, functionName: 'symbol' }).catch(() => null),
       client
-        .readContract({ address: net.launchpad as Address, abi: launchpadAbi, functionName: 'spotPriceWeiPerToken', args: [token] })
+        .readContract({ address: pad, abi: launchpadAbi, functionName: 'spotPriceWeiPerToken', args: [token] })
         .catch(() => null),
       // Logo moze siedziec takze W LANCUCHU, w `metadataURI` ustawionym przy
       // starcie. Sam profil z bazy nie wystarcza: tworca, ktory podal obrazek
@@ -139,7 +138,7 @@ export async function GET(request: NextRequest) {
       // postem szary glif z inicjalami mimo ze logo istnieje.
       // Starsze wdrozenie tego odczytu nie ma - stad `catch`.
       client
-        .readContract({ address: net.launchpad as Address, abi: launchpadAbi, functionName: 'metadataURI', args: [token] })
+        .readContract({ address: pad, abi: launchpadAbi, functionName: 'metadataURI', args: [token] })
         .catch(() => null),
       getProfiles([address]),
       blobLogo(chainId, address),

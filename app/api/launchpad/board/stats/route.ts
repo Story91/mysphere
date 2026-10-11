@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createPublicClient, formatEther, getAbiItem, http, type Address } from 'viem';
-import { hookAbi, LAUNCHPAD_NETWORKS, launchpadAbi } from '../../../../startpad/config';
+import { hookAbi, hooksOf, LAUNCHPAD_NETWORKS, launchpadAbi, launchpadsOf, scanFloorOf } from '../../../../startpad/config';
 import {
   emptyAggregate,
   mergeAggregates,
@@ -184,7 +184,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Unknown chain.' }, { status: 400, headers: noStore });
   }
   const chainId = asked;
+  // Zapis kluczowany GLOWNYM launchpadem: nowe wdrozenie = swiezy agregat
+  // liczony od nowa po wszystkich adresach (stary nie zna nowego kontraktu).
   const launchpad = net.launchpad;
+  const deployFloor = scanFloorOf(net);
+  const scanAddresses = [...launchpadsOf(net), ...hooksOf(net)] as Address[];
 
   const stored = await readBoardStats(chainId, launchpad);
 
@@ -240,11 +244,11 @@ export async function GET(request: NextRequest) {
        * kazdym zadaniu. Sonda jest jednym zapytaniem i pyta o DOKLADNIE to okno,
        * ktore skan zrobi jako pierwsze, wiec nie zgaduje.
        */
-      const probeFrom = stored && stored.meta.lastBlock >= net.deployBlock ? stored.meta.lastBlock + 1n : net.deployBlock;
+      const probeFrom = stored && stored.meta.lastBlock >= deployFloor ? stored.meta.lastBlock + 1n : deployFloor;
       if (probeFrom <= latest) {
         const probeTo = probeFrom + net.scanWindow - 1n > latest ? latest : probeFrom + net.scanWindow - 1n;
         await candidate.getLogs({
-          address: [net.launchpad as Address, net.hook as Address],
+          address: scanAddresses,
           events: [LAUNCHED_EVENT, BOUGHT_EVENT, SOLD_EVENT, HOOK_FEE_SETTLED_EVENT, FEE_ACCRUED_EVENT],
           fromBlock: probeFrom,
           toBlock: probeTo,
@@ -295,7 +299,7 @@ export async function GET(request: NextRequest) {
   const plan = planBoardStatsScan({
     cachedLastBlock: baseAggregate ? stored?.meta.lastBlock ?? null : null,
     head,
-    deployBlock: net.deployBlock,
+    deployBlock: deployFloor,
     scanWindow: net.scanWindow,
     maxWindows: maxWindowsFor(net.maxScanWindows),
   });
@@ -342,7 +346,7 @@ export async function GET(request: NextRequest) {
     const scanOne = async (window: { fromBlock: bigint; toBlock: bigint }) => {
       const once = () =>
         client!.getLogs({
-          address: [net.launchpad as Address, net.hook as Address],
+          address: scanAddresses,
           events: [LAUNCHED_EVENT, BOUGHT_EVENT, SOLD_EVENT, HOOK_FEE_SETTLED_EVENT, FEE_ACCRUED_EVENT],
           fromBlock: window.fromBlock,
           toBlock: window.toBlock,
@@ -411,7 +415,7 @@ export async function GET(request: NextRequest) {
 
     // `lastBlock` przesuwamy TYLKO tam, dokad naprawde doczytalismy. Przy
     // wznowieniu bez ani jednego udanego okna zostaje to, co bylo.
-    const previous = plan.resume ? stored?.meta.lastBlock ?? net.deployBlock - 1n : net.deployBlock - 1n;
+    const previous = plan.resume ? stored?.meta.lastBlock ?? deployFloor - 1n : deployFloor - 1n;
     const lastBlock = covered > previous ? covered : previous;
 
     /**
@@ -435,7 +439,7 @@ export async function GET(request: NextRequest) {
      * blokiem wdrozenia to dla wolajacego zdanie "policzone, wolumen zerowy".
      * Tablica pokazalaby wtedy zera zamiast poczekac na wlasny skan.
      */
-    if (lastBlock < net.deployBlock) {
+    if (lastBlock < deployFloor) {
       return fromStore(chainId, launchpad, stored, noStore);
     }
 

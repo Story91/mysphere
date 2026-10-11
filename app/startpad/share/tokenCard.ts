@@ -2,6 +2,7 @@ import 'server-only';
 import { createPublicClient, formatEther, http, type Address } from 'viem';
 import { list } from '@vercel/blob';
 import { erc20Abi, LAUNCHPAD_NETWORKS, launchpadAbi, LAUNCH_STATE, type LaunchpadNetwork } from '../config';
+import { findTokenLaunch } from '../deployments';
 import { pickTokenImage, tokenAccent } from '../metadata';
 import { rpcCandidates } from '../../api/launchpad/historyRpc';
 import { readHistory } from '../../api/launchpad/historyStore';
@@ -117,14 +118,10 @@ function clientFor(net: LaunchpadNetwork) {
 
 /** Stan 0 znaczy "ten launchpad nie zna tego adresu", a nie "pusta krzywa". */
 async function probe(net: LaunchpadNetwork, token: Address) {
-  const launch = (await clientFor(net).readContract({
-    address: net.launchpad as Address,
-    abi: launchpadAbi,
-    functionName: 'launchOf',
-    args: [token],
-  })) as LaunchTuple;
-  if (Number(launch[1]) === 0) throw new Error('unknown token');
-  return { net, launch };
+  // Kazde wdrozenie sieci - token zyje w tym, ktore go wystartowalo.
+  const found = await findTokenLaunch(clientFor(net), net, token);
+  if (!found) throw new Error('unknown token');
+  return { net, launch: found.launch as LaunchTuple, pad: found.dep.launchpad as Address };
 }
 
 /**
@@ -289,7 +286,7 @@ export async function loadTokenCard(
   const found = await resolveNetwork(token, chainHint).catch(() => null);
   if (!found) return null;
 
-  const { net, launch } = found;
+  const { net, launch, pad } = found;
   const [creator, stateIndex, ethReserve, tokenReserve, startedAt] = launch;
   const client = clientFor(net);
 
@@ -302,10 +299,10 @@ export async function loadTokenCard(
       .catch(() => '') as Promise<string>,
     // Po graduacji ten odczyt rewertuje - cena zyje wtedy w puli v4.
     client
-      .readContract({ address: net.launchpad as Address, abi: launchpadAbi, functionName: 'spotPriceWeiPerToken', args: [token] })
+      .readContract({ address: pad, abi: launchpadAbi, functionName: 'spotPriceWeiPerToken', args: [token] })
       .catch(() => 0n) as Promise<bigint>,
     client
-      .readContract({ address: net.launchpad as Address, abi: launchpadAbi, functionName: 'metadataURI', args: [token] })
+      .readContract({ address: pad, abi: launchpadAbi, functionName: 'metadataURI', args: [token] })
       .catch(() => '') as Promise<string>,
   ]);
 

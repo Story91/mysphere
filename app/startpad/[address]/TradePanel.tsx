@@ -209,7 +209,7 @@ export default function TradePanel({
     let cancelled = false;
     const timer = window.setTimeout(() => {
       readClient
-        .readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'quoteBuy', args: [core.token, value] })
+        .readContract({ address: core.deployment.launchpad as Address, abi: launchpadAbi, functionName: 'quoteBuy', args: [core.token, value] })
         .then((quote) => {
           if (cancelled) return;
           setBuyQuote({ tokensOut: quote[0], fee: quote[1], refund: quote[2] });
@@ -237,7 +237,7 @@ export default function TradePanel({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [readClient, core.token, buyAmount, onCurve]);
+  }, [readClient, core.token, buyAmount, onCurve, core.deployment.launchpad]);
 
   useEffect(() => {
     setSellQuote(null);
@@ -252,7 +252,7 @@ export default function TradePanel({
     let cancelled = false;
     const timer = window.setTimeout(() => {
       readClient
-        .readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'quoteSell', args: [core.token, amount] })
+        .readContract({ address: core.deployment.launchpad as Address, abi: launchpadAbi, functionName: 'quoteSell', args: [core.token, amount] })
         .then((quote) => {
           if (cancelled) return;
           setSellQuote({ ethOut: quote[0], fee: quote[1] });
@@ -277,7 +277,7 @@ export default function TradePanel({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [readClient, core.token, sellAmount, decimals, canSell]);
+  }, [readClient, core.token, sellAmount, decimals, canSell, core.deployment.launchpad]);
 
   const ensureChain = useCallback(async () => {
     if (chainId === LAUNCHPAD_CHAIN.id) return true;
@@ -314,7 +314,7 @@ export default function TradePanel({
       address: core.token,
       abi: erc20Abi,
       functionName: 'allowance',
-      args: [account, LAUNCHPAD_ADDRESS as Address],
+      args: [account, core.deployment.launchpad as Address],
     })) as bigint;
     if (current >= amount) return true;
 
@@ -325,7 +325,7 @@ export default function TradePanel({
         address: core.token,
         abi: erc20Abi,
         functionName: 'approve',
-        args: [LAUNCHPAD_ADDRESS as Address, maxUint256],
+        args: [core.deployment.launchpad as Address, maxUint256],
         account,
       });
       gas = (estimate * 125n) / 100n;
@@ -338,7 +338,7 @@ export default function TradePanel({
       address: core.token,
       abi: erc20Abi,
       functionName: 'approve',
-      args: [LAUNCHPAD_ADDRESS as Address, maxUint256],
+      args: [core.deployment.launchpad as Address, maxUint256],
       chain: LAUNCHPAD_CHAIN,
       account,
       ...(gas ? { gas } : {}),
@@ -366,13 +366,13 @@ export default function TradePanel({
     setNotice(null);
     setShareable(null);
     try {
-      const quote = await readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'quoteBuy', args: [core.token, value] });
+      const quote = await readClient.readContract({ address: core.deployment.launchpad as Address, abi: launchpadAbi, functionName: 'quoteBuy', args: [core.token, value] });
       const minTokensOut = applySlippage(quote[0], slippageBps);
       // Symulacja PRZED otwarciem portfela. Transakcja, ktora i tak by padla,
       // nie ma po co isc na lancuch - uzytkownik dostaje powod zamiast
       // rachunku za gaz.
       const { request } = await readClient.simulateContract({
-        address: LAUNCHPAD_ADDRESS as Address,
+        address: core.deployment.launchpad as Address,
         abi: launchpadAbi,
         functionName: 'buy',
         args: [core.token, minTokensOut, BigInt(Math.floor(Date.now() / 1000) + 900)],
@@ -384,7 +384,7 @@ export default function TradePanel({
       // jest tym samym kupnem. Opis formatu w tradeMessage.ts.
       const dataSuffix = encodeTradeMessage(tradeMessage) ?? undefined;
       const hash = await walletClient.writeContract({
-        address: LAUNCHPAD_ADDRESS as Address,
+        address: core.deployment.launchpad as Address,
         abi: launchpadAbi,
         functionName: 'buy',
         args: [core.token, minTokensOut, BigInt(Math.floor(Date.now() / 1000) + 900)],
@@ -430,10 +430,10 @@ export default function TradePanel({
     try {
       if (!(await ensureAllowance(amount))) return;
       setBusy('sell');
-      const quote = await readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'quoteSell', args: [core.token, amount] });
+      const quote = await readClient.readContract({ address: core.deployment.launchpad as Address, abi: launchpadAbi, functionName: 'quoteSell', args: [core.token, amount] });
       const minEthOut = applySlippage(quote[0], slippageBps);
       await readClient.simulateContract({
-        address: LAUNCHPAD_ADDRESS as Address,
+        address: core.deployment.launchpad as Address,
         abi: launchpadAbi,
         functionName: 'sell',
         args: [core.token, amount, minEthOut, BigInt(Math.floor(Date.now() / 1000) + 900)],
@@ -442,7 +442,7 @@ export default function TradePanel({
       // Notka na pozegnanie - ten sam dopisek co przy kupnie, `sell` tez go nie czyta.
       const dataSuffix = encodeTradeMessage(tradeMessage) ?? undefined;
       const hash = await walletClient.writeContract({
-        address: LAUNCHPAD_ADDRESS as Address,
+        address: core.deployment.launchpad as Address,
         abi: launchpadAbi,
         functionName: 'sell',
         args: [core.token, amount, minEthOut, BigInt(Math.floor(Date.now() / 1000) + 900)],
@@ -475,7 +475,7 @@ export default function TradePanel({
     setBusy('graduate');
     setNotice(null);
     try {
-      const hash = await walletClient.writeContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'graduate', args: [core.token], chain: LAUNCHPAD_CHAIN, account });
+      const hash = await walletClient.writeContract({ address: core.deployment.launchpad as Address, abi: launchpadAbi, functionName: 'graduate', args: [core.token], chain: LAUNCHPAD_CHAIN, account });
       const receipt = await readClient.waitForTransactionReceipt({ hash });
       if (receipt.status !== 'success') throw new Error('The graduation transaction reverted.');
       setNotice({ kind: 'success', text: `Pool opened. ${hash.slice(0, 10)}...` });
@@ -495,7 +495,7 @@ export default function TradePanel({
     if (!(await ensureChain())) return;
     setBusy('settle');
     try {
-      const hash = await walletClient.writeContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'settle', args: [core.token], chain: LAUNCHPAD_CHAIN, account });
+      const hash = await walletClient.writeContract({ address: core.deployment.hook as Address, abi: hookAbi, functionName: 'settle', args: [core.token], chain: LAUNCHPAD_CHAIN, account });
       await readClient.waitForTransactionReceipt({ hash });
       setNotice({ kind: 'success', text: `Hook fees settled. ${hash.slice(0, 10)}...` });
       onAfterTx();
@@ -533,7 +533,7 @@ export default function TradePanel({
       const v4 = V4_BY_CHAIN[ACTIVE_LAUNCHPAD_NETWORK.chain.id];
       let minTokensOut = 0n;
       if (v4) {
-        const poolKey = canonicalPoolKey(core.token, LAUNCH_HOOK_ADDRESS as Address);
+        const poolKey = canonicalPoolKey(core.token, core.deployment.hook as Address);
         const quoted = (await readClient.readContract({
           address: v4.quoter,
           abi: v4QuoterAbi,
@@ -544,7 +544,7 @@ export default function TradePanel({
       }
       const deadline = BigInt(Math.floor(Date.now() / 1000) + 600);
       const hash = await walletClient.writeContract({
-        address: LAUNCH_HOOK_ADDRESS as Address,
+        address: core.deployment.hook as Address,
         abi: hookAbi,
         functionName: 'executeBuyback',
         args: [core.token, minTokensOut, deadline],
@@ -569,7 +569,7 @@ export default function TradePanel({
     if (!(await ensureChain())) return;
     setBusy('harvest');
     try {
-      const hash = await walletClient.writeContract({ address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'harvest', args: [core.token], chain: LAUNCHPAD_CHAIN, account });
+      const hash = await walletClient.writeContract({ address: core.deployment.vault as Address, abi: liquidityVaultAbi, functionName: 'harvest', args: [core.token], chain: LAUNCHPAD_CHAIN, account });
       await readClient.waitForTransactionReceipt({ hash });
       setNotice({ kind: 'success', text: `Pool fees harvested. ${hash.slice(0, 10)}...` });
       onAfterTx();
@@ -590,14 +590,14 @@ export default function TradePanel({
     try {
       const transaction =
         source === 'launch'
-          ? { address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'claim' as const, args: [] as const }
+          ? { address: core.deployment.launchpad as Address, abi: launchpadAbi, functionName: 'claim' as const, args: [] as const }
           : source === 'hookEth'
-            ? { address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'claimEth' as const, args: [] as const }
+            ? { address: core.deployment.hook as Address, abi: hookAbi, functionName: 'claimEth' as const, args: [] as const }
             : source === 'hookToken'
-              ? { address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'claimToken' as const, args: [core.token] as const }
+              ? { address: core.deployment.hook as Address, abi: hookAbi, functionName: 'claimToken' as const, args: [core.token] as const }
               : source === 'vaultEth'
-                ? { address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'claimEth' as const, args: [] as const }
-                : { address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'claimToken' as const, args: [core.token] as const };
+                ? { address: core.deployment.vault as Address, abi: liquidityVaultAbi, functionName: 'claimEth' as const, args: [] as const }
+                : { address: core.deployment.vault as Address, abi: liquidityVaultAbi, functionName: 'claimToken' as const, args: [core.token] as const };
       // Symulacja przed podpisem. Kwota w tabelce pochodzi z odczytu przy
       // wejsciu na strone i potrafi sie zdezaktualizowac - a wtedy przycisk
       // zostaje aktywny i wysyla transakcje donikad. Tak wlasnie odpadlo 37 z

@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createPublicClient, getAbiItem, http, type Address } from 'viem';
-import { LAUNCHPAD_NETWORKS, launchpadAbi } from '../../../startpad/config';
+import { LAUNCHPAD_NETWORKS, launchpadAbi, launchpadsOf, scanFloorOf } from '../../../startpad/config';
 import { rpcCandidates } from '../historyRpc';
 import {
   claimIndexScanLock,
@@ -151,6 +151,10 @@ export async function GET(request: NextRequest) {
     );
   }
   const chainId = asked;
+  // Kilka wdrozen na siec (patrz `LaunchpadDeployment`): skan po wszystkich
+  // launchpadach naraz, od NAJSTARSZEGO bloku wdrozenia.
+  const deployFloor = scanFloorOf(net);
+  const launchpadAddresses = launchpadsOf(net) as Address[];
 
   const stored = await readTokenIndex(chainId);
 
@@ -217,7 +221,7 @@ export async function GET(request: NextRequest) {
    */
   const staleCoverage =
     stored !== null &&
-    (stored.lastBlock < net.deployBlock || (!stored.complete && stored.scannedDownTo <= net.deployBlock));
+    (stored.lastBlock < deployFloor || (!stored.complete && stored.scannedDownTo <= deployFloor));
 
   const state: IndexScanState | null =
     stored && !staleCoverage
@@ -244,7 +248,7 @@ export async function GET(request: NextRequest) {
 
   const bounds = (chainHead: bigint) => ({
     head: chainHead,
-    deployBlock: net.deployBlock,
+    deployBlock: deployFloor,
     headSpan: net.scanWindow * BigInt(HEAD_WINDOWS),
     backfillSpan: net.scanWindow * BigInt(BACKFILL_WINDOWS),
   });
@@ -331,7 +335,7 @@ export async function GET(request: NextRequest) {
       const index = (preferred + step) % clients.length;
       try {
         const logs = await clients[index].getLogs({
-          address: net.launchpad as Address,
+          address: launchpadAddresses,
           event: LAUNCHED_EVENT,
           fromBlock: window.from,
           toBlock: window.to,
@@ -369,8 +373,8 @@ export async function GET(request: NextRequest) {
    */
   if (!complete) {
     const seedTo =
-      head - net.deployBlock >= net.scanWindow ? net.deployBlock + net.scanWindow - 1n : head;
-    const seedLogs = await fetchWindow({ from: net.deployBlock, to: seedTo });
+      head - deployFloor >= net.scanWindow ? deployFloor + net.scanWindow - 1n : head;
+    const seedLogs = await fetchWindow({ from: deployFloor, to: seedTo });
     for (const log of seedLogs ?? []) {
       const args = log.args as Record<string, unknown>;
       const address = args.token as string | undefined;
@@ -469,7 +473,7 @@ export async function GET(request: NextRequest) {
       if (range.head > lastBlock) lastBlock = range.head;
       if (scannedDownTo === 0n || edge < scannedDownTo) scannedDownTo = edge;
       // Skan dolecial do bloku wdrozenia - nizej logow tego launchpada nie ma.
-      if (edge <= net.deployBlock) complete = true;
+      if (edge <= deployFloor) complete = true;
     } else if (edge >= range.floor && edge > lastBlock) {
       // Delta: pokrycie przylega do `lastBlock` od dolu, wiec kazde udane okno
       // przesuwa gorny znacznik, nawet gdy dalsze padly.

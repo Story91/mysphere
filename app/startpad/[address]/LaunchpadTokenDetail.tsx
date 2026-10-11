@@ -20,13 +20,11 @@ import {
   CURVE_TARGET_ETH,
   erc20Abi,
   hookAbi,
-  LAUNCH_HOOK_ADDRESS,
-  LAUNCHPAD_ADDRESS,
+  LAUNCHPAD_DEPLOYMENTS,
   LAUNCHPAD_CHAIN,
   LAUNCHPAD_EXPLORER_URL,
   LAUNCH_STATE,
   launchpadAbi,
-  LIQUIDITY_VAULT_ADDRESS,
   liquidityVaultAbi,
   LIVE_WATCH,
   ACTIVE_LAUNCHPAD_NETWORK,
@@ -42,6 +40,7 @@ import ShareToken from '../ShareToken';
 import DetailTabs from './DetailTabs';
 import PriceChart from './PriceChart';
 import TradePanel from './TradePanel';
+import { resolveTokenDeployment } from '../deployments';
 import { LifecycleGuide, STATE_HINT } from '../LifecycleGuide';
 import {
   DEAD_ADDRESS,
@@ -156,6 +155,9 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
       // LAUNCHPAD_ADDRESS moze stac wersja sprzed launchAdvanced i wtedy tych
       // selektorow nie ma, a pojedynczy rewert nie moze zabrac calej strony.
       const missing = Symbol('missing');
+      // Wdrozenie tokena (siec moze miec kilka). Nieznany wszystkim = glowne:
+      // `launchOf` odda tam stan 0 i strona pokaze "nie znaleziono", jak dotad.
+      const dep = (await resolveTokenDeployment(readClient as any, tokenAddress)) ?? LAUNCHPAD_DEPLOYMENTS[0];
 
       /**
        * WSZYSTKO W JEDNEJ RUNDZIE.
@@ -173,36 +175,36 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
        */
       const [launch, name, symbol, decimals, balance, allowance, spotPrice, position, pendingEth, pendingToken, launchClaimable, hookEthClaimable, hookTokenClaimable, vaultEthClaimable, vaultTokenClaimable, feeConfig, metadataUri, buybackBps, pendingBuybackEth, buybackBurned, gradFee] =
         await Promise.all([
-          readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'launchOf', args: [tokenAddress] }),
+          readClient.readContract({ address: dep.launchpad as Address, abi: launchpadAbi, functionName: 'launchOf', args: [tokenAddress] }),
           readClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'name' }),
           readClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'symbol' }),
           readClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'decimals' }),
           account ? readClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'balanceOf', args: [accountAddress] }) : Promise.resolve(0n),
-          account ? readClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'allowance', args: [accountAddress, LAUNCHPAD_ADDRESS as Address] }) : Promise.resolve(0n),
+          account ? readClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'allowance', args: [accountAddress, dep.launchpad as Address] }) : Promise.resolve(0n),
           // Po graduacji ten odczyt rewertuje - cena zyje wtedy w puli v4.
-          readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'spotPriceWeiPerToken', args: [tokenAddress] }).catch(() => 0n),
-          readClient.readContract({ address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'positionOf', args: [tokenAddress] }),
-          readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'pendingEth', args: [tokenAddress] }),
-          readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'pendingToken', args: [tokenAddress] }),
-          account ? readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'claimable', args: [accountAddress] }) : Promise.resolve(0n),
-          account ? readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'claimableEth', args: [accountAddress] }) : Promise.resolve(0n),
-          account ? readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'claimableToken', args: [tokenAddress, accountAddress] }) : Promise.resolve(0n),
-          account ? readClient.readContract({ address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'claimableEth', args: [accountAddress] }) : Promise.resolve(0n),
-          account ? readClient.readContract({ address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'claimableToken', args: [tokenAddress, accountAddress] }) : Promise.resolve(0n),
-        readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'feeConfigOf', args: [tokenAddress] }).catch(() => missing),
-        readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'metadataURI', args: [tokenAddress] }).catch(() => ''),
+          readClient.readContract({ address: dep.launchpad as Address, abi: launchpadAbi, functionName: 'spotPriceWeiPerToken', args: [tokenAddress] }).catch(() => 0n),
+          readClient.readContract({ address: dep.vault as Address, abi: liquidityVaultAbi, functionName: 'positionOf', args: [tokenAddress] }),
+          readClient.readContract({ address: dep.hook as Address, abi: hookAbi, functionName: 'pendingEth', args: [tokenAddress] }),
+          readClient.readContract({ address: dep.hook as Address, abi: hookAbi, functionName: 'pendingToken', args: [tokenAddress] }),
+          account ? readClient.readContract({ address: dep.launchpad as Address, abi: launchpadAbi, functionName: 'claimable', args: [accountAddress] }) : Promise.resolve(0n),
+          account ? readClient.readContract({ address: dep.hook as Address, abi: hookAbi, functionName: 'claimableEth', args: [accountAddress] }) : Promise.resolve(0n),
+          account ? readClient.readContract({ address: dep.hook as Address, abi: hookAbi, functionName: 'claimableToken', args: [tokenAddress, accountAddress] }) : Promise.resolve(0n),
+          account ? readClient.readContract({ address: dep.vault as Address, abi: liquidityVaultAbi, functionName: 'claimableEth', args: [accountAddress] }) : Promise.resolve(0n),
+          account ? readClient.readContract({ address: dep.vault as Address, abi: liquidityVaultAbi, functionName: 'claimableToken', args: [tokenAddress, accountAddress] }) : Promise.resolve(0n),
+        readClient.readContract({ address: dep.launchpad as Address, abi: launchpadAbi, functionName: 'feeConfigOf', args: [tokenAddress] }).catch(() => missing),
+        readClient.readContract({ address: dep.launchpad as Address, abi: launchpadAbi, functionName: 'metadataURI', args: [tokenAddress] }).catch(() => ''),
         // Hook zna buybackBps dopiero od graduate() (CurveLaunchpad.sol:1388);
         // wczesniej pytamy launchpad, inaczej krzywa klamie "0%" wbrew
         // zamrozonemu przy launchu configowi.
-        readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'buybackBps', args: [tokenAddress] }).catch(() => 0)
+        readClient.readContract({ address: dep.hook as Address, abi: hookAbi, functionName: 'buybackBps', args: [tokenAddress] }).catch(() => 0)
           .then(async (bps) =>
             Number(bps) > 0
               ? bps
-              : readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'launchBuybackBps', args: [tokenAddress] }).catch(() => 0)
+              : readClient.readContract({ address: dep.launchpad as Address, abi: launchpadAbi, functionName: 'launchBuybackBps', args: [tokenAddress] }).catch(() => 0)
           ),
-        readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'pendingBuybackEth', args: [tokenAddress] }).catch(() => 0n),
-        readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'buybackTokens', args: [tokenAddress] }).catch(() => 0n),
-        readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'gradFeeOf', args: [tokenAddress] }).catch(() => null),
+        readClient.readContract({ address: dep.hook as Address, abi: hookAbi, functionName: 'pendingBuybackEth', args: [tokenAddress] }).catch(() => 0n),
+        readClient.readContract({ address: dep.hook as Address, abi: hookAbi, functionName: 'buybackTokens', args: [tokenAddress] }).catch(() => 0n),
+        readClient.readContract({ address: dep.launchpad as Address, abi: launchpadAbi, functionName: 'gradFeeOf', args: [tokenAddress] }).catch(() => null),
       ]);
 
       const [creator, stateIndex, ethReserve, tokenReserve, startedAt] = launch as readonly [
@@ -226,6 +228,7 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
 
       setCore({
         token: tokenAddress,
+        deployment: dep,
         name: name as string,
         symbol: symbol as string,
         decimals: Number(decimals),
@@ -288,12 +291,16 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
     void loadCore();
   }, [loadCore]);
 
+  // Wdrozenie tokena dla subskrypcji i historii - stabilna referencja (z loadCore).
+  const watchDep = core?.deployment ?? null;
+
   // Po graduacji hook historii dostaje pule: doklada swapy z v4 do wykresu.
   const history = useTokenHistory(
     notFound ? null : tokenAddress,
     core?.startedAt ?? null,
     core?.state === 'Graduated' && hasPool(core.poolId) ? core.poolId : null,
-    core?.decimals ?? 18
+    core?.decimals ?? 18,
+    watchDep?.launchpad
   );
   const { applyLive, applyPoolSwaps, reload: reloadHistory } = history;
 
@@ -393,14 +400,15 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
    *     tokena - filtrowanie ich po tokenie gubiloby prawde.
    */
   useEffect(() => {
-    if (!readClient || !tokenAddress || notFound) return;
+    if (!readClient || !tokenAddress || notFound || !watchDep) return;
     const claimContext = {
       viewer: account ? account.toLowerCase() : null,
       token: tokenAddress.toLowerCase(),
       isCreator,
     };
     const unwatch = readClient.watchEvent({
-      address: [LAUNCHPAD_ADDRESS, LAUNCH_HOOK_ADDRESS, LIQUIDITY_VAULT_ADDRESS] as Address[],
+      // Kontrakty wdrozenia TEGO tokena (siec moze miec kilka).
+      address: [watchDep.launchpad, watchDep.hook, watchDep.vault] as Address[],
       events: LIVE_EVENTS,
       // Tempo z konfiguracji sieci: raz na blok na wlasnym RPC, osiem sekund na
       // publicznym, subskrypcja gdy transportem jest WebSocket.
@@ -455,7 +463,7 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
     return () => {
       unwatch();
     };
-  }, [readClient, tokenAddress, notFound, applyLive, loadCore, account, isCreator]);
+  }, [readClient, tokenAddress, notFound, applyLive, loadCore, account, isCreator, watchDep]);
 
   /**
    * NA ZYWO PO GRADUACJI: swapy puli v4. Osobna subskrypcja, bo to inny
@@ -860,10 +868,10 @@ function StatsCard({
   const holdersFromChain = useMemo(() => {
     let count = 0;
     for (const [holder, balance] of balances) {
-      if (balance > 0n && holder !== LAUNCHPAD_ADDRESS.toLowerCase()) count += 1;
+      if (balance > 0n && holder !== core.deployment.launchpad.toLowerCase()) count += 1;
     }
     return count;
-  }, [balances]);
+  }, [balances, core.deployment.launchpad]);
 
   // Liczniki z BLOCKSCOUTA jednym zapytaniem: posiadacze i WSZYSTKIE transfery
   // tokena. Transferow z wlasnych danych dzis nie liczymy, wiec to zapytanie

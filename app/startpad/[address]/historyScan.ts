@@ -390,7 +390,8 @@ export type ScanResult = {
 };
 
 export type ScanOptions = {
-  launchpad: string;
+  /** Jeden adres albo wszystkie wdrozenia sieci - zdarzenia maja to samo ABI. */
+  launchpad: string | string[];
   token: string;
   /** Gorny blok skanu (wlacznie). */
   head: bigint;

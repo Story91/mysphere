@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { put } from '@vercel/blob';
 import { createPublicClient, http, type Address } from 'viem';
 import { ACTIVE_LAUNCHPAD_NETWORK, LAUNCHPAD_NETWORKS, launchpadAbi } from '../../../startpad/config';
+import { findTokenLaunch } from '../../../startpad/deployments';
 import { sessionAddress } from '../../asks/identity';
 import { resolveCreatorWithRetry } from '../launchOwnership';
 import { getProfiles, isProfileStoreAvailable, saveProfile, tokenDocId } from '../profileStore';
@@ -152,13 +153,10 @@ export async function POST(request: NextRequest) {
   // w Blobie, widoczne tylko w localStorage tworcy.
   const client = readClient(net);
   const resolution = await resolveCreatorWithRetry(async () => {
-    const launch = (await client.readContract({
-      address: net.launchpad as Address,
-      abi: launchpadAbi,
-      functionName: 'launchOf',
-      args: [address as Address],
-    })) as readonly [Address, number, bigint, bigint, number, `0x${string}`];
-    return { creator: launch[0], state: Number(launch[1]) };
+    // Kazde wdrozenie sieci - nieznany wszystkim = stan 0, jak dotad.
+    const found = await findTokenLaunch(client, net, address as Address);
+    if (!found) return { creator: '0x0000000000000000000000000000000000000000' as Address, state: 0 };
+    return { creator: found.launch[0], state: Number(found.launch[1]) };
   });
   if (!resolution.ok) {
     // `state == 0` po wyczerpaniu prob znaczy "ten launchpad nie zna tego

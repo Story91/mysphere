@@ -34,7 +34,12 @@ import {
   erc20Abi,
   hookAbi,
   LAUNCH_HOOK_ADDRESS,
+  LAUNCH_HOOK_ADDRESSES,
   LAUNCHPAD_ADDRESS,
+  LAUNCHPAD_ADDRESSES,
+  LAUNCHPAD_DEPLOYMENTS,
+  LIQUIDITY_VAULT_ADDRESSES,
+  deploymentOrOldest,
   LAUNCHPAD_CHAIN,
   LAUNCHPAD_DEPLOY_BLOCK,
   LAUNCHPAD_NETWORKS,
@@ -464,6 +469,16 @@ function isSphereRow(token: { address?: string | null }): boolean {
  * z przypieciem na gorze listy to jedyne wyroznienie, jakie SPHERE dostaje;
  * dane rynkowe liczone sa identycznie jak dla kazdego innego tokena.
  */
+/** Znaczek wersji wdrozenia - tylko od v2; tokeny z pierwszego wdrozenia nie maja zadnego. */
+function VersionPill({ version }: { version?: number }) {
+  if (!version || version < 2) return null;
+  return (
+    <span className="rounded-full bg-sp-shade/8 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.06em] text-sp-shade/55">
+      v{version}
+    </span>
+  );
+}
+
 function SpherePill() {
   return (
     <span className="rounded-full bg-sp-brand/10 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.08em] text-sp-brand">
@@ -504,6 +519,7 @@ function LaunchCard({
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-2">
           <span className="truncate text-[15px] font-extrabold text-sp-ink">{token.symbol}</span>
+          <VersionPill version={token.version} />
           {isSphereRow(token) && <SpherePill />}
           <StatePill state={token.state} />
           {sample && <SamplePill />}
@@ -670,6 +686,7 @@ function KingOfTheHill({ token, ethUsd, onTrade, onDetails }: { token: BoardToke
             </p>
             <div className="mt-1 flex flex-wrap items-center gap-2">
               <span className="text-[17px] font-extrabold text-sp-ink">{token.symbol}</span>
+              <VersionPill version={token.version} />
               <StatePill state={token.state} />
             </div>
             <p className="mt-0.5 truncate text-[12px] text-sp-shade/50">{token.name} · {peopleNote(token)} · {formatEth(vol.eth)}{volNote ? ` (${volNote})` : ''} {vol.label} · {token.age}</p>
@@ -988,7 +1005,12 @@ function TopEarnings({ rows, ethUsd }: { rows: CreatorEarnings[]; ethUsd: number
 }
 
 /** Salda do wyplaty podlaczonego portfela - trzy zrodla, kazde per KONTO. */
-type MyClaimable = { launch: bigint; hookEth: bigint; vaultEth: bigint };
+/**
+ * Sumy po WSZYSTKICH wdrozeniach sieci (stare tez trzyma nieodebrane saldo) +
+ * lista niezerowych zrodel do wyplaty - jedno na kontrakt.
+ */
+type ClaimSource = { address: Address; kind: 'launch' | 'hook' | 'vault' };
+type MyClaimable = { launch: bigint; hookEth: bigint; vaultEth: bigint; sources?: ClaimSource[] };
 
 /**
  * Portfel tworcy: tokeny wystartowane z podlaczonego adresu. Zarobki sa per
@@ -1135,7 +1157,7 @@ function LaunchTableRow({
     <>
       <TokenGlyph token={token} />
       <span className="min-w-0">
-        <span className="flex flex-wrap items-center gap-2"><span className="truncate text-[14px] font-extrabold text-sp-ink">{token.symbol}</span>{isSphereRow(token) && <SpherePill />}<StatePill state={token.state} />{sample && <SamplePill />}</span>
+        <span className="flex flex-wrap items-center gap-2"><span className="truncate text-[14px] font-extrabold text-sp-ink">{token.symbol}</span><VersionPill version={token.version} />{isSphereRow(token) && <SpherePill />}<StatePill state={token.state} />{sample && <SamplePill />}</span>
         <span className="mt-1 flex items-center gap-2 truncate text-[12px] text-sp-shade/50"><span>{token.name}</span><span aria-hidden="true">•</span><span>{token.age}</span></span>
       </span>
     </>
@@ -1693,7 +1715,9 @@ export default function LaunchpadBoard() {
       const scanOne = async (r: { fromBlock: bigint; toBlock: bigint }) => {
         const once = () =>
           readClient.getLogs({
-            address: [LAUNCHPAD_ADDRESS as Address, LAUNCH_HOOK_ADDRESS as Address],
+            // Wszystkie wdrozenia sieci naraz - zdarzenia maja to samo ABI,
+            // a `log.address` mowi potem, z ktorego wdrozenia jest token.
+            address: [...LAUNCHPAD_ADDRESSES, ...LAUNCH_HOOK_ADDRESSES] as Address[],
             events: [LAUNCHED_EVENT, BOUGHT_EVENT, SOLD_EVENT, HOOK_FEE_SETTLED_EVENT, FEE_ACCRUED_EVENT],
             fromBlock: r.fromBlock,
             toBlock: r.toBlock,
@@ -1718,6 +1742,7 @@ export default function LaunchpadBoard() {
       };
       type ScanLog = {
         eventName?: string;
+        address?: string;
         args: Record<string, unknown>;
         transactionHash?: string;
         blockNumber: bigint | null;
@@ -1841,16 +1866,36 @@ export default function LaunchpadBoard() {
           .map((item) => ({ ...item, address: item.token, symbol: launched.get(item.token)?.symbol ?? shortAddress(item.token), accent: accentFor(item.token) }))
       );
 
+      // Kazdy token rozmawia z wdrozeniem, z ktorego pochodzi. Wpis z indeksu
+      // serwera albo ze starego agregatu nie zna swojego launchpada - wtedy
+      // pytamy WSZYSTKIE (najnowsze pierwsze) i bierzemy ten, ktory go zna.
       const addresses = [...launched.keys()];
-      const states = await readClient.multicall({
+      const probes = addresses.flatMap((token) => {
+        const known = launched.get(token)?.launchpad;
+        const deps = known ? [deploymentOrOldest(known)] : LAUNCHPAD_DEPLOYMENTS;
+        return deps.map((dep) => ({ token, dep }));
+      });
+      const probeResults = await readClient.multicall({
         allowFailure: true,
-        contracts: addresses.map((token) => ({
-          address: LAUNCHPAD_ADDRESS as Address,
+        contracts: probes.map(({ token, dep }) => ({
+          address: dep.launchpad as Address,
           abi: launchpadAbi,
           functionName: 'launchOf' as const,
           args: [token] as const,
         })),
       });
+      const resolved = new Map<Address, { dep: (typeof LAUNCHPAD_DEPLOYMENTS)[number]; result: (typeof probeResults)[number] }>();
+      probes.forEach(({ token, dep }, i) => {
+        if (resolved.has(token)) return;
+        const r = probeResults[i];
+        if (r?.status !== 'success') return;
+        if (Number((r.result as readonly unknown[])[1]) === 0) return;
+        resolved.set(token, { dep, result: r });
+        const meta = launched.get(token);
+        if (meta && !meta.launchpad) launched.set(token, { ...meta, launchpad: dep.launchpad as Address });
+      });
+      const depOf = (token: Address) => resolved.get(token)?.dep ?? deploymentOrOldest(launched.get(token)?.launchpad);
+      const states = addresses.map((token) => resolved.get(token)?.result);
 
       // token -> (tworca, czy graduowany) - potrzebne do przypisania oplat
       // hooka wlasciwemu kontu w tablicy zarobkow.
@@ -1886,9 +1931,12 @@ export default function LaunchpadBoard() {
           .sort((a, b) => a.order - b.order)
           .map((entry) => entry.price)
           .slice(-12);
+        const dep = depOf(token);
         live.push({
           id: token,
           address: token,
+          launchpad: dep.launchpad,
+          version: dep.version,
           name: meta.name,
           symbol: meta.symbol,
           creator,
@@ -1975,15 +2023,20 @@ export default function LaunchpadBoard() {
         // W TLE, zeby nie blokowac pierwszego renderu tablicy.
         void (async () => {
           try {
-            const calls = accountKeys.flatMap((acc) => [
-              { address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'claimable', args: [acc as Address] },
-              { address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'claimableEth', args: [acc as Address] },
-              { address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'claimableEth', args: [acc as Address] },
-            ]);
+            // Trzy salda NA KAZDE wdrozenie - stare tez trzyma nieodebrane oplaty.
+            const perAccount = LAUNCHPAD_DEPLOYMENTS.length * 3;
+            const calls = accountKeys.flatMap((acc) =>
+              LAUNCHPAD_DEPLOYMENTS.flatMap((d) => [
+                { address: d.launchpad as Address, abi: launchpadAbi, functionName: 'claimable', args: [acc as Address] },
+                { address: d.hook as Address, abi: hookAbi, functionName: 'claimableEth', args: [acc as Address] },
+                { address: d.vault as Address, abi: liquidityVaultAbi, functionName: 'claimableEth', args: [acc as Address] },
+              ])
+            );
             const balances = await readClient.multicall({ contracts: calls, allowFailure: true });
             const cell = (i: number) => (balances[i]?.status === 'success' ? (balances[i].result as bigint) : 0n);
             accountKeys.forEach((acc, i) => {
-              const claimableNow = cell(i * 3) + cell(i * 3 + 1) + cell(i * 3 + 2);
+              let claimableNow = 0n;
+              for (let k = 0; k < perAccount; k++) claimableNow += cell(i * perAccount + k);
               const entry = earningsByAccount.get(acc);
               // NIE nadpisujemy suma do odebrania - patrz `totalEarned`. Kto
               // odebral swoje oplaty, spadal przez to z rankingu do zera.
@@ -2061,7 +2114,7 @@ export default function LaunchpadBoard() {
           const positions = await readClient.multicall({
             allowFailure: true,
             contracts: graduatedTokens.map((token) => ({
-              address: LIQUIDITY_VAULT_ADDRESS as Address,
+              address: depOf(token).vault as Address,
               abi: liquidityVaultAbi,
               functionName: 'positionOf' as const,
               args: [token] as const,
@@ -2349,7 +2402,7 @@ export default function LaunchpadBoard() {
         // Salda, ktore istnieja, ale nie naleza do zadnego czlowieka: plynnosc
         // puli, skarbiec, hook i adres bez klucza (`0x...dead` - tam na $SPHERE
         // lezy 59 mln tokenow, ktorych nikt juz nie ruszy).
-        const exclude = [ACTIVE_LAUNCHPAD_NETWORK.poolManager, LIQUIDITY_VAULT_ADDRESS, LAUNCH_HOOK_ADDRESS, BURN_SINK];
+        const exclude = [ACTIVE_LAUNCHPAD_NETWORK.poolManager, ...LIQUIDITY_VAULT_ADDRESSES, ...LAUNCH_HOOK_ADDRESSES, BURN_SINK];
         setTokens((current) =>
           current.map((t) => {
             if (!t.address) return t;
@@ -2482,7 +2535,8 @@ export default function LaunchpadBoard() {
     if (!readClient) return;
 
     const unwatch = readClient.watchContractEvent({
-      address: LAUNCHPAD_ADDRESS as Address,
+      // Wszystkie wdrozenia - stare dalej handluja krzywymi, ktore nie awansowaly.
+      address: LAUNCHPAD_ADDRESSES as Address[],
       abi: launchpadAbi,
       // Tempo idzie z konfiguracji sieci (patrz `liveWatchFor`): raz na blok,
       // gdy stoimy na wlasnym RPC, osiem sekund na publicznym.
@@ -2498,7 +2552,7 @@ export default function LaunchpadBoard() {
         const freshHashes: string[] = [];
 
         for (const log of logs) {
-          const decoded = log as unknown as { eventName?: string; args?: Record<string, unknown>; transactionHash?: string };
+          const decoded = log as unknown as { eventName?: string; args?: Record<string, unknown>; transactionHash?: string; address?: string };
           const token = decoded.args?.token as Address | undefined;
           const eventName = decoded.eventName;
           if (!token || !eventName) continue;
@@ -2510,9 +2564,12 @@ export default function LaunchpadBoard() {
             fresh.push({ id, address: token, symbol, accent: accentFor(token), label: 'Launched', tone: 'launch' });
             setTokens((current) => {
               if (current.some((row) => row.address?.toLowerCase() === token.toLowerCase())) return current;
+              const dep = deploymentOrOldest(decoded.address);
               const row: BoardToken = {
                 id: token,
                 address: token,
+                launchpad: dep.launchpad,
+                version: dep.version,
                 name: (decoded.args?.name as string) ?? symbol,
                 symbol,
                 creator: (decoded.args?.creator as string) ?? '',
@@ -2640,7 +2697,8 @@ export default function LaunchpadBoard() {
     () =>
       tokens
         .filter((row) => row.state === 'Graduated' && row.address)
-        .map((row) => (row.address as string).toLowerCase())
+        // Adres tokena + jego launchpad: pozycja LP siedzi w vaulcie TEGO wdrozenia.
+        .map((row) => `${(row.address as string).toLowerCase()}@${row.launchpad ?? ''}`)
         .sort()
         .join(','),
     [tokens]
@@ -2656,10 +2714,11 @@ export default function LaunchpadBoard() {
     let cancelled = false;
     void (async () => {
       const out: Array<{ token: Address; poolId: `0x${string}` }> = [];
-      for (const address of graduatedKey.split(',') as Address[]) {
+      for (const entry of graduatedKey.split(',')) {
+        const [address, launchpad] = entry.split('@') as [Address, string];
         try {
           const position = (await readClient.readContract({
-            address: LIQUIDITY_VAULT_ADDRESS as Address,
+            address: deploymentOrOldest(launchpad).vault as Address,
             abi: liquidityVaultAbi,
             functionName: 'positionOf',
             args: [address],
@@ -2984,12 +3043,21 @@ export default function LaunchpadBoard() {
       return;
     }
     try {
-      const [launch, hookEth, vaultEth] = await Promise.all([
-        readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'claimable', args: [address] }),
-        readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'claimableEth', args: [address] }),
-        readClient.readContract({ address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'claimableEth', args: [address] }),
-      ]);
-      setMyClaimable({ launch: launch as bigint, hookEth: hookEth as bigint, vaultEth: vaultEth as bigint });
+      const sums: MyClaimable = { launch: 0n, hookEth: 0n, vaultEth: 0n, sources: [] };
+      for (const d of LAUNCHPAD_DEPLOYMENTS) {
+        const [launch, hookEth, vaultEth] = (await Promise.all([
+          readClient.readContract({ address: d.launchpad as Address, abi: launchpadAbi, functionName: 'claimable', args: [address] }),
+          readClient.readContract({ address: d.hook as Address, abi: hookAbi, functionName: 'claimableEth', args: [address] }),
+          readClient.readContract({ address: d.vault as Address, abi: liquidityVaultAbi, functionName: 'claimableEth', args: [address] }),
+        ])) as [bigint, bigint, bigint];
+        sums.launch += launch;
+        sums.hookEth += hookEth;
+        sums.vaultEth += vaultEth;
+        if (launch > 0n) sums.sources!.push({ address: d.launchpad as Address, kind: 'launch' });
+        if (hookEth > 0n) sums.sources!.push({ address: d.hook as Address, kind: 'hook' });
+        if (vaultEth > 0n) sums.sources!.push({ address: d.vault as Address, kind: 'vault' });
+      }
+      setMyClaimable(sums);
     } catch {
       setMyClaimable(null);
     }
@@ -2998,6 +3066,9 @@ export default function LaunchpadBoard() {
   useEffect(() => {
     void refreshMyClaimable();
   }, [refreshMyClaimable]);
+
+  /** Wdrozenie wybranego tokena - kazda operacja na nim idzie do JEGO kontraktow. */
+  const selDep = useMemo(() => deploymentOrOldest(selected?.launchpad), [selected?.launchpad]);
 
   const refreshDetails = useCallback(async () => {
     if (!readClient || !selected?.address) {
@@ -3011,17 +3082,17 @@ export default function LaunchpadBoard() {
       const [decimals, balance, allowance, spotPrice, launchClaimable, hookEthClaimable, hookTokenClaimable, vaultEthClaimable, vaultTokenClaimable, pendingEth, pendingToken, seeded, position] = await Promise.all([
         readClient.readContract({ address: token, abi: erc20Abi, functionName: 'decimals' }),
         address ? readClient.readContract({ address: token, abi: erc20Abi, functionName: 'balanceOf', args: [account] }) : Promise.resolve(0n),
-        address ? readClient.readContract({ address: token, abi: erc20Abi, functionName: 'allowance', args: [account, LAUNCHPAD_ADDRESS as Address] }) : Promise.resolve(0n),
-        selected.state === 'Graduated' ? Promise.resolve(0n) : readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'spotPriceWeiPerToken', args: [token] }),
-        address ? readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'claimable', args: [account] }) : Promise.resolve(0n),
-        address ? readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'claimableEth', args: [account] }) : Promise.resolve(0n),
-        address ? readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'claimableToken', args: [token, account] }) : Promise.resolve(0n),
-        address ? readClient.readContract({ address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'claimableEth', args: [account] }) : Promise.resolve(0n),
-        address ? readClient.readContract({ address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'claimableToken', args: [token, account] }) : Promise.resolve(0n),
-        readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'pendingEth', args: [token] }),
-        readClient.readContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'pendingToken', args: [token] }),
-        readClient.readContract({ address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'seeded', args: [token] }),
-        readClient.readContract({ address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'positionOf', args: [token] }),
+        address ? readClient.readContract({ address: token, abi: erc20Abi, functionName: 'allowance', args: [account, selDep.launchpad as Address] }) : Promise.resolve(0n),
+        selected.state === 'Graduated' ? Promise.resolve(0n) : readClient.readContract({ address: selDep.launchpad as Address, abi: launchpadAbi, functionName: 'spotPriceWeiPerToken', args: [token] }),
+        address ? readClient.readContract({ address: selDep.launchpad as Address, abi: launchpadAbi, functionName: 'claimable', args: [account] }) : Promise.resolve(0n),
+        address ? readClient.readContract({ address: selDep.hook as Address, abi: hookAbi, functionName: 'claimableEth', args: [account] }) : Promise.resolve(0n),
+        address ? readClient.readContract({ address: selDep.hook as Address, abi: hookAbi, functionName: 'claimableToken', args: [token, account] }) : Promise.resolve(0n),
+        address ? readClient.readContract({ address: selDep.vault as Address, abi: liquidityVaultAbi, functionName: 'claimableEth', args: [account] }) : Promise.resolve(0n),
+        address ? readClient.readContract({ address: selDep.vault as Address, abi: liquidityVaultAbi, functionName: 'claimableToken', args: [token, account] }) : Promise.resolve(0n),
+        readClient.readContract({ address: selDep.hook as Address, abi: hookAbi, functionName: 'pendingEth', args: [token] }),
+        readClient.readContract({ address: selDep.hook as Address, abi: hookAbi, functionName: 'pendingToken', args: [token] }),
+        readClient.readContract({ address: selDep.vault as Address, abi: liquidityVaultAbi, functionName: 'seeded', args: [token] }),
+        readClient.readContract({ address: selDep.vault as Address, abi: liquidityVaultAbi, functionName: 'positionOf', args: [token] }),
       ] as const);
       const positionTuple = position as readonly [`0x${string}`, bigint, number, number];
       setDetails({
@@ -3045,7 +3116,7 @@ export default function LaunchpadBoard() {
     } catch {
       setDetails(null);
     }
-  }, [address, readClient, selected?.address, selected?.state]);
+  }, [address, readClient, selected?.address, selected?.state, selDep]);
 
   useEffect(() => {
     void refreshDetails();
@@ -3057,10 +3128,10 @@ export default function LaunchpadBoard() {
     // `.catch` nie jest ozdoba: bez niego chwilowe odbicie RPC staje sie
     // nieobsluzonym odrzuceniem, zamiast po prostu wyczyscic wycene.
     void readClient
-      .readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'gradFeeOf', args: [selected.address as Address] })
+      .readContract({ address: selDep.launchpad as Address, abi: launchpadAbi, functionName: 'gradFeeOf', args: [selected.address as Address] })
       .then((quote) => setGradReward(quote[1]))
       .catch(() => setGradReward(null));
-  }, [readClient, selected?.address, selected?.state]);
+  }, [readClient, selected?.address, selected?.state, selDep]);
 
   useEffect(() => {
     setSellQuote(null);
@@ -3071,7 +3142,7 @@ export default function LaunchpadBoard() {
     try {
       const amount = parseUnits(sellAmount, details.decimals);
       void readClient
-        ?.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'quoteSell', args: [selected.address as Address, amount] })
+        ?.readContract({ address: selDep.launchpad as Address, abi: launchpadAbi, functionName: 'quoteSell', args: [selected.address as Address, amount] })
         .then((quote) => {
           if (!cancelled) setSellQuote(quote[0]);
         })
@@ -3084,7 +3155,7 @@ export default function LaunchpadBoard() {
     return () => {
       cancelled = true;
     };
-  }, [details, readClient, selected?.address, sellAmount]);
+  }, [details, readClient, selected?.address, sellAmount, selDep]);
 
   // Klik w nazwe nawiguje na strone tokena, wiec "zaznaczenie" istnieje juz
   // tylko jako otwarcie modala handlu - stad parametr openTrade bez wartosci
@@ -3170,13 +3241,13 @@ export default function LaunchpadBoard() {
     setBusy('buy');
     setNotice(null);
     try {
-      const quote = await readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'quoteBuy', args: [selected.address, value] });
+      const quote = await readClient.readContract({ address: selDep.launchpad as Address, abi: launchpadAbi, functionName: 'quoteBuy', args: [selected.address, value] });
       // Ten sam bufor, co na stronie tokena. Stalo tu 0,5% na sztywno, czyli
       // dokladnie ta wartosc, ktora 13 sierpnia wywalala co czwarta transakcje
       // na ruchliwej krzywej (uzasadnienie przy DEFAULT_SLIPPAGE_BPS).
       const minTokensOut = (quote[0] * BigInt(10_000 - DEFAULT_SLIPPAGE_BPS)) / 10_000n;
       const hash = await walletClient.writeContract({
-        address: LAUNCHPAD_ADDRESS as Address,
+        address: selDep.launchpad as Address,
         abi: launchpadAbi,
         functionName: 'buy',
         args: [selected.address, minTokensOut, BigInt(Math.floor(Date.now() / 1000) + 900)],
@@ -3200,7 +3271,7 @@ export default function LaunchpadBoard() {
       // Optymistyczny update wiersza (natychmiast) w try - hiccup odczytu nic nie
       // psuje. Cichy loadBoard w tle pogodzi zarobki/holderow/rezerwy.
       try {
-        const onchain = await readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'launchOf', args: [selected.address] });
+        const onchain = await readClient.readContract({ address: selDep.launchpad as Address, abi: launchpadAbi, functionName: 'launchOf', args: [selected.address] });
         const [, state, ethReserve] = onchain;
         setTokens((current) =>
           current.map((token) =>
@@ -3245,17 +3316,17 @@ export default function LaunchpadBoard() {
           address: selected.address as Address,
           abi: erc20Abi,
           functionName: 'approve',
-          args: [LAUNCHPAD_ADDRESS as Address, maxUint256],
+          args: [selDep.launchpad as Address, maxUint256],
           chain: LAUNCHPAD_CHAIN,
           account: address,
         });
         await readClient.waitForTransactionReceipt({ hash: approveHash });
       }
       setBusy('sell');
-      const quote = await readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'quoteSell', args: [selected.address as Address, amount] });
+      const quote = await readClient.readContract({ address: selDep.launchpad as Address, abi: launchpadAbi, functionName: 'quoteSell', args: [selected.address as Address, amount] });
       const minEthOut = (quote[0] * BigInt(10_000 - DEFAULT_SLIPPAGE_BPS)) / 10_000n;
       const hash = await walletClient.writeContract({
-        address: LAUNCHPAD_ADDRESS as Address,
+        address: selDep.launchpad as Address,
         abi: launchpadAbi,
         functionName: 'sell',
         args: [selected.address as Address, amount, minEthOut, BigInt(Math.floor(Date.now() / 1000) + 900)],
@@ -3278,7 +3349,7 @@ export default function LaunchpadBoard() {
       // Optymistyczny update wiersza w try; cichy loadBoard w tle pogodzi reszte.
       try {
         await refreshDetails();
-        const afterSell = await readClient.readContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'launchOf', args: [selected.address as Address] });
+        const afterSell = await readClient.readContract({ address: selDep.launchpad as Address, abi: launchpadAbi, functionName: 'launchOf', args: [selected.address as Address] });
         const [, sellState, sellReserve] = afterSell;
         setTokens((current) =>
           current.map((token) =>
@@ -3311,7 +3382,7 @@ export default function LaunchpadBoard() {
     setBusy('graduate');
     setNotice(null);
     try {
-      const hash = await walletClient.writeContract({ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'graduate', args: [selected.address as Address], chain: LAUNCHPAD_CHAIN, account: address });
+      const hash = await walletClient.writeContract({ address: selDep.launchpad as Address, abi: launchpadAbi, functionName: 'graduate', args: [selected.address as Address], chain: LAUNCHPAD_CHAIN, account: address });
       const receipt = await readClient.waitForTransactionReceipt({ hash });
       if (receipt.status !== 'success') throw new Error('The graduation transaction reverted.');
       setNotice({ kind: 'success', text: `Pool opened. ${hash.slice(0, 10)}...` });
@@ -3334,7 +3405,7 @@ export default function LaunchpadBoard() {
     if (!(await ensureSepolia())) return;
     setBusy('settle');
     try {
-      const hash = await walletClient.writeContract({ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'settle', args: [selected.address as Address], chain: LAUNCHPAD_CHAIN, account: address });
+      const hash = await walletClient.writeContract({ address: selDep.hook as Address, abi: hookAbi, functionName: 'settle', args: [selected.address as Address], chain: LAUNCHPAD_CHAIN, account: address });
       await readClient.waitForTransactionReceipt({ hash });
       setNotice({ kind: 'success', text: `Hook fees settled. ${hash.slice(0, 10)}...` });
       await refreshDetails();
@@ -3350,7 +3421,7 @@ export default function LaunchpadBoard() {
     if (!(await ensureSepolia())) return;
     setBusy('harvest');
     try {
-      const hash = await walletClient.writeContract({ address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'harvest', args: [selected.address as Address], chain: LAUNCHPAD_CHAIN, account: address });
+      const hash = await walletClient.writeContract({ address: selDep.vault as Address, abi: liquidityVaultAbi, functionName: 'harvest', args: [selected.address as Address], chain: LAUNCHPAD_CHAIN, account: address });
       await readClient.waitForTransactionReceipt({ hash });
       setNotice({ kind: 'success', text: `Pool fees harvested. ${hash.slice(0, 10)}...` });
       await refreshDetails();
@@ -3370,14 +3441,14 @@ export default function LaunchpadBoard() {
     setBusy('claim');
     try {
       const transaction = source === 'launch'
-        ? { address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'claim' as const, args: [] as const }
+        ? { address: selDep.launchpad as Address, abi: launchpadAbi, functionName: 'claim' as const, args: [] as const }
         : source === 'hookEth'
-          ? { address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'claimEth' as const, args: [] as const }
+          ? { address: selDep.hook as Address, abi: hookAbi, functionName: 'claimEth' as const, args: [] as const }
           : source === 'hookToken'
-            ? { address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'claimToken' as const, args: [selected.address as Address] as const }
+            ? { address: selDep.hook as Address, abi: hookAbi, functionName: 'claimToken' as const, args: [selected.address as Address] as const }
             : source === 'vaultEth'
-              ? { address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'claimEth' as const, args: [] as const }
-              : { address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'claimToken' as const, args: [selected.address as Address] as const };
+              ? { address: selDep.vault as Address, abi: liquidityVaultAbi, functionName: 'claimEth' as const, args: [] as const }
+              : { address: selDep.vault as Address, abi: liquidityVaultAbi, functionName: 'claimToken' as const, args: [selected.address as Address] as const };
       const hash = await walletClient.writeContract({ ...transaction, chain: LAUNCHPAD_CHAIN, account: address } as any);
       await readClient.waitForTransactionReceipt({ hash });
       setNotice({ kind: 'success', text: `Claim confirmed. ${hash.slice(0, 10)}...` });
@@ -3401,11 +3472,13 @@ export default function LaunchpadBoard() {
       setNotice({ kind: 'error', text: 'Connect a wallet before claiming.' });
       return;
     }
-    const calls = [
-      ...(myClaimable.launch > 0n ? [{ address: LAUNCHPAD_ADDRESS as Address, abi: launchpadAbi, functionName: 'claim' as const }] : []),
-      ...(myClaimable.hookEth > 0n ? [{ address: LAUNCH_HOOK_ADDRESS as Address, abi: hookAbi, functionName: 'claimEth' as const }] : []),
-      ...(myClaimable.vaultEth > 0n ? [{ address: LIQUIDITY_VAULT_ADDRESS as Address, abi: liquidityVaultAbi, functionName: 'claimEth' as const }] : []),
-    ];
+    const calls = (myClaimable.sources ?? []).map((source) =>
+      source.kind === 'launch'
+        ? { address: source.address, abi: launchpadAbi, functionName: 'claim' as const }
+        : source.kind === 'hook'
+          ? { address: source.address, abi: hookAbi, functionName: 'claimEth' as const }
+          : { address: source.address, abi: liquidityVaultAbi, functionName: 'claimEth' as const }
+    );
     if (calls.length === 0) {
       setNotice({ kind: 'error', text: 'Nothing to claim right now.' });
       return;

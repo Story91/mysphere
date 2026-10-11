@@ -104,7 +104,12 @@ export function shouldKeepUnscanned(
  * regula "albo cala delta, albo zadna" po stronie wolajacego.
  */
 
-export type LaunchMeta = { name: string; symbol: string; creator: Address; startedAt: number };
+/**
+ * `launchpad` - adres wdrozenia, ktore wyemitowalo `Launched` (od 2026-10 siec
+ * moze miec kilka, patrz `LaunchpadDeployment`). Agregaty zapisane wczesniej
+ * nie maja tego pola - wszystkie ich tokeny pochodza z pierwszego wdrozenia.
+ */
+export type LaunchMeta = { name: string; symbol: string; creator: Address; startedAt: number; launchpad?: Address };
 export type FeedTone = 'buy' | 'sell' | 'launch' | 'graduate';
 export type FeedEntry = { id: string; token: Address; label: string; eth?: number; tone: FeedTone; order: number };
 export type PricePoint = { order: number; price: number };
@@ -153,6 +158,8 @@ export function emptyAggregate(): BoardAggregate {
 /** Log tak, jak widzi go ten modul: tyle, ile naprawde czytamy. */
 export type BoardLog = {
   eventName?: string;
+  /** Kontrakt, ktory wyemitowal log - przy kilku wdrozeniach mowi, z ktorego jest token. */
+  address?: string;
   args: Record<string, unknown>;
   transactionHash?: string;
   blockNumber: bigint | null;
@@ -212,6 +219,7 @@ export function reduceBoardLogs(
         symbol: log.args.symbol as string,
         creator: log.args.creator as Address,
         startedAt: Number(log.args.startedAt ?? 0),
+        ...(log.address ? { launchpad: log.address as Address } : {}),
       });
       agg.feed.push({ id: `${hash}-launch`, token, label: 'Launched', tone: 'launch', order });
     } else if (log.eventName === 'Bought') {

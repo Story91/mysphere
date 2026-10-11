@@ -58,13 +58,13 @@ type Tab = 'trades' | 'holders' | 'info';
 
 const PAGE_SIZE = 15;
 
-function badgeFor(address: string, creator: string): HolderRow['badge'] {
+function badgeFor(address: string, creator: string, dep: CoreState['deployment']): HolderRow['badge'] {
   const value = address.toLowerCase();
   if (value === creator.toLowerCase()) return 'dev';
-  if (value === LAUNCHPAD_ADDRESS.toLowerCase()) return 'bonding curve';
+  if (value === dep.launchpad.toLowerCase()) return 'bonding curve';
   if (value === DEAD_ADDRESS) return 'burned';
-  if (value === LIQUIDITY_VAULT_ADDRESS.toLowerCase()) return 'vault';
-  if (value === LAUNCH_HOOK_ADDRESS.toLowerCase()) return 'hook';
+  if (value === dep.vault.toLowerCase()) return 'vault';
+  if (value === dep.hook.toLowerCase()) return 'hook';
   if (value === POOL_MANAGER_ADDRESS) return 'pool';
   return null;
 }
@@ -171,12 +171,12 @@ export default function DetailTabs({
         address,
         balance,
         pctBps: Number((balance * 10_000n) / SUPPLY_WEI),
-        badge: badgeFor(address, core.creator),
+        badge: badgeFor(address, core.creator, core.deployment),
       });
     }
     rows.sort((a, b) => (a.balance === b.balance ? 0 : a.balance < b.balance ? 1 : -1));
     return rows.slice(0, 20);
-  }, [indexHolders, balances, core.creator, exactHolders]);
+  }, [indexHolders, balances, core.creator, exactHolders, core.deployment]);
 
   const newestFirst = useMemo(() => [...trades].reverse(), [trades]);
   // Strona liczona przy renderze, nie trzymana w stanie: lista zmienia dlugosc
@@ -498,9 +498,9 @@ export default function DetailTabs({
               {(
                 [
                   ['Token', core.token],
-                  ['Curve launchpad', LAUNCHPAD_ADDRESS],
-                  ['Launch hook', LAUNCH_HOOK_ADDRESS],
-                  ['Liquidity vault', LIQUIDITY_VAULT_ADDRESS],
+                  ['Curve launchpad', core.deployment.launchpad],
+                  ['Launch hook', core.deployment.hook],
+                  ['Liquidity vault', core.deployment.vault],
                 ] as const
               ).map(([label, address]) => (
                 <a key={label} href={`${EXPLORER}/address/${address}`} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-2 rounded-xl border border-sp-shade/10 px-3 py-2.5 text-[11.5px] hover:border-soft-primary">

@@ -6,6 +6,7 @@ import { usePublicClient } from 'wagmi';
 import {
   ACTIVE_LAUNCHPAD_NETWORK,
   LAUNCHPAD_ADDRESS,
+  LAUNCHPAD_ADDRESSES,
   LAUNCHPAD_CHAIN,
   LAUNCHPAD_DEPLOY_BLOCK,
 } from '../config';
@@ -135,7 +136,14 @@ export function useTokenHistory(
    * (krzywa jeszcze zyje albo puli nie ma) zachowanie jest jak dawniej.
    */
   poolId: string | null = null,
-  decimals = 18
+  decimals = 18,
+  /**
+   * Launchpad, z ktorego pochodzi token (siec moze miec kilka wdrozen). To jego
+   * adres jest "krzywa" w saldach - tam leza tokeny niesprzedane jeszcze ludziom.
+   * Skan zdarzen idzie po wszystkich launchpadach naraz, bo zdarzenia tego
+   * tokena i tak emituje tylko jego wlasny.
+   */
+  launchpad: string = LAUNCHPAD_ADDRESS
 ) {
   const readClient = usePublicClient({ chainId: LAUNCHPAD_CHAIN.id });
   const [state, setState] = useState<TokenHistory>(EMPTY);
@@ -197,7 +205,7 @@ export function useTokenHistory(
     const floor = candidate > LAUNCHPAD_DEPLOY_BLOCK ? candidate : LAUNCHPAD_DEPLOY_BLOCK;
 
     const result = await scanBackward(readClient, {
-      launchpad: LAUNCHPAD_ADDRESS,
+      launchpad: LAUNCHPAD_ADDRESSES,
       token,
       head: anchorBlock,
       floor,
@@ -292,7 +300,7 @@ export function useTokenHistory(
         const head = BigInt(highBlock);
         const seen = new Set(trades.map((trade) => trade.id));
         const live = prev.trades.filter((trade) => !seen.has(trade.id) && trade.block > head);
-        for (const trade of live) applyTradeToBalances(balances, trade, LAUNCHPAD_ADDRESS.toLowerCase());
+        for (const trade of live) applyTradeToBalances(balances, trade, launchpad.toLowerCase());
 
         const merged = live.length ? mergeTrades(trades, live) : trades;
 
@@ -329,7 +337,7 @@ export function useTokenHistory(
       setState((prev) => {
         const seen = new Set(result.trades.map((trade) => trade.id));
         const live = prev.trades.filter((trade) => !seen.has(trade.id) && trade.block > anchorBlock);
-        for (const trade of live) applyTradeToBalances(result.balances, trade, LAUNCHPAD_ADDRESS.toLowerCase());
+        for (const trade of live) applyTradeToBalances(result.balances, trade, launchpad.toLowerCase());
         const trades = live.length ? mergeTrades(result.trades, live) : result.trades;
         return {
           loading: false,
@@ -348,7 +356,7 @@ export function useTokenHistory(
         error: cause instanceof Error ? cause.message.split('\n')[0] : String(cause),
       }));
     }
-  }, [scanFromChain, startedAt, tokenAddress]);
+  }, [scanFromChain, startedAt, tokenAddress, launchpad]);
 
   useEffect(() => {
     void load();
@@ -385,7 +393,7 @@ export function useTokenHistory(
       const mutable = () => (balances ??= new Map(prev.balances));
       let graduatedTs = prev.graduatedTs;
       const now = Math.floor(Date.now() / 1000);
-      const curve = LAUNCHPAD_ADDRESS.toLowerCase();
+      const curve = launchpad.toLowerCase();
 
       for (const log of logs) {
         const name = log.eventName;
@@ -439,7 +447,7 @@ export function useTokenHistory(
         graduatedTs,
       };
     });
-  }, []);
+  }, [launchpad]);
 
   /**
    * BACKFILL SWAPOW PULI, dwukierunkowy.

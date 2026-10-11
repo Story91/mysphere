@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createPublicClient, http, type Address } from 'viem';
-import { LAUNCHPAD_NETWORKS, type LaunchpadNetwork } from '../../../startpad/config';
+import { deploymentsOf, LAUNCHPAD_NETWORKS, launchpadsOf, scanFloorOf, type LaunchpadNetwork } from '../../../startpad/config';
 import {
   balanceCandidates,
   balancesArePoisoned,
@@ -153,7 +153,7 @@ export async function GET(request: NextRequest) {
 
   // Dno skanu: estymowany blok startu tokena minus zapas, nigdy ponizej bloku
   // wdrozenia launchpada - starszych logow tego launchpada z definicji nie ma.
-  let launchFloor = net.deployBlock;
+  let launchFloor = scanFloorOf(net);
   if (startedAt !== null) {
     const ageBlocks = BigInt(Math.max(0, Math.floor((anchorTs - startedAt) / net.secondsPerBlock)));
     const estimated = anchorBlock > ageBlocks ? anchorBlock - ageBlocks : 0n;
@@ -198,7 +198,8 @@ export async function GET(request: NextRequest) {
       for (const range of ranges) {
         const windows = Number((range.head - range.floor) / net.scanWindow) + 2;
         const result = await scanBackward(client, {
-          launchpad: net.launchpad,
+          // Wszystkie wdrozenia sieci - zdarzenia tokena emituje tylko jego launchpad.
+          launchpad: launchpadsOf(net),
           token,
           head: range.head,
           floor: range.floor,
@@ -278,7 +279,7 @@ export async function GET(request: NextRequest) {
     const accounts = balanceCandidates(
       balances,
       trades,
-      [net.launchpad, net.vault, net.hook, net.poolManager, DEAD_ADDRESS],
+      [...deploymentsOf(net).flatMap((d) => [d.launchpad, d.vault, d.hook]), net.poolManager, DEAD_ADDRESS],
       MAX_BALANCE_ACCOUNTS
     );
     // Adres tokena malymi literami: konta z `balanceCandidates` juz takie sa,

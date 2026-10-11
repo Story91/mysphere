@@ -22,6 +22,25 @@ import { pickChainId } from './chainFromUrl';
  * Na serwerze (SSR) modul zawsze widzi siec domyslna; jedyne chain-zalezne
  * elementy renderowane statycznie (stopka) czekaja z adresami na klienta.
  */
+/**
+ * Jedno wdrozenie launchpada (krzywa + vault + hook + fabryka) na danej sieci.
+ *
+ * Od 2026-10 sieć moze miec ich KILKA. Kontrakty sa bez admina i bez migracji,
+ * wiec gdy trzeba wdrozyc nowe (Base: hardfork Cobalt zepsul fabryke v1 -
+ * docs/LAUNCHPAD-QUOTE-ERC20.md, memory b20-cobalt-launch-outage), stare zostaje
+ * na zawsze: trzyma rezerwy krzywych, ktore jeszcze nie awansowaly, i salda
+ * oplat do odebrania. Nowe starty ida do NAJNOWSZEGO, a kazdy token rozmawia
+ * z tym wdrozeniem, z ktorego pochodzi.
+ */
+export type LaunchpadDeployment = {
+  version: number;
+  launchpad: `0x${string}`;
+  vault: `0x${string}`;
+  hook: `0x${string}`;
+  tokenFactory: `0x${string}`;
+  deployBlock: bigint;
+};
+
 export type LaunchpadNetwork = {
   chain: Chain;
   /** Krotka etykieta do UI. */
@@ -128,6 +147,14 @@ export type LaunchpadNetwork = {
    * Mechanika i uzasadnienie: app/startpad/networkTheme.ts.
    */
   theme?: NetworkTheme;
+  /** Wersja GLOWNEGO wdrozenia (pola launchpad/vault/hook/tokenFactory wyzej). Brak = 1. */
+  version?: number;
+  /**
+   * Starsze wdrozenia tej samej sieci - tylko do odczytu i handlu tokenami,
+   * ktore w nich wystartowaly. Musza miec TA SAMA skale krzywej (`rVirt`) co
+   * glowne wdrozenie: interfejs liczy ceny i pasek awansu z jednej liczby.
+   */
+  legacy?: LaunchpadDeployment[];
 };
 
 /**
@@ -194,20 +221,36 @@ export const LAUNCHPAD_NETWORKS: Record<number, LaunchpadNetwork> = {
     label: 'Base B20 Sepolia',
     testnet: true,
     tokenStandard: 'b20',
-    launchpad:
-      (process.env.NEXT_PUBLIC_LAUNCHPAD_SEPOLIA_ADDRESS as `0x${string}` | undefined) ??
-      '0x4Cc0ff50912400eeeC38db45ef5CEf00f5Ad1A48',
-    vault:
-      (process.env.NEXT_PUBLIC_LIQUIDITY_VAULT_SEPOLIA_ADDRESS as `0x${string}` | undefined) ??
-      '0x35B3217b8Ada69103b801FEFe9ca16E307a649B6',
-    hook:
-      (process.env.NEXT_PUBLIC_LAUNCH_HOOK_SEPOLIA_ADDRESS as `0x${string}` | undefined) ??
-      '0xf2EAEBceeC6Ccc168d8fe5B539F37e2d8c44e044',
-    tokenFactory:
-      (process.env.NEXT_PUBLIC_B20_TOKEN_FACTORY_SEPOLIA_ADDRESS as `0x${string}` | undefined) ??
-      '0x8ad50FFdD5957C34519e922c1Ff18e3DF089565F',
+    // v2 (2026-10-11): ten sam CurveLaunchpad, fabryka B20TokenFactoryV2 -
+    // v1 po hardforku Cobalt (Sepolia 2026-09-23) nie startuje juz tokenow.
+    // Adresy wpisane literalnie, BEZ zmiennych srodowiskowych: stare zmienne
+    // na Vercelu wskazuja v1 i po cichu przykrylyby nowe wdrozenie. Skala
+    // (R_VIRT 0.75) MUSI byc ta sama co v1 - interfejs liczy z jednej liczby.
+    version: 2,
+    launchpad: '0x74aB8aD577fB49dc4930D8BBAD144c7a230143e6',
+    vault: '0xbE9Af2282E4177e236dCb4682687a05DdA8888EA',
+    hook: '0xb2519EC575812369B117011828d8B276f0746044',
+    tokenFactory: '0xC2855687d5234C64D816a763d1513B4484Db72Ed',
     poolManager: '0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408',
-    deployBlock: BigInt(process.env.NEXT_PUBLIC_LAUNCHPAD_DEPLOY_BLOCK ?? '45304536'),
+    deployBlock: 47984848n,
+    legacy: [
+      {
+        version: 1,
+        launchpad:
+          (process.env.NEXT_PUBLIC_LAUNCHPAD_SEPOLIA_ADDRESS as `0x${string}` | undefined) ??
+          '0x4Cc0ff50912400eeeC38db45ef5CEf00f5Ad1A48',
+        vault:
+          (process.env.NEXT_PUBLIC_LIQUIDITY_VAULT_SEPOLIA_ADDRESS as `0x${string}` | undefined) ??
+          '0x35B3217b8Ada69103b801FEFe9ca16E307a649B6',
+        hook:
+          (process.env.NEXT_PUBLIC_LAUNCH_HOOK_SEPOLIA_ADDRESS as `0x${string}` | undefined) ??
+          '0xf2EAEBceeC6Ccc168d8fe5B539F37e2d8c44e044',
+        tokenFactory:
+          (process.env.NEXT_PUBLIC_B20_TOKEN_FACTORY_SEPOLIA_ADDRESS as `0x${string}` | undefined) ??
+          '0x8ad50FFdD5957C34519e922c1Ff18e3DF089565F',
+        deployBlock: BigInt(process.env.NEXT_PUBLIC_LAUNCHPAD_DEPLOY_BLOCK ?? '45304536'),
+      },
+    ],
     // Wdrozenie sprzed parametryzacji skali - dawna stala kontraktu.
     rVirt: 0.75,
     explorerUrl: 'https://sepolia.basescan.org',
@@ -651,9 +694,79 @@ export const NATIVE_SYMBOL = ACTIVE_LAUNCHPAD_NETWORK.chain.nativeCurrency.symbo
  */
 export const NATIVE_IS_USD = /^(USDC|USDT|USD)$/i.test(NATIVE_SYMBOL);
 export const LAUNCHPAD_EXPLORER_URL = ACTIVE_LAUNCHPAD_NETWORK.explorerUrl;
+/** GLOWNE (najnowsze) wdrozenie aktywnej sieci - tu ida nowe starty. */
 export const LAUNCHPAD_ADDRESS = ACTIVE_LAUNCHPAD_NETWORK.launchpad;
 export const LIQUIDITY_VAULT_ADDRESS = ACTIVE_LAUNCHPAD_NETWORK.vault;
 export const LAUNCH_HOOK_ADDRESS = ACTIVE_LAUNCHPAD_NETWORK.hook;
+
+/**
+ * Wszystkie wdrozenia sieci, najnowsze PIERWSZE. Glowne zawsze jest na
+ * pozycji 0. Wpis legacy o adresie glownego jest pomijany - zmienna
+ * srodowiskowa moze wskazywac stary launchpad i nie ma prawa go zdublowac.
+ */
+export function deploymentsOf(network: LaunchpadNetwork): LaunchpadDeployment[] {
+  const primary: LaunchpadDeployment = {
+    version: network.version ?? 1,
+    launchpad: network.launchpad,
+    vault: network.vault,
+    hook: network.hook,
+    tokenFactory: network.tokenFactory,
+    deployBlock: network.deployBlock,
+  };
+  const legacy = (network.legacy ?? [])
+    .filter((d) => d.launchpad.toLowerCase() !== primary.launchpad.toLowerCase())
+    .sort((a, b) => b.version - a.version);
+  return [primary, ...legacy];
+}
+
+/** Adresy launchpadow DOWOLNEJ sieci - dla tras serwera, ktore nie maja aktywnej sieci. */
+export function launchpadsOf(network: LaunchpadNetwork): `0x${string}`[] {
+  return deploymentsOf(network).map((d) => d.launchpad);
+}
+
+export function hooksOf(network: LaunchpadNetwork): `0x${string}`[] {
+  return deploymentsOf(network).map((d) => d.hook);
+}
+
+/** Najstarszy blok wdrozenia sieci - od niego zaczyna sie historia wszystkich tokenow. */
+export function scanFloorOf(network: LaunchpadNetwork): bigint {
+  return deploymentsOf(network).reduce((min, d) => (d.deployBlock < min ? d.deployBlock : min), network.deployBlock);
+}
+
+/** Wdrozenie DOWOLNEJ sieci po adresie launchpada; nieznany adres = najstarsze. */
+export function networkDeploymentOrOldest(network: LaunchpadNetwork, launchpad: string | null | undefined): LaunchpadDeployment {
+  const all = deploymentsOf(network);
+  const a = launchpad?.toLowerCase();
+  return (a && all.find((d) => d.launchpad.toLowerCase() === a)) || all[all.length - 1];
+}
+
+export const LAUNCHPAD_DEPLOYMENTS = deploymentsOf(ACTIVE_LAUNCHPAD_NETWORK);
+/** Do `getLogs` po wszystkich wdrozeniach naraz - zdarzenia maja identyczne ABI. */
+export const LAUNCHPAD_ADDRESSES = LAUNCHPAD_DEPLOYMENTS.map((d) => d.launchpad);
+export const LAUNCH_HOOK_ADDRESSES = LAUNCHPAD_DEPLOYMENTS.map((d) => d.hook);
+export const LIQUIDITY_VAULT_ADDRESSES = LAUNCHPAD_DEPLOYMENTS.map((d) => d.vault);
+
+/** Wdrozenie po adresie launchpada (np. z `log.address`). Nieznany adres = null. */
+export function deploymentByLaunchpad(address: string | null | undefined): LaunchpadDeployment | null {
+  if (!address) return null;
+  const a = address.toLowerCase();
+  return LAUNCHPAD_DEPLOYMENTS.find((d) => d.launchpad.toLowerCase() === a) ?? null;
+}
+
+/**
+ * Wdrozenie tokena po adresie jego launchpada. Bez adresu (zapisy sprzed
+ * kilku wdrozen) - NAJSTARSZE: wtedy istnialo tylko ono.
+ */
+export function deploymentOrOldest(launchpad: string | null | undefined): LaunchpadDeployment {
+  return deploymentByLaunchpad(launchpad) ?? LAUNCHPAD_DEPLOYMENTS[LAUNCHPAD_DEPLOYMENTS.length - 1];
+}
+
+/** Wdrozenie po adresie hooka albo vaulta (zdarzenia puli i oplat). */
+export function deploymentByHookOrVault(address: string | null | undefined): LaunchpadDeployment | null {
+  if (!address) return null;
+  const a = address.toLowerCase();
+  return LAUNCHPAD_DEPLOYMENTS.find((d) => d.hook.toLowerCase() === a || d.vault.toLowerCase() === a) ?? null;
+}
 export const B20_TOKEN_FACTORY_ADDRESS = ACTIVE_LAUNCHPAD_NETWORK.tokenFactory;
 /**
  * 'b20' = token robi precompile Base (adres vanity da sie wykopac); 'plain' =
@@ -1215,7 +1328,12 @@ export const CURVE_TARGET_ETH = ACTIVE_LAUNCHPAD_NETWORK.rVirt * 4;
  * publicznym RPC albo trwa wieczne, albo dostaje limit zakresu - a przed tym
  * blokiem zadnego `Launched` z definicji nie ma.
  */
-export const LAUNCHPAD_DEPLOY_BLOCK = ACTIVE_LAUNCHPAD_NETWORK.deployBlock;
+// NAJSTARSZE wdrozenie, nie glowne: od niego zaczyna sie historia wszystkich
+// tokenow sieci, a skany ida po wszystkich adresach naraz.
+export const LAUNCHPAD_DEPLOY_BLOCK = LAUNCHPAD_DEPLOYMENTS.reduce(
+  (min, d) => (d.deployBlock < min ? d.deployBlock : min),
+  ACTIVE_LAUNCHPAD_NETWORK.deployBlock
+);
 
 /**
  * StateView v4 - jedyny sposob odczytania `slot0` puli bez transient storage.
@@ -1333,6 +1451,10 @@ export type LaunchpadToken = {
   lastPrice?: number;
   /** Logo z profilu tworcy albo z `metadataURI`. Lancuch sam go NIE zna. */
   logoUrl?: string;
+  /** Launchpad, z ktorego pochodzi token (kilka wdrozen na siec - `LaunchpadDeployment`). */
+  launchpad?: `0x${string}`;
+  /** Wersja tego wdrozenia - karta pokazuje znaczek "v2" od wersji 2. */
+  version?: number;
 };
 
 /**

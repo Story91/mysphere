@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { formatEther, type Address } from 'viem';
 import { usePublicClient } from 'wagmi';
-import { launchpadAbi, liquidityVaultAbi, liveWatchForChain } from './config';
+import { launchpadAbi, launchpadsOf, liquidityVaultAbi, liveWatchForChain } from './config';
 import { tapeAmount } from './[address]/detailShared';
 import { POOL_SWAP_EVENT } from './[address]/poolSwaps';
 import { useEthUsd } from './useEthUsd';
@@ -319,7 +319,8 @@ export default function StartpadTicker() {
   useEffect(() => {
     if (!readClient) return;
     const unwatch = readClient.watchContractEvent({
-      address: TICKER_NETWORK.launchpad,
+      // Wszystkie wdrozenia Base - stare dalej handluje niegraduowanymi krzywymi.
+      address: launchpadsOf(TICKER_NETWORK),
       abi: launchpadAbi,
       poll: LIVE.poll,
       pollingInterval: LIVE.pollingInterval,

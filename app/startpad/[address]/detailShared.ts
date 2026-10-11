@@ -1,5 +1,5 @@
 import { formatEther, formatUnits, parseEther, type Address } from 'viem';
-import { ACTIVE_LAUNCHPAD_NETWORK, LAUNCHPAD_NETWORKS } from '../config';
+import { ACTIVE_LAUNCHPAD_NETWORK, LAUNCHPAD_NETWORKS, type LaunchpadDeployment } from '../config';
 import { formatUsd } from '../useEthUsd';
 
 /**
@@ -115,6 +115,8 @@ export type TradeEntry = {
  */
 export type CoreState = {
   token: Address;
+  /** Wdrozenie, z ktorego pochodzi token - wszystkie operacje ida do JEGO kontraktow. */
+  deployment: LaunchpadDeployment;
   name: string;
   symbol: string;
   decimals: number;

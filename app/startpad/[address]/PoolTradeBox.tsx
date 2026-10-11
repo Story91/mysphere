@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { maxUint256, parseUnits, type Address } from 'viem';
 import { useAccount, useChainId, usePublicClient, useSwitchChain, useWalletClient } from 'wagmi';
-import { ACTIVE_LAUNCHPAD_NETWORK, LAUNCH_HOOK_ADDRESS, LAUNCHPAD_CHAIN, NATIVE_SYMBOL, erc20Abi } from '../config';
+import { ACTIVE_LAUNCHPAD_NETWORK, LAUNCHPAD_CHAIN, NATIVE_SYMBOL, erc20Abi } from '../config';
 import {
   applySlippage,
   DEFAULT_SLIPPAGE_BPS,
@@ -60,7 +60,7 @@ export default function PoolTradeBox({ core, onAfterTx }: { core: CoreState; onA
   const [ethBalance, setEthBalance] = useState<bigint | null>(null);
 
   const decimals = core.decimals;
-  const poolKey = canonicalPoolKey(core.token, LAUNCH_HOOK_ADDRESS as Address);
+  const poolKey = canonicalPoolKey(core.token, core.deployment.hook as Address);
 
   useEffect(() => {
     if (!readClient || !account) {
