@@ -370,6 +370,15 @@ export default function TradePanel({
       setNotice({ kind: 'error', text: `Enter an ${NATIVE_SYMBOL} amount greater than zero, written as a decimal number.` });
       return;
     }
+    // Rynek Q: kupno to przelew perpa z portfela. Bez salda kontrakt rewertuje
+    // `TokenTransferFailed` po zgodzie, ktora i tak nic nie dala.
+    if (QUOTE_ASSET && ethBalance !== null && value > ethBalance) {
+      setNotice({
+        kind: 'error',
+        text: `Your wallet holds ${fmtEth(ethBalance, 4)} ${NATIVE_SYMBOL}. Get ${NATIVE_SYMBOL} on Flash (tryflash.app/perps) first, then buy.`,
+      });
+      return;
+    }
     if (!(await ensureChain())) return;
     setBusy('buy');
     setNotice(null);
@@ -784,7 +793,19 @@ export default function TradePanel({
             <>
               <div className="mt-4 flex items-end justify-between">
                 <span className="text-[12px] font-extrabold text-sp-ink">{NATIVE_SYMBOL} amount</span>
-                {ethBalance !== null && <span className="text-[11px] text-sp-shade/45">Balance {fmtEth(ethBalance, 4)} {NATIVE_SYMBOL}</span>}
+                {ethBalance !== null && (
+                  <span className="text-[11px] text-sp-shade/45">
+                    Balance {fmtEth(ethBalance, 4)} {NATIVE_SYMBOL}
+                    {QUOTE_ASSET && (
+                      <>
+                        {' · '}
+                        <a href="https://tryflash.app/perps" target="_blank" rel="noopener noreferrer" className="font-bold text-soft-primary hover:underline">
+                          Get on Flash
+                        </a>
+                      </>
+                    )}
+                  </span>
+                )}
               </div>
               <div className="relative mt-2">
                 <input inputMode="decimal" value={buyAmount} onChange={(event) => setBuyAmount(event.target.value)} className={`${FIELD} pr-14`} aria-label={`${NATIVE_SYMBOL} amount to spend`} />

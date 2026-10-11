@@ -411,6 +411,28 @@ export default function LaunchTokenModal({
   const vanityCounterRef = useRef<bigint>(0n);
   const vanityStopRef = useRef(false);
   const [preBuyEth, setPreBuyEth] = useState('0');
+  // Saldo aktywa pary (perpa) na rynku Q; `null` = nie dotyczy albo jeszcze nie odczytane.
+  const [quoteBalance, setQuoteBalance] = useState<bigint | null>(null);
+  useEffect(() => {
+    if (!QUOTE_ASSET || !address || !readClient) {
+      setQuoteBalance(null);
+      return;
+    }
+    const asset = QUOTE_ASSET.address;
+    let alive = true;
+    const read = () =>
+      readClient
+        .readContract({ address: asset, abi: erc20Abi, functionName: 'balanceOf', args: [address] })
+        .then((value) => alive && setQuoteBalance(value as bigint))
+        .catch(() => alive && setQuoteBalance(null));
+    read();
+    // Tworca zwykle dokupuje perpa na Flash w innej karcie i wraca - odswiezamy przy powrocie.
+    window.addEventListener('focus', read);
+    return () => {
+      alive = false;
+      window.removeEventListener('focus', read);
+    };
+  }, [address, readClient]);
   const [addedReceivers, setAddedReceivers] = useState<AddedReceiver[]>([]);
   const [receiverDraft, setReceiverDraft] = useState({ account: '', share: '' });
   const [receiverDraftError, setReceiverDraftError] = useState<string | null>(null);
@@ -945,10 +967,17 @@ export default function LaunchTokenModal({
     if (links[key].trim() !== '' && !isHttpsLink(links[key])) linkErrors[key] = 'Must start with https://';
   });
   const anyLinkError = Object.values(linkErrors).length > 0 ? 'Social links must start with https://.' : null;
+  const preBuyWeiNow = preBuyEth.trim() === '' || Number(preBuyEth) === 0 ? 0n : toWei(preBuyEth);
+  // Na rynku Q pre-buy to PRZELEW perpa z portfela. Bez salda kontrakt rewertuje
+  // `TokenTransferFailed`, a portfel pokazuje tylko "likely to fail" - 11.10.2026
+  // tak wygladal pierwszy start na ETH2xL z portfela bez ani jednego ETH2xL.
+  const quoteShort = QUOTE_ASSET !== null && quoteBalance !== null && preBuyWeiNow !== null && preBuyWeiNow > quoteBalance;
   const preBuyError =
-    preBuyEth.trim() !== '' && Number(preBuyEth) !== 0 && toWei(preBuyEth) === null
+    preBuyWeiNow === null
       ? 'Write the amount as a plain decimal number, e.g. 0.05.'
-      : null;
+      : quoteShort
+        ? `Your wallet holds ${formatEther(quoteBalance ?? 0n)} ${NATIVE_SYMBOL}. Get ${NATIVE_SYMBOL} on Flash first, or set the pre-buy to None.`
+        : null;
 
   const feeBpsNow = Math.round((Number(launchFeePct) || 0) * 100);
   const creatorPctNow = Math.max(0, Math.min(limits.maxCreatorShareBps / 100, Number(creatorSharePct) || 0));
@@ -1184,6 +1213,21 @@ export default function LaunchTokenModal({
       return;
     }
     if (!(await ensureSepolia())) return;
+    // Swiezy odczyt, nie stan z renderu: brak perpa ma zatrzymac start PRZED
+    // zgoda i transakcja, ktora i tak by rewertowala.
+    if (QUOTE_ASSET && preBuyWei > 0n) {
+      const held = (await readClient
+        .readContract({ address: QUOTE_ASSET.address, abi: erc20Abi, functionName: 'balanceOf', args: [address] })
+        .catch(() => null)) as bigint | null;
+      if (held !== null) setQuoteBalance(held);
+      if (held !== null && held < preBuyWei) {
+        setNotice({
+          kind: 'error',
+          text: `Your wallet holds ${formatEther(held)} ${NATIVE_SYMBOL}, the pre-buy needs ${formatEther(preBuyWei)}. Get ${NATIVE_SYMBOL} on Flash (tryflash.app/perps) or set the pre-buy to None.`,
+        });
+        return;
+      }
+    }
     setBusy(true);
     setNotice(null);
     try {
@@ -1832,7 +1876,9 @@ export default function LaunchTokenModal({
                         </div>
                       </div>
                       <div className="mt-2 flex flex-wrap gap-1.5">
-                        {['0', '0.01', '0.05', '0.1'].map((amount) => (
+                        {/* Na rynku Q te same proporcje do progu co 0.01/0.05/0.1 ETH przy 3 ETH:
+                            kwoty w perpie liczone od zbiorki 7 500. */}
+                        {(QUOTE_ASSET ? ['0', '25', '100', '250'] : ['0', '0.01', '0.05', '0.1']).map((amount) => (
                           <button key={amount} type="button" onClick={() => setPreBuyEth(amount)} className={CHIP}>
                             {amount === '0' ? 'None' : `${amount} ${NATIVE_SYMBOL}`}
                           </button>
@@ -1845,6 +1891,15 @@ export default function LaunchTokenModal({
                           {preBuyPreview
                             ? `≈ ${preBuyPreview.tokens.toLocaleString('en-US', { maximumFractionDigits: 0 })} ${launchSymbol || 'tokens'} · ${preBuyPreview.share.toFixed(2)}% of supply · for ${Number(preBuyEth)} ${NATIVE_SYMBOL}${usdSuffix(Number(preBuyEth))}`
                             : 'No pre-buy. The curve opens to everyone at the same price.'}
+                        </p>
+                      )}
+                      {QUOTE_ASSET && address && (
+                        <p className={HINT}>
+                          Wallet: {quoteBalance === null ? '...' : `${Number(formatEther(quoteBalance)).toLocaleString('en-US', { maximumFractionDigits: 4 })} ${NATIVE_SYMBOL}`}
+                          {' · '}
+                          <a href="https://tryflash.app/perps" target="_blank" rel="noopener noreferrer" className="font-bold text-soft-primary underline-offset-2 hover:underline">
+                            Get {NATIVE_SYMBOL} on Flash
+                          </a>
                         </p>
                       )}
                       <p className={HINT}>
