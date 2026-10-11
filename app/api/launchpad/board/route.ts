@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createPublicClient, getAbiItem, http, type Address } from 'viem';
-import { LAUNCHPAD_NETWORKS, launchpadAbi, launchpadsOf, scanFloorOf } from '../../../startpad/config';
+import { LAUNCHPAD_NETWORKS, launchpadAbi, launchpadsOf, networkForMarket, scanFloorOf } from '../../../startpad/config';
 import { rpcCandidates } from '../historyRpc';
 import {
   claimIndexScanLock,
@@ -143,7 +143,9 @@ const FRESH_FOR_MS = 30_000;
 
 export async function GET(request: NextRequest) {
   const asked = Number(request.nextUrl.searchParams.get('chainId'));
-  const net = Number.isFinite(asked) ? LAUNCHPAD_NETWORKS[asked] : undefined;
+  // `m` = rynek Q (para mem/perp) - wlasne launchpady i wlasny indeks.
+  const baseNet = Number.isFinite(asked) ? LAUNCHPAD_NETWORKS[asked] : undefined;
+  const net = baseNet ? networkForMarket(baseNet, request.nextUrl.searchParams.get('m')) : undefined;
   if (!net) {
     return NextResponse.json(
       { ok: false, error: 'Unknown chain.' },
@@ -151,12 +153,13 @@ export async function GET(request: NextRequest) {
     );
   }
   const chainId = asked;
+  const indexKey = net.marketId ? `${chainId}-${net.marketId}` : chainId;
   // Kilka wdrozen na siec (patrz `LaunchpadDeployment`): skan po wszystkich
   // launchpadach naraz, od NAJSTARSZEGO bloku wdrozenia.
   const deployFloor = scanFloorOf(net);
   const launchpadAddresses = launchpadsOf(net) as Address[];
 
-  const stored = await readTokenIndex(chainId);
+  const stored = await readTokenIndex(indexKey);
 
   /** Odpowiedz z samego zapisu - bez skanu. Jeden ksztalt na wszystkie wyjscia. */
   const fromStore = (body: Record<string, unknown>, headers: Record<string, string>) =>
@@ -241,7 +244,7 @@ export async function GET(request: NextRequest) {
    * blokady i tracimy najwyzej powtorzona prace. Ta sama zasada, co przy
    * historii tokena.
    */
-  const locked = await claimIndexScanLock(chainId);
+  const locked = await claimIndexScanLock(indexKey);
   if (!locked && indexed) {
     return fromStore({ ok: true, scanned: false }, { 'Cache-Control': 'no-store' });
   }
@@ -300,7 +303,7 @@ export async function GET(request: NextRequest) {
 
   // Bez zywej glowy lancucha nie ma jak skanowac - oddajemy to, co w bazie.
   if (clients.length === 0 || head === 0n) {
-    await releaseIndexScanLock(chainId);
+    await releaseIndexScanLock(indexKey);
     return fromStore({ ok: stored !== null, scanned: false }, { 'Cache-Control': 'no-store' });
   }
 
@@ -489,7 +492,7 @@ export async function GET(request: NextRequest) {
     // wlasciwe: skan naprawde sie odbyl, a jego powtorka za sekunde niczego by
     // nie dolozyla.
     tokens = await writeTokenIndex({
-      chainId,
+      chainId: indexKey,
       scanned,
       lastBlock,
       scannedDownTo,
@@ -503,7 +506,7 @@ export async function GET(request: NextRequest) {
     // teraz. Gorzej niz z baza, ale nadal lepiej niz nic, a klient ma wtedy
     // swoj skan awaryjny.
     tokens = mergeIndex(stored?.tokens ?? [], scanned);
-    if (locked) await releaseIndexScanLock(chainId);
+    if (locked) await releaseIndexScanLock(indexKey);
   }
 
   return NextResponse.json(

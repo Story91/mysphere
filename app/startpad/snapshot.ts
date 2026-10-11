@@ -7,7 +7,8 @@
  * te maja byc swieze, zeby launchpad zyl.
  */
 
-const KEY = (chainId: number) => `startpad.snapshot.${chainId}`;
+// `chainId` albo "8453-eth2xl" - rynek Q ma wlasna migawke (inne tokeny, inne jednostki).
+const KEY = (chainId: number | string) => `startpad.snapshot.${chainId}`;
 // Po dobie migawka jest za stara nawet jako placeholder - i tak dociagnie ja
 // skan, ale nie chcemy mignac tygodniowym stanem.
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -16,7 +17,7 @@ const MAX_AGE_MS = 24 * 60 * 60 * 1000;
  * Zapisuje TYLKO to, co da sie zserializowac: `flash` (animacja) i
  * `creatorAccruedWei` (bigint, i tak przeliczany przez skan) sa odrzucane.
  */
-export function saveSnapshot(chainId: number, tokens: unknown[]): void {
+export function saveSnapshot(chainId: number | string, tokens: unknown[]): void {
   if (typeof window === 'undefined') return;
   try {
     const clean = tokens.map((token) => {
@@ -29,7 +30,7 @@ export function saveSnapshot(chainId: number, tokens: unknown[]): void {
   }
 }
 
-export function loadSnapshot<T>(chainId: number): T[] | null {
+export function loadSnapshot<T>(chainId: number | string): T[] | null {
   if (typeof window === 'undefined') return null;
   try {
     const raw = window.localStorage.getItem(KEY(chainId));
@@ -209,9 +210,9 @@ export function loadTokenHistory(chainId: number, token: string): HistorySnapsho
  * WEJSCIU lepiej pokazac ostatni znany pasek od razu i odswiezyc, niz trzymac
  * pusto przez caly skan. Skan i subskrypcja i tak nadpisza to sekundy pozniej.
  */
-const FEED_KEY = (chainId: number) => `startpad.feed.${chainId}`;
+const FEED_KEY = (chainId: number | string) => `startpad.feed.${chainId}`;
 
-export function saveFeedSnapshot(chainId: number, feed: unknown[]): void {
+export function saveFeedSnapshot(chainId: number | string, feed: unknown[]): void {
   if (typeof window === 'undefined') return;
   try {
     window.localStorage.setItem(FEED_KEY(chainId), JSON.stringify({ savedAt: Date.now(), feed: feed.slice(0, 24) }));
@@ -220,7 +221,7 @@ export function saveFeedSnapshot(chainId: number, feed: unknown[]): void {
   }
 }
 
-export function loadFeedSnapshot<T>(chainId: number): T[] | null {
+export function loadFeedSnapshot<T>(chainId: number | string): T[] | null {
   if (typeof window === 'undefined') return null;
   try {
     const raw = window.localStorage.getItem(FEED_KEY(chainId));

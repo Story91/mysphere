@@ -7,6 +7,7 @@ import {
   ACTIVE_LAUNCHPAD_NETWORK,
   LAUNCHPAD_ADDRESS,
   LAUNCHPAD_ADDRESSES,
+  ACTIVE_MARKET_ID,
   LAUNCHPAD_CHAIN,
   LAUNCHPAD_DEPLOY_BLOCK,
 } from '../config';
@@ -247,6 +248,7 @@ export function useTokenHistory(
         startedAt: String(startedAt),
       });
       if (since) query.set('sinceBlock', since);
+      if (ACTIVE_MARKET_ID) query.set('m', ACTIVE_MARKET_ID);
 
       // TERMIN NA ODPOWIEDZ TRASY, nie tylko na jej blad.
       //

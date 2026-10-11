@@ -37,7 +37,7 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import { decodeEventLog, encodeEventTopics, formatEther, parseEther, type Address, type Hex } from 'viem';
+import { decodeEventLog, encodeEventTopics, formatEther, maxUint256, parseEther, type Address, type Hex } from 'viem';
 import { useAccount, useChainId, usePublicClient, useSwitchChain, useWalletClient } from 'wagmi';
 import {
   B20_TOKEN_FACTORY_ADDRESS,
@@ -51,6 +51,9 @@ import {
   launchpadAbi,
   type LaunchpadToken,
   NATIVE_SYMBOL,
+  QUOTE_ASSET,
+  quoteLaunchpadAbi,
+  erc20Abi,
 } from './config';
 import { formatUsd, useEthUsd } from './useEthUsd';
 import { browserStorage, clearPendingProfile, postProfileWithRetry, savePendingProfile, sendTokenProfile } from './profileSync';
@@ -1192,7 +1195,83 @@ export default function LaunchTokenModal({
       // jest deterministyczna, wiec `1` spelnia wymog `SlippageRequired`, nie
       // udajac przy tym ochrony, ktorej ten jeden przypadek nie potrzebuje.
       const minTokensOut = preBuyWei > 0n ? 1n : 0n;
-      const hash = useVanity && advanced.args && vanitySalt
+      // RYNEK Q (para z perpem): dev-buy w aktywie pary, nie w ETH - zgoda
+      // dla launchpada i funkcje z argumentem `quoteIn` (quoteLaunchpadAbi).
+      if (QUOTE_ASSET && preBuyWei > 0n) {
+        const allowance = (await readClient.readContract({
+          address: QUOTE_ASSET.address,
+          abi: erc20Abi,
+          functionName: 'allowance',
+          args: [address, LAUNCHPAD_ADDRESS as Address],
+        })) as bigint;
+        if (allowance < preBuyWei) {
+          const approveHash = await walletClient.writeContract({
+            address: QUOTE_ASSET.address,
+            abi: erc20Abi,
+            functionName: 'approve',
+            args: [LAUNCHPAD_ADDRESS as Address, maxUint256],
+            chain: LAUNCHPAD_CHAIN,
+            account: address,
+          });
+          const approveReceipt = await readClient.waitForTransactionReceipt({ hash: approveHash });
+          if (approveReceipt.status !== 'success') throw new Error(`The ${QUOTE_ASSET.symbol} approval failed, so nothing was launched.`);
+        }
+      }
+      const hash = QUOTE_ASSET
+        ? useVanity && advanced.args && vanitySalt
+          ? await walletClient.writeContract({
+              address: LAUNCHPAD_ADDRESS as Address,
+              abi: quoteLaunchpadAbi,
+              functionName: 'launchVanity',
+              args: [
+                vanitySalt,
+                name,
+                symbol,
+                preBuyWei,
+                minTokensOut,
+                deadline,
+                advanced.args.feeBps,
+                advanced.args.creatorFeeBps,
+                advanced.args.buybackBps,
+                advanced.args.windowCap,
+                advanced.args.accounts,
+                advanced.args.shares,
+                advanced.args.metadataURI,
+              ],
+              chain: LAUNCHPAD_CHAIN,
+              account: address,
+            })
+          : useAdvanced && advanced.args
+          ? await walletClient.writeContract({
+              address: LAUNCHPAD_ADDRESS as Address,
+              abi: quoteLaunchpadAbi,
+              functionName: 'launchAdvanced',
+              args: [
+                name,
+                symbol,
+                preBuyWei,
+                minTokensOut,
+                deadline,
+                advanced.args.feeBps,
+                advanced.args.creatorFeeBps,
+                advanced.args.buybackBps,
+                advanced.args.windowCap,
+                advanced.args.accounts,
+                advanced.args.shares,
+                advanced.args.metadataURI,
+              ],
+              chain: LAUNCHPAD_CHAIN,
+              account: address,
+            })
+          : await walletClient.writeContract({
+              address: LAUNCHPAD_ADDRESS as Address,
+              abi: quoteLaunchpadAbi,
+              functionName: 'launch',
+              args: [name, symbol, preBuyWei, minTokensOut, deadline],
+              chain: LAUNCHPAD_CHAIN,
+              account: address,
+            })
+        : useVanity && advanced.args && vanitySalt
         ? await walletClient.writeContract({
             address: LAUNCHPAD_ADDRESS as Address,
             abi: launchpadAbi,

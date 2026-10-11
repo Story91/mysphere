@@ -114,6 +114,28 @@ fabryka `B20TokenFactoryV2` `0xC2855687d5234C64D816a763d1513B4484Db72Ed`:
   i w USDC (1246 jedn.), settle 373/699/174 - wszystko zgodne z testami.
 - Wczesniejsze wdrozenie z fabryka v1 (`0xbcB13EA7...2100`) jest martwe - start odbija sie od `WrongVariant()`.
 
+## 2.10 Mainnet - rynki perpow Flash (2026-10-11)
+
+Fabryka `B20TokenFactoryV2` `0xF1DAd68f9B0b00A80E993286419AD03e9380e7B0`, R_VIRT 1875 jednostek perpa
+(NAV ~1 $ -> zbiorka ~7 500 $), oplaty do Safe `0x83E2DE974FC6B866FDb78AEFa5596d58fDc4142F`.
+
+| Rynek | Perp (QUOTE) | Launchpad | Vault | Hook |
+|---|---|---|---|---|
+| ETH2xL | `0xB200000000000000000000FfFF60CC8138cDf452` | `0x86B7d672B0520A37A5f13788b9b2F821a9E9ff5d` | `0x45f3ea7a6c68f4BB3a0d3B2cb8aA697D102674F8` | `0xBd69E3b17FD25b33d965C4857569e8a800C32044` |
+| NVDA2xL | `0xb200000000000000000000fFFfE13bBeCe8B183C` | `0x90C0213B96f5B279D68259D1E527B878e9eCc61D` | `0x39e77AED2805316e05B381ea85fD8664793EF153` | `0x1B32f340AFaA6Ba5c750f588CBf51e83f8516044` |
+| BTC2xL | `0xB200000000000000000000ffff4a0dA1092f5359` | `0x1043e1e26256a0a66F05D649C88a637Fd15a8Dbc` | `0x0459c8c89929668BC65163F804c77ECD69B66551` | `0xcB1e55968dc91f68D5e3a7019F0a21ECA9F6e044` |
+| SPCX2xL | `0xB200000000000000000000ffFFDaEA025548eAe4` | `0x10eF2Edc204Dcc8060aBB03699a13eaB0c3c14eE` | `0x8b2e0Cb173a73B6db857848c78e0ACa1F65E4ae0` | `0x490DcE11B858B816E9153cF54deB3B32bd1F6044` |
+
+Start sprawdzony eth_call na kazdym. Perp ma adres `0xB200...ffff`, wiec prawie zawsze lezy POWYZEJ mema -
+orientacja "QUOTE = currency1" (przetestowana). Zweryfikowane odczytem: ETH2xL to B20 ASSET, 18 miejsc,
+wlasciciel ma tylko METADATA_ROLE (brak admin/mint/pause/seize). Ryzyka po stronie Flash: brak audytu,
+hook i rail kontroluje EOA `0x3Cc4...578d` (setPoolParams, retirePool, disableIssuance,
+closeVaultForOutage) - zaakceptowane przez wlasciciela 2026-10-11 ("znam ich").
+
+Front: rynki jako osobne tablice w przelaczniku (`?m=eth2xl`), kwoty i ceny w jednostkach perpa,
+dopiski $ z NAV (`/api/launchpad/quote-price` -> api.tryflash.app), kupno = approve + `buy(kwota)`,
+pula po graduacji przez Permit2 na perpie.
+
 ## 3. Fazy
 
 1. **Kontrakty + testy** (ta faza): `contracts/launchpad/quote/*`, testy na PRAWDZIWYM

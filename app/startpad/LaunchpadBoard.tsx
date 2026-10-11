@@ -52,6 +52,9 @@ import {
   LIVE_WATCH,
   previewTokens,
   setLaunchpadChain,
+  setLaunchpadMarket,
+  MARKET_QUERY,
+  ACTIVE_MARKET_ID,
   STATE_VIEW_ADDRESS,
   type LaunchpadToken,
 } from './config';
@@ -137,6 +140,14 @@ const NET = ACTIVE_LAUNCHPAD_NETWORK.label;
  * Do hydratacji renderujemy sam napis; select wchodzi po montazu, zeby
  * kontrolowana wartosc nie klocila sie z HTML-em z serwera.
  */
+/**
+ * Klucz migawek tablicy w localStorage: siec, a na rynku Q siec + rynek.
+ * Sam chainId wczytywal na tablicy ETH2xL wiersze z tablicy ETH tej sieci.
+ */
+const BOARD_CACHE_KEY: number | string = ACTIVE_MARKET_ID
+  ? `${ACTIVE_LAUNCHPAD_NETWORK.chain.id}-${ACTIVE_MARKET_ID}`
+  : ACTIVE_LAUNCHPAD_NETWORK.chain.id;
+
 function NetworkSwitch() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -148,7 +159,7 @@ function NetworkSwitch() {
     <span className={`inline-flex items-center gap-1.5 py-2.5 pl-3.5 pr-2 ${active.accentTextClass}`}>
       <span className="h-2 w-2 shrink-0 rounded-full bg-current" aria-hidden="true" />
       <select
-        value={active.chain.id}
+        value={active.marketId ? `${active.chain.id}:${active.marketId}` : active.chain.id}
         onChange={(event) => {
           // $SPHERE mieszka NA LISCIE sieci (decyzja wlasciciela 2026-08-31:
           // osobny przycisk rozpychal piguke wyboru) - to nawigacja, nie
@@ -157,7 +168,17 @@ function NetworkSwitch() {
             window.location.href = '/startpad/sphere';
             return;
           }
-          setLaunchpadChain(Number(event.target.value));
+          // Rynek Q na sieci ("8453:eth2xl") - osobna tablica z para mem/perp.
+          const [chainPart, marketPart] = event.target.value.split(':');
+          if (marketPart) {
+            setLaunchpadMarket(Number(chainPart), marketPart);
+            return;
+          }
+          if (Number(chainPart) === active.chain.id && active.marketId) {
+            setLaunchpadMarket(active.chain.id, null);
+            return;
+          }
+          setLaunchpadChain(Number(chainPart));
         }}
         aria-label="Launchpad network"
         className="cursor-pointer bg-transparent text-[12px] font-extrabold outline-none [color:inherit] [&>option]:bg-sp-surface [&>option]:text-sp-ink"
@@ -169,11 +190,17 @@ function NetworkSwitch() {
             przelaczyc sie z niego na mainnet. */}
         {Object.values(LAUNCHPAD_NETWORKS)
           .filter((net) => !net.testnet || net.chain.id === active.chain.id)
-          .map((net) => (
+          .flatMap((net) => [
             <option key={net.chain.id} value={net.chain.id}>
               {net.label}
-            </option>
-          ))}
+            </option>,
+            // Rynki Q tej sieci - zaraz pod nia, jako "Base B20 · ETH2xL".
+            ...(net.markets ?? []).map((m) => (
+              <option key={`${net.chain.id}:${m.id}`} value={`${net.chain.id}:${m.id}`}>
+                {`${net.label} · ${m.label}`}
+              </option>
+            )),
+          ])}
         <option disabled>──────</option>
         <option value="sphere">✦ $SPHERE</option>
       </select>
@@ -1810,7 +1837,7 @@ export default function LaunchpadBoard() {
       // Doklejamy WYLACZNIE brakujace: gdy skan zobaczyl `Launched`, jego dane
       // sa swiezsze i zostaja.
       try {
-        const response = await fetch(`/api/launchpad/board?chainId=${ACTIVE_LAUNCHPAD_NETWORK.chain.id}`);
+        const response = await fetch(`/api/launchpad/board?chainId=${ACTIVE_LAUNCHPAD_NETWORK.chain.id}${MARKET_QUERY}`);
         if (response.ok) {
           const body = (await response.json()) as {
             ok?: boolean;
@@ -2461,7 +2488,7 @@ export default function LaunchpadBoard() {
   useEffect(() => {
     if (snapshotRestored.current) return;
     snapshotRestored.current = true;
-    const cached = loadSnapshot<BoardToken>(ACTIVE_LAUNCHPAD_NETWORK.chain.id);
+    const cached = loadSnapshot<BoardToken>(BOARD_CACHE_KEY);
     if (cached && cached.length) {
       setTokens(cached);
       setSelectedId((current) => current || cached[0].id);
@@ -2471,7 +2498,7 @@ export default function LaunchpadBoard() {
     }
     // Live tape z migawki - pasek pokazuje sie OD RAZU zamiast pusty przez caly
     // skan; skan i subskrypcja nadpisza go sekundy pozniej.
-    const cachedFeed = loadFeedSnapshot<ActivityItem>(ACTIVE_LAUNCHPAD_NETWORK.chain.id);
+    const cachedFeed = loadFeedSnapshot<ActivityItem>(BOARD_CACHE_KEY);
     if (cachedFeed && cachedFeed.length) setActivityFeed(cachedFeed);
   }, []);
 
@@ -2505,7 +2532,7 @@ export default function LaunchpadBoard() {
   // lapie tez logo scalone z Bloba, wiec po reloadzie sa od razu.
   useEffect(() => {
     const real = tokens.filter((token) => token.live);
-    if (real.length) saveSnapshot(ACTIVE_LAUNCHPAD_NETWORK.chain.id, real);
+    if (real.length) saveSnapshot(BOARD_CACHE_KEY, real);
   }, [tokens]);
 
   // Migawka live tape, zeby przy nastepnym wejsciu pasek byl od razu. Wiersze
@@ -2513,7 +2540,7 @@ export default function LaunchpadBoard() {
   // sesji, a nie faktem - po przeladowaniu wisialaby jako wieczne oczekiwanie.
   useEffect(() => {
     const landed = activityFeed.filter((item) => !item.pending);
-    if (landed.length) saveFeedSnapshot(ACTIVE_LAUNCHPAD_NETWORK.chain.id, landed);
+    if (landed.length) saveFeedSnapshot(BOARD_CACHE_KEY, landed);
   }, [activityFeed]);
 
   /**
@@ -3725,7 +3752,7 @@ export default function LaunchpadBoard() {
         )}
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <BoardStats symbol={netState.chain.nativeCurrency.symbol} totalRaised={totalRaised} totalVolume={totalVolume} totalTrades={totalTrades} liveCount={liveCount} ethUsd={ethUsd} />
+          <BoardStats symbol={netState.quote?.symbol ?? netState.chain.nativeCurrency.symbol} totalRaised={totalRaised} totalVolume={totalVolume} totalTrades={totalTrades} liveCount={liveCount} ethUsd={ethUsd} />
           <TopLaunches sample={showingPreview} tokens={tokens} onOpen={(token) => token.address && router.push(`/startpad/${token.address}`)} />
           <VolumePanel sample={showingPreview} tokens={tokens} onOpen={(token) => token.address && router.push(`/startpad/${token.address}`)} />
           <TopEarnings rows={topEarners} ethUsd={ethUsd} />

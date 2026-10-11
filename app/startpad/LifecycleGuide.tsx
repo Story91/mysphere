@@ -132,7 +132,7 @@ export function LifecycleGuide({ className = '' }: { className?: string }) {
   );
   useEffect(() => setNet(ACTIVE_LAUNCHPAD_NETWORK), []);
 
-  const symbol = net.chain.nativeCurrency.symbol;
+  const symbol = net.quote?.symbol ?? net.chain.nativeCurrency.symbol;
   const rVirt = net.rVirt;
   const targetValue = rVirt * 4;
   const target = `${amount(targetValue)} ${symbol}`;

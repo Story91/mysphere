@@ -26,6 +26,8 @@ import {
   launchpadAbi,
   LIQUIDITY_VAULT_ADDRESS,
   liquidityVaultAbi,
+  QUOTE_ASSET,
+  quoteLaunchpadAbi,
 } from '../config';
 import {
   applySlippage,
@@ -186,8 +188,11 @@ export default function TradePanel({
       return;
     }
     let cancelled = false;
-    readClient
-      .getBalance({ address: account })
+    // Rynek Q: placi sie tokenem aktywa pary (ETH2xL...), nie ETH.
+    const read = QUOTE_ASSET
+      ? (readClient.readContract({ address: QUOTE_ASSET.address, abi: erc20Abi, functionName: 'balanceOf', args: [account] }) as Promise<bigint>)
+      : readClient.getBalance({ address: account });
+    read
       .then((value) => {
         if (!cancelled) setEthBalance(value);
       })
@@ -306,12 +311,16 @@ export default function TradePanel({
    * Stad dwie rzeczy naraz: WLASNY limit gazu z zapasem (portfele licza go
    * ciasno i bez marginesu) oraz sprawdzenie statusu paragonu.
    */
-  const ensureAllowance = async (amount: bigint): Promise<boolean> => {
+  /**
+   * Zgoda na przelew `asset` przez launchpad tego tokena. Domyslnie sam token
+   * (sprzedaz); na rynku Q takze aktywo pary przy kupnie.
+   */
+  const ensureAllowance = async (amount: bigint, asset: Address = core.token): Promise<boolean> => {
     if (!account || !walletClient || !readClient) return false;
 
     // Swiezy odczyt, nie `core.allowance` sprzed wejscia na strone.
     const current = (await readClient.readContract({
-      address: core.token,
+      address: asset,
       abi: erc20Abi,
       functionName: 'allowance',
       args: [account, core.deployment.launchpad as Address],
@@ -322,7 +331,7 @@ export default function TradePanel({
     let gas: bigint | undefined;
     try {
       const estimate = await readClient.estimateContractGas({
-        address: core.token,
+        address: asset,
         abi: erc20Abi,
         functionName: 'approve',
         args: [core.deployment.launchpad as Address, maxUint256],
@@ -335,7 +344,7 @@ export default function TradePanel({
     }
 
     const hash = await walletClient.writeContract({
-      address: core.token,
+      address: asset,
       abi: erc20Abi,
       functionName: 'approve',
       args: [core.deployment.launchpad as Address, maxUint256],
@@ -345,7 +354,7 @@ export default function TradePanel({
     });
     const receipt = await readClient.waitForTransactionReceipt({ hash });
     if (receipt.status !== 'success') {
-      setNotice({ kind: 'error', text: 'The approval transaction failed, so nothing was sold. Try again.' });
+      setNotice({ kind: 'error', text: 'The approval transaction failed, so nothing was traded. Try again.' });
       return false;
     }
     return true;
@@ -368,31 +377,46 @@ export default function TradePanel({
     try {
       const quote = await readClient.readContract({ address: core.deployment.launchpad as Address, abi: launchpadAbi, functionName: 'quoteBuy', args: [core.token, value] });
       const minTokensOut = applySlippage(quote[0], slippageBps);
-      // Symulacja PRZED otwarciem portfela. Transakcja, ktora i tak by padla,
-      // nie ma po co isc na lancuch - uzytkownik dostaje powod zamiast
-      // rachunku za gaz.
-      const { request } = await readClient.simulateContract({
-        address: core.deployment.launchpad as Address,
-        abi: launchpadAbi,
-        functionName: 'buy',
-        args: [core.token, minTokensOut, BigInt(Math.floor(Date.now() / 1000) + 900)],
-        value,
-        account,
-      });
-      void request;
+      const deadline = BigInt(Math.floor(Date.now() / 1000) + 900);
       // Wiadomosc jedzie za argumentami ABI - kontrakt jej nie czyta, kupno
       // jest tym samym kupnem. Opis formatu w tradeMessage.ts.
       const dataSuffix = encodeTradeMessage(tradeMessage) ?? undefined;
-      const hash = await walletClient.writeContract({
-        address: core.deployment.launchpad as Address,
-        abi: launchpadAbi,
-        functionName: 'buy',
-        args: [core.token, minTokensOut, BigInt(Math.floor(Date.now() / 1000) + 900)],
-        value,
-        chain: LAUNCHPAD_CHAIN,
-        account,
-        dataSuffix,
-      });
+      let hash: `0x${string}`;
+      if (QUOTE_ASSET) {
+        // Rynek Q: kwota w aktywie pary, najpierw zgoda dla launchpada.
+        if (!(await ensureAllowance(value, QUOTE_ASSET.address))) return;
+        setBusy('buy');
+        const buyCall = {
+          address: core.deployment.launchpad as Address,
+          abi: quoteLaunchpadAbi,
+          functionName: 'buy' as const,
+          args: [core.token, value, minTokensOut, deadline] as const,
+        };
+        await readClient.simulateContract({ ...buyCall, account });
+        hash = await walletClient.writeContract({ ...buyCall, chain: LAUNCHPAD_CHAIN, account, dataSuffix });
+      } else {
+        // Symulacja PRZED otwarciem portfela. Transakcja, ktora i tak by padla,
+        // nie ma po co isc na lancuch - uzytkownik dostaje powod zamiast
+        // rachunku za gaz.
+        await readClient.simulateContract({
+          address: core.deployment.launchpad as Address,
+          abi: launchpadAbi,
+          functionName: 'buy',
+          args: [core.token, minTokensOut, deadline],
+          value,
+          account,
+        });
+        hash = await walletClient.writeContract({
+          address: core.deployment.launchpad as Address,
+          abi: launchpadAbi,
+          functionName: 'buy',
+          args: [core.token, minTokensOut, deadline],
+          value,
+          chain: LAUNCHPAD_CHAIN,
+          account,
+          dataSuffix,
+        });
+      }
       const receipt = await readClient.waitForTransactionReceipt({ hash });
       if (receipt.status !== 'success') throw new Error('The buy transaction reverted.');
       setNotice({ kind: 'success', text: `Buy confirmed${dataSuffix ? ' with your message' : ''}. ${hash.slice(0, 10)}...` });
@@ -533,7 +557,7 @@ export default function TradePanel({
       const v4 = V4_BY_CHAIN[ACTIVE_LAUNCHPAD_NETWORK.chain.id];
       let minTokensOut = 0n;
       if (v4) {
-        const poolKey = canonicalPoolKey(core.token, core.deployment.hook as Address);
+        const poolKey = canonicalPoolKey(core.token, core.deployment.hook as Address, QUOTE_ASSET?.address ?? null);
         const quoted = (await readClient.readContract({
           address: v4.quoter,
           abi: v4QuoterAbi,
@@ -622,7 +646,8 @@ export default function TradePanel({
   // Wydawalne ETH: saldo minus rezerwa na gaz. Ta sama poprawka, co w mini
   // panelu na tablicy - rezerwa 0,005 ETH byla wieksza niz cale saldo malego
   // portfela i kazdy procent wpisywal ZERO. Uzasadnienie przy `GAS_RESERVE_WEI`.
-  const spendable = spendableEth(ethBalance, GAS_RESERVE_WEI);
+  // Na rynku Q gaz placi sie w ETH, a kupuje aktywem pary - rezerwy nie ma.
+  const spendable = QUOTE_ASSET ? (ethBalance ?? 0n) : spendableEth(ethBalance, GAS_RESERVE_WEI);
 
   const setBuyPct = (pct: bigint) => {
     if (spendable <= 0n) return;

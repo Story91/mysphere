@@ -21,7 +21,7 @@ import {
  */
 
 export type TokenIndex = {
-  chainId: number;
+  chainId: number | string;
   tokens: IndexedToken[];
   /** Do ktorego bloku zeskanowano zdarzenia `Launched`, liczac W GORE. */
   lastBlock: bigint;
@@ -51,7 +51,7 @@ export async function isTokenIndexAvailable(): Promise<boolean> {
 }
 
 /** Prawda, gdy to zadanie ma prawo skanowac. Falsz - ktos inny wlasnie to robi. */
-export async function claimIndexScanLock(chainId: number): Promise<boolean> {
+export async function claimIndexScanLock(chainId: number | string): Promise<boolean> {
   const db = await getAdminDb();
   if (!db) return false;
 
@@ -81,7 +81,7 @@ export async function claimIndexScanLock(chainId: number): Promise<boolean> {
  * samym atomowym `set`. `withDeadline`, bo to wywolanie stoi miedzy policzona
  * odpowiedzia a jej wyslaniem, a blokada i tak wygasa sama.
  */
-export async function releaseIndexScanLock(chainId: number): Promise<void> {
+export async function releaseIndexScanLock(chainId: number | string): Promise<void> {
   const db = await getAdminDb();
   if (!db) return;
   try {
@@ -95,7 +95,7 @@ export async function releaseIndexScanLock(chainId: number): Promise<void> {
   }
 }
 
-export async function readTokenIndex(chainId: number): Promise<TokenIndex | null> {
+export async function readTokenIndex(chainId: number | string): Promise<TokenIndex | null> {
   const db = await getAdminDb();
   if (!db) return null;
 
@@ -170,7 +170,7 @@ export async function readTokenIndex(chainId: number): Promise<TokenIndex | null
  * Tozsamosci zostaja, bo `mergeIndex` niczego nie usuwa.
  */
 export async function writeTokenIndex(input: {
-  chainId: number;
+  chainId: number | string;
   scanned: IndexedToken[];
   lastBlock: bigint;
   scannedDownTo: bigint;

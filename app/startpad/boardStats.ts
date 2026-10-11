@@ -1,3 +1,4 @@
+import { MARKET_QUERY } from './config';
 /**
  * AGREGAT TABLICY Z SERWERA - i regula, ktora decyduje, ktory z dwoch
  * zapamietanych stanow jest podstawa do doliczenia delty.
@@ -113,7 +114,7 @@ export async function fetchBoardStats(
   chainId: number
 ): Promise<{ aggregate: BoardAggregate; lastBlock: bigint } | null> {
   try {
-    const response = await fetch(`/api/launchpad/board/stats?chainId=${chainId}`, {
+    const response = await fetch(`/api/launchpad/board/stats?chainId=${chainId}${MARKET_QUERY}`, {
       signal: AbortSignal.timeout(BOARD_STATS_TIMEOUT_MS),
     });
     if (!response.ok) return null;

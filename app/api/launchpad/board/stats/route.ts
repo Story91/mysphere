@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createPublicClient, formatEther, getAbiItem, http, type Address } from 'viem';
-import { hookAbi, hooksOf, LAUNCHPAD_NETWORKS, launchpadAbi, launchpadsOf, scanFloorOf } from '../../../../startpad/config';
+import { hookAbi, hooksOf, LAUNCHPAD_NETWORKS, launchpadAbi, launchpadsOf, networkForMarket, scanFloorOf } from '../../../../startpad/config';
 import {
   emptyAggregate,
   mergeAggregates,
@@ -179,7 +179,9 @@ function fromStore(
 
 export async function GET(request: NextRequest) {
   const asked = Number(request.nextUrl.searchParams.get('chainId'));
-  const net = Number.isFinite(asked) ? LAUNCHPAD_NETWORKS[asked] : undefined;
+  // `m` = rynek Q: zapis kluczowany launchpadem rynku, wiec agregaty sie nie mieszaja.
+  const baseNet = Number.isFinite(asked) ? LAUNCHPAD_NETWORKS[asked] : undefined;
+  const net = baseNet ? networkForMarket(baseNet, request.nextUrl.searchParams.get('m')) : undefined;
   if (!net) {
     return NextResponse.json({ ok: false, error: 'Unknown chain.' }, { status: 400, headers: noStore });
   }

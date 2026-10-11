@@ -1,5 +1,5 @@
 import type { Address } from 'viem';
-import { deploymentsOf, LAUNCHPAD_DEPLOYMENTS, launchpadAbi, type LaunchpadDeployment, type LaunchpadNetwork } from './config';
+import { ACTIVE_LAUNCHPAD_NETWORK, ACTIVE_MARKET_ID, allDeploymentsOfChain, LAUNCHPAD_DEPLOYMENTS, LAUNCHPAD_NETWORKS, launchpadAbi, type LaunchpadDeployment, type LaunchpadNetwork } from './config';
 
 /**
  * Z ktorego wdrozenia pochodzi token - dla stron, ktore znaja tylko jego adres
@@ -64,7 +64,8 @@ export async function findTokenLaunch(
 ): Promise<{ dep: LaunchpadDeployment; launch: LaunchTuple } | null> {
   let lastError: unknown = null;
   let answered = 0;
-  for (const dep of deploymentsOf(network)) {
+  // Takze rynki Q - profil, logo i karta tokena perpa sa tak samo potrzebne.
+  for (const dep of allDeploymentsOfChain(network)) {
     try {
       const launch = (await client.readContract({
         address: dep.launchpad as Address,
@@ -82,4 +83,29 @@ export async function findTokenLaunch(
   // wolajacy ma prawo to rozroznic (np. ponowic), wiec rzucamy ostatni blad.
   if (answered === 0 && lastError) throw lastError;
   return null;
+}
+
+/**
+ * Rynek, do ktorego nalezy token spoza aktywnego rynku - dla strony tokena
+ * otwartej z linku bez `?m=`. Zwraca id rynku Q, `null` dla rynku ETH sieci,
+ * albo `undefined`, gdy nikt na tej sieci nie zna tokena.
+ */
+export async function findTokenMarket(client: ReadClient, token: Address): Promise<string | null | undefined> {
+  const base = LAUNCHPAD_NETWORKS[ACTIVE_LAUNCHPAD_NETWORK.chain.id];
+  const candidates = allDeploymentsOfChain(base).filter((d) => (d.marketId ?? null) !== ACTIVE_MARKET_ID);
+  if (candidates.length === 0) return undefined;
+  const results = await client.multicall({
+    allowFailure: true,
+    contracts: candidates.map((d) => ({
+      address: d.launchpad as Address,
+      abi: launchpadAbi,
+      functionName: 'launchOf' as const,
+      args: [token] as const,
+    })),
+  });
+  for (let i = 0; i < candidates.length; i++) {
+    const r = results[i];
+    if (r?.status === 'success' && Number((r.result as readonly unknown[])[1]) !== 0) return candidates[i].marketId ?? null;
+  }
+  return undefined;
 }

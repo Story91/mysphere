@@ -119,9 +119,26 @@ export type PoolKey = {
   hooks: Address;
 };
 
-/** Klucz puli tokena z pada: ETH jako currency0, token jako currency1, hook launchpada. */
-export function canonicalPoolKey(token: Address, hooks: Address): PoolKey {
-  return { currency0: NATIVE, currency1: token, fee: CANONICAL_POOL_FEE, tickSpacing: CANONICAL_TICK_SPACING, hooks };
+/**
+ * Klucz puli tokena z pada: ETH jako currency0, token jako currency1, hook
+ * launchpada. Na rynku Q para to aktywo (ETH2xL...) i token, w kolejnosci
+ * adresow - v4 wymaga currency0 < currency1 (patrz QuoteCurveLaunchpad.poolKeyOf).
+ */
+export function canonicalPoolKey(token: Address, hooks: Address, quote?: Address | null): PoolKey {
+  if (!quote) return { currency0: NATIVE, currency1: token, fee: CANONICAL_POOL_FEE, tickSpacing: CANONICAL_TICK_SPACING, hooks };
+  const quoteIs0 = BigInt(quote) < BigInt(token);
+  return {
+    currency0: quoteIs0 ? quote : token,
+    currency1: quoteIs0 ? token : quote,
+    fee: CANONICAL_POOL_FEE,
+    tickSpacing: CANONICAL_TICK_SPACING,
+    hooks,
+  };
+}
+
+/** Kierunek KUPNA tokena w puli: ETH/aktywo -> token. Na rynku ETH zawsze zeroForOne. */
+export function buyIsZeroForOne(token: Address, quote?: Address | null): boolean {
+  return quote ? BigInt(quote) < BigInt(token) : true;
 }
 
 export const universalRouterAbi = [

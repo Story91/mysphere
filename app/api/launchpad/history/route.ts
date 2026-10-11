@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createPublicClient, http, type Address } from 'viem';
-import { deploymentsOf, LAUNCHPAD_NETWORKS, launchpadsOf, scanFloorOf, type LaunchpadNetwork } from '../../../startpad/config';
+import { deploymentsOf, LAUNCHPAD_NETWORKS, launchpadsOf, networkForMarket, scanFloorOf, type LaunchpadNetwork } from '../../../startpad/config';
 import {
   balanceCandidates,
   balancesArePoisoned,
@@ -111,7 +111,9 @@ export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
 
   const chainId = Number(params.get('chainId'));
-  const net = Number.isFinite(chainId) ? LAUNCHPAD_NETWORKS[chainId] : undefined;
+  const baseNet = Number.isFinite(chainId) ? LAUNCHPAD_NETWORKS[chainId] : undefined;
+  // `m` = rynek Q: skan po launchpadach rynku (adres tokena jest i tak unikalny).
+  const net = baseNet ? networkForMarket(baseNet, params.get('m')) : undefined;
   if (!net) return bad(`Chain ${params.get('chainId')} is not served here.`, 400);
 
   const token = (params.get('token') ?? '').trim();

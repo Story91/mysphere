@@ -27,7 +27,8 @@
 export const TOKEN_INDEX_COLLECTION = 'launchpadTokenIndex';
 
 /** Jeden dokument na siec. Ten sam launchpad na dwoch lancuchach to dwie listy. */
-export function indexDocId(chainId: number): string {
+export function indexDocId(chainId: number | string): string {
+  // Rynek Q ma wlasny indeks: klucz "8453-eth2xl" (tokeny rynku nie mieszaja sie z ETH).
   return String(chainId);
 }
 

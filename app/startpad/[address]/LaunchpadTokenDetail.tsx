@@ -21,6 +21,7 @@ import {
   erc20Abi,
   hookAbi,
   LAUNCHPAD_DEPLOYMENTS,
+  setLaunchpadMarket,
   LAUNCHPAD_CHAIN,
   LAUNCHPAD_EXPLORER_URL,
   LAUNCH_STATE,
@@ -40,7 +41,7 @@ import ShareToken from '../ShareToken';
 import DetailTabs from './DetailTabs';
 import PriceChart from './PriceChart';
 import TradePanel from './TradePanel';
-import { resolveTokenDeployment } from '../deployments';
+import { findTokenMarket, resolveTokenDeployment } from '../deployments';
 import { LifecycleGuide, STATE_HINT } from '../LifecycleGuide';
 import {
   DEAD_ADDRESS,
@@ -218,6 +219,13 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
       // Stan 0 znaczy "launchpad nie zna tego adresu" - to nie jest pusta
       // krzywa, tylko nieznany token, i tak go pokazujemy.
       if (Number(stateIndex) === 0) {
+        // Token z innego rynku tej sieci (np. mem na ETH2xL otwarty linkiem
+        // bez `?m=`) - przelaczamy rynek zamiast pokazywac "nie znaleziono".
+        const market = await findTokenMarket(readClient as any, tokenAddress).catch(() => undefined);
+        if (market !== undefined) {
+          setLaunchpadMarket(LAUNCHPAD_CHAIN.id, market);
+          return;
+        }
         setNotFound(true);
         setCoreLoading(false);
         return;

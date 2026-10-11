@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { NATIVE_IS_USD } from './config';
+import { NATIVE_IS_USD, QUOTE_ASSET } from './config';
 
 /**
  * Kurs jednostki natywnej do USD dla dopiskow w UI - KONTRAKT INTERFEJSU dla
@@ -39,7 +39,10 @@ export function useEthUsd(options?: EthUsdOptions): { usd: number | null; refres
     let cancelled = false;
     const load = async () => {
       try {
-        const response = await fetch('/api/launchpad/eth-price');
+        // Rynek Q: kwoty sa w aktywie pary, wiec kurs aktywa (NAV perpa), nie ETH.
+        const response = await fetch(
+          QUOTE_ASSET ? `/api/launchpad/quote-price?token=${QUOTE_ASSET.address}` : '/api/launchpad/eth-price'
+        );
         if (!response.ok) return;
         const payload = (await response.json()) as { usd?: number; at?: number };
         if (cancelled) return;

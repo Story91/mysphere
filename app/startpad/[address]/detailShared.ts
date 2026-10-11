@@ -28,7 +28,10 @@ export const SUPPLY_WEI = SUPPLY_TOKENS * WEI;
  * aktywna siec wynika juz z adresu strony.
  */
 function scaleOf(chainId: number): bigint {
-  const net = LAUNCHPAD_NETWORKS[chainId] ?? ACTIVE_LAUNCHPAD_NETWORK;
+  // Aktywna siec = AKTYWNY RYNEK: na rynku Q (para z perpem) skala jest w
+  // jednostkach aktywa pary i rozni sie od skali ETH tej samej sieci.
+  const net =
+    chainId === ACTIVE_LAUNCHPAD_NETWORK.chain.id ? ACTIVE_LAUNCHPAD_NETWORK : LAUNCHPAD_NETWORKS[chainId] ?? ACTIVE_LAUNCHPAD_NETWORK;
   return parseEther(String(net.rVirt));
 }
 

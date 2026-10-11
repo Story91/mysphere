@@ -1,17 +1,16 @@
 import 'server-only';
-import { createPublicClient, formatEther, http, type Address } from 'viem';
+import { createPublicClient, formatEther, http, parseEther, type Address } from 'viem';
 import { list } from '@vercel/blob';
-import { erc20Abi, LAUNCHPAD_NETWORKS, launchpadAbi, LAUNCH_STATE, type LaunchpadNetwork } from '../config';
+import { erc20Abi, LAUNCHPAD_NETWORKS, launchpadAbi, LAUNCH_STATE, networkForMarket, type LaunchpadNetwork } from '../config';
 import { findTokenLaunch } from '../deployments';
 import { pickTokenImage, tokenAccent } from '../metadata';
 import { rpcCandidates } from '../../api/launchpad/historyRpc';
 import { readHistory } from '../../api/launchpad/historyStore';
 import {
   priceToNumber,
-  priceWeiAfterOn,
-  startPriceWeiFor,
   SUPPLY_TOKENS,
-  targetWeiFor,
+  SUPPLY_WEI,
+  WEI,
   type TradeEntry,
 } from '../[address]/detailShared';
 import { formatMultiple } from '../shareText';
@@ -121,7 +120,9 @@ async function probe(net: LaunchpadNetwork, token: Address) {
   // Kazde wdrozenie sieci - token zyje w tym, ktore go wystartowalo.
   const found = await findTokenLaunch(clientFor(net), net, token);
   if (!found) throw new Error('unknown token');
-  return { net, launch: found.launch as LaunchTuple, pad: found.dep.launchpad as Address };
+  // Rynek Q (para z perpem): skala krzywej i jednostka kwot sa z RYNKU, nie z sieci.
+  const marketId = (found.dep as { marketId?: string }).marketId ?? null;
+  return { net, launch: found.launch as LaunchTuple, pad: found.dep.launchpad as Address, scaleNet: networkForMarket(net, marketId) };
 }
 
 /**
@@ -249,7 +250,7 @@ function ageLabelFrom(startedAt: number): string {
  * brak wpisu to nie jest blad - to jest token, ktorego jeszcze nikt nie
  * ogladal na tyle dlugo, zeby powstal cache.
  */
-async function historyFrom(chainId: number, token: string): Promise<{ prices: number[]; holders: number }> {
+async function historyFrom(chainId: number, token: string, startWei: bigint): Promise<{ prices: number[]; holders: number }> {
   const record = await readHistory(chainId, token).catch(() => null);
   const trades: TradeEntry[] = record?.trades ?? [];
 
@@ -262,7 +263,7 @@ async function historyFrom(chainId: number, token: string): Promise<{ prices: nu
     // Cena startowa krzywej wynika ze skali TEJ sieci i obowiazuje od bloku
     // startu, wiec jest pelnoprawnym pierwszym punktem, a nie domysleniem.
     prices: [
-      priceToNumber(startPriceWeiFor(chainId)),
+      priceToNumber(startWei),
       ...trades.map((trade) => priceToNumber(trade.priceWei)),
     ],
     holders: buyers.size,
@@ -286,7 +287,11 @@ export async function loadTokenCard(
   const found = await resolveNetwork(token, chainHint).catch(() => null);
   if (!found) return null;
 
-  const { net, launch, pad } = found;
+  const { net, launch, pad, scaleNet } = found;
+  // Skala krzywej tokena (ETH albo aktywo rynku Q) - wszystkie przeliczenia ceny ponizej.
+  const rVirtWei = parseEther(String(scaleNet.rVirt));
+  const startWei = (rVirtWei * WEI) / SUPPLY_WEI;
+  const targetWei = rVirtWei * 4n;
   const [creator, stateIndex, ethReserve, tokenReserve, startedAt] = launch;
   const client = clientFor(net);
 
@@ -308,15 +313,15 @@ export async function loadTokenCard(
 
   // Po graduacji zostaja ostatnie rezerwy krzywej i licza sie tym samym wzorem,
   // co w kontrakcie - inaczej karta tokena po graduacji nie mialaby ceny wcale.
-  const priceWei = spotPrice > 0n ? spotPrice : priceWeiAfterOn(net.chain.id, ethReserve, tokenReserve);
+  const priceWei = spotPrice > 0n ? spotPrice : tokenReserve > 0n ? ((rVirtWei + ethReserve) * WEI) / tokenReserve : 0n;
   const priceEth = priceToNumber(priceWei);
 
-  const native = net.chain.nativeCurrency.symbol;
+  const native = scaleNet.quote?.symbol ?? net.chain.nativeCurrency.symbol;
   const isUsd = /^(USDC|USDT|USD)$/i.test(native);
   const isEth = /^(ETH|WETH)$/i.test(native);
 
   const [history, blobLogo, ethUsd] = await Promise.all([
-    historyFrom(net.chain.id, token),
+    historyFrom(net.chain.id, token, startWei),
     withLogo ? logoFromBlob(net.chain.id, token) : Promise.resolve(null),
     isEth ? ethUsdSpot() : Promise.resolve(null),
   ]);
@@ -343,9 +348,9 @@ export async function loadTokenCard(
     // linku. Po graduacji zbiorka jest domknieta, wiec pokazujemy prog.
     raised:
       LAUNCH_STATE[Number(stateIndex)] === 'Graduated'
-        ? Number(formatEther(targetWeiFor(net.chain.id)))
+        ? Number(formatEther(targetWei))
         : Number(formatEther(ethReserve)),
-    target: Number(formatEther(targetWeiFor(net.chain.id))),
+    target: Number(formatEther(targetWei)),
     priceEth,
     // Kapitalizacja Z CALEJ PODAZY - ta sama regula, co `mcapWei` na stronie
     // tokena i w karcie pod postem, zeby trzy miejsca nie podawaly trzech
@@ -357,7 +362,7 @@ export async function loadTokenCard(
     // dolarach ma kurs 1; jednostka, ktorej nie umiemy wycenic, oddaje null i
     // karta pisze kreske zamiast zmyslonej liczby.
     mcapUsd: usdRate === null ? null : priceEth * usdRate * Number(SUPPLY_TOKENS),
-    multiple: formatMultiple(priceEth, priceToNumber(startPriceWeiFor(net.chain.id))),
+    multiple: formatMultiple(priceEth, priceToNumber(startWei)),
     holders: history.holders,
     prices: history.prices,
     up: last >= first,

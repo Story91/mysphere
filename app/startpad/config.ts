@@ -41,6 +41,36 @@ export type LaunchpadDeployment = {
   deployBlock: bigint;
 };
 
+/**
+ * Aktywo po drugiej stronie pary w rynku Q (launchpad z tokenem ERC-20
+ * zamiast natywnego ETH - docs/LAUNCHPAD-QUOTE-ERC20.md).
+ */
+export type QuoteAsset = {
+  address: `0x${string}`;
+  symbol: string;
+  decimals: number;
+  /** perp = token z dzwignia (Flash), stable = USDC, stock = akcja B20. */
+  kind: 'perp' | 'stable' | 'stock';
+};
+
+/**
+ * Rynek Q na sieci: osobna tablica obok ETH ("Base · ETH2xL"). Tokeny z rynku
+ * nie mieszaja sie z tablica ETH - wolumen i zbiorki sa w innych jednostkach.
+ * Kazdy rynek to jedno wdrozenie QuoteCurveLaunchpad (+ vault + hook).
+ */
+export type LaunchpadMarket = {
+  id: string;
+  label: string;
+  quote: QuoteAsset;
+  /** Skala krzywej w jednostkach QUOTE (R_VIRT_QUOTE z deployQuote.ts). */
+  rVirt: number;
+  launchpad: `0x${string}`;
+  vault: `0x${string}`;
+  hook: `0x${string}`;
+  tokenFactory: `0x${string}`;
+  deployBlock: bigint;
+};
+
 export type LaunchpadNetwork = {
   chain: Chain;
   /** Krotka etykieta do UI. */
@@ -155,7 +185,47 @@ export type LaunchpadNetwork = {
    * glowne wdrozenie: interfejs liczy ceny i pasek awansu z jednej liczby.
    */
   legacy?: LaunchpadDeployment[];
+  /** Rynki Q tej sieci (pary z tokenami ERC-20). */
+  markets?: LaunchpadMarket[];
+  /** Ustawione, gdy aktywny jest rynek Q - aktywo po drugiej stronie pary. */
+  quote?: QuoteAsset;
+  /** Id aktywnego rynku Q (`?m=`); brak = rynek ETH sieci. */
+  marketId?: string;
 };
+
+/**
+ * Siec widziana przez pryzmat rynku: launchpad, vault, hook, fabryka, blok
+ * i skala z rynku Q, reszta (lancuch, RPC, eksplorator, tempo skanu) z sieci.
+ * Dzieki temu cala tablica, strona tokena i handel dzialaja w rynku Q bez
+ * osobnej sciezki kodu - zmienia sie tylko to, z czym rozmawiaja.
+ */
+export function networkForMarket(network: LaunchpadNetwork, marketId: string | null | undefined): LaunchpadNetwork {
+  const market = marketId ? network.markets?.find((m) => m.id === marketId) : undefined;
+  if (!market) return network;
+  return {
+    ...network,
+    label: `${network.label} · ${market.label}`,
+    launchpad: market.launchpad,
+    vault: market.vault,
+    hook: market.hook,
+    tokenFactory: market.tokenFactory,
+    deployBlock: market.deployBlock,
+    rVirt: market.rVirt,
+    version: 1,
+    legacy: [],
+    quote: market.quote,
+    marketId: market.id,
+  };
+}
+
+/** Wszystkie wdrozenia sieci RAZEM z rynkami Q - do odnajdywania tokena po samym adresie. */
+export function allDeploymentsOfChain(network: LaunchpadNetwork): Array<LaunchpadDeployment & { marketId?: string }> {
+  const out: Array<LaunchpadDeployment & { marketId?: string }> = [...deploymentsOf(network)];
+  for (const m of network.markets ?? []) {
+    out.push({ version: 1, launchpad: m.launchpad, vault: m.vault, hook: m.hook, tokenFactory: m.tokenFactory, deployBlock: m.deployBlock, marketId: m.id });
+  }
+  return out;
+}
 
 /**
  * Base MAINNET - wdrozenie z 2026-08-11 (docs/LAUNCHPAD-STAN.md). Fallbacki to
@@ -173,6 +243,56 @@ const baseMainnetEntry: LaunchpadNetwork = {
   // Od hardforku Cobalt (2026-09-30) v1 nie startuje tokenow (WrongVariant) -
   // memory b20-cobalt-launch-outage. Adresy LITERALNIE: zmienne
   // NEXT_PUBLIC_*_BASE_* na Vercelu wskazuja v1 i opisuja teraz wpis legacy.
+  // Rynki perpow Flash (2026-10-11): mem sparowany z tokenem z dzwignia (ETH2xL...).
+  // QuoteCurveLaunchpad + vault + hook, R_VIRT 1875 jednostek perpa (NAV ~1 $,
+  // wiec zbiorka ~7 500 $), oplaty do Safe. Ryzyka i lista kontrolna:
+  // docs/LAUNCHPAD-QUOTE-ERC20.md (2.5, 2.8, 4).
+  markets: [
+      {
+        id: 'eth2xl',
+        label: 'ETH2xL',
+        quote: { address: '0xB200000000000000000000FfFF60CC8138cDf452', symbol: 'ETH2xL', decimals: 18, kind: 'perp' },
+        rVirt: 1875,
+        launchpad: '0x86B7d672B0520A37A5f13788b9b2F821a9E9ff5d',
+        vault: '0x45f3ea7a6c68f4BB3a0d3B2cb8aA697D102674F8',
+        hook: '0xBd69E3b17FD25b33d965C4857569e8a800C32044',
+        tokenFactory: '0xF1DAd68f9B0b00A80E993286419AD03e9380e7B0',
+        deployBlock: 52475870n,
+      },
+      {
+        id: 'nvda2xl',
+        label: 'NVDA2xL',
+        quote: { address: '0xb200000000000000000000fFFfE13bBeCe8B183C', symbol: 'NVDA2xL', decimals: 18, kind: 'perp' },
+        rVirt: 1875,
+        launchpad: '0x90C0213B96f5B279D68259D1E527B878e9eCc61D',
+        vault: '0x39e77AED2805316e05B381ea85fD8664793EF153',
+        hook: '0x1B32f340AFaA6Ba5c750f588CBf51e83f8516044',
+        tokenFactory: '0xF1DAd68f9B0b00A80E993286419AD03e9380e7B0',
+        deployBlock: 52475877n,
+      },
+      {
+        id: 'btc2xl',
+        label: 'BTC2xL',
+        quote: { address: '0xB200000000000000000000ffff4a0dA1092f5359', symbol: 'BTC2xL', decimals: 18, kind: 'perp' },
+        rVirt: 1875,
+        launchpad: '0x1043e1e26256a0a66F05D649C88a637Fd15a8Dbc',
+        vault: '0x0459c8c89929668BC65163F804c77ECD69B66551',
+        hook: '0xcB1e55968dc91f68D5e3a7019F0a21ECA9F6e044',
+        tokenFactory: '0xF1DAd68f9B0b00A80E993286419AD03e9380e7B0',
+        deployBlock: 52475886n,
+      },
+      {
+        id: 'spcx2xl',
+        label: 'SPCX2xL',
+        quote: { address: '0xB200000000000000000000ffFFDaEA025548eAe4', symbol: 'SPCX2xL', decimals: 18, kind: 'perp' },
+        rVirt: 1875,
+        launchpad: '0x10eF2Edc204Dcc8060aBB03699a13eaB0c3c14eE',
+        vault: '0x8b2e0Cb173a73B6db857848c78e0ACa1F65E4ae0',
+        hook: '0x490DcE11B858B816E9153cF54deB3B32bd1F6044',
+        tokenFactory: '0xF1DAd68f9B0b00A80E993286419AD03e9380e7B0',
+        deployBlock: 52475894n,
+      },
+  ],
   version: 2,
   launchpad: '0xb5C71DE0B6b2280A7b05ECDdd9F22a895A5E243e',
   vault: '0x019098A6e1377ABE2a40faF5643EE1cC5459AFF3',
@@ -249,6 +369,21 @@ export const LAUNCHPAD_NETWORKS: Record<number, LaunchpadNetwork> = {
     tokenFactory: '0xC2855687d5234C64D816a763d1513B4484Db72Ed',
     poolManager: '0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408',
     deployBlock: 47984848n,
+    // Rynek testowy launchpada Q: token udajacy perpa (18 miejsc, jak ETH2xL),
+    // ten sam kod co rynki perpow na mainnecie. Do sprawdzania UI bez pieniedzy.
+    markets: [
+      {
+        id: 'mq',
+        label: 'MQ test perp',
+        quote: { address: '0xb57840675F82F8aa31314278346924c03FF3888C', symbol: 'MQ', decimals: 18, kind: 'perp' },
+        rVirt: 1875,
+        launchpad: '0x3D9F65202f8CCd5A83fF2aDBCf275d7123dB470b',
+        vault: '0x2Fc4897E3542957c4EA9Bd04037F13f6B18f0090',
+        hook: '0xC0B07A8E0D2F2Fd3Ca1200f3C8933bD41879a044',
+        tokenFactory: '0xC2855687d5234C64D816a763d1513B4484Db72Ed',
+        deployBlock: 47986194n,
+      },
+    ],
     legacy: [
       {
         version: 1,
@@ -634,12 +769,25 @@ function resolveActiveNetwork(): LaunchpadNetwork {
   if (typeof window === 'undefined') return LAUNCHPAD_NETWORKS[DEFAULT_LAUNCHPAD_CHAIN_ID];
 
   // ADRES WYGRYWA Z PAMIECIA - uzasadnienie i testy przy `pickChainId`.
-  const chainId = pickChainId({
+  let chainId = pickChainId({
     search: window.location.search,
     stored: window.localStorage.getItem(STORAGE_KEY),
     networks: LAUNCHPAD_NETWORKS,
     fallback: DEFAULT_LAUNCHPAD_CHAIN_ID,
   });
+  // Link z rynkiem, ale bez sieci (`?m=eth2xl` - siec domyslna nie dostaje
+  // `?c=`): rynek wskazuje siec. Bez tego gosc z inna siecia w pamieci
+  // trafilby na rynek ETH tamtej sieci zamiast na udostepniony rynek perpa.
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const askedMarket = params.get('m');
+    if (askedMarket && askedMarket !== 'eth' && !params.get('c')) {
+      const owner = Object.values(LAUNCHPAD_NETWORKS).find((net) => net.markets?.some((m) => m.id === askedMarket));
+      if (owner) chainId = owner.chain.id;
+    }
+  } catch {
+    // Zepsuty adres - zostaje wybor z `pickChainId`.
+  }
 
   // Siec z linku ZOSTAJE po wejsciu. Bez tego zapisu pierwsze klikniecie w
   // menu wracaloby do sieci sprzed linku - i wygladaloby jak samoczynne
@@ -652,10 +800,56 @@ function resolveActiveNetwork(): LaunchpadNetwork {
     // Tryb prywatny - wybor dziala na ta jedna strone i tyle.
   }
 
-  return LAUNCHPAD_NETWORKS[chainId];
+  return networkForMarket(LAUNCHPAD_NETWORKS[chainId], resolveMarketId(chainId));
+}
+
+const MARKET_KEY = (chainId: number) => `startpad.market.${chainId}`;
+
+/**
+ * Rynek Q z `?m=` (wygrywa) albo z pamieci tej sieci. `?m=eth` albo nieznane
+ * id = rynek ETH. Zapamietany, zeby przejscie z tablicy na strone tokena i z
+ * powrotem nie wyrzucalo z rynku perpa.
+ */
+function resolveMarketId(chainId: number): string | null {
+  const markets = LAUNCHPAD_NETWORKS[chainId]?.markets ?? [];
+  if (markets.length === 0) return null;
+  let id: string | null = null;
+  try {
+    const fromUrl = new URLSearchParams(window.location.search).get('m');
+    if (fromUrl !== null) {
+      id = markets.some((m) => m.id === fromUrl) ? fromUrl : null;
+      window.localStorage.setItem(MARKET_KEY(chainId), id ?? '');
+    } else {
+      const stored = window.localStorage.getItem(MARKET_KEY(chainId));
+      id = stored && markets.some((m) => m.id === stored) ? stored : null;
+    }
+  } catch {
+    // Tryb prywatny / zepsuty adres - rynek ETH.
+  }
+  return id;
+}
+
+/** Przelacza rynek aktywnej sieci (null = ETH) - przeladowanie pod nowym adresem, jak przy sieci. */
+export function setLaunchpadMarket(chainId: number, marketId: string | null) {
+  try {
+    window.localStorage.setItem(MARKET_KEY(chainId), marketId ?? '');
+    window.localStorage.setItem(STORAGE_KEY, String(chainId));
+  } catch {
+    // Wybor przeniesie sam adres.
+  }
+  const url = new URL(window.location.href);
+  if (chainId === DEFAULT_LAUNCHPAD_CHAIN_ID) url.searchParams.delete('c');
+  else url.searchParams.set('c', String(chainId));
+  url.searchParams.set('m', marketId ?? 'eth');
+  window.location.assign(url.toString());
 }
 
 export const ACTIVE_LAUNCHPAD_NETWORK = resolveActiveNetwork();
+/** Aktywo pary aktywnego rynku Q albo null (rynek ETH). */
+export const QUOTE_ASSET: QuoteAsset | null = ACTIVE_LAUNCHPAD_NETWORK.quote ?? null;
+export const ACTIVE_MARKET_ID: string | null = ACTIVE_LAUNCHPAD_NETWORK.marketId ?? null;
+/** Parametr zapytania dla tras serwera (`&m=...`) - pusty na rynku ETH. */
+export const MARKET_QUERY = ACTIVE_MARKET_ID ? `&m=${encodeURIComponent(ACTIVE_MARKET_ID)}` : '';
 
 /**
  * Zmiana sieci = zapis + PRZELADOWANIE. Celowo nie ma tu setState: stale
@@ -702,7 +896,8 @@ export const LAUNCHPAD_CHAIN = ACTIVE_LAUNCHPAD_NETWORK.chain;
  * wiec `formatEther` i `parseEther` licza tak samo. Zmienia sie wylacznie to,
  * co jest napisane obok liczby.
  */
-export const NATIVE_SYMBOL = ACTIVE_LAUNCHPAD_NETWORK.chain.nativeCurrency.symbol;
+// Na rynku Q kwoty sa w jednostkach aktywa pary (ETH2xL...), wiec i symbol.
+export const NATIVE_SYMBOL = ACTIVE_LAUNCHPAD_NETWORK.quote?.symbol ?? ACTIVE_LAUNCHPAD_NETWORK.chain.nativeCurrency.symbol;
 
 /**
  * Czy jednostka natywna JEST dolarem. Na takiej sieci kurs do dopiskow USD
@@ -794,6 +989,88 @@ export const LAUNCHPAD_TOKEN_STANDARD = ACTIVE_LAUNCHPAD_NETWORK.tokenStandard;
 // To NIE jest nasz kontrakt, wiec nie ma zmiennej srodowiskowej. Na sieciach
 // bez B20 (tokenStandard 'plain') nie ma go wcale.
 export const B20_PRECOMPILE_ADDRESS = '0xB20f000000000000000000000000000000000000' as const;
+
+/**
+ * Funkcje QuoteCurveLaunchpad, ktore roznia sie od wersji ETH: kwota QUOTE
+ * zamiast `msg.value`. Cala reszta (quoteBuy, sell, graduate, claim, launchOf,
+ * zdarzenia) ma te same nazwy i argumenty - idzie przez `launchpadAbi`.
+ */
+const LAUNCH_OUTPUTS = [
+  { name: 'token', type: 'address' },
+  { name: 'launchId', type: 'bytes32' },
+] as const;
+const ADVANCED_TAIL = [
+  { name: 'feeBps_', type: 'uint16' },
+  { name: 'creatorFeeBps_', type: 'uint16' },
+  { name: 'buybackBps_', type: 'uint16' },
+  { name: 'windowCap_', type: 'uint256' },
+  { name: 'receiverAccounts_', type: 'address[]' },
+  { name: 'receiverSharesBps_', type: 'uint16[]' },
+  { name: 'metadataURI_', type: 'string' },
+] as const;
+export const quoteLaunchpadAbi = [
+  {
+    type: 'function',
+    name: 'launch',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'name_', type: 'string' },
+      { name: 'symbol_', type: 'string' },
+      { name: 'quoteIn', type: 'uint256' },
+      { name: 'minTokensOut', type: 'uint256' },
+      { name: 'deadline', type: 'uint256' },
+    ],
+    outputs: LAUNCH_OUTPUTS,
+  },
+  {
+    type: 'function',
+    name: 'launchAdvanced',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'name_', type: 'string' },
+      { name: 'symbol_', type: 'string' },
+      { name: 'quoteIn', type: 'uint256' },
+      { name: 'minTokensOut', type: 'uint256' },
+      { name: 'deadline', type: 'uint256' },
+      ...ADVANCED_TAIL,
+    ],
+    outputs: LAUNCH_OUTPUTS,
+  },
+  {
+    type: 'function',
+    name: 'launchVanity',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'vanitySalt', type: 'bytes32' },
+      { name: 'name_', type: 'string' },
+      { name: 'symbol_', type: 'string' },
+      { name: 'quoteIn', type: 'uint256' },
+      { name: 'minTokensOut', type: 'uint256' },
+      { name: 'deadline', type: 'uint256' },
+      ...ADVANCED_TAIL,
+    ],
+    outputs: LAUNCH_OUTPUTS,
+  },
+  {
+    type: 'function',
+    name: 'buy',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'token', type: 'address' },
+      { name: 'quoteIn', type: 'uint256' },
+      { name: 'minTokensOut', type: 'uint256' },
+      { name: 'deadline', type: 'uint256' },
+    ],
+    outputs: [{ name: 'tokensOut', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'QUOTE',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+  },
+] as const;
 
 export const launchpadAbi = [
   {

@@ -134,7 +134,7 @@ export default function StartpadFooter() {
    * wyboru), po montazu wybrana. Zadnego rozjazdu, bo obie strony renderuja
    * to samo w pierwszym podejsciu.
    */
-  const symbol = net.chain.nativeCurrency.symbol;
+  const symbol = net.quote?.symbol ?? net.chain.nativeCurrency.symbol;
   const rVirt = net.rVirt;
   const target = net.rVirt * 4;
 

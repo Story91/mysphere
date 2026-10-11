@@ -51,7 +51,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // pisala o tokenie w stanie Locked "... on the curve", chociaz krzywa jest
   // wtedy DOMKNIETA i kupic sie juz nie da. `target` szlo tu tez surowo, wiec
   // podglad linku pokazywal "3" i "1000" zamiast kwoty.
-  const nativeSymbol = LAUNCHPAD_NETWORKS[data.chainId]?.chain.nativeCurrency.symbol ?? 'ETH';
+  // Karta tokena zna juz jednostke (ETH albo aktywo rynku Q, np. ETH2xL).
+  const nativeSymbol = data.nativeSymbol || (LAUNCHPAD_NETWORKS[data.chainId]?.chain.nativeCurrency.symbol ?? 'ETH');
   const targetText = data.target.toLocaleString('en-US', {
     maximumFractionDigits: data.target < 10 ? 2 : 0,
   });

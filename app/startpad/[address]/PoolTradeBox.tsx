@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { maxUint256, parseUnits, type Address } from 'viem';
 import { useAccount, useChainId, usePublicClient, useSwitchChain, useWalletClient } from 'wagmi';
-import { ACTIVE_LAUNCHPAD_NETWORK, LAUNCHPAD_CHAIN, NATIVE_SYMBOL, erc20Abi } from '../config';
+import { ACTIVE_LAUNCHPAD_NETWORK, LAUNCHPAD_CHAIN, NATIVE_SYMBOL, QUOTE_ASSET, erc20Abi } from '../config';
 import {
   applySlippage,
   DEFAULT_SLIPPAGE_BPS,
@@ -16,6 +16,7 @@ import {
   type CoreState,
 } from './detailShared';
 import {
+  buyIsZeroForOne,
   canonicalPoolKey,
   encodeV4ExactInSingle,
   PERMIT2_MAX_AMOUNT,
@@ -60,7 +61,10 @@ export default function PoolTradeBox({ core, onAfterTx }: { core: CoreState; onA
   const [ethBalance, setEthBalance] = useState<bigint | null>(null);
 
   const decimals = core.decimals;
-  const poolKey = canonicalPoolKey(core.token, core.deployment.hook as Address);
+  const quoteAsset = QUOTE_ASSET?.address ?? null;
+  const poolKey = canonicalPoolKey(core.token, core.deployment.hook as Address, quoteAsset);
+  // Kupno = ETH/aktywo pary -> token; na rynku Q kierunek zalezy od adresow.
+  const buyZeroForOne = buyIsZeroForOne(core.token, quoteAsset);
 
   useEffect(() => {
     if (!readClient || !account) {
@@ -68,8 +72,11 @@ export default function PoolTradeBox({ core, onAfterTx }: { core: CoreState; onA
       return;
     }
     let cancelled = false;
-    readClient
-      .getBalance({ address: account })
+    // Rynek Q: kupuje sie aktywem pary, wiec saldo tego tokena, nie ETH.
+    const read = quoteAsset
+      ? (readClient.readContract({ address: quoteAsset, abi: erc20Abi, functionName: 'balanceOf', args: [account] }) as Promise<bigint>)
+      : readClient.getBalance({ address: account });
+    read
       .then((v) => {
         if (!cancelled) setEthBalance(v);
       })
@@ -77,7 +84,7 @@ export default function PoolTradeBox({ core, onAfterTx }: { core: CoreState; onA
     return () => {
       cancelled = true;
     };
-  }, [readClient, account, core.balance]);
+  }, [readClient, account, core.balance, quoteAsset]);
 
   // Wycena z V4Quoter - symuluje prawdziwy swap z hookiem, wiec wynik jest
   // juz po oplacie LP (0.3%) i hooka (1%). Debounce, zeby nie strzelac do RPC
@@ -111,7 +118,7 @@ export default function PoolTradeBox({ core, onAfterTx }: { core: CoreState; onA
           address: v4.quoter,
           abi: v4QuoterAbi,
           functionName: 'quoteExactInputSingle',
-          args: [{ poolKey, zeroForOne: side === 'buy', exactAmount: amountIn as bigint, hookData: '0x' }],
+          args: [{ poolKey, zeroForOne: side === 'buy' ? buyZeroForOne : !buyZeroForOne, exactAmount: amountIn as bigint, hookData: '0x' }],
         })
         .then((res) => {
           if (!cancelled) setQuote((res as readonly [bigint, bigint])[0]);
@@ -162,20 +169,25 @@ export default function PoolTradeBox({ core, onAfterTx }: { core: CoreState; onA
         address: v4.quoter,
         abi: v4QuoterAbi,
         functionName: 'quoteExactInputSingle',
-        args: [{ poolKey, zeroForOne: true, exactAmount: value, hookData: '0x' }],
+        args: [{ poolKey, zeroForOne: buyZeroForOne, exactAmount: value, hookData: '0x' }],
       })) as readonly [bigint, bigint];
       const minOut = applySlippage(out, slippageBps);
-      const { commands, inputs } = encodeV4ExactInSingle({ poolKey, zeroForOne: true, amountIn: value, minOut });
+      const { commands, inputs } = encodeV4ExactInSingle({ poolKey, zeroForOne: buyZeroForOne, amountIn: value, minOut });
       const args = [commands, inputs, deadline()] as const;
+      // Rynek Q: aktywo pary idzie przez Permit2 jak token przy sprzedazy,
+      // bez `value`. Rynek ETH: natywne ETH w `value`.
+      if (quoteAsset && !(await ensurePermit2(value, quoteAsset))) return;
+      if (quoteAsset) setBusy('buy');
+      const ethValue = quoteAsset ? 0n : value;
       // Symulacja przed portfelem: transakcja, ktora i tak by padla, nie ma po
       // co isc na lancuch - uzytkownik dostaje powod, nie rachunek za gaz.
-      await readClient.simulateContract({ address: v4.universalRouter, abi: universalRouterAbi, functionName: 'execute', args, value, account });
+      await readClient.simulateContract({ address: v4.universalRouter, abi: universalRouterAbi, functionName: 'execute', args, value: ethValue, account });
       const hash = await walletClient.writeContract({
         address: v4.universalRouter,
         abi: universalRouterAbi,
         functionName: 'execute',
         args,
-        value,
+        value: ethValue,
         chain: LAUNCHPAD_CHAIN,
         account,
       });
@@ -198,10 +210,10 @@ export default function PoolTradeBox({ core, onAfterTx }: { core: CoreState; onA
    * SAUSAGES w TradePanel: zatwierdzenie bez gazu + sprzedaz = dwa rachunki,
    * zero sprzedanych tokenow.
    */
-  const ensurePermit2 = async (amount: bigint): Promise<boolean> => {
+  const ensurePermit2 = async (amount: bigint, asset: Address = core.token): Promise<boolean> => {
     if (!v4 || !account || !walletClient || !readClient) return false;
     const erc20Allowance = (await readClient.readContract({
-      address: core.token,
+      address: asset,
       abi: erc20Abi,
       functionName: 'allowance',
       args: [account, v4.permit2],
@@ -210,13 +222,13 @@ export default function PoolTradeBox({ core, onAfterTx }: { core: CoreState; onA
       setBusy('approve');
       let gas: bigint | undefined;
       try {
-        const est = await readClient.estimateContractGas({ address: core.token, abi: erc20Abi, functionName: 'approve', args: [v4.permit2, maxUint256], account });
+        const est = await readClient.estimateContractGas({ address: asset, abi: erc20Abi, functionName: 'approve', args: [v4.permit2, maxUint256], account });
         gas = (est * 125n) / 100n;
       } catch {
         /* portfel oszacuje sam */
       }
       const hash = await walletClient.writeContract({
-        address: core.token,
+        address: asset,
         abi: erc20Abi,
         functionName: 'approve',
         args: [v4.permit2, maxUint256],
@@ -226,7 +238,7 @@ export default function PoolTradeBox({ core, onAfterTx }: { core: CoreState; onA
       });
       const receipt = await readClient.waitForTransactionReceipt({ hash });
       if (receipt.status !== 'success') {
-        setNotice({ kind: 'error', text: 'The token approval failed, so nothing was sold. Try again.' });
+        setNotice({ kind: 'error', text: 'The token approval failed, so nothing was traded. Try again.' });
         return false;
       }
     }
@@ -234,7 +246,7 @@ export default function PoolTradeBox({ core, onAfterTx }: { core: CoreState; onA
       address: v4.permit2,
       abi: permit2Abi,
       functionName: 'allowance',
-      args: [account, core.token, v4.universalRouter],
+      args: [account, asset, v4.universalRouter],
     })) as readonly [bigint, number, number];
     const now = Math.floor(Date.now() / 1000);
     if (p2Amount < amount || Number(p2Exp) <= now + 60) {
@@ -252,13 +264,13 @@ export default function PoolTradeBox({ core, onAfterTx }: { core: CoreState; onA
         address: v4.permit2,
         abi: permit2Abi,
         functionName: 'approve',
-        args: [core.token, v4.universalRouter, allowance, permit2Expiration(now)],
+        args: [asset, v4.universalRouter, allowance, permit2Expiration(now)],
         chain: LAUNCHPAD_CHAIN,
         account,
       });
       const receipt = await readClient.waitForTransactionReceipt({ hash });
       if (receipt.status !== 'success') {
-        setNotice({ kind: 'error', text: 'The Permit2 approval failed, so nothing was sold. Try again.' });
+        setNotice({ kind: 'error', text: 'The Permit2 approval failed, so nothing was traded. Try again.' });
         return false;
       }
     }
@@ -290,10 +302,10 @@ export default function PoolTradeBox({ core, onAfterTx }: { core: CoreState; onA
         address: v4.quoter,
         abi: v4QuoterAbi,
         functionName: 'quoteExactInputSingle',
-        args: [{ poolKey, zeroForOne: false, exactAmount: amount, hookData: '0x' }],
+        args: [{ poolKey, zeroForOne: !buyZeroForOne, exactAmount: amount, hookData: '0x' }],
       })) as readonly [bigint, bigint];
       const minOut = applySlippage(out, slippageBps);
-      const { commands, inputs } = encodeV4ExactInSingle({ poolKey, zeroForOne: false, amountIn: amount, minOut });
+      const { commands, inputs } = encodeV4ExactInSingle({ poolKey, zeroForOne: !buyZeroForOne, amountIn: amount, minOut });
       const args = [commands, inputs, deadline()] as const;
       await readClient.simulateContract({ address: v4.universalRouter, abi: universalRouterAbi, functionName: 'execute', args, account });
       const hash = await walletClient.writeContract({
