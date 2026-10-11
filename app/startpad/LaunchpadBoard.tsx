@@ -86,7 +86,7 @@ import { fetchBoardStats, pickAggregateBase } from './boardStats';
 // Jedna, ZMIERZONA rezerwa na gaz i jedna arytmetyka procentow dla obu paneli
 // handlu - mini modala na tablicy i panelu na stronie tokena. Dwie kopie tej
 // samej liczby wlasnie kosztowaly nas przyciski, ktore wpisywaly zero.
-import { DEFAULT_SLIPPAGE_BPS, fractionOf, GAS_RESERVE_WEI, spendableEth, tapeAmount, totalEarned } from './[address]/detailShared';
+import { DEAD_ADDRESS, DEFAULT_SLIPPAGE_BPS, fractionOf, GAS_RESERVE_WEI, spendableEth, tapeAmount, totalEarned } from './[address]/detailShared';
 import { fetchTokenCountersBatch, indexLooksCaughtUp } from './blockscout';
 // Ta sama arytmetyka ceny puli, co na stronie tokena - jedna kopia, zeby karta
 // i strona nie mogly pokazac dwoch roznych cen tego samego tokena.
@@ -2067,7 +2067,7 @@ export default function LaunchpadBoard() {
 
           const withPool = graduatedTokens.map((token, index) => ({ token, poolId: poolIds[index] })).filter((e) => e.poolId);
           if (withPool.length) {
-            const [slots, supplies] = await Promise.all([
+            const [slots, supplies, burned] = await Promise.all([
               readClient.multicall({
                 allowFailure: true,
                 contracts: withPool.map((entry) => ({
@@ -2083,6 +2083,17 @@ export default function LaunchpadBoard() {
                   address: entry.token,
                   abi: totalSupplyAbi,
                   functionName: 'totalSupply' as const,
+                })),
+              }),
+              // Saldo 0xdEaD - kapitalizacja liczy sie od podazy w obiegu, ta
+              // sama regula co wykres i karta statystyk na stronie tokena.
+              readClient.multicall({
+                allowFailure: true,
+                contracts: withPool.map((entry) => ({
+                  address: entry.token,
+                  abi: erc20Abi,
+                  functionName: 'balanceOf' as const,
+                  args: [DEAD_ADDRESS as Address] as const,
                 })),
               }),
             ]);
@@ -2101,7 +2112,9 @@ export default function LaunchpadBoard() {
               if (supply?.status === 'success') {
                 const total = supply.result as bigint;
                 supplyByToken.set(entry.token.toLowerCase(), total);
-                mcap = price * Number(formatEther(total));
+                const dead = burned[index]?.status === 'success' ? (burned[index].result as bigint) : 0n;
+                const circulating = total > dead ? total - dead : total;
+                mcap = price * Number(formatEther(circulating));
               }
               priceByToken.set(entry.token.toLowerCase(), { price, mcap });
             });

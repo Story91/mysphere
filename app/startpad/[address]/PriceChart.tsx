@@ -14,6 +14,7 @@ import {
   START_PRICE_WEI,
   SUPPLY_TOKENS,
   toPricePoints,
+  WEI,
   type TradeEntry,
 } from './detailShared';
 
@@ -109,6 +110,7 @@ export default function PriceChart({
   loading,
   ethUsd,
   poolId = null,
+  burnedWei = 0n,
 }: {
   trades: TradeEntry[];
   startedAt: number;
@@ -121,6 +123,8 @@ export default function PriceChart({
   ethUsd: number | null;
   /** Po graduacji: poolId v4 = identyfikator pary na DexScreenerze (przelacznik zrodla wykresu). */
   poolId?: string | null;
+  /** Saldo 0xdEaD - kapitalizacja liczy sie od podazy w obiegu. */
+  burnedWei?: bigint;
 }) {
   // Zrodlo wykresu po graduacji: nasz (swapy z lancucha) albo osadzony
   // DexScreener. DexScreener widzi wylacznie pule, wiec przelacznik istnieje
@@ -172,7 +176,7 @@ export default function PriceChart({
   const endTs = state === 'Graduated' && graduatedTs !== null && !hasPoolPoints ? graduatedTs : nowMinute;
 
   /**
-   * KAPITALIZACJA IDZIE W DOLARACH.
+   * KAPITALIZACJA IDZIE W DOLARACH, OD PODAZY W OBIEGU - NIE OD CALYCH 1B.
    *
    * "26.27 ETH kapitalizacji" nie mowi nikomu nic - kazdy, kto siega po ten
    * przelacznik, chce wiedziec, ile ten token jest wart w pieniadzu, ktory zna.
@@ -180,9 +184,18 @@ export default function PriceChart({
    *
    * Gdy kurs ETH/USD jeszcze nie doszedl, kapitalizacja zostaje w ETH i tak
    * jest podpisana - zaden ekran nie pokazuje liczby z niewiadoma jednostka.
+   *
+   * SPALONE TOKENY NIE SA W OBIEGU. Mnozenie ceny przez caly SUPPLY_TOKENS
+   * liczy martwy balans na 0xdEaD tak, jakby ktos mogl go jeszcze sprzedac -
+   * dla SPHERE to dzis prawie 7% ceny z powietrza i rosnie z kazdym spaleniem
+   * (keeper, AutoBuyback). Odejmujemy wiec saldo 0xdEaD od podazy PRZED
+   * przemnozeniem przez cene; przy braku odczytu (siec jeszcze nie odpowiedziala
+   * albo token nie ma spalen) liczymy od pelnej podazy, nie blokujemy wykresu.
    */
+  const burnedTokens = burnedWei / WEI;
+  const circulatingSupply = SUPPLY_TOKENS > burnedTokens ? SUPPLY_TOKENS - burnedTokens : SUPPLY_TOKENS;
   const mcapInUsd = mode === 'mcap' && ethUsd !== null;
-  const scale = mode === 'mcap' ? Number(SUPPLY_TOKENS) * (ethUsd ?? 1) : 1;
+  const scale = mode === 'mcap' ? Number(circulatingSupply) * (ethUsd ?? 1) : 1;
 
   const points = useMemo(
     () => toPricePoints(trades, startedAt, scale, endTs),

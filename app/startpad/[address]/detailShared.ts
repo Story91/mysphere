@@ -257,9 +257,15 @@ export function priceWeiAfter(ethReserveAfter: bigint, tokenReserveAfter: bigint
   return priceWeiAfterOn(ACTIVE_CHAIN_ID, ethReserveAfter, tokenReserveAfter);
 }
 
-/** Market cap w wei ETH: cena za token razy cala podaz (1e9 tokenow). */
-export function mcapWei(priceWei: bigint): bigint {
-  return priceWei * SUPPLY_TOKENS;
+/**
+ * Market cap w wei ETH: cena za token razy podaz W OBIEGU, czyli 1e9 minus
+ * saldo 0xdEaD. Spalone tokeny nikt juz nie sprzeda, wiec liczenie ich do
+ * kapitalizacji zawyzalo ja o tyle, ile spalono (SPHERE: ~7% w paz. 2026).
+ */
+export function mcapWei(priceWei: bigint, burnedWei: bigint = 0n): bigint {
+  const burnedTokens = burnedWei / WEI;
+  const circulating = SUPPLY_TOKENS > burnedTokens ? SUPPLY_TOKENS - burnedTokens : SUPPLY_TOKENS;
+  return priceWei * circulating;
 }
 
 /** Wei za token -> liczba w ETH. Do WIDOKU i wykresu; nigdy do transakcji. */

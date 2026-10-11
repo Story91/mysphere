@@ -250,10 +250,20 @@ export function useTokenHistory(
       // tokena budowal sie "w nieskonczonosc", majac obok gotowa droge do
       // policzenia tego samego z logow.
       //
-      // Osiem sekund to sufit sensownego cache'u: skan lancucha trwa okolo
-      // dwoch, wiec czekanie dluzej przestaje byc przyspieszeniem.
+      // 11.10.2026: zmierzone na produkcji, trasa w stanie "cache trafiony,
+      // nic do doskanowania" (SPHERE, 74 transakcje) odpowiadala 6,7 s. Osiem
+      // sekund limitu bylo wiec ciasne na wlasnym najlepszym przypadku - przy
+      // normalnej konkurencji o CPU/siec na stronie (hydratacja, inne karty
+      // pobierajace rownolegle) przekraczalo je i trasa padala na
+      // ERR_ABORTED, ZANIM zdazyla odpowiedziec. Skutek byl gorszy niz brak
+      // limitu: wykres zostawal na "Building the chart..." w nieskonczonosc,
+      // bo przegladarkowy skan zapasowy (nizej) sam pyta publiczny RPC, ktory
+      // bywa wtedy juz ograniczony (429). Pietnascie sekund daje zapas nad
+      // zmierzonym najlepszym przypadkiem; limit wciaz istnieje, zeby trasa,
+      // ktora naprawde milczy (Firestore jak 14 sierpnia), nie wisiala bez
+      // konca.
       const response = await fetch(`/api/launchpad/history?${query.toString()}`, {
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(15000),
       });
       if (!response.ok) throw new Error(`History cache responded ${response.status}.`);
       const data = (await response.json()) as CacheResponse;

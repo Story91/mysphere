@@ -44,6 +44,7 @@ import PriceChart from './PriceChart';
 import TradePanel from './TradePanel';
 import { LifecycleGuide, STATE_HINT } from '../LifecycleGuide';
 import {
+  DEAD_ADDRESS,
   fmtEth,
   fmtPrice,
   fmtUsdPrice,
@@ -104,6 +105,34 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
   // Jeden kurs na cala strone - kazdy komponent nizej dostaje te sama liczbe,
   // zamiast trzech niezaleznych pollerow do tego samego endpointu.
   const { usd: ethUsd } = useEthUsd();
+
+  // Saldo 0xdEaD - jeden odczyt na strone, z niego licza kapitalizacje wykres
+  // i karta statystyk, zeby obie pokazywaly te sama liczbe.
+  const [burnedWei, setBurnedWei] = useState<bigint>(0n);
+  useEffect(() => {
+    setBurnedWei(0n);
+    if (!tokenAddress || !readClient) return;
+    let cancelled = false;
+    const read = async () => {
+      try {
+        const dead = (await readClient.readContract({
+          address: tokenAddress,
+          abi: erc20Abi,
+          functionName: 'balanceOf',
+          args: [DEAD_ADDRESS as Address],
+        })) as bigint;
+        if (!cancelled) setBurnedWei(dead);
+      } catch {
+        // Brak odczytu = kapitalizacja od pelnej podazy, nie blad na ekranie.
+      }
+    };
+    void read();
+    const timer = window.setInterval(read, 30_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [tokenAddress, readClient]);
 
   const [core, setCore] = useState<CoreState | null>(null);
   const [coreLoading, setCoreLoading] = useState(true);
@@ -550,13 +579,14 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
                   poolId={core.poolId}
                   loading={history.loading}
                   ethUsd={ethUsd}
+                  burnedWei={burnedWei}
                 />
               </div>
 
               <div className="min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1">
                 <div className="space-y-4 lg:sticky lg:top-4">
                   <TradePanel core={core} ethUsd={ethUsd} onAfterTx={() => void loadCore()} />
-                  <StatsCard core={core} tokenAddress={tokenAddress} ethUsd={ethUsd} trades={history.trades} balances={history.balances} historyComplete={historyComplete} poolPriceWei={poolPriceWei} copied={copied} onCopy={() => void copyAddress()} />
+                  <StatsCard core={core} tokenAddress={tokenAddress} ethUsd={ethUsd} trades={history.trades} balances={history.balances} historyComplete={historyComplete} poolPriceWei={poolPriceWei} burnedWei={burnedWei} copied={copied} onCopy={() => void copyAddress()} />
                   {/* Pod panelem handlu, bo tu padaja pytania, na ktore ten
                       przewodnik odpowiada: co znaczy "Locked", czemu kupno
                       rewertuje, i gdzie handlowac po graduacji. */}
@@ -801,6 +831,7 @@ function StatsCard({
   balances,
   historyComplete,
   poolPriceWei,
+  burnedWei,
   copied,
   onCopy,
 }: {
@@ -813,6 +844,8 @@ function StatsCard({
   historyComplete: boolean;
   /** Biezaca cena z puli po graduacji; null = nie wiemy, zostaje krzywa. */
   poolPriceWei: bigint | null;
+  /** Saldo 0xdEaD - odejmowane od podazy przy kapitalizacji. */
+  burnedWei: bigint;
   copied: boolean;
   onCopy: () => void;
 }) {
@@ -863,7 +896,7 @@ function StatsCard({
       // ($0.00000367) zamiast bezuzytecznego "<$0.01".
       usd: ethUsd !== null ? fmtUsdPrice(priceToNumber(priceWei) * ethUsd) : null,
     },
-    { label: 'Market cap', value: `${fmtEth(mcapWei(priceWei), 3)} ${NATIVE_SYMBOL}`, usd: usdSuffix(mcapWei(priceWei), ethUsd) },
+    { label: 'Market cap', value: `${fmtEth(mcapWei(priceWei, burnedWei), 3)} ${NATIVE_SYMBOL}`, usd: usdSuffix(mcapWei(priceWei, burnedWei), ethUsd) },
     { label: `${NATIVE_SYMBOL} reserve`, value: `${fmtEth(core.ethReserve, 4)} ${NATIVE_SYMBOL}`, usd: usdSuffix(core.ethReserve, ethUsd) },
     { label: 'Volume', value: `${fmtEth(volumeWei, 4)} ${NATIVE_SYMBOL}`, usd: usdSuffix(volumeWei, ethUsd) },
     { label: 'Trades', value: String(trades.length) },
