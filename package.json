@@ -26,6 +26,8 @@
     "launchpad:deploy": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run scripts/launchpad/deploy.ts",
     "launchpad:deploy:sepolia": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run scripts/launchpad/deploy.ts --network base-sepolia",
     "launchpad:deploy:base": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run scripts/launchpad/deploy.ts --network base",
+    "launchpad:deploy:q:sepolia": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run scripts/launchpad/deployQuote.ts --network base-sepolia",
+    "launchpad:deploy:q:base": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run scripts/launchpad/deployQuote.ts --network base",
     "launchpad:sphere:rehearsal": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json FORK_REHEARSAL=tak hardhat run scripts/launchpad/deploySphere.ts",
     "launchpad:sphere:base": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run scripts/launchpad/deploySphere.ts --network base",
     "launchpad:sphere:1b": "cross-env TS_NODE_PROJECT=./hardhat.tsconfig.json hardhat run scripts/launchpad/deploySphere1B.ts --network base",
