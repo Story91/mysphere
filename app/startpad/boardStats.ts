@@ -124,3 +124,23 @@ export async function fetchBoardStats(
     return null;
   }
 }
+
+/**
+ * Agregat tablicy DOWOLNEGO rynku Q tej sieci - dla widoku "Perp memes", ktory
+ * pokazuje kilka rynkow naraz, wiec nie moze polegac na aktywnym (`MARKET_QUERY`).
+ */
+export async function fetchBoardStatsFor(
+  chainId: number,
+  marketId: string | null
+): Promise<{ aggregate: BoardAggregate; lastBlock: bigint } | null> {
+  try {
+    const m = marketId ? `&m=${encodeURIComponent(marketId)}` : '';
+    const response = await fetch(`/api/launchpad/board/stats?chainId=${chainId}${m}`, {
+      signal: AbortSignal.timeout(BOARD_STATS_TIMEOUT_MS),
+    });
+    if (!response.ok) return null;
+    return readBoardStatsResponse(await response.json());
+  } catch {
+    return null;
+  }
+}

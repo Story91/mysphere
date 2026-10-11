@@ -21,6 +21,7 @@ import {
   erc20Abi,
   hookAbi,
   LAUNCHPAD_DEPLOYMENTS,
+  QUOTE_ASSET,
   setLaunchpadMarket,
   LAUNCHPAD_CHAIN,
   LAUNCHPAD_EXPLORER_URL,
@@ -702,6 +703,12 @@ function TokenHeader({
               {/* Ta sama podpowiedz, co przy plakietce na tablicy - slowo
                   "Locked" nie tlumaczy sie samo. */}
               <span title={STATE_HINT[core.state]} className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] ${stateClass}`}>{core.state}</span>
+              {/* Mem sparowany z perpem Flash - para jest czescia tozsamosci tokena. */}
+              {QUOTE_ASSET && (
+                <a href="/startpad/perps" className="rounded-full bg-sp-brand/10 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-brand hover:bg-sp-brand/15">
+                  ⚡ on {QUOTE_ASSET.symbol}
+                </a>
+              )}
             </div>
             <p className="mt-0.5 truncate text-[13px] text-sp-shade/50">
               {core.name} · launched {timeAgo(core.startedAt)}

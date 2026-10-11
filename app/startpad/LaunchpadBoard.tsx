@@ -168,6 +168,11 @@ function NetworkSwitch() {
             window.location.href = '/startpad/sphere';
             return;
           }
+          // Wszystkie rynki perpow w jednym widoku (jak w aplikacji Flash).
+          if (event.target.value === 'perps') {
+            window.location.href = '/startpad/perps';
+            return;
+          }
           // Rynek Q na sieci ("8453:eth2xl") - osobna tablica z para mem/perp.
           const [chainPart, marketPart] = event.target.value.split(':');
           if (marketPart) {
@@ -194,14 +199,21 @@ function NetworkSwitch() {
             <option key={net.chain.id} value={net.chain.id}>
               {net.label}
             </option>,
-            // Rynki Q tej sieci - zaraz pod nia, jako "Base B20 · ETH2xL".
-            ...(net.markets ?? []).map((m) => (
-              <option key={`${net.chain.id}:${m.id}`} value={`${net.chain.id}:${m.id}`}>
-                {`${net.label} · ${m.label}`}
-              </option>
-            )),
+            // Rynki perpow maja wspolny widok "Perp memes" (pozycja nizej). Na
+            // liscie zostaje tylko AKTYWNY rynek, zeby `value` selecta nie
+            // wskazywal na nieistniejaca opcje, gdy ktos jest na tablicy perpa.
+            ...(net.markets ?? [])
+              .filter((m) => net.chain.id === active.chain.id && m.id === active.marketId)
+              .map((m) => (
+                <option key={`${net.chain.id}:${m.id}`} value={`${net.chain.id}:${m.id}`}>
+                  {`${net.label} · ${m.label}`}
+                </option>
+              )),
           ])}
         <option disabled>──────</option>
+        {Object.values(LAUNCHPAD_NETWORKS).some((net) => (net.markets?.length ?? 0) > 0 && !net.testnet) && (
+          <option value="perps">⚡ Perp memes</option>
+        )}
         <option value="sphere">✦ $SPHERE</option>
       </select>
     </span>
@@ -1580,6 +1592,19 @@ export default function LaunchpadBoard() {
   const [selectedId, setSelectedId] = useState<string>('');
   const [buyAmount, setBuyAmount] = useState('0.05');
   const [launchOpen, setLaunchOpen] = useState(false);
+  // `?launch=1` - wejscie z widoku "Perp memes" z wybranym perpem: modal startu
+  // otwiera sie od razu, juz w kontekscie tego rynku (`?m=`).
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get('launch') !== '1') return;
+      setLaunchOpen(true);
+      url.searchParams.delete('launch');
+      window.history.replaceState(null, '', url.toString());
+    } catch {
+      // Zepsuty adres - modal zostaje zamkniety.
+    }
+  }, []);
   const [tradeOpen, setTradeOpen] = useState(false);
   // Animacje handlu sa ZAWSZE wlaczone - i tak byly caly czas, a przelacznik
   // tylko zajmowal miejsce w pasku. Stala, zeby karty dalej dostawaly prop.

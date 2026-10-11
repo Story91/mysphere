@@ -281,12 +281,11 @@ export default function Navigation() {
     // POWROT DO BELKI = odkomentowanie ponizszej linii. Kolor obwodki czeka
     // w NAV_ACCENT, wiec nie trzeba ruszac niczego wiecej.
     // { href: '/marketplace', label: 'CAMP' },
-    // Perps zaraz za $SPHERE, bo to ten sam ruch co Startpad, tylko o stopien
-    // dalej: tam tworca wystawia token na krzywej, tu wystawia FEED i rynek
-    // lewarowany na Arc. Bez tego wpisu /derivatives bylo dokladnie tym, przed
-    // czym ostrzega komentarz przy /startpad - trasa dostepna wylacznie
-    // z palca, czyli dla uzytkownika nieistniejaca.
-    { href: '/derivatives', label: 'Perps' },
+    // Perps zaraz za $SPHERE: memy sparowane z perpami Flash na Base MAINNET
+    // (/perps, od 2026-10-11). Wczesniej wpis prowadzil do /derivatives - vAMM
+    // na Arc TESTNET bez prawdziwych pieniedzy i bez wdrozenia na mainnecie;
+    // tamta trasa dziala dalej pod adresem, tylko nie ma jej w belce.
+    { href: '/perps', label: 'Perps' },
     // "B20" jest CHWILOWO UKRYTE w belce (na zyczenie). Trasa /b20 DZIALA dalej
     // pod adresem - NIE dodajemy jej do DISABLED_ROUTES, wiec nie jest
     // przekierowana, tylko niepokazana w nawigacji. Powrot do belki =
