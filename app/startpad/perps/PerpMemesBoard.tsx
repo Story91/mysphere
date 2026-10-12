@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import PerpAvatar, { PerpCornerBadge } from './PerpAvatar';
-import DuelsSection from './DuelsSection';
 import { formatEther, getAddress, type Address } from 'viem';
 import { usePublicClient } from 'wagmi';
 import { ArrowDownRight, ArrowUpRight, ChevronLeft, Rocket, X, Zap } from 'lucide-react';
@@ -264,8 +263,6 @@ export default function PerpMemesBoard() {
         </button>
         </div>
       </div>
-
-      <DuelsSection ethChange24h={perps.find((p) => p.id === 'eth2xl')?.change24hPct ?? null} />
 
       <div className="mt-5 grid gap-4 lg:grid-cols-[300px_1fr]">
         {/* PERPY */}

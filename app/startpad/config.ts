@@ -292,18 +292,8 @@ const baseMainnetEntry: LaunchpadNetwork = {
         tokenFactory: '0xF1DAd68f9B0b00A80E993286419AD03e9380e7B0',
         deployBlock: 52475894n,
       },
-      // Wdrozone 2026-10-12 (scripts/output/launchpad-q-{eth2xs,aapl2xl,meta2xl}-base.json).
-      {
-        id: 'eth2xs',
-        label: 'ETH2xS',
-        quote: { address: '0xb200000000000000000000FFFfb1A72FA82A8694', symbol: 'ETH2xS', decimals: 18, kind: 'perp' },
-        rVirt: 1875,
-        launchpad: '0x70ba3d1c7043164c8553433c2AA27207cd364018',
-        vault: '0x779d66625eF44b1bd081d1f1706e46D5e046E461',
-        hook: '0xAfa29A185F0D9653C7EB50568a7B62588aA4e044',
-        tokenFactory: '0xF1DAd68f9B0b00A80E993286419AD03e9380e7B0',
-        deployBlock: 52491530n,
-      },
+      // Wdrozone 2026-10-12 (scripts/output/launchpad-q-{aapl2xl,meta2xl}-base.json). ETH2xS
+      // (0x70ba...4018) tez wdrozony, ale schowany 2026-10-13 decyzja wlasciciela: bez shortow.
       {
         id: 'aapl2xl',
         label: 'AAPL2xL',
