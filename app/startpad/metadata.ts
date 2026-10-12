@@ -89,6 +89,12 @@ export type TokenMetadata = {
    * osobno po adresie feedu (usePairedMarket w module derywatow).
    */
   pairedIndex: { symbol: string; feed: string } | null;
+  /**
+   * Bull vs Bear: wspolny identyfikator pojedynku i strona. Dwa tokeny tego
+   * samego tworcy na ETH2xL (bull) i ETH2xS (bear) z tym samym `id` to jedna
+   * para - patrz app/startpad/duel.ts i /api/launchpad/duels.
+   */
+  duel: { id: string; side: 'bull' | 'bear'; ticker: string } | null;
 };
 
 const DATA_JSON_PREFIX = 'data:application/json;base64,';
@@ -122,26 +128,36 @@ function parsePairedIndex(value: unknown): TokenMetadata['pairedIndex'] {
   return { symbol, feed };
 }
 
+function parseDuel(value: unknown): TokenMetadata['duel'] {
+  if (!value || typeof value !== 'object') return null;
+  const { id, side, ticker } = value as { id?: unknown; side?: unknown; ticker?: unknown };
+  if (typeof id !== 'string' || !/^[a-z0-9]{8,24}$/.test(id)) return null;
+  if (side !== 'bull' && side !== 'bear') return null;
+  if (typeof ticker !== 'string' || !/^[A-Z0-9]{1,8}$/.test(ticker)) return null;
+  return { id, side, ticker };
+}
+
 export function parseMetadataUri(uri: string | null | undefined): TokenMetadata {
-  const empty: TokenMetadata = { image: null, description: null, link: null, pairedIndex: null };
+  const empty: TokenMetadata = { image: null, description: null, link: null, pairedIndex: null, duel: null };
   if (!uri) return empty;
   const trimmed = uri.trim();
   if (trimmed === '') return empty;
 
   if (!trimmed.startsWith(DATA_JSON_PREFIX)) {
-    return { image: null, description: null, link: resolveMediaUrl(trimmed), pairedIndex: null };
+    return { image: null, description: null, link: resolveMediaUrl(trimmed), pairedIndex: null, duel: null };
   }
 
   const decoded = decodeBase64(trimmed.slice(DATA_JSON_PREFIX.length));
   if (decoded === null) return empty;
 
   try {
-    const parsed = JSON.parse(decoded) as { image?: unknown; description?: unknown; pairedIndex?: unknown };
+    const parsed = JSON.parse(decoded) as { image?: unknown; description?: unknown; pairedIndex?: unknown; duel?: unknown };
     return {
       image: resolveMediaUrl(typeof parsed.image === 'string' ? parsed.image : null),
       description: typeof parsed.description === 'string' ? parsed.description.slice(0, 280) : null,
       link: null,
       pairedIndex: parsePairedIndex(parsed.pairedIndex),
+      duel: parseDuel(parsed.duel),
     };
   } catch {
     return empty;

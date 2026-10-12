@@ -670,6 +670,25 @@ function TokenHeader({
   const image = pickTokenImage({ profileLogoUrl: profile?.logoUrl, metadataUri: core.config.metadataURI });
   const chainMeta = parseMetadataUri(core.config.metadataURI);
   const description = profile?.description ?? chainMeta.description;
+  // Bull vs Bear: bliźniak z tego samego pojedynku (para sprawdzana po tworcy w /api/launchpad/duels).
+  const duelId = chainMeta.duel?.id ?? null;
+  const duelSide = chainMeta.duel?.side ?? null;
+  const [twin, setTwin] = useState<{ address: string; symbol: string; market: string } | null>(null);
+  useEffect(() => {
+    if (!duelId || !duelSide) return;
+    let cancelled = false;
+    fetch(`/api/launchpad/duels?id=${duelId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((body: { duels?: Array<{ bull: { address: string; symbol: string } | null; bear: { address: string; symbol: string } | null }> } | null) => {
+        const d = body?.duels?.[0];
+        const other = duelSide === 'bull' ? d?.bear : d?.bull;
+        if (!cancelled && other) setTwin({ address: other.address, symbol: other.symbol, market: duelSide === 'bull' ? 'eth2xs' : 'eth2xl' });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [duelId, duelSide]);
   /* ---- SPAROWANY INDEKS. Metadane mowia "AAPL/USD"; czy rynek na tym feedzie
      istnieje, sprawdzamy w fabryce. Jest -> link do rynku. Nie ma -> link do
      prefilowanego kreatora (kaucje placi ten, kto kliknie). Feed spoza naszej
@@ -712,6 +731,15 @@ function TokenHeader({
               {QUOTE_ASSET && (
                 <a href="/startpad/perps" className="rounded-full bg-sp-brand/10 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-brand hover:bg-sp-brand/15">
                   ⚡ on {QUOTE_ASSET.symbol}
+                </a>
+              )}
+              {twin && (
+                <a
+                  href={`/startpad/${twin.address.toLowerCase()}?m=${twin.market}`}
+                  className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] ${duelSide === 'bull' ? 'bg-sp-down/12 text-sp-down-deep' : 'bg-sp-up/12 text-sp-up'}`}
+                  title="Bull vs Bear duel"
+                >
+                  ⚔️ vs ${twin.symbol}
                 </a>
               )}
             </div>
