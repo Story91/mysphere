@@ -1,0 +1,9 @@
+{
+  "network": "base",
+  "chainId": 8453,
+  "raidVault": "0x000fF26384921f6886f82125559Ccb1270df5d1d",
+  "deployer": "0xD4885A5aa53446843CABcDE1F35DE9b4E906030e",
+  "deployTx": "0x96f03621ce57ef76dee2e32a844711718993a63ab80742cc85a7a9ec0606ce37",
+  "deployBlock": 52494333,
+  "deployedAt": "2026-10-12T04:06:54.407Z"
+}

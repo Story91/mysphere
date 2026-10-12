@@ -5,7 +5,10 @@ import { parseAbi, type Address } from 'viem';
  * Jeden vault na siec, dla rynku ETH (launchpad.buy) i rynkow perpow (PerpZap).
  * Brak wpisu = brak raidow w UI.
  */
-export const RAID_VAULT_BY_CHAIN: Record<number, Address | undefined> = {};
+export const RAID_VAULT_BY_CHAIN: Record<number, Address | undefined> = {
+  // Wdrozony 2026-10-12, blok 52494333 (scripts/output/raid-vault-base.json).
+  8453: '0x000fF26384921f6886f82125559Ccb1270df5d1d',
+};
 
 export function raidVaultOf(chainId: number): Address | null {
   return RAID_VAULT_BY_CHAIN[chainId] ?? null;
