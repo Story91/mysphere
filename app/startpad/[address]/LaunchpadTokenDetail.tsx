@@ -70,6 +70,7 @@ import { applyClaimLogs, claimsNeedReload } from './liveClaims';
 import { hasPool, poolPriceWeiFromSqrt, readPoolPriceWei } from './poolPrice';
 import { POOL_SWAP_EVENT } from './poolSwaps';
 import { useTokenHistory, type LiveLaunchpadLog } from './useTokenHistory';
+import RaidPanel from './RaidPanel';
 
 const EXPLORER = LAUNCHPAD_EXPLORER_URL;
 
@@ -608,6 +609,7 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
               <div className="min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1">
                 <div className="space-y-4 lg:sticky lg:top-4">
                   <TradePanel core={core} ethUsd={ethUsd} onAfterTx={() => void loadCore()} />
+                  <RaidPanel core={core} onAfterTx={() => void loadCore()} />
                   <StatsCard core={core} tokenAddress={tokenAddress} ethUsd={ethUsd} trades={history.trades} balances={history.balances} historyComplete={historyComplete} poolPriceWei={poolPriceWei} burnedWei={burnedWei} copied={copied} onCopy={() => void copyAddress()} />
                   {/* Pod panelem handlu, bo tu padaja pytania, na ktore ten
                       przewodnik odpowiada: co znaczy "Locked", czemu kupno
