@@ -1,0 +1,11 @@
+{
+  "network": "base",
+  "chainId": 8453,
+  "zap": "0x338dbB64FAD7D506b9DF52De764e806e3954Be2b",
+  "contract": "PerpZap",
+  "poolManager": "0x498581fF718922c3f8e6A244956aF099B2652b2b",
+  "deployer": "0xD4885A5aa53446843CABcDE1F35DE9b4E906030e",
+  "deployTx": "0xb4e16cc920e5cef1c44162e44939b10d246ff7353508d84c298ab23096956a85",
+  "deployBlock": 52493047,
+  "deployedAt": "2026-10-12T03:24:06.310Z"
+}

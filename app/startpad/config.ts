@@ -893,7 +893,10 @@ const PERP_BUY_ZAP_BY_CHAIN: Record<number, `0x${string}` | undefined> = {
   // Wdrozony 2026-10-12, blok 52489206 (scripts/output/perp-zap-base.json).
   [base.id]: '0xBDBe76a51Af1D444f89ee6d0a457A1FD1Dc06b9A',
 };
-const PERP_ZAP_V2_BY_CHAIN: Record<number, `0x${string}` | undefined> = {};
+const PERP_ZAP_V2_BY_CHAIN: Record<number, `0x${string}` | undefined> = {
+  // Wdrozony 2026-10-12, blok 52493047 (scripts/output/perp-zap-v2-base.json).
+  [base.id]: '0x338dbB64FAD7D506b9DF52De764e806e3954Be2b',
+};
 /** Wszystkie sprzedajace zapy ze wszystkich sieci - do pominiecia w licznikach traderow. */
 export const ALL_PERP_SELL_ZAPS: ReadonlySet<string> = new Set(
   Object.values(PERP_ZAP_V2_BY_CHAIN).filter((a): a is `0x${string}` => Boolean(a)).map((a) => a.toLowerCase())

@@ -166,3 +166,13 @@ Zap nie trzyma srodkow: zwrot nadwyzki z krzywej (perp) idzie do odbiorcy, niewy
 Sprawdzenie: `test/PerpBuyZap.test.ts` (lokalnie) + symulacja `eth_call` na zywym Base w `deployPerpZap.ts` (B20 i hook Flash nie dzialaja na forku).
 Front: przelacznik "Pay with ETH / ETH2xL" w panelu kupna, `PERP_ZAP_BY_CHAIN` w `app/startpad/config.ts`.
 Nie obejmuje: pre-buy przy starcie (tworca = msg.sender launchpada) i sprzedazy do ETH (`Sold` zapisalby zap jako sprzedajacego).
+
+## 2.12 PerpZap v2 i handel za ETH po graduacji (2026-10-12)
+
+PerpZap v2 `0x338dbB64FAD7D506b9DF52De764e806e3954Be2b` (blok 52493047, `scripts/output/perp-zap-v2-base.json`):
+`buyWithEth` jak v1 + `sellForEth` (mem -> `launchpad.sell` -> perp -> USDC -> ETH). Front uzywa tylko v2.
+`Sold.seller` przy sprzedazy przez zap to zap - historia podstawia sprzedajacego z Transferu mema do zapa
+(skan) albo z `ZapSell` (na zywo); tablica nie liczy zapa jako tradera.
+Po graduacji handel za ETH idzie bez kontraktu: Universal Router, jedna sciezka v4 ETH <-> USDC <-> perp <-> mem
+(`perpMemePaths`, `encodeV4ExactInPath` w `app/startpad/[address]/v4Swap.ts`), wycena `V4Quoter.quoteExactInput`.
+Pre-buy przy starcie nadal wymaga perpa (tworca = msg.sender launchpada).
