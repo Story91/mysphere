@@ -30,9 +30,13 @@ import type { TokenCardData } from '../../startpad/share/tokenCard';
  *
  * TLO: #F1EDFA, nie #0A1024. Zmiana zamowiona przez wlasciciela 2026-09-01
  * razem z HomeShareCard - uzasadnienie i przyjeta cena sa opisane tam.
- * UWAGA: cztery karty danych (/leaderboard, /post, /tip, /u) SA JESZCZE
- * ciemne, wiec rodzina jest chwilowo rozjechana 2:4. To jest znany dlug,
- * nie przeoczenie.
+ * Od 2026-10 cala rodzina (strony, ranking, post, tip, profil, perpy, aski)
+ * stoi na jasnym tle.
+ *
+ * WARIANT PERPA: token z rynku perpa (`data.perp`) dostaje nadlinie
+ * MYSPHERE PERPS, plakietke "PAIRED WITH <perp>", zbiorke w dolarach z NAV
+ * i kafel ruchu perpa z 24h zamiast wieku. Bez NAV zostaja jednostki perpa
+ * i kreska przy kapitalizacji.
  *
  * SATORI, NIE PRZEGLADARKA: kazdy kontener ma jawny `display`, zero klas
  * Tailwinda, zero cieni pod tekstem, zero jednostek innych niz liczby.
@@ -156,7 +160,30 @@ function priceLabel(priceEth: number): string {
 }
 
 function ethLabel(value: number): string {
+  // 0.004 ETH na krzywej to nie "0" - przy jednym kupujacym karta pisala
+  // "0 / 3 ETH" obok kapitalizacji 1.9k $, czyli przeczyla sama sobie.
+  if (value > 0 && value < 0.01) return '<0.01';
   return value.toFixed(2).replace(/\.?0+$/, '');
+}
+
+/** Kwota zbiorki w dolarach - rynek perpa liczy krzywa w jednostkach perpa, ktorych nikt nie zna. */
+function usdShort(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return '$0';
+  if (value < 10) return `$${value.toFixed(2)}`;
+  return mcapLabel(value);
+}
+
+function pctLabel(value: number): string {
+  const sign = value > 0 ? '+' : value < 0 ? '-' : '';
+  return `${sign}${Math.abs(value).toFixed(2)}%`;
+}
+
+/**
+ * Nazwa perpa z API Flash ("ETH 2x Long"), a gdy jej nie ma - ticker z
+ * konfiguracji ("ETH2xL"). Wielkie litery, bo stoi w nadlinii.
+ */
+function perpLabel(perp: NonNullable<TokenCardData['perp']>): string {
+  return (perp.name ?? perp.symbol).toUpperCase();
 }
 
 export function TokenShareCard({ data, height }: { data: TokenCardData; height: number }) {
@@ -169,6 +196,8 @@ export function TokenShareCard({ data, height }: { data: TokenCardData; height: 
   // wlasnie wykres ma z tego skorzystac, a nie powietrze miedzy pasmami.
   const chartHeight = Math.max(120, height - 470);
   const chart = chartDataUri(data.prices, { width: COLUMN, height: chartHeight, up: data.up });
+  const perp = data.perp;
+  const nav = perp?.navUsd ?? null;
 
   return (
     <div
@@ -186,11 +215,35 @@ export function TokenShareCard({ data, height }: { data: TokenCardData; height: 
       {/* PASMO 1 - skad to jest i z ktorego lancucha. */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', fontSize: 24, fontWeight: 700, letterSpacing: 5, color: CARD.brand }}>
-          MYSPHERE STARTPAD
+          {perp ? 'MYSPHERE PERPS' : 'MYSPHERE STARTPAD'}
         </div>
-        <div style={{ display: 'flex', fontSize: 22, letterSpacing: 2, color: CARD.inkMuted }}>
-          {data.networkLabel.toUpperCase()} · {data.state.toUpperCase()}
-        </div>
+        {/* Rynek perpa mowi, z CZYM mem jest sparowany - to jest powod, dla
+            ktorego ten link w ogole ktos wkleja. Siec i stan schodza wtedy
+            z karty (siec jest jedna: Base; stan widac po pasku krzywej). */}
+        {perp ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ display: 'flex', fontSize: 22, letterSpacing: 2, color: CARD.inkMuted }}>PAIRED WITH</div>
+            <div
+              style={{
+                display: 'flex',
+                padding: '6px 16px',
+                borderRadius: 999,
+                border: `2px solid ${CARD.line}`,
+                background: CARD.panel,
+                fontFamily: DISPLAY_FAMILY,
+                fontSize: 24,
+                fontWeight: 700,
+                color: CARD.brand,
+              }}
+            >
+              {perpLabel(perp)}
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', fontSize: 22, letterSpacing: 2, color: CARD.inkMuted }}>
+            {data.networkLabel.toUpperCase()} · {data.state.toUpperCase()}
+          </div>
+        )}
       </div>
 
       {/* PASMO 2 - tozsamosc po lewej, powod udostepnienia po prawej. */}
@@ -232,7 +285,11 @@ export function TokenShareCard({ data, height }: { data: TokenCardData; height: 
             label={data.state === 'Graduated' ? 'RAISED' : `ON THE CURVE · ${progress}%`}
             // Jednostka SIECI, nie wpisany na sztywno eter: Arc rozlicza sie
             // w USDC i karta pisala tam "1000 ETH".
-            value={`${ethLabel(data.raised)} / ${ethLabel(data.target)} ${data.nativeSymbol}`}
+            value={
+              perp && nav !== null
+                ? `${usdShort(data.raised * nav)} / ${usdShort(data.target * nav)}`
+                : `${ethLabel(data.raised)} / ${ethLabel(data.target)} ${data.nativeSymbol}`
+            }
             tone={CARD.ink}
           />
           <Stat label="BUYERS" value={String(data.holders)} />
@@ -240,12 +297,24 @@ export function TokenShareCard({ data, height }: { data: TokenCardData; height: 
               w dolarach wyglada jak zero, a w gwei nikt nie wie, czy 0.88 to
               duzo. Bez kursu ETH schodzimy na cene, zeby kafelek nie zostal
               pusty. */}
-          {data.mcapUsd === null ? (
+          {/* Cena w gwei ma sens tylko w ETH - na rynku perpa bez NAV zostaje
+              kreska przy kapitalizacji zamiast liczby w zlej jednostce. */}
+          {data.mcapUsd === null && !perp ? (
             <Stat label="PRICE" value={priceLabel(data.priceEth)} />
           ) : (
             <Stat label="MARKET CAP" value={mcapLabel(data.mcapUsd)} />
           )}
-          <Stat label="AGE" value={data.ageLabel.replace(' old', '')} />
+          {/* Na rynku perpa ostatni kafel nalezy do perpa: jego ruch z 24h to
+              druga polowa argumentu "mem na dzwigni". Wiek tokena ustepuje. */}
+          {perp && perp.change24hPct !== null ? (
+            <Stat
+              label={`${perp.symbol.toUpperCase()} · 24H`}
+              value={pctLabel(perp.change24hPct)}
+              tone={perp.change24hPct >= 0 ? CARD.up : CARD.down}
+            />
+          ) : (
+            <Stat label="AGE" value={data.ageLabel.replace(' old', '')} />
+          )}
         </div>
       </div>
     </div>

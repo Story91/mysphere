@@ -37,6 +37,9 @@ const MAX_POINTS = 64;
 /** Zapas nad i pod linia, zeby szczyt i dolek nie przycinaly sie o krawedz. */
 const PAD_Y = 12;
 
+/** Najmniejsza rozpietosc osi Y jako ulamek sredniej ceny serii. */
+const MIN_RANGE_FRACTION = 0.06;
+
 export type ChartOptions = {
   width: number;
   height: number;
@@ -68,8 +71,15 @@ export function buildChartSvg(values: number[], options: ChartOptions): string |
   if (points.length < 2) return null;
 
   const { width, height, up } = options;
-  const min = Math.min(...points);
-  const max = Math.max(...points);
+  // MINIMALNA ROZPIETOSC OSI. Bez niej ruch o 0.3% rozciagal sie na cala
+  // wysokosc: karta pisala "x1.00", a linia leciala stromo w gore albo w dol.
+  // Os ma co najmniej 6% sredniej ceny, wiec drobny ruch wyglada na drobny.
+  const rawMin = Math.min(...points);
+  const rawMax = Math.max(...points);
+  const floor = ((rawMin + rawMax) / 2) * MIN_RANGE_FRACTION;
+  const pad = Math.max(0, (floor - (rawMax - rawMin)) / 2);
+  const min = rawMin - pad;
+  const max = rawMax + pad;
   const range = max - min;
   const span = height - PAD_Y * 2;
 

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { pageMeta } from '../../utils/pageMeta';
 import Link from 'next/link';
 import { getTokenDetail, type TokenDetail } from '../../utils/b20/token';
 import { tokenInitials, uniswapBuyUrl } from '../../utils/b20/format';
@@ -73,10 +74,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const label = t.symbol ? `${t.name ?? t.symbol} (${t.symbol})` : 'B20 token';
   const price = fmtUsd(t.quote?.priceUsd ?? null);
 
-  return {
+  return pageMeta({
     title: price ? `${label} · ${price}` : `${label} · B20 on Base`,
     description: `${label} is a B20 token on Base. Supply, cap, pool and price, read from the chain.`,
-  };
+    image: '/b20/opengraph-image',
+  });
 }
 
 /* -------------------------------------------------------------------------- */

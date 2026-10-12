@@ -1,6 +1,7 @@
 import { ImageResponse } from 'next/og';
 import { HomeShareCard, OG_CACHE_HEADERS } from './components/og/HomeShareCard';
 import { ogFonts } from './components/og/fonts';
+import { HEADLINE, SUBLINE } from './narrative';
 
 /**
  * Karta OG korzenia serwisu.
@@ -21,13 +22,10 @@ import { ogFonts } from './components/og/fonts';
  * === TRZY OSOBNE TEKSTY, NIE JEDEN ===
  * To, co czlowiek widzi na X, sklada sie z trzech napisow pisanych w DWOCH
  * plikach i latwo je pomylic:
- *   1. TRESC W OBRAZKU (naglowek + stopka) - HomeShareCard.tsx,
- *   2. `openGraph.title` - czarny pasek POD obrazkiem - app/layout.tsx
- *      (SOCIAL_TITLE),
- *   3. `openGraph.description` - pokazywany przez czesc platform, na X czesto
- *      ucinany - app/layout.tsx (APP_DESCRIPTION).
- * Sa napisane tak, zeby sie nie powtarzac. Zmieniajac jeden, przeczytaj dwa
- * pozostale, bo inaczej karta zaczyna mowic to samo dwa razy i marnuje pasek.
+ *   1. TRESC W OBRAZKU (naglowek, druga linijka, chipy),
+ *   2. `openGraph.title` - czarny pasek POD obrazkiem (SOCIAL_TITLE),
+ *   3. `openGraph.description` - na X czesto ucinany (APP_DESCRIPTION).
+ * Wszystkie trzy sa w app/narrative.ts, zeby sie nie powtarzaly.
  */
 
 export const runtime = 'nodejs';
@@ -36,7 +34,7 @@ export const runtime = 'nodejs';
  * crawler, gdy obrazka nie da sie pokazac. Dlatego jest to naglowek karty
  * przepisany co do znaku, a nie tytul serwisu.
  */
-export const alt = 'An AI agent paid to ask. It held no gas. It signed once.';
+export const alt = `${HEADLINE} ${SUBLINE}`;
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 

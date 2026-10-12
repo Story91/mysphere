@@ -115,6 +115,9 @@ function isReDefinitionTab(searchParams: SearchParams | undefined): boolean {
   return (Array.isArray(tab) ? tab[0] : tab) === 're-definition';
 }
 
+const HOW_SOCIAL_DESCRIPTION =
+  'Launch a meme on a bonding curve or pair it with a 2x perp, post onchain, tip, unlock part of a post, and ask a question with a budget - step by step.';
+
 /**
  * Metadane zalezne od zakladki. Manifest przynosi swoje wlasne z
  * ReDefinitionContent - stoja przy tresci, ktora opisuja, a nie tutaj.
@@ -136,11 +139,20 @@ export function generateMetadata({ searchParams }: { searchParams: SearchParams 
     // Marke doklada `title.template` z layoutu glownego.
     title: 'How it works',
     description: `What you can do on MySphere today: post on nine networks, ${tipAndReply}, sell part of a post, ask a question with a budget, launch a token on the Startpad curve, collect what you are owed, and look up what a vault curator changed.`,
+    // Twitter wpisany wprost: bez niego pasek na X dziedziczyl tytul strony
+    // glownej (scalanie metadanych jest plytkie - patrz app/utils/pageMeta.ts).
+    // "Every amount settles onchain with a hash" usuniete: dla napiwkow to
+    // nieprawda (hash ma mniejszosc wpisow - firestore.rules, blok tipow).
     openGraph: {
       title: 'How MySphere works',
-      description:
-        'Post onchain, tip in USDC, put part of a post behind a payment, ask a question with a budget and seats, launch a token on a bonding curve. Every amount settles onchain with a hash.',
+      description: HOW_SOCIAL_DESCRIPTION,
       type: 'article',
+      siteName: 'MySphere',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: 'How MySphere works',
+      description: HOW_SOCIAL_DESCRIPTION,
     },
   };
 }

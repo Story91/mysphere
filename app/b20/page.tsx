@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { pageMeta } from '../utils/pageMeta';
 import Link from 'next/link';
 import { Suspense } from 'react';
 import B20Board from './B20Board';
@@ -34,11 +35,12 @@ import { getBoard } from '../utils/b20/market';
  * czekac na siec".
  */
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta({
+  socialTitle: 'B20 market: every token on Base · MySphere',
   title: 'B20 market: every token created on Base, and which ones actually trade',
   description:
     'A live list of B20 tokens on Base: who made them, when, and whether anyone has ever traded them. A token with no pool has no price, and we say so instead of writing $0.00.',
-};
+});
 
 // Migawka zyje w pamieci instancji i ma wlasny licznik swiezosci (60 s), wiec
 // zamrozenie tej strony przy budowaniu daloby liste tokenow z dnia wdrozenia.

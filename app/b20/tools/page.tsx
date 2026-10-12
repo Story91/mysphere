@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { pageMeta } from '../../utils/pageMeta';
 import Link from 'next/link';
 import B20Console from './B20Console';
 import B20Nav from '../B20Nav';
@@ -23,11 +24,12 @@ import B20Nav from '../B20Nav';
  * zakladajacego i dowolnego wariantu, bez zadania o token.
  */
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta({
   title: 'B20 tools: mine an address, build a private receipt',
   description:
     'Search for a B20 token address that spells something, and turn an invoice into a memo nobody can read but you can prove. Everything runs in your browser.',
-};
+  image: '/b20/opengraph-image',
+});
 
 const CARD = 'rounded-card border border-soft-line bg-soft-surface p-4 shadow-card sm:p-5';
 

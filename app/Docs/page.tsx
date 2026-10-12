@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { pageMeta } from '../utils/pageMeta';
 import Link from 'next/link';
 import DocsShell from './_components/DocsShell';
 import { DOC_PAGES, docHref } from './nav';
@@ -8,11 +9,12 @@ import { DOC_PAGES, docHref } from './nav';
  * (bg-black, karty "Coming Soon"); teraz to hub w systemie Soft, z ktorego
  * wchodzi sie na strone kazdego modulu. Whitepaper zostaje jako osobna pozycja.
  */
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta({
   title: 'Docs',
   description:
     'How MySphere works: the feed, posting and tipping on Solana, Asks and escrow, your money, the curator record, the Startpad launchpad and B20 tokens, in plain terms, with the math and how to verify each part onchain.',
-};
+  socialTitle: 'MySphere Docs - how every part works',
+});
 
 export default function DocsOverviewPage() {
   const cards = DOC_PAGES.filter((page) => page.slug !== '');

@@ -3,7 +3,6 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getAskForShare, shortAskAuthor } from '../../utils/asks/getAskForShare';
 import {
-  formatShareMoney,
   shareFundingNote,
   shareSeatsLabel,
   shareStateLine,
@@ -11,17 +10,8 @@ import {
 } from '../../utils/asks/askPublicView';
 import ShareAskActions from './ShareAskActions';
 // Czysty modul (bez 'use client') - komponent serwerowy moze go wolac.
-// formatAskAmount z AskCard.tsx tu NIE wolno: patrz formatShareMoney.
-import { solAskAmount, solRailBadge } from '../../utils/asks/solAskDisplay';
-import type { Ask } from '../../utils/asks/types';
-
-/**
- * Kwota na tej stronie: Ask SOL z lamportow (dokladnie to, co zapieczetowal
- * serwer), reszta przez formatShareMoney jak dotad.
- */
-function shareAmount(ask: Ask, which: 'budget' | 'perAnswer'): string {
-  return solAskAmount(ask, which) ?? formatShareMoney(which === 'budget' ? ask.budget : ask.perAnswer, ask.token);
-}
+import { solRailBadge } from '../../utils/asks/solAskDisplay';
+import { shareAmount } from '../../utils/asks/shareAmount';
 
 /**
  * Udostepnialna strona jednego Aska.

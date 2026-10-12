@@ -7,6 +7,7 @@ import { SpeedInsights } from '@vercel/speed-insights/react';
 import AppShell from './components/AppShell';
 import { DEFAULT_LAUNCHPAD_CHAIN_ID } from './startpad/config';
 import { networkThemeCss, themeBootScript } from './startpad/networkTheme';
+import { APP_DESCRIPTION, MINIAPP_BUTTON, SOCIAL_TITLE } from './narrative';
 
 // next/font hostuje fonty same-origin i wstrzykuje preload - zamiast
 // render-blokujacego @import z fonts.googleapis.com wewnatrz globals.css.
@@ -74,9 +75,8 @@ const MINIAPP_EMBED = JSON.stringify({
   version: '1',
   imageUrl: `${APP_URL}/miniapp-image/`,
   button: {
-    // Limit Farcastera to 32 znaki; tu jest 22. Bez wiodacej spacji - klient
-    // nie przycina bialych znakow, wiec napis wjezdzalby na przycisku z wcieciem.
-    title: 'Ask. Answer. Get paid.',
+    // Limit Farcastera to 32 znaki - pilnuje go komentarz w app/narrative.ts.
+    title: MINIAPP_BUTTON,
     action: {
       type: 'launch_miniapp',
       name: 'MySphere',
@@ -88,76 +88,11 @@ const MINIAPP_EMBED = JSON.stringify({
 });
 
 /**
- * === TYTUL I OPIS NIOSA TEZE, NIE KATEGORIE ===
- * Stalo tu: "The onchain social Dapp on Base. Build, grow, and own your digital
- * Sphere." - zdanie prawdziwe i zupelnie puste, bo pasuje do kazdego produktu
- * spolecznosciowego z portfelem. Nie mowilo ani co tu sie robi, ani czym to
- * miejsce rozni sie od pozostalych.
- *
- * Teza MySphere jest jedna: OSIA CZASU SA PIENIADZE, nie tresc. Opis mowi wiec
- * dokladnie to i tylko to, co dziala DZIS: posty, napiwki oraz rynek Askow -
- * budzet, zapieczetowane odpowiedzi, wyplata z hashem. Zadnej liczby
- * uzytkownikow, zadnego czasu przyszlego.
- *
- * Napiwki NIE sa "w ETH i USDC" - tak stalo do 23.09.2026 i bylo prawda tylko
- * na Base. TipNetworkConfig.ts: Celo i Camp tipuja wylacznie CELO i CAMP,
- * World i Linea dokladaja WLD i LINEA, Robinhood USDG, Arc USDC. Stad "ETH,
- * USDC or the chain's own token".
- *
- * === DLACZEGO DWIE ROZNE LICZBY SIECI ===
- * Bo to sa dwie rozne listy i od wejscia Solany juz sie nie pokrywaja.
- *
- * POSTOWANIE - dziewiec, z app/basechat/soft/SoftStoryRail.tsx (SOFT_NETWORKS):
- * Base, Camp, Linea, Celo, Ethereum, World, Robinhood, Arc, Solana. Arc postuje
- * na testnecie, dopoki nie ma NEXT_PUBLIC_ARC_POST_CONTRACT_MAINNET
- * (ArcPostContract.ts) - /how mowi to wprost, ten opis juz nie ma miejsca.
- *
- * NAPIWKI W APLIKACJI - osiem, z `TipNetworkType` w app/utils/firebase.ts:
- * Base, Ethereum, Celo, World, Linea, Camp, Robinhood, Arc. Solany tam NIE MA
- * i nie wolno jej doliczyc. Napiwek w SOL istnieje, ale POZA ta lista: pod
- * postem z Solany ida z linku (/blink/tip/<id>, a platna odpowiedz z
- * /blink/reply/<id>, obie jako Solana Actions), SOL leci prosto na portfel,
- * ktory podpisal post, i nic z tego nie trafia do kolekcji `tips` - ani na
- * Paid, ani do /money. Zapisem jest sama transakcja na Solanie. Dlatego opis
- * mowi o osmiu sieciach napiwkow i nie dopisuje SOL-a: to inna sciezka,
- * inny zapis, a na produkcji dziala tylko z mainnetem Solany (blinksDisabled
- * w app/api/actions/actionHeaders.ts).
- *
- * Do 22.09.2026 stalo tu jedno zdanie o "seven networks" i bylo juz falszywe -
- * Arc doszedl jako osmy i nikt tej notki nie poprawil. Stad rozbicie na dwie
- * liczby: zeby nastepna siec wymuszala pytanie "ktorej listy dotyczy".
- *
- * === DLACZEGO SLOWO "EVERY" PRZENIESLO SIE Z NAPIWKOW NA ASKI ===
- * Stalo tu "every tip settles onchain with a hash anyone can open". To nie jest
- * prawda: firestore.rules (blok tipow) mowi wprost, ze z 189 napiwkow hash ma
- * 18 - reszta pochodzi ze sciezek, ktore go nie zapisuja, i /money pokazuje ten
- * brak jako `withoutProof`. "Every" jest natomiast prawda O ASKACH, bo tam
- * serwer odmawia przyjecia wyplaty bez hasha i sam sprawdza log Transfer na
- * lancuchu (app/api/asks/[id]/accept/route.ts:84). Slowo stoi wiec teraz tam,
- * gdzie da sie go bronic.
+ * Tytul, opis i haslo zyja w app/narrative.ts - jednym pliku dla metadanych,
+ * karty strony glownej i embeddu miniappki. Historia poprzednich wersji
+ * (teza "money is the timeline", liczby sieci postowania i napiwkow, slowo
+ * "every" przy Askach) jest w git log tego pliku przed 2026-10-12.
  */
-const APP_DESCRIPTION =
-  "Post across nine networks and tip on eight of them in ETH, USDC or the chain's own token. Open an Ask with a budget, collect sealed answers, and pay the ones you pick - every Ask payout carries a transaction hash anyone can open.";
-
-/**
- * Jeden tytul dla <title>, og:title i twitter:title.
- *
- * DLACZEGO NIE POWTARZA ZDAN Z KARTY. Karta obrazka niesie teraz zdarzenie
- * ("An AI agent paid to ask...") i rynek Askow, a X pokazuje pod obrazkiem
- * dokladnie jeden pasek tekstu - powtorzenie tych samych slow zmarnowaloby go
- * w calosci. Na obrazku nie pada ani "social", ani "feed", ani "Base": to trzy
- * rzeczy, ktore czlowiek musi wiedziec, zeby zrozumiec, na co patrzy, i one
- * wlasnie sa tutaj. Obrazek i pasek skladaja sie na jedno zdanie.
- *
- * Poprzednik brzmial "MySphere - social on Base, scored by settled payments".
- * Wymieniony razem z karta: mowil o mierzeniu pozycji platnosciami, czego nowy
- * obrazek nie zapowiada ani slowem, wiec para przestala sie skladac.
- *
- * DLUGOSC MA ZNACZENIE: X urywa ten pasek w okolicach 70 znakow na pulpicie
- * i wczesniej na telefonie. Ponizej jest 59 - nazwa i teza mieszcza sie przed
- * kazdym mozliwym ucieciem.
- */
-const SOCIAL_TITLE = 'MySphere - a social feed on Base where money is the timeline';
 
 /**
  * Metadane generowane po stronie SERWERA.

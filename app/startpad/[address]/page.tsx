@@ -62,7 +62,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       : data.state === 'Locked'
         ? `Curve full at ${data.raised.toFixed(2)} ${nativeSymbol}, waiting for graduation.`
         : `${data.raised.toFixed(2)} of ${targetText} ${nativeSymbol} on the curve.`;
-  const description = `${data.name} on MySphere Startpad. ${curve} ${data.holders} buyers so far.`;
+  const buyers = `${data.holders} ${data.holders === 1 ? 'buyer' : 'buyers'} so far.`;
+  // Mem z rynku perpa mowi od razu, z czym jest sparowany - to jego wyroznik.
+  const intro = data.perp
+    ? `${data.name} is a meme paired with ${data.perp.name ?? data.perp.symbol} on MySphere.`
+    : `${data.name} on MySphere Startpad.`;
+  const description = `${intro} ${curve} ${buyers}`;
 
   const url = buildShareUrl({ address: data.address, chainId: data.chainId });
   // Obrazek embeddu jest 3:2 i niesie juz rozpoznana siec, wiec klient

@@ -14,6 +14,7 @@ import {
   type TradeEntry,
 } from '../[address]/detailShared';
 import { formatMultiple } from '../shareText';
+import { flashItems, flashPriceUsd } from '../../api/launchpad/flashFeed';
 
 /**
  * Dane karty udostepniania tokena - jedno zrodlo dla obrazka OG, obrazka
@@ -101,6 +102,11 @@ export type TokenCardData = {
   accent: string;
   startedAt: number;
   ageLabel: string;
+  /**
+   * Rynek perpa, na ktorym stoi krzywa (`?m=` tablicy), albo null dla rynku
+   * ETH. `name` i `change24hPct` z API Flash - bez nich karta pisze sam ticker.
+   */
+  perp: { symbol: string; name: string | null; navUsd: number | null; change24hPct: number | null } | null;
 };
 
 type LaunchTuple = readonly [Address, number, bigint, bigint, number, `0x${string}`];
@@ -320,13 +326,20 @@ export async function loadTokenCard(
   const isUsd = /^(USDC|USDT|USD)$/i.test(native);
   const isEth = /^(ETH|WETH)$/i.test(native);
 
-  const [history, blobLogo, ethUsd] = await Promise.all([
+  const perpQuote = scaleNet.quote?.kind === 'perp' ? scaleNet.quote : null;
+
+  const [history, blobLogo, ethUsd, flash] = await Promise.all([
     historyFrom(net.chain.id, token, startWei),
     withLogo ? logoFromBlob(net.chain.id, token) : Promise.resolve(null),
     isEth ? ethUsdSpot() : Promise.resolve(null),
+    perpQuote ? flashItems().then((items) => items.get(perpQuote.address.toLowerCase())) : Promise.resolve(undefined),
   ]);
 
-  const usdRate = isUsd ? 1 : ethUsd;
+  // Rynek perpa liczy dolary z NAV udzialu perpa (API Flash) - kurs ETH
+  // dawalby tu liczbe z kosmosu, a brak kursu dawal na karcie "1878 gwei"
+  // w jednostce, ktora nie byla ani ETH, ani gwei.
+  const navUsd = perpQuote ? flashPriceUsd(flash) : null;
+  const usdRate = isUsd ? 1 : perpQuote ? navUsd : ethUsd;
 
   const first = history.prices[0] ?? 0;
   const last = history.prices[history.prices.length - 1] ?? 0;
@@ -370,6 +383,14 @@ export async function loadTokenCard(
     accent: tokenAccent(token),
     startedAt: Number(startedAt),
     ageLabel: ageLabelFrom(Number(startedAt)),
+    perp: perpQuote
+      ? {
+          symbol: perpQuote.symbol,
+          name: flash?.name ?? null,
+          navUsd,
+          change24hPct: typeof flash?.change24hPct === 'number' ? flash.change24hPct : null,
+        }
+      : null,
   };
 }
 

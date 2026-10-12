@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { pageMeta } from '../../utils/pageMeta';
 import Link from 'next/link';
 import CreateToken from './CreateToken';
 import B20Nav from '../B20Nav';
@@ -32,11 +33,12 @@ import B20Nav from '../B20Nav';
  * bo nie ma tu ani jednej rzeczy, ktora zdezaktualizowalaby sie w buildzie.
  */
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta({
   title: 'Create a B20 token on Base: two words and one signature',
   description:
     'Make a token on Base straight from your wallet: fixed supply, nobody as admin unless you choose otherwise, and the address worked out before you sign. Nobody can buy it until someone opens a pool, and we say so instead of implying otherwise.',
-};
+  image: '/b20/opengraph-image',
+});
 
 const CARD = 'rounded-card border border-soft-line bg-soft-surface p-4 shadow-card sm:p-5';
 
