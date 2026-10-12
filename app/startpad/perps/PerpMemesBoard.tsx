@@ -251,6 +251,10 @@ export default function PerpMemesBoard() {
             Memes paired with Flash leveraged perps. Buy a meme with ETH2xL and you ride ETH at 2x and the meme on top of it.
           </p>
         </div>
+        <div className="flex flex-wrap items-center gap-2">
+        <Link href="/calls" className="inline-flex items-center gap-1.5 rounded-full border border-sp-shade/15 bg-sp-surface px-4 py-2.5 text-[13px] font-extrabold text-sp-ink hover:border-soft-primary">
+          📣 Calls
+        </Link>
         <button
           type="button"
           onClick={() => setPicker(true)}
@@ -258,6 +262,7 @@ export default function PerpMemesBoard() {
         >
           <Rocket className="h-4 w-4" aria-hidden="true" /> Launch a perp meme
         </button>
+        </div>
       </div>
 
       <DuelsSection ethChange24h={perps.find((p) => p.id === 'eth2xl')?.change24hPct ?? null} />

@@ -180,6 +180,11 @@ function NetworkSwitch() {
             window.location.href = '/startpad/perps';
             return;
           }
+          // Calls: kupna z wiadomoscia jako prognozy z wynikiem, wszystkie rynki.
+          if (event.target.value === 'calls') {
+            window.location.href = '/calls';
+            return;
+          }
           // Rynek Q na sieci ("8453:eth2xl") - osobna tablica z para mem/perp.
           const [chainPart, marketPart] = event.target.value.split(':');
           if (marketPart) {
@@ -221,6 +226,7 @@ function NetworkSwitch() {
         {Object.values(LAUNCHPAD_NETWORKS).some((net) => (net.markets?.length ?? 0) > 0 && !net.testnet) && (
           <option value="perps">⚡ Perp memes</option>
         )}
+        <option value="calls">📣 Calls</option>
         <option value="sphere">✦ $SPHERE</option>
       </select>
     </span>
