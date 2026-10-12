@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import PerpAvatar, { PerpCornerBadge } from './PerpAvatar';
 import { formatEther, getAddress, type Address } from 'viem';
 import { usePublicClient } from 'wagmi';
 import { ArrowDownRight, ArrowUpRight, ChevronLeft, Rocket, X, Zap } from 'lucide-react';
@@ -266,6 +267,7 @@ export default function PerpMemesBoard() {
             onClick={() => setSelected('all')}
             title="All perps"
             subtitle={`${perps.length} markets`}
+            stack={perps.map((p) => p.symbol)}
             count={allStats.count}
             raisedUsd={allStats.raisedUsd}
           />
@@ -277,6 +279,7 @@ export default function PerpMemesBoard() {
                 active={selected === p.id}
                 onClick={() => setSelected(p.id)}
                 title={p.symbol}
+                symbol={p.symbol}
                 subtitle={`${p.name}${p.leverage ? ` · ${p.leverage.toFixed(2)}x` : ''}`}
                 priceUsd={p.priceUsd}
                 change={p.change24hPct}
@@ -366,9 +369,12 @@ export default function PerpMemesBoard() {
                   onClick={() => launchOn(p.id)}
                   className="flex items-center justify-between rounded-xl border border-sp-shade/10 px-3.5 py-3 text-left hover:border-soft-primary"
                 >
-                  <span>
-                    <span className="block text-[14px] font-extrabold text-sp-ink">{p.symbol}</span>
-                    <span className="block text-[11.5px] text-sp-shade/50">{p.name}</span>
+                  <span className="flex items-center gap-3">
+                    <PerpAvatar symbol={p.symbol} size={34} change={p.change24hPct} glow />
+                    <span>
+                      <span className="block text-[14px] font-extrabold text-sp-ink">{p.symbol}</span>
+                      <span className="block text-[11.5px] text-sp-shade/50">{p.name}</span>
+                    </span>
                   </span>
                   <span className="text-right">
                     <span className="block text-[13px] font-extrabold text-sp-ink">{p.priceUsd !== null ? formatUsd(p.priceUsd) : '--'}</span>
@@ -404,11 +410,17 @@ function PerpCard({
   change,
   count,
   raisedUsd,
+  symbol,
+  stack,
 }: {
   active: boolean;
   onClick: () => void;
   title: string;
   subtitle: string;
+  /** Perp karty - awatar z poswiata wg zmiany 24h. */
+  symbol?: string;
+  /** Karta "All perps" - stos malych awatarow wszystkich rynkow. */
+  stack?: string[];
   priceUsd?: number | null;
   change?: number | null;
   count: number;
@@ -421,9 +433,21 @@ function PerpCard({
       className={`w-full rounded-[16px] border p-3.5 text-left transition-colors ${active ? 'border-soft-primary bg-sp-brand-soft' : 'border-sp-shade/10 bg-sp-surface hover:border-soft-primary/50'}`}
     >
       <div className="flex items-start justify-between gap-2">
-        <span className="min-w-0">
-          <span className="block truncate text-[15px] font-extrabold text-sp-ink">{title}</span>
-          <span className="block truncate text-[11.5px] text-sp-shade/50">{subtitle}</span>
+        <span className="flex min-w-0 items-center gap-3">
+          {symbol && <PerpAvatar symbol={symbol} size={40} change={change ?? null} glow />}
+          {stack && stack.length > 0 && (
+            <span className="flex shrink-0 -space-x-2.5">
+              {stack.slice(0, 4).map((s) => (
+                <span key={s} className="rounded-full ring-2 ring-sp-surface">
+                  <PerpAvatar symbol={s} size={26} />
+                </span>
+              ))}
+            </span>
+          )}
+          <span className="min-w-0">
+            <span className="block truncate text-[15px] font-extrabold text-sp-ink">{title}</span>
+            <span className="block truncate text-[11.5px] text-sp-shade/50">{subtitle}</span>
+          </span>
         </span>
         {priceUsd !== undefined && (
           <span className="shrink-0 text-right">
@@ -453,14 +477,17 @@ function MemeCard({ meme, perp, usd }: { meme: Meme; perp: Perp | undefined; usd
   return (
     <div className="flex flex-col rounded-[18px] border border-sp-shade/10 bg-sp-surface p-4 transition-shadow hover:shadow-[0_10px_30px_rgba(0,0,0,0.08)]">
       <Link href={href} className="flex min-w-0 items-start gap-3">
-        {meme.logo ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={meme.logo} alt="" width={40} height={40} className="h-10 w-10 shrink-0 rounded-full object-cover" loading="lazy" />
-        ) : (
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[13px] font-extrabold text-white" style={{ backgroundColor: accent(meme.address) }}>
-            {meme.symbol.slice(0, 2).toUpperCase()}
-          </span>
-        )}
+        <span className="relative shrink-0">
+          {meme.logo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={meme.logo} alt="" width={40} height={40} className="h-10 w-10 shrink-0 rounded-full object-cover" loading="lazy" />
+          ) : (
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[13px] font-extrabold text-white" style={{ backgroundColor: accent(meme.address) }}>
+              {meme.symbol.slice(0, 2).toUpperCase()}
+            </span>
+          )}
+          {perp && <PerpCornerBadge symbol={perp.symbol} />}
+        </span>
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-1.5">
             <span className="truncate text-[15px] font-extrabold text-sp-ink">{meme.symbol}</span>
