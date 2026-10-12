@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createPublicClient, http, type Address } from 'viem';
-import { deploymentsOf, LAUNCHPAD_NETWORKS, launchpadsOf, networkForMarket, scanFloorOf, type LaunchpadNetwork } from '../../../startpad/config';
+import { deploymentsOf, LAUNCHPAD_NETWORKS, launchpadsOf, networkForMarket, perpSellZapsOf, scanFloorOf, type LaunchpadNetwork } from '../../../startpad/config';
 import {
   balanceCandidates,
   balancesArePoisoned,
@@ -202,6 +202,7 @@ export async function GET(request: NextRequest) {
         const result = await scanBackward(client, {
           // Wszystkie wdrozenia sieci - zdarzenia tokena emituje tylko jego launchpad.
           launchpad: launchpadsOf(net),
+          sellZaps: perpSellZapsOf(net.chain.id),
           token,
           head: range.head,
           floor: range.floor,

@@ -41,7 +41,7 @@ export async function simulateZapBuy(opts: {
   ethIn: bigint;
   code?: string;
 }): Promise<{ perpIn: bigint; tokensOut: bigint; gas: bigint }> {
-  const iface = (await ethers.getContractFactory("PerpBuyZap")).interface;
+  const iface = (await ethers.getContractFactory("PerpZap")).interface;
   const pad = new ethers.Contract(opts.launchpad, ["function QUOTE() view returns (address)"], ethers.provider);
   const perpPool = await flashPoolKey(await pad.QUOTE());
   const buyer = "0x00000000000000000000000000000000000b0b01";

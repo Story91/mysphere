@@ -265,3 +265,113 @@ export const PERMIT2_MAX_AMOUNT = (1n << 160n) - 1n;
 export function permit2Expiration(nowSeconds: number): number {
   return nowSeconds + 30 * 24 * 3600;
 }
+
+/* ======================================================================= */
+/*  WIELE SKOKOW: ETH <-> mem na rynkach perpow (po graduacji)              */
+/* ======================================================================= */
+
+/**
+ * Jeden skok sciezki v4 (`PathKey` z v4-periphery): waluta, do ktorej
+ * idziemy, i parametry puli laczacej ja z poprzednia.
+ */
+export type PathKey = {
+  intermediateCurrency: Address;
+  fee: number;
+  tickSpacing: number;
+  hooks: Address;
+  hookData: `0x${string}`;
+};
+
+const PATH_KEY_COMPONENTS = [
+  { name: 'intermediateCurrency', type: 'address' },
+  { name: 'fee', type: 'uint24' },
+  { name: 'tickSpacing', type: 'int24' },
+  { name: 'hooks', type: 'address' },
+  { name: 'hookData', type: 'bytes' },
+] as const;
+
+/** V4Quoter.quoteExactInput - wycena calej sciezki (z hookami) jednym eth_call. */
+export const v4QuoterPathAbi = [
+  {
+    type: 'function',
+    name: 'quoteExactInput',
+    stateMutability: 'view',
+    inputs: [
+      {
+        name: 'params',
+        type: 'tuple',
+        components: [
+          { name: 'exactCurrency', type: 'address' },
+          { name: 'path', type: 'tuple[]', components: PATH_KEY_COMPONENTS },
+          { name: 'exactAmount', type: 'uint128' },
+        ],
+      },
+    ],
+    outputs: [
+      { name: 'amountOut', type: 'uint256' },
+      { name: 'gasEstimate', type: 'uint256' },
+    ],
+  },
+] as const;
+
+/** Skok do waluty `to` przez pule `key` (hookData pusty - tak samo jak w trasie Flash). */
+export function hop(key: PoolKey, to: Address): PathKey {
+  return { intermediateCurrency: to, fee: key.fee, tickSpacing: key.tickSpacing, hooks: key.hooks, hookData: '0x' };
+}
+
+/**
+ * Sciezki mema z rynku perpa po graduacji. Format i akcje zweryfikowane
+ * 2026-10-12 dekodowaniem transakcji ETH -> ETH2xL zbudowanej przez API Flash
+ * (ExactInputParams bez maxHopSlippage, akcje 0x07 + 0x0b + 0x0f).
+ *   kupno:    ETH -(ethPool)-> USDC -(perpPool)-> perp -(memePool)-> mem
+ *   sprzedaz: mem -(memePool)-> perp -(perpPool)-> USDC -(ethPool)-> ETH
+ */
+export function perpMemePaths(input: { token: Address; perp: Address; memePool: PoolKey; perpPool: PoolKey; ethPool: PoolKey }) {
+  const usdc = input.ethPool.currency1;
+  return {
+    buy: [hop(input.ethPool, usdc), hop(input.perpPool, input.perp), hop(input.memePool, input.token)],
+    sell: [hop(input.memePool, input.perp), hop(input.perpPool, usdc), hop(input.ethPool, NATIVE)],
+  };
+}
+
+const ACTION_SWAP_EXACT_IN = '07';
+const ACTION_SETTLE = '0b';
+const ACTION_SETTLE_ALL = '0c';
+const ACTION_TAKE_ALL = '0f';
+
+/**
+ * `execute()` dla exact-in po sciezce. Natywne ETH na wejsciu placi router z
+ * `msg.value` (SETTLE, payerIsUser=false); token na wejsciu sciaga Permit2
+ * (SETTLE_ALL). Wyjscie zawsze TAKE_ALL z minimum.
+ */
+export function encodeV4ExactInPath(input: {
+  currencyIn: Address;
+  path: PathKey[];
+  amountIn: bigint;
+  minOut: bigint;
+}): { commands: `0x${string}`; inputs: `0x${string}`[] } {
+  const { currencyIn, path, amountIn, minOut } = input;
+  const currencyOut = path[path.length - 1].intermediateCurrency;
+  const swap = encodeAbiParameters(
+    [
+      {
+        type: 'tuple',
+        components: [
+          { name: 'currencyIn', type: 'address' },
+          { name: 'path', type: 'tuple[]', components: PATH_KEY_COMPONENTS },
+          { name: 'amountIn', type: 'uint128' },
+          { name: 'amountOutMinimum', type: 'uint128' },
+        ],
+      },
+    ],
+    [{ currencyIn, path, amountIn, amountOutMinimum: minOut }]
+  );
+  const native = currencyIn === NATIVE;
+  const settle = native
+    ? encodeAbiParameters([{ type: 'address' }, { type: 'uint256' }, { type: 'bool' }], [currencyIn, amountIn, false])
+    : encodeAbiParameters([{ type: 'address' }, { type: 'uint256' }], [currencyIn, amountIn]);
+  const take = encodeAbiParameters([{ type: 'address' }, { type: 'uint256' }], [currencyOut, minOut]);
+  const actions = `0x${ACTION_SWAP_EXACT_IN}${native ? ACTION_SETTLE : ACTION_SETTLE_ALL}${ACTION_TAKE_ALL}` as `0x${string}`;
+  const v4Input = encodeAbiParameters([{ type: 'bytes' }, { type: 'bytes[]' }], [actions, [swap, settle, take]]);
+  return { commands: COMMAND_V4_SWAP, inputs: [v4Input] };
+}

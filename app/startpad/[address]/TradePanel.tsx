@@ -28,6 +28,7 @@ import {
   liquidityVaultAbi,
   ETH_USDC_POOL,
   PERP_ZAP_ADDRESS,
+  PERP_ZAP_SELLS,
   perpZapAbi,
   QUOTE_ASSET,
   quoteLaunchpadAbi,
@@ -51,7 +52,7 @@ import {
 import { quoteBuyLocal, quoteDrifts, quoteSellLocal } from './curveQuote';
 import { hasPool } from './poolPrice';
 import PoolTradeBox from './PoolTradeBox';
-import { canonicalPoolKey, V4_BY_CHAIN, v4QuoterAbi } from './v4Swap';
+import { canonicalPoolKey, NATIVE, V4_BY_CHAIN, v4QuoterAbi, v4QuoterPathAbi } from './v4Swap';
 import { buildMessageShareText, encodeTradeMessage, messageByteLength, TRADE_MESSAGE_MAX_BYTES } from './tradeMessage';
 import { buildShareUrl, safeSymbol, shareIntentUrl } from '../shareText';
 import { fetchPerpPoolKey, type ZapPoolKey } from '../perpZap';
@@ -160,6 +161,10 @@ export default function TradePanel({
   const [perpPoolKey, setPerpPoolKey] = useState<ZapPoolKey | null>(null);
   const [zapQuote, setZapQuote] = useState<{ perpIn: bigint; tokensOut: bigint } | null>(null);
   const [zapQuoteError, setZapQuoteError] = useState<string | null>(null);
+  // Sprzedaz na krzywej za ETH przez PerpZap v2 (mem -> perp -> USDC -> ETH).
+  const [sellToEth, setSellToEth] = useState(PERP_ZAP_SELLS);
+  const sellEth = PERP_ZAP_SELLS && PERP_ZAP_ADDRESS !== null && sellToEth;
+  const [ethSellQuote, setEthSellQuote] = useState<bigint | null>(null);
   /**
    * Czy lokalnemu podgladowi wolno jeszcze wierzyc.
    *
@@ -373,6 +378,37 @@ export default function TradePanel({
     };
   }, [readClient, core.token, sellAmount, decimals, canSell, core.deployment.launchpad]);
 
+  useEffect(() => {
+    setEthSellQuote(null);
+    const v4 = V4_BY_CHAIN[LAUNCHPAD_CHAIN.id];
+    if (!sellEth || !readClient || !perpPoolKey || !QUOTE_ASSET || !v4 || !sellQuote || sellQuote.ethOut <= 0n) return;
+    const perp = QUOTE_ASSET.address;
+    let cancelled = false;
+    readClient
+      .readContract({
+        address: v4.quoter,
+        abi: v4QuoterPathAbi,
+        functionName: 'quoteExactInput',
+        args: [
+          {
+            exactCurrency: perp,
+            path: [
+              { intermediateCurrency: ETH_USDC_POOL.currency1, fee: perpPoolKey.fee, tickSpacing: perpPoolKey.tickSpacing, hooks: perpPoolKey.hooks, hookData: '0x' },
+              { intermediateCurrency: NATIVE, fee: ETH_USDC_POOL.fee, tickSpacing: ETH_USDC_POOL.tickSpacing, hooks: ETH_USDC_POOL.hooks, hookData: '0x' },
+            ],
+            exactAmount: sellQuote.ethOut,
+          },
+        ],
+      })
+      .then(([out]) => {
+        if (!cancelled) setEthSellQuote(out);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [sellEth, readClient, perpPoolKey, sellQuote]);
+
   const ensureChain = useCallback(async () => {
     if (chainId === LAUNCHPAD_CHAIN.id) return true;
     try {
@@ -404,7 +440,11 @@ export default function TradePanel({
    * Zgoda na przelew `asset` przez launchpad tego tokena. Domyslnie sam token
    * (sprzedaz); na rynku Q takze aktywo pary przy kupnie.
    */
-  const ensureAllowance = async (amount: bigint, asset: Address = core.token): Promise<boolean> => {
+  const ensureAllowance = async (
+    amount: bigint,
+    asset: Address = core.token,
+    spender: Address = core.deployment.launchpad as Address
+  ): Promise<boolean> => {
     if (!account || !walletClient || !readClient) return false;
 
     // Swiezy odczyt, nie `core.allowance` sprzed wejscia na strone.
@@ -412,7 +452,7 @@ export default function TradePanel({
       address: asset,
       abi: erc20Abi,
       functionName: 'allowance',
-      args: [account, core.deployment.launchpad as Address],
+      args: [account, spender],
     })) as bigint;
     if (current >= amount) return true;
 
@@ -423,7 +463,7 @@ export default function TradePanel({
         address: asset,
         abi: erc20Abi,
         functionName: 'approve',
-        args: [core.deployment.launchpad as Address, maxUint256],
+        args: [spender, maxUint256],
         account,
       });
       gas = (estimate * 125n) / 100n;
@@ -436,7 +476,7 @@ export default function TradePanel({
       address: asset,
       abi: erc20Abi,
       functionName: 'approve',
-      args: [core.deployment.launchpad as Address, maxUint256],
+      args: [spender, maxUint256],
       chain: LAUNCHPAD_CHAIN,
       account,
       ...(gas ? { gas } : {}),
@@ -620,6 +660,10 @@ export default function TradePanel({
     if (!(await ensureChain())) return;
     setNotice(null);
     setShareable(null);
+    if (sellEth && PERP_ZAP_ADDRESS) {
+      await sellWithZap(amount, PERP_ZAP_ADDRESS);
+      return;
+    }
     try {
       if (!(await ensureAllowance(amount))) return;
       setBusy('sell');
@@ -647,6 +691,52 @@ export default function TradePanel({
       if (receipt.status !== 'success') throw new Error('The sell transaction reverted.');
       setSellAmount('');
       setNotice({ kind: 'success', text: `Sell confirmed${dataSuffix ? ' with your note' : ''}. ${hash.slice(0, 10)}...` });
+      if (dataSuffix) {
+        setShareable({ kind: 'sell', text: tradeMessage });
+        setTradeMessage('');
+      }
+      onAfterTx();
+    } catch (cause) {
+      fail(cause);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /** Sprzedaz za ETH przez PerpZap v2: zgoda dla zapa (raz), potem jedna transakcja. */
+  const sellWithZap = async (amount: bigint, zap: Address) => {
+    if (!account || !walletClient || !readClient) return;
+    if (!perpPoolKey) {
+      setNotice({ kind: 'error', text: `The ${NATIVE_SYMBOL} to ETH route is still loading. Try again in a moment.` });
+      return;
+    }
+    try {
+      if (!(await ensureAllowance(amount, core.token, zap))) return;
+      setBusy('sell');
+      const deadline = BigInt(Math.floor(Date.now() / 1000) + 900);
+      const launchpad = core.deployment.launchpad as Address;
+      const quote = await readClient.readContract({ address: launchpad, abi: launchpadAbi, functionName: 'quoteSell', args: [core.token, amount] });
+      const minPerpOut = applySlippage(quote[0], slippageBps);
+      const zapCall = { address: zap, abi: perpZapAbi, functionName: 'sellForEth' as const, account };
+      const { result } = await readClient.simulateContract({
+        ...zapCall,
+        args: [launchpad, core.token, amount, ETH_USDC_POOL, perpPoolKey, minPerpOut > 0n ? minPerpOut : 1n, 1n, deadline, account],
+      });
+      const minEthOut = applySlippage(result[1], slippageBps);
+      const args = [launchpad, core.token, amount, ETH_USDC_POOL, perpPoolKey, minPerpOut > 0n ? minPerpOut : 1n, minEthOut > 0n ? minEthOut : 1n, deadline, account] as const;
+      const gas = await readClient.estimateContractGas({ ...zapCall, args }).catch(() => undefined);
+      const dataSuffix = encodeTradeMessage(tradeMessage) ?? undefined;
+      const hash = await walletClient.writeContract({
+        ...zapCall,
+        args,
+        chain: LAUNCHPAD_CHAIN,
+        dataSuffix,
+        ...(gas ? { gas: (gas * 120n) / 100n } : {}),
+      });
+      const receipt = await readClient.waitForTransactionReceipt({ hash });
+      if (receipt.status !== 'success') throw new Error('The sell transaction reverted.');
+      setSellAmount('');
+      setNotice({ kind: 'success', text: `Sold for ETH${dataSuffix ? ' with your note' : ''}. ${hash.slice(0, 10)}...` });
       if (dataSuffix) {
         setShareable({ kind: 'sell', text: tradeMessage });
         setTradeMessage('');
@@ -1059,6 +1149,22 @@ export default function TradePanel({
             </>
           ) : (
             <>
+              {PERP_ZAP_SELLS && (
+                <div className="mt-4 flex items-center gap-1 rounded-full bg-sp-sunken p-1 text-[11px] font-extrabold" role="tablist" aria-label="Receive">
+                  {([true, false] as const).map((option) => (
+                    <button
+                      key={String(option)}
+                      type="button"
+                      role="tab"
+                      aria-selected={sellToEth === option}
+                      onClick={() => setSellToEth(option)}
+                      className={`flex-1 rounded-full px-3 py-1.5 transition-colors ${sellToEth === option ? 'bg-sp-surface text-sp-ink shadow-sm' : 'text-sp-shade/50 hover:text-sp-ink'}`}
+                    >
+                      Receive {option ? 'ETH' : NATIVE_SYMBOL}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="mt-4 flex items-end justify-between">
                 <span className="text-[12px] font-extrabold text-sp-ink">Token amount</span>
                 <span className="text-[11px] text-sp-shade/45">Balance {fmtTokens(core.balance, decimals)}</span>
@@ -1082,8 +1188,14 @@ export default function TradePanel({
                 <div className="flex items-center justify-between">
                   <span className="text-sp-shade/50">You receive</span>
                   <span className="font-extrabold text-sp-ink">
-                    {shownSell ? `~${fmtEth(shownSell.ethOut)} ${NATIVE_SYMBOL}` : '--'}
-                    {sellUsd && <span className="ml-1 text-[10px] font-bold text-sp-shade/40">· {sellUsd}</span>}
+                    {sellEth
+                      ? ethSellQuote !== null
+                        ? `~${fmtEth(ethSellQuote, 6)} ETH`
+                        : '--'
+                      : shownSell
+                        ? `~${fmtEth(shownSell.ethOut)} ${NATIVE_SYMBOL}`
+                        : '--'}
+                    {!sellEth && sellUsd && <span className="ml-1 text-[10px] font-bold text-sp-shade/40">· {sellUsd}</span>}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">

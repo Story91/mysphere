@@ -28,6 +28,9 @@ import {
   LAUNCH_STATE,
   launchpadAbi,
   liquidityVaultAbi,
+  PERP_ZAP_ADDRESS,
+  PERP_ZAP_SELLS,
+  perpZapAbi,
   LIVE_WATCH,
   ACTIVE_LAUNCHPAD_NETWORK,
 } from '../config';
@@ -84,6 +87,8 @@ const LIVE_EVENTS = [
   getAbiItem({ abi: launchpadAbi, name: 'Claimed' }),
   getAbiItem({ abi: hookAbi, name: 'HookFeeSettled' }),
   getAbiItem({ abi: liquidityVaultAbi, name: 'Harvested' }),
+  // Sprzedaz przez PerpZap v2: `Sold.seller` to zap, prawdziwy sprzedajacy jest tu.
+  getAbiItem({ abi: perpZapAbi, name: 'ZapSell' }),
 ];
 
 /**
@@ -417,7 +422,7 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
     };
     const unwatch = readClient.watchEvent({
       // Kontrakty wdrozenia TEGO tokena (siec moze miec kilka).
-      address: [watchDep.launchpad, watchDep.hook, watchDep.vault] as Address[],
+      address: [watchDep.launchpad, watchDep.hook, watchDep.vault, ...(PERP_ZAP_SELLS && PERP_ZAP_ADDRESS ? [PERP_ZAP_ADDRESS] : [])] as Address[],
       events: LIVE_EVENTS,
       // Tempo z konfiguracji sieci: raz na blok na wlasnym RPC, osiem sekund na
       // publicznym, subskrypcja gdy transportem jest WebSocket.

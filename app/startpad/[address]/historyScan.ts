@@ -228,6 +228,28 @@ export function balanceCandidates(
   return out;
 }
 
+/**
+ * txHash -> prawdziwy sprzedajacy dla sprzedazy przez zap: nadawca Transferu
+ * mema do zapa (PerpZap.sellForEth najpierw sciaga mema od sprzedajacego).
+ */
+export function zapSellersFromTransfers(transferLogs: ScanLog[], zaps: string[]): Map<string, `0x${string}`> {
+  const out = new Map<string, `0x${string}`>();
+  if (zaps.length === 0) return out;
+  for (const log of transferLogs) {
+    const to = (log.args?.to as string | undefined)?.toLowerCase();
+    const from = log.args?.from as `0x${string}` | undefined;
+    if (to && from && log.transactionHash && zaps.includes(to)) out.set(log.transactionHash.toLowerCase(), from);
+  }
+  return out;
+}
+
+/** Podmiana `account` sprzedazy przez zap na prawdziwego sprzedajacego (gdy go znamy). */
+export function withRealSeller(trade: TradeEntry, zaps: string[], sellers: Map<string, `0x${string}`>): TradeEntry {
+  if (trade.kind !== 'sell' || !zaps.includes(trade.account.toLowerCase()) || !trade.txHash) return trade;
+  const real = sellers.get(trade.txHash.toLowerCase());
+  return real ? { ...trade, account: real } : trade;
+}
+
 /** Bought/Sold -> wpis historii. Null, gdy log nie niesie kompletu pol. */
 export function decodeTradeLog(log: ScanLog, estTs: (block: bigint) => number): TradeEntry | null {
   const isBuy = log.eventName === 'Bought';
@@ -392,6 +414,12 @@ export type ScanResult = {
 export type ScanOptions = {
   /** Jeden adres albo wszystkie wdrozenia sieci - zdarzenia maja to samo ABI. */
   launchpad: string | string[];
+  /**
+   * Zapy sprzedajace za ETH (PerpZap v2, `perpSellZapsOf`). Ich `Sold.seller` to
+   * zap, a nie czlowiek - prawdziwy sprzedajacy jest nadawca Transferu mema DO
+   * zapa w tej samej transakcji. Male litery.
+   */
+  sellZaps?: string[];
   token: string;
   /** Gorny blok skanu (wlacznie). */
   head: bigint;
@@ -549,6 +577,8 @@ export async function scanBackward(client: ScanClient, opts: ScanOptions): Promi
       scannedFrom = window.fromBlock;
 
       applyTransferLogs(balances, transferLogs);
+      const zaps = opts.sellZaps ?? [];
+      const zapSellers = zapSellersFromTransfers(transferLogs, zaps);
 
       for (const log of launchpadLogs) {
         const token = log.args?.token as string | undefined;
@@ -560,7 +590,7 @@ export async function scanBackward(client: ScanClient, opts: ScanOptions): Promi
           graduatedTs = opts.estTs(log.blockNumber ?? 0n);
         } else {
           const trade = decodeTradeLog(log, opts.estTs);
-          if (trade) trades.push(trade);
+          if (trade) trades.push(withRealSeller(trade, zaps, zapSellers));
         }
       }
 

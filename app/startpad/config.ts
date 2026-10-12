@@ -884,16 +884,30 @@ export const QUOTE_ASSET: QuoteAsset | null = ACTIVE_LAUNCHPAD_NETWORK.quote ?? 
 export const ACTIVE_MARKET_ID: string | null = ACTIVE_LAUNCHPAD_NETWORK.marketId ?? null;
 
 /**
- * PerpBuyZap (contracts/launchpad/quote/PerpBuyZap.sol): kupno mema z rynku Q
- * za ETH w jednej transakcji, ETH -> USDC -> perp (pula Flash) -> buyFor.
- * Jeden zap na siec, dla wszystkich rynkow perpow. Brak wpisu = brak opcji ETH.
+ * Zap ETH <-> mem na rynkach Q. Jeden na siec, dla wszystkich rynkow perpow.
+ *   v1 PerpBuyZap (contracts/launchpad/quote/PerpBuyZap.sol) - tylko kupno.
+ *   v2 PerpZap    (contracts/launchpad/quote/PerpZap.sol)    - kupno i sprzedaz.
+ * Gdy jest v2, front uzywa wylacznie jego. Brak wpisu = brak opcji ETH.
  */
-const PERP_ZAP_BY_CHAIN: Record<number, `0x${string}` | undefined> = {
+const PERP_BUY_ZAP_BY_CHAIN: Record<number, `0x${string}` | undefined> = {
   // Wdrozony 2026-10-12, blok 52489206 (scripts/output/perp-zap-base.json).
   [base.id]: '0xBDBe76a51Af1D444f89ee6d0a457A1FD1Dc06b9A',
 };
-export const PERP_ZAP_ADDRESS: `0x${string}` | null =
-  QUOTE_ASSET ? PERP_ZAP_BY_CHAIN[ACTIVE_LAUNCHPAD_NETWORK.chain.id] ?? null : null;
+const PERP_ZAP_V2_BY_CHAIN: Record<number, `0x${string}` | undefined> = {};
+/** Wszystkie sprzedajace zapy ze wszystkich sieci - do pominiecia w licznikach traderow. */
+export const ALL_PERP_SELL_ZAPS: ReadonlySet<string> = new Set(
+  Object.values(PERP_ZAP_V2_BY_CHAIN).filter((a): a is `0x${string}` => Boolean(a)).map((a) => a.toLowerCase())
+);
+/** Zapy, ktore SPRZEDAJA (v2) - `Sold.seller` rowny ktoremus z nich to nie jest prawdziwy sprzedajacy. */
+export function perpSellZapsOf(chainId: number): string[] {
+  const v2 = PERP_ZAP_V2_BY_CHAIN[chainId];
+  return v2 ? [v2.toLowerCase()] : [];
+}
+export const PERP_ZAP_ADDRESS: `0x${string}` | null = QUOTE_ASSET
+  ? PERP_ZAP_V2_BY_CHAIN[ACTIVE_LAUNCHPAD_NETWORK.chain.id] ?? PERP_BUY_ZAP_BY_CHAIN[ACTIVE_LAUNCHPAD_NETWORK.chain.id] ?? null
+  : null;
+/** Czy zap aktywnej sieci umie sprzedawac za ETH (v2). */
+export const PERP_ZAP_SELLS = QUOTE_ASSET !== null && PERP_ZAP_V2_BY_CHAIN[ACTIVE_LAUNCHPAD_NETWORK.chain.id] !== undefined;
 /** Bezhakowa pula natywne ETH/USDC v4 na Base (fee 500, tickSpacing 10) - pierwszy krok zapa. */
 export const ETH_USDC_POOL = {
   currency0: '0x0000000000000000000000000000000000000000',
@@ -927,6 +941,39 @@ export const perpZapAbi = [
     outputs: [
       { name: 'perpIn', type: 'uint256' },
       { name: 'tokensOut', type: 'uint256' },
+    ],
+  },
+  {
+    type: 'function',
+    name: 'sellForEth',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'launchpad', type: 'address' },
+      { name: 'token', type: 'address' },
+      { name: 'tokensIn', type: 'uint256' },
+      { name: 'ethPool', type: 'tuple', components: zapPoolKeyComponents },
+      { name: 'perpPool', type: 'tuple', components: zapPoolKeyComponents },
+      { name: 'minPerpOut', type: 'uint256' },
+      { name: 'minEthOut', type: 'uint256' },
+      { name: 'deadline', type: 'uint256' },
+      { name: 'recipient', type: 'address' },
+    ],
+    outputs: [
+      { name: 'perpOut', type: 'uint256' },
+      { name: 'ethOut', type: 'uint256' },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'ZapSell',
+    inputs: [
+      { name: 'launchpad', type: 'address', indexed: true },
+      { name: 'token', type: 'address', indexed: true },
+      { name: 'seller', type: 'address', indexed: true },
+      { name: 'recipient', type: 'address', indexed: false },
+      { name: 'tokensIn', type: 'uint256', indexed: false },
+      { name: 'perpOut', type: 'uint256', indexed: false },
+      { name: 'ethOut', type: 'uint256', indexed: false },
     ],
   },
 ] as const;

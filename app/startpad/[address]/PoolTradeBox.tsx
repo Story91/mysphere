@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { maxUint256, parseUnits, type Address } from 'viem';
 import { useAccount, useChainId, usePublicClient, useSwitchChain, useWalletClient } from 'wagmi';
-import { ACTIVE_LAUNCHPAD_NETWORK, LAUNCHPAD_CHAIN, NATIVE_SYMBOL, QUOTE_ASSET, erc20Abi } from '../config';
+import { ACTIVE_LAUNCHPAD_NETWORK, ETH_USDC_POOL, LAUNCHPAD_CHAIN, NATIVE_SYMBOL, QUOTE_ASSET, erc20Abi } from '../config';
+import { fetchPerpPoolKey, type ZapPoolKey } from '../perpZap';
 import {
   applySlippage,
   DEFAULT_SLIPPAGE_BPS,
@@ -18,13 +19,17 @@ import {
 import {
   buyIsZeroForOne,
   canonicalPoolKey,
+  encodeV4ExactInPath,
   encodeV4ExactInSingle,
+  NATIVE,
   PERMIT2_MAX_AMOUNT,
+  perpMemePaths,
   permit2Abi,
   permit2Expiration,
   universalRouterAbi,
   V4_BY_CHAIN,
   v4QuoterAbi,
+  v4QuoterPathAbi,
 } from './v4Swap';
 
 /**
@@ -66,6 +71,30 @@ export default function PoolTradeBox({ core, onAfterTx }: { core: CoreState; onA
   // Kupno = ETH/aktywo pary -> token; na rynku Q kierunek zalezy od adresow.
   const buyZeroForOne = buyIsZeroForOne(core.token, quoteAsset);
 
+  // RYNEK PERPA: domyslnie handel za ETH, trasa przez trzy pule w jednym
+  // swapie Universal Routera (ETH <-> USDC <-> perp <-> mem). Bez tego po
+  // graduacji kupic mogl tylko ktos, kto juz mial perpa. Tylko Base (pula
+  // ETH/USDC i pule Flash istnieja tylko tam).
+  const [perpPool, setPerpPool] = useState<ZapPoolKey | null>(null);
+  const ethRoutePossible = quoteAsset !== null && LAUNCHPAD_CHAIN.id === 8453;
+  const [viaEth, setViaEth] = useState(ethRoutePossible);
+  useEffect(() => {
+    if (!ethRoutePossible || !quoteAsset) return;
+    let cancelled = false;
+    void fetchPerpPoolKey(LAUNCHPAD_CHAIN.id, quoteAsset).then((key) => {
+      if (!cancelled) setPerpPool(key);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [ethRoutePossible, quoteAsset]);
+  const paths =
+    viaEth && perpPool && quoteAsset
+      ? perpMemePaths({ token: core.token, perp: quoteAsset, memePool: poolKey, perpPool, ethPool: ETH_USDC_POOL as unknown as typeof poolKey })
+      : null;
+  const ethMode = viaEth && ethRoutePossible;
+  const unit = ethMode ? 'ETH' : NATIVE_SYMBOL;
+
   useEffect(() => {
     if (!readClient || !account) {
       setEthBalance(null);
@@ -73,9 +102,10 @@ export default function PoolTradeBox({ core, onAfterTx }: { core: CoreState; onA
     }
     let cancelled = false;
     // Rynek Q: kupuje sie aktywem pary, wiec saldo tego tokena, nie ETH.
-    const read = quoteAsset
-      ? (readClient.readContract({ address: quoteAsset, abi: erc20Abi, functionName: 'balanceOf', args: [account] }) as Promise<bigint>)
-      : readClient.getBalance({ address: account });
+    const read =
+      quoteAsset && !ethMode
+        ? (readClient.readContract({ address: quoteAsset, abi: erc20Abi, functionName: 'balanceOf', args: [account] }) as Promise<bigint>)
+        : readClient.getBalance({ address: account });
     read
       .then((v) => {
         if (!cancelled) setEthBalance(v);
@@ -84,7 +114,7 @@ export default function PoolTradeBox({ core, onAfterTx }: { core: CoreState; onA
     return () => {
       cancelled = true;
     };
-  }, [readClient, account, core.balance, quoteAsset]);
+  }, [readClient, account, core.balance, quoteAsset, ethMode]);
 
   // Wycena z V4Quoter - symuluje prawdziwy swap z hookiem, wiec wynik jest
   // juz po oplacie LP (0.3%) i hooka (1%). Debounce, zeby nie strzelac do RPC
@@ -112,14 +142,26 @@ export default function PoolTradeBox({ core, onAfterTx }: { core: CoreState; onA
     // Publiczne RPC Base odpowiada 429 przy serii odczytow strony tokena;
     // jedna ponowna proba po 1.5 s zamienia "--" w liczbe zamiast zostawiac
     // pusta wycene do nastepnego wpisanego znaku.
+    if (ethMode && !paths) {
+      setQuote(null);
+      return;
+    }
+    const request = () =>
+      ethMode && paths
+        ? readClient.readContract({
+            address: v4.quoter,
+            abi: v4QuoterPathAbi,
+            functionName: 'quoteExactInput',
+            args: [{ exactCurrency: side === 'buy' ? NATIVE : core.token, path: side === 'buy' ? paths.buy : paths.sell, exactAmount: amountIn as bigint }],
+          })
+        : readClient.readContract({
+            address: v4.quoter,
+            abi: v4QuoterAbi,
+            functionName: 'quoteExactInputSingle',
+            args: [{ poolKey, zeroForOne: side === 'buy' ? buyZeroForOne : !buyZeroForOne, exactAmount: amountIn as bigint, hookData: '0x' }],
+          });
     const ask = (attempt: number) => {
-      readClient
-        .readContract({
-          address: v4.quoter,
-          abi: v4QuoterAbi,
-          functionName: 'quoteExactInputSingle',
-          args: [{ poolKey, zeroForOne: side === 'buy' ? buyZeroForOne : !buyZeroForOne, exactAmount: amountIn as bigint, hookData: '0x' }],
-        })
+      request()
         .then((res) => {
           if (!cancelled) setQuote((res as readonly [bigint, bigint])[0]);
         })
@@ -136,7 +178,7 @@ export default function PoolTradeBox({ core, onAfterTx }: { core: CoreState; onA
       if (retry) clearTimeout(retry);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [readClient, v4, side, buyAmount, sellAmount, decimals, core.token]);
+  }, [readClient, v4, side, buyAmount, sellAmount, decimals, core.token, ethMode, perpPool]);
 
   const ensureChain = async () => {
     if (chainId === LAUNCHPAD_CHAIN.id) return true;
@@ -161,10 +203,44 @@ export default function PoolTradeBox({ core, onAfterTx }: { core: CoreState; onA
       setNotice({ kind: 'error', text: `Enter an ${NATIVE_SYMBOL} amount greater than zero.` });
       return;
     }
+    if (ethMode && !paths) {
+      setNotice({ kind: 'error', text: `The ETH route to ${NATIVE_SYMBOL} is still loading. Try again in a moment.` });
+      return;
+    }
     if (!(await ensureChain())) return;
     setBusy('buy');
     setNotice(null);
     try {
+      if (ethMode && paths) {
+        // ETH -> USDC -> perp -> mem jednym swapem, ETH w `value`, bez zgod.
+        const [outEth] = (await readClient.readContract({
+          address: v4.quoter,
+          abi: v4QuoterPathAbi,
+          functionName: 'quoteExactInput',
+          args: [{ exactCurrency: NATIVE, path: paths.buy, exactAmount: value }],
+        })) as readonly [bigint, bigint];
+        const enc = encodeV4ExactInPath({ currencyIn: NATIVE, path: paths.buy, amountIn: value, minOut: applySlippage(outEth, slippageBps) });
+        const ethArgs = [enc.commands, enc.inputs, deadline()] as const;
+        await readClient.simulateContract({ address: v4.universalRouter, abi: universalRouterAbi, functionName: 'execute', args: ethArgs, value, account });
+        const gas = await readClient
+          .estimateContractGas({ address: v4.universalRouter, abi: universalRouterAbi, functionName: 'execute', args: ethArgs, value, account })
+          .catch(() => undefined);
+        const ethHash = await walletClient.writeContract({
+          address: v4.universalRouter,
+          abi: universalRouterAbi,
+          functionName: 'execute',
+          args: ethArgs,
+          value,
+          chain: LAUNCHPAD_CHAIN,
+          account,
+          ...(gas ? { gas: (gas * 120n) / 100n } : {}),
+        });
+        const ethReceipt = await readClient.waitForTransactionReceipt({ hash: ethHash });
+        if (ethReceipt.status !== 'success') throw new Error('The swap reverted.');
+        setNotice({ kind: 'success', text: `Bought with ETH in the v4 pool. ${ethHash.slice(0, 10)}...` });
+        onAfterTx();
+        return;
+      }
       const [out] = (await readClient.readContract({
         address: v4.quoter,
         abi: v4QuoterAbi,
@@ -298,6 +374,35 @@ export default function PoolTradeBox({ core, onAfterTx }: { core: CoreState; onA
     try {
       if (!(await ensurePermit2(amount))) return;
       setBusy('sell');
+      if (ethMode && paths) {
+        // mem -> perp -> USDC -> ETH jednym swapem; mem przez Permit2 jak zwykle.
+        const [outEth] = (await readClient.readContract({
+          address: v4.quoter,
+          abi: v4QuoterPathAbi,
+          functionName: 'quoteExactInput',
+          args: [{ exactCurrency: core.token, path: paths.sell, exactAmount: amount }],
+        })) as readonly [bigint, bigint];
+        const enc = encodeV4ExactInPath({ currencyIn: core.token, path: paths.sell, amountIn: amount, minOut: applySlippage(outEth, slippageBps) });
+        const ethArgs = [enc.commands, enc.inputs, deadline()] as const;
+        await readClient.simulateContract({ address: v4.universalRouter, abi: universalRouterAbi, functionName: 'execute', args: ethArgs, account });
+        const gas = await readClient
+          .estimateContractGas({ address: v4.universalRouter, abi: universalRouterAbi, functionName: 'execute', args: ethArgs, account })
+          .catch(() => undefined);
+        const ethHash = await walletClient.writeContract({
+          address: v4.universalRouter,
+          abi: universalRouterAbi,
+          functionName: 'execute',
+          args: ethArgs,
+          chain: LAUNCHPAD_CHAIN,
+          account,
+          ...(gas ? { gas: (gas * 120n) / 100n } : {}),
+        });
+        const ethReceipt = await readClient.waitForTransactionReceipt({ hash: ethHash });
+        if (ethReceipt.status !== 'success') throw new Error('The swap reverted.');
+        setNotice({ kind: 'success', text: `Sold for ETH in the v4 pool. ${ethHash.slice(0, 10)}...` });
+        onAfterTx();
+        return;
+      }
       const [out] = (await readClient.readContract({
         address: v4.quoter,
         abi: v4QuoterAbi,
@@ -363,19 +468,37 @@ export default function PoolTradeBox({ core, onAfterTx }: { core: CoreState; onA
           </button>
         ))}
       </div>
+      {ethRoutePossible && (
+        <div className="mt-3 flex items-center gap-1 rounded-full bg-sp-sunken p-1 text-[11px] font-extrabold" role="tablist" aria-label="Trade with">
+          {([true, false] as const).map((option) => (
+            <button
+              key={String(option)}
+              type="button"
+              role="tab"
+              aria-selected={viaEth === option}
+              onClick={() => setViaEth(option)}
+              className={`flex-1 rounded-full px-3 py-1.5 transition-colors ${viaEth === option ? 'bg-sp-surface text-sp-ink shadow-sm' : 'text-sp-shade/50 hover:text-sp-ink'}`}
+            >
+              {side === 'buy' ? 'Pay with' : 'Receive'} {option ? 'ETH' : NATIVE_SYMBOL}
+            </button>
+          ))}
+        </div>
+      )}
       <p className="mt-2 text-[11px] leading-[1.4] text-sp-shade/50">
-        Trades go through the Uniswap v4 pool with the launch hook attached: 0.3% pool fee plus the 1% hook fee, quoted below already net of both.
+        {ethMode
+          ? `One swap through three Uniswap v4 pools: ETH ↔ USDC ↔ ${NATIVE_SYMBOL} (Flash) ↔ ${core.symbol}. The quote below is the whole route, net of every pool and hook fee.`
+          : 'Trades go through the Uniswap v4 pool with the launch hook attached: 0.3% pool fee plus the 1% hook fee, quoted below already net of both.'}
       </p>
 
       {side === 'buy' ? (
         <>
           <div className="mt-4 flex items-end justify-between">
-            <span className="text-[12px] font-extrabold text-sp-ink">{NATIVE_SYMBOL} amount</span>
-            {ethBalance !== null && <span className="text-[11px] text-sp-shade/45">Balance {fmtEth(ethBalance, 4)} {NATIVE_SYMBOL}</span>}
+            <span className="text-[12px] font-extrabold text-sp-ink">{unit} amount</span>
+            {ethBalance !== null && <span className="text-[11px] text-sp-shade/45">Balance {fmtEth(ethBalance, 4)} {unit}</span>}
           </div>
           <div className="relative mt-2">
-            <input inputMode="decimal" value={buyAmount} onChange={(e) => setBuyAmount(e.target.value)} className={`${FIELD} pr-14`} aria-label={`${NATIVE_SYMBOL} amount to spend`} />
-            <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[12px] font-extrabold text-sp-shade/40">{NATIVE_SYMBOL}</span>
+            <input inputMode="decimal" value={buyAmount} onChange={(e) => setBuyAmount(e.target.value)} className={`${FIELD} pr-14`} aria-label={`${unit} amount to spend`} />
+            <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[12px] font-extrabold text-sp-shade/40">{unit}</span>
           </div>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {([25n, 50n, 100n] as const).map((pct) => (
@@ -408,7 +531,7 @@ export default function PoolTradeBox({ core, onAfterTx }: { core: CoreState; onA
           </div>
           <div className="mt-3 flex items-center justify-between text-[11.5px]">
             <span className="text-sp-shade/50">You receive (est.)</span>
-            <span className="font-extrabold text-sp-ink">{quote !== null ? `~${fmtEth(quote, 6)} ${NATIVE_SYMBOL}` : '--'}</span>
+            <span className="font-extrabold text-sp-ink">{quote !== null ? `~${fmtEth(quote, 6)} ${unit}` : '--'}</span>
           </div>
         </>
       )}

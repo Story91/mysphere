@@ -5,6 +5,7 @@ import { type Address } from 'viem';
 import { usePublicClient } from 'wagmi';
 import {
   ACTIVE_LAUNCHPAD_NETWORK,
+  perpSellZapsOf,
   LAUNCHPAD_ADDRESS,
   LAUNCHPAD_ADDRESSES,
   ACTIVE_MARKET_ID,
@@ -207,6 +208,7 @@ export function useTokenHistory(
 
     const result = await scanBackward(readClient, {
       launchpad: LAUNCHPAD_ADDRESSES,
+      sellZaps: perpSellZapsOf(ACTIVE_LAUNCHPAD_NETWORK.chain.id),
       token,
       head: anchorBlock,
       floor,
@@ -397,6 +399,15 @@ export function useTokenHistory(
       const now = Math.floor(Date.now() / 1000);
       const curve = launchpad.toLowerCase();
 
+      // Sprzedaz przez PerpZap v2: prawdziwy sprzedajacy z `ZapSell` tej samej transakcji.
+      const zaps = perpSellZapsOf(ACTIVE_LAUNCHPAD_NETWORK.chain.id);
+      const zapSellers = new Map<string, Address>();
+      for (const log of logs) {
+        if (log.eventName === 'ZapSell' && log.transactionHash && log.args?.seller) {
+          zapSellers.set(log.transactionHash.toLowerCase(), log.args.seller as Address);
+        }
+      }
+
       for (const log of logs) {
         const name = log.eventName;
         const args = log.args ?? {};
@@ -404,7 +415,10 @@ export function useTokenHistory(
         if (name === 'Bought' || name === 'Sold') {
           if (seen.has(id)) continue;
           const isBuy = name === 'Bought';
-          const account = (isBuy ? args.buyer : args.seller) as Address | undefined;
+          let account = (isBuy ? args.buyer : args.seller) as Address | undefined;
+          if (!isBuy && account && zaps.includes(account.toLowerCase()) && log.transactionHash) {
+            account = zapSellers.get(log.transactionHash.toLowerCase()) ?? account;
+          }
           const eth = (isBuy ? args.ethNet : args.ethOut) as bigint | undefined;
           const tokens = (isBuy ? args.tokensOut : args.tokensIn) as bigint | undefined;
           const reserveAfter = args.ethReserveAfter as bigint | undefined;

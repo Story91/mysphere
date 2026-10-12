@@ -16,7 +16,9 @@ import { simulateZapBuy } from "./perpZapSim";
  *
  *   SIM_LAUNCHPAD=0x86B7... SIM_TOKEN=0xb200... npm run launchpad:deploy:zap:base
  *   DRY_RUN=1 - tylko symulacja z kodem podstawionym, bez wdrozenia.
+ *   ZAP_CONTRACT=PerpBuyZap - v1 (tylko kupno); domyslnie PerpZap (v2, kupno i sprzedaz).
  */
+const ZAP_CONTRACT = process.env.ZAP_CONTRACT ?? "PerpZap";
 
 async function main() {
   const simLaunchpad = process.env.SIM_LAUNCHPAD ? getAddress(process.env.SIM_LAUNCHPAD) : null;
@@ -30,7 +32,7 @@ async function main() {
   if (pmCode === "0x") throw new Error(`Pod ${poolManager} nie ma kodu (chainId ${chainId}, ${source}).`);
   verifyPoolManagerCode(chainId, pmCode);
 
-  const Zap = await ethers.getContractFactory("PerpBuyZap");
+  const Zap = await ethers.getContractFactory(ZAP_CONTRACT);
 
   // 1. Symulacja PRZED wdrozeniem: kod uruchomieniowy z wpisanym PoolManagerem
   // (immutable) pod adresem, pod ktory zap faktycznie trafi.
@@ -53,13 +55,14 @@ async function main() {
     network: network.name,
     chainId,
     zap: address,
+    contract: ZAP_CONTRACT,
     poolManager,
     deployer: getAddress(signer.address),
     deployTx: receipt!.hash,
     deployBlock: receipt!.blockNumber,
     deployedAt: new Date().toISOString(),
   };
-  const outputPath = join(process.cwd(), "scripts", "output", `perp-zap-${network.name}.json`);
+  const outputPath = join(process.cwd(), "scripts", "output", `${ZAP_CONTRACT === "PerpBuyZap" ? "perp-zap" : "perp-zap-v2"}-${network.name}.json`);
   mkdirSync(dirname(outputPath), { recursive: true });
   writeFileSync(outputPath, JSON.stringify(record, null, 2) + "\n", { encoding: "utf8" });
   console.log("WDROZONE", JSON.stringify(record, null, 2));
@@ -70,7 +73,7 @@ async function main() {
  * (eth_call z kodem inicjalizujacym zwraca kod uruchomieniowy).
  */
 async function localRuntime(poolManager: string) {
-  const Zap = await ethers.getContractFactory("PerpBuyZap");
+  const Zap = await ethers.getContractFactory(ZAP_CONTRACT);
   const deployTx = await Zap.getDeployTransaction(poolManager);
   return ethers.provider.call({ data: deployTx.data });
 }

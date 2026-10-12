@@ -27,6 +27,7 @@
  */
 
 import type { Address } from 'viem';
+import { ALL_PERP_SELL_ZAPS } from './config';
 
 export type ScanHealth = {
   /** Ile okien nie przeszlo mimo ponowienia. */
@@ -229,7 +230,10 @@ export function reduceBoardLogs(
       pushPrice();
       agg.feed.push({ id: `${hash}-buy`, token, label: 'Buy', eth, tone: 'buy', order });
     } else if (log.eventName === 'Sold') {
-      addBuyer(agg, token, log.args.seller as Address | undefined);
+      // Sprzedaz przez PerpZap v2: sprzedajacym w logu jest zap, nie czlowiek -
+      // nie liczymy go jako tradera (prawdziwy sprzedajacy i tak wczesniej kupil).
+      const seller = log.args.seller as Address | undefined;
+      if (!seller || !ALL_PERP_SELL_ZAPS.has(seller.toLowerCase())) addBuyer(agg, token, seller);
       const eth = helpers.ethOf(log.args.ethOut as bigint);
       addTrade(agg, token, eth);
       pushPrice();
