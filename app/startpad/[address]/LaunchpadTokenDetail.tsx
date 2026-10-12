@@ -672,19 +672,19 @@ function TokenHeader({
   const image = pickTokenImage({ profileLogoUrl: profile?.logoUrl, metadataUri: core.config.metadataURI });
   const chainMeta = parseMetadataUri(core.config.metadataURI);
   const description = profile?.description ?? chainMeta.description;
-  // Bull vs Bear: bliźniak z tego samego pojedynku (para sprawdzana po tworcy w /api/launchpad/duels).
+  // Asset Clash: druga strona tego samego starcia (para sprawdzana po tworcy w /api/launchpad/clashes).
   const duelId = chainMeta.duel?.id ?? null;
   const duelSide = chainMeta.duel?.side ?? null;
   const [twin, setTwin] = useState<{ address: string; symbol: string; market: string } | null>(null);
   useEffect(() => {
     if (!duelId || !duelSide) return;
     let cancelled = false;
-    fetch(`/api/launchpad/duels?id=${duelId}`)
+    fetch(`/api/launchpad/clashes?id=${duelId}`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((body: { duels?: Array<{ bull: { address: string; symbol: string } | null; bear: { address: string; symbol: string } | null }> } | null) => {
-        const d = body?.duels?.[0];
-        const other = duelSide === 'bull' ? d?.bear : d?.bull;
-        if (!cancelled && other) setTwin({ address: other.address, symbol: other.symbol, market: duelSide === 'bull' ? 'eth2xs' : 'eth2xl' });
+      .then((body: { clashes?: Array<{ a: { address: string; symbol: string; marketId: string } | null; b: { address: string; symbol: string; marketId: string } | null }> } | null) => {
+        const c = body?.clashes?.[0];
+        const other = duelSide === 'a' ? c?.b : c?.a;
+        if (!cancelled && other) setTwin({ address: other.address, symbol: other.symbol, market: other.marketId });
       })
       .catch(() => {});
     return () => {
@@ -738,8 +738,8 @@ function TokenHeader({
               {twin && (
                 <a
                   href={`/startpad/${twin.address.toLowerCase()}?m=${twin.market}`}
-                  className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] ${duelSide === 'bull' ? 'bg-sp-down/12 text-sp-down-deep' : 'bg-sp-up/12 text-sp-up'}`}
-                  title="Bull vs Bear duel"
+                  className="rounded-full bg-amber-500/15 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] text-amber-600"
+                  title="Asset Clash"
                 >
                   ⚔️ vs ${twin.symbol}
                 </a>

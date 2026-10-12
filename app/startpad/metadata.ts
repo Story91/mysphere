@@ -90,11 +90,11 @@ export type TokenMetadata = {
    */
   pairedIndex: { symbol: string; feed: string } | null;
   /**
-   * Bull vs Bear: wspolny identyfikator pojedynku i strona. Dwa tokeny tego
-   * samego tworcy na ETH2xL (bull) i ETH2xS (bear) z tym samym `id` to jedna
-   * para - patrz app/startpad/duel.ts i /api/launchpad/duels.
+   * Asset Clash: wspolny identyfikator starcia i strona ('a' | 'b'). Dwa tokeny
+   * tego samego tworcy na dwoch roznych perpach z tym samym `id` to jedna para -
+   * patrz app/startpad/duel.ts i /api/launchpad/clashes.
    */
-  duel: { id: string; side: 'bull' | 'bear'; ticker: string } | null;
+  duel: { id: string; side: 'a' | 'b'; ticker: string } | null;
 };
 
 const DATA_JSON_PREFIX = 'data:application/json;base64,';
@@ -132,8 +132,8 @@ function parseDuel(value: unknown): TokenMetadata['duel'] {
   if (!value || typeof value !== 'object') return null;
   const { id, side, ticker } = value as { id?: unknown; side?: unknown; ticker?: unknown };
   if (typeof id !== 'string' || !/^[a-z0-9]{8,24}$/.test(id)) return null;
-  if (side !== 'bull' && side !== 'bear') return null;
-  if (typeof ticker !== 'string' || !/^[A-Z0-9]{1,8}$/.test(ticker)) return null;
+  if (side !== 'a' && side !== 'b') return null;
+  if (typeof ticker !== 'string' || !/^[A-Z0-9]{1,7}$/.test(ticker)) return null;
   return { id, side, ticker };
 }
 
