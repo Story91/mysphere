@@ -854,7 +854,10 @@ export const ACTIVE_MARKET_ID: string | null = ACTIVE_LAUNCHPAD_NETWORK.marketId
  * za ETH w jednej transakcji, ETH -> USDC -> perp (pula Flash) -> buyFor.
  * Jeden zap na siec, dla wszystkich rynkow perpow. Brak wpisu = brak opcji ETH.
  */
-const PERP_ZAP_BY_CHAIN: Record<number, `0x${string}` | undefined> = {};
+const PERP_ZAP_BY_CHAIN: Record<number, `0x${string}` | undefined> = {
+  // Wdrozony 2026-10-12, blok 52489206 (scripts/output/perp-zap-base.json).
+  [base.id]: '0xBDBe76a51Af1D444f89ee6d0a457A1FD1Dc06b9A',
+};
 export const PERP_ZAP_ADDRESS: `0x${string}` | null =
   QUOTE_ASSET ? PERP_ZAP_BY_CHAIN[ACTIVE_LAUNCHPAD_NETWORK.chain.id] ?? null : null;
 /** Bezhakowa pula natywne ETH/USDC v4 na Base (fee 500, tickSpacing 10) - pierwszy krok zapa. */

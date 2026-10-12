@@ -1,0 +1,10 @@
+{
+  "network": "base",
+  "chainId": 8453,
+  "zap": "0xBDBe76a51Af1D444f89ee6d0a457A1FD1Dc06b9A",
+  "poolManager": "0x498581fF718922c3f8e6A244956aF099B2652b2b",
+  "deployer": "0xD4885A5aa53446843CABcDE1F35DE9b4E906030e",
+  "deployTx": "0x2c18d41e54d625b0fdb8295ced1b01bf562459bba48c9e5b97a482217eb20858",
+  "deployBlock": 52489206,
+  "deployedAt": "2026-10-12T01:16:00.419Z"
+}

@@ -156,3 +156,13 @@ pula po graduacji przez Permit2 na perpie.
 - czy ich pule przyjma pary z naszym hookiem i czy routing ETH -> perp -> mem przejdzie
   przez ich agregator;
 - udzial w oplatach z wolumenu, ktory przyprowadzimy.
+
+## 2.11 PerpBuyZap - kupno za ETH (Base mainnet, 2026-10-12)
+
+`0xBDBe76a51Af1D444f89ee6d0a457A1FD1Dc06b9A` (blok 52489206, `scripts/output/perp-zap-base.json`).
+Jeden zap dla wszystkich rynkow perpow: `buyWithEth(launchpad, token, ethPool, perpPool, minPerpOut, minTokensOut, deadline, recipient)`.
+Trasa ETH -> USDC (pula v4 ETH/USDC 500/10, bez hooka) -> perp (pula Flash z `/v1/perps` -> `poolKey`) -> `buyFor(recipient)`, jeden `unlock`.
+Zap nie trzyma srodkow: zwrot nadwyzki z krzywej (perp) idzie do odbiorcy, niewydane ETH do wolajacego.
+Sprawdzenie: `test/PerpBuyZap.test.ts` (lokalnie) + symulacja `eth_call` na zywym Base w `deployPerpZap.ts` (B20 i hook Flash nie dzialaja na forku).
+Front: przelacznik "Pay with ETH / ETH2xL" w panelu kupna, `PERP_ZAP_BY_CHAIN` w `app/startpad/config.ts`.
+Nie obejmuje: pre-buy przy starcie (tworca = msg.sender launchpada) i sprzedazy do ETH (`Sold` zapisalby zap jako sprzedajacego).
