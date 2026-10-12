@@ -10,11 +10,13 @@ Stan: 2026-10-12, przed implementacja. Pomysl nr 2 z listy "unikalny launchpad".
 - Schemat "Coinbase Verified Account" (`bool verifiedAccount`):
   `0xf8b05c79f090979bf4a80270aba232dff11a10d9ca55c4f88de95317970f0de9` (docs CDP i OnchainKit).
 - Portfele wlasciciela `0xD4885A5a...030e` i `0x83C68Dbf...1E83` NIE maja atestacji (uid = 0).
+- Atestator Coinbase: `0x357458739F90461b99789350868CD7CF330Dd7EE` - odczytany z prawdziwych
+  atestacji (np. `0x849151d7...8bf1`, 2023-10-25): bez wygasniecia, odwolywalne.
+- Etap 1 WDROZONY: plakietka "Verified humans" w statystykach tokena (`/api/launchpad/human`,
+  top 100 posiadaczy, sprawdzenie w EAS) - bez zmian w kontraktach.
 
-Niesprawdzone: adres atestatora Coinbase (zadne oficjalne zrodlo w wynikach; base.easscan.org mial
-przerwe techniczna, Infura wyczerpala limit getLogs) i liczba aktywnych atestacji (jedyna liczba
-"20 mln" pochodzi z bloga strony trzeciej, bez zrodla). Przed wdrozeniem: odczytac atestatora z
-dowolnej prawdziwej atestacji i wpisac go jako immutable.
+Niesprawdzone: liczba aktywnych atestacji (jedyna liczba "20 mln" pochodzi z bloga strony
+trzeciej, bez zrodla; base.easscan.org mial przerwe techniczna).
 
 ## Projekt (v3 launchpada, nowe wdrozenie - stare tokeny bez zmian)
 

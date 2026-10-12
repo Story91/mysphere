@@ -904,6 +904,39 @@ function StatsCard({
     };
   }, [tokenAddress]);
 
+  // "Verified humans": ilu z najwiekszych posiadaczy ma Coinbase Verification
+  // (EAS na Base). Bez zmian w kontraktach - patrz /api/launchpad/human i
+  // docs/STARTPAD-HUMAN-LAUNCH.md. Kontrakty (launchpad, vault, hook, 0xdEaD)
+  // nie sa ludzmi, wiec nie wchodza do mianownika.
+  const humanCandidates = useMemo(() => {
+    const skip = new Set(
+      [core.deployment.launchpad, core.deployment.vault, core.deployment.hook, DEAD_ADDRESS]
+        .filter(Boolean)
+        .map((a) => String(a).toLowerCase())
+    );
+    return [...balances.entries()]
+      .filter(([holder, balance]) => balance > 0n && !skip.has(holder.toLowerCase()))
+      .sort((a, b) => (b[1] > a[1] ? 1 : b[1] < a[1] ? -1 : 0))
+      .slice(0, 100)
+      .map(([holder]) => holder);
+  }, [balances, core.deployment.launchpad, core.deployment.vault, core.deployment.hook]);
+  const humanKey = humanCandidates.join(',');
+  const [humans, setHumans] = useState<{ verified: number; checked: number } | null>(null);
+  useEffect(() => {
+    setHumans(null);
+    if (LAUNCHPAD_CHAIN.id !== 8453 || !humanKey) return;
+    let cancelled = false;
+    fetch(`/api/launchpad/human?addresses=${humanKey}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body: { ok?: boolean; verified?: string[]; checked?: number } | null) => {
+        if (!cancelled && body?.ok) setHumans({ verified: body.verified?.length ?? 0, checked: body.checked ?? 0 });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [humanKey]);
+
   const exactHolders = holdersAreExact({ complete: historyComplete, knownBalances: balances.size });
   const holdersCount = pickHolderCount({ chain: holdersFromChain, index: counters.holders, exact: exactHolders });
 
@@ -929,6 +962,15 @@ function StatsCard({
       ? [{ label: 'Transfers', value: String(counters.transfers) }]
       : []),
     { label: 'Holders', value: String(holdersCount) },
+    ...(humans && humans.checked > 0
+      ? [
+          {
+            label: 'Verified humans',
+            value: `${humans.verified}/${humans.checked}${humans.verified > 0 ? ' ✓' : ''}`,
+            usd: `${Math.round((humans.verified / humans.checked) * 100)}% Coinbase verified`,
+          },
+        ]
+      : []),
     { label: 'Age', value: timeAgo(core.startedAt).replace(' ago', '') },
     { label: 'Curve fee', value: core.config.known ? `${(core.config.feeBps / 100).toFixed(2)}%` : '--' },
   ];
