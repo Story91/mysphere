@@ -29,7 +29,7 @@ export const dynamic = 'force-dynamic';
 const SIZE = { width: 1200, height: 800 };
 
 export async function GET() {
-  return new ImageResponse(HomeShareCard(), {
+  return new ImageResponse(HomeShareCard(SIZE.height), {
     ...SIZE,
     headers: OG_CACHE_HEADERS,
     fonts: await ogFonts(),

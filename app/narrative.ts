@@ -14,43 +14,48 @@ import { DEFAULT_LAUNCHPAD_CHAIN_ID, LAUNCHPAD_NETWORKS } from './startpad/confi
  * obrazku.
  *
  * === TRZY TEKSTY, KTORE SIE NIE POWTARZAJA ===
- * Na X widac: obrazek (HEADLINE + SUBLINE + chipy), pod nim jeden pasek
+ * Na X widac: obrazek (HEADLINE + SUBLINE + naklejki), pod nim jeden pasek
  * (SOCIAL_TITLE) i czasem opis (APP_DESCRIPTION). Obrazek mowi CO, pasek mowi
  * CZYM JEST MIEJSCE, opis wylicza reszte. Zmieniajac jeden, przeczytaj dwa
  * pozostale.
  *
  * === CO JEST PRAWDA DZIS ===
  * - Rynki perpow: `markets` wpisu Base w app/startpad/config.ts (2026-10-12:
- *   ETH long i short, BTC, Nvidia, SpaceX, Apple, Meta). Chipy liczy
- *   PERP_CHIPS prosto z tej listy, wiec nowy rynek pojawia sie na kartach sam.
+ *   ETH long i short, BTC, Nvidia, SpaceX, Apple, Meta). Naklejki liczy
+ *   PERP_STICKERS prosto z tej listy, wiec nowy rynek pojawia sie na kartach sam.
  * - "Stocks" w hasle to tokeny Flash sledzace akcje (NVDA2xL, SPCX2xL,
  *   AAPL2xL, META2xL), a nie akcje. Opis mowi "perps", nie "shares".
  * - Siec postowania (dziewiec) i napiwkow (osiem) - uzasadnienie liczb jest
  *   w historii app/layout.tsx; tu tylko jedno zdanie o feedzie.
  */
 
-/** Naglowek karty strony glownej. Limit ~23 znakow przy 88 px (nowrap). */
-export const HEADLINE = 'Memes × perps × stocks.';
+/** Naglowek karty strony glownej - kazdy element to osobna linijka (~11 znakow przy 104 px). */
+export const HEADLINE_LINES = ['Memes', '× perps', '× stocks.'];
+export const HEADLINE = HEADLINE_LINES.join(' ');
 
-/** Druga linijka karty. Limit ~40 znakow przy 48 px. */
-export const SUBLINE = 'Launch a meme paired with 2x leverage.';
-
-/** Ticker z symbolu perpa Flash: "ETH2xL" -> "ETH". Tylko tam, gdzie skrot nic nie mowi, pelna nazwa. */
-const TICKER_NAMES: Record<string, string> = { SPCX: 'SPACEX' };
-/** Chipow miesci sie w kolumnie karty ~6 - reszta idzie do chipu "+N". */
-const MAX_CHIPS = 6;
+/** Zdanie pod naglowkiem. Jedna linijka w kolumnie 560 px przy 30 px - do ~36 znakow. */
+export const SUBLINE = 'Launch a meme on 2x leverage.';
 
 /**
- * Chipy na dole karty - po jednym na AKTYWO z rynkow perpow sieci domyslnej
- * (long i short tego samego aktywa to jeden chip). Bez liczb, wiec karta moze
- * stac w CDN tydzien i nie klamac.
+ * Nazwa aktywa na naklejce, z symbolu perpa Flash ("SPCX2xL" -> "SpaceX").
+ * Ticker, ktorego tu nie ma, idzie na naklejke tak, jak jest.
  */
-export const PERP_CHIPS: readonly string[] = (() => {
+const ASSET_NAMES: Record<string, string> = { ETH: 'ETH', BTC: 'BTC', NVDA: 'Nvidia', SPCX: 'SpaceX', AAPL: 'Apple', META: 'Meta' };
+/** W kolazu jest szesc miejsc (SLOTS w app/components/og/sticker.tsx). */
+const MAX_STICKERS = 6;
+
+/**
+ * Naklejki aktywow rynkow perpow sieci domyslnej ("ETH 2x", "Nvidia 2x"...).
+ * Long i short tego samego aktywa to jedna naklejka. Lista liczona z
+ * `markets` w config.ts, wiec nowy rynek pojawia sie na kartach sam; ponad
+ * szesc - ostatnia naklejka mowi "+N more". Bez liczb, wiec karta moze stac
+ * w CDN tydzien i nie klamac.
+ */
+export const PERP_STICKERS: readonly string[] = (() => {
   const markets = LAUNCHPAD_NETWORKS[DEFAULT_LAUNCHPAD_CHAIN_ID]?.markets ?? [];
-  const tickers = Array.from(
-    new Set(markets.map((m) => m.quote.symbol.replace(/\d+x[LS]$/i, '').toUpperCase()).map((t) => TICKER_NAMES[t] ?? t))
-  );
-  return tickers.length > MAX_CHIPS ? [...tickers.slice(0, MAX_CHIPS - 1), `+${tickers.length - MAX_CHIPS + 1}`] : tickers;
+  const assets = Array.from(new Set(markets.map((m) => m.quote.symbol.replace(/\d+x[LS]$/i, '').toUpperCase())));
+  const labels = assets.map((a) => `${ASSET_NAMES[a] ?? a} 2x`);
+  return labels.length > MAX_STICKERS ? [...labels.slice(0, MAX_STICKERS - 1), `+${labels.length - MAX_STICKERS + 1} more`] : labels;
 })();
 
 /**

@@ -1,159 +1,81 @@
-import { DISPLAY_FAMILY, BODY_FAMILY } from './fonts';
+import { DISPLAY_FAMILY } from './fonts';
+import { BrandMark, Collage, Disc, Frame, INK, type StickerSpec } from './sticker';
 
 /**
- * Karta podgladu linku dla STRONY (nie dla rekordu z danymi).
+ * Karta podgladu linku dla STRONY (nie dla rekordu z danymi): strona glowna,
+ * /startpad, /startpad/sphere, /b20, /asks, /how, /Docs.
  *
- * Jeden rysunek dla strony glownej, /startpad, /startpad/sphere i /b20 - te
- * same trzy pasma, ktore wczesniej mialy statyczne PNG z /asks, /how i /Docs:
- *   1. nadlinia (domena albo sekcja),
- *   2. krecoslup + naglowek + druga linijka,
- *   3. chipy i/lub stopka.
+ * Uklad rodziny naklejek (app/components/og/sticker.tsx):
+ *   lewa kolumna  - znak marki z adresem, naglowek w 2-3 linijkach, zdanie,
+ *   prawa strona  - kolaz do szesciu naklejek + fioletowy bohater.
  *
- * Paleta przepisana z tokenow produktu (app/globals.css), kontrasty wobec
- * tla #F1EDFA: ink 11.9:1, inkMuted 4.8:1, brand 5.4:1. Nadlinia NIE uzywa
- * --soft-primary #7C6BDA (3.67:1) - X skaluje podglad do ~0.35 i taki fiolet
- * znika. Pomarancz (--soft-accent) w tym systemie znaczy KWOTE, a na kartach
- * stron kwot nie ma - wiec go tu nie ma.
+ * MIARA: kolumna tekstu ma 560 px, linijki naglowka sa `nowrap`. Baloo 2 700
+ * zajmuje ~0.47 kegla na znak, wiec przy 104 px linijka miesci ~11 znakow -
+ * dluzsza wyjdzie pod kolaz. Po kazdej zmianie tresci obejrzec obrazek.
  *
- * MIARA: kolumna tekstu ma 1020 px, a naglowek i druga linijka sa `nowrap`.
- * Zmierzone na wyrenderowanym PNG: znak Baloo 2 700 zajmuje ~0.44 kegla,
- * Nunito 600 ~0.48. Przy 88 px miesci sie ~23 znaki naglowka, przy 48 px
- * ~42 znaki drugiej linijki. Za dlugi tekst wychodzi poza kadr - widac to od
- * razu, w przeciwienstwie do cichego zlamania na dwie linijki. Po kazdej
- * zmianie tresci obejrzec obrazek.
- *
- * SATORI, NIE PRZEGLADARKA: kazdy kontener ma jawny `display`, zero klas
- * Tailwinda, zero cieni.
+ * `height` 800 = karta miniappki (3:2); kolaz i kolo zjezdzaja wtedy o polowe
+ * nadwyzki, zeby nie wisialy u gory.
  */
 
-const CARD = {
-  bg: '#F1EDFA', // --soft-bg
-  ink: '#2E2A44', // --soft-ink
-  inkMuted: '#6B6486', // --soft-ink-muted
-  brand: '#5F4EC2', // --soft-primary-deep
-  line: '#B9B1D8', // --soft-line-strong
-  panel: '#FFFFFF', // --soft-surface
-} as const;
-
 const PADDING = 72;
-const HEAD_SIZE = 88;
-const HEAD_LINE_HEIGHT = 1.12;
-const SUB_SIZE = 48;
-const SUB_LINE_HEIGHT = 1.3;
-const SPINE_WIDTH = 8;
-const SPINE_GAP = 28;
-const TEXT_INDENT = SPINE_WIDTH + SPINE_GAP;
-const TEXT_WIDTH = 1200 - PADDING * 2 - TEXT_INDENT;
+const COLUMN = 560;
 
 export type PageShareCardProps = {
-  eyebrow: string;
-  headline: string;
+  /** Sciezka po domenie w znaku marki, np. "/perps". */
+  path?: string;
+  /** Linijki naglowka - kazda w osobnym wierszu. */
+  headline: string[];
+  headSize?: number;
   subline?: string;
-  /** Krotkie etykiety w pigulkach - rynki, moduly. Max ~5, zeby zmiescic sie w kolumnie. */
-  chips?: readonly string[];
-  /** Zdanie w ostatnim pasmie, obok chipow albo zamiast nich. */
-  footer?: string;
+  stickers: StickerSpec[];
+  hero?: StickerSpec;
+  height?: number;
 };
 
-export function PageShareCard({ eyebrow, headline, subline, chips, footer }: PageShareCardProps) {
-  const heroHeight = Math.round(HEAD_SIZE * HEAD_LINE_HEIGHT + (subline ? SUB_SIZE * SUB_LINE_HEIGHT + 14 : 0));
-
+export function PageShareCard({ path, headline, headSize = 104, subline, stickers, hero, height = 630 }: PageShareCardProps) {
+  const dy = Math.round((height - 630) / 2);
   return (
-    <div
-      style={{
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-between',
-        background: CARD.bg,
-        padding: `${PADDING}px`,
-        fontFamily: BODY_FAMILY,
-      }}
-    >
+    <Frame>
+      <Disc dy={dy} />
       <div
         style={{
+          position: 'absolute',
+          left: PADDING,
+          top: 64,
+          bottom: 64,
+          width: COLUMN,
           display: 'flex',
-          marginLeft: TEXT_INDENT,
-          fontSize: 24,
-          fontWeight: 700,
-          letterSpacing: 5,
-          color: CARD.brand,
+          flexDirection: 'column',
+          justifyContent: 'space-between',
         }}
       >
-        {eyebrow}
-      </div>
-
-      <div style={{ display: 'flex', gap: SPINE_GAP }}>
-        {/* Krecoslup - ten sam gest co .spine-fill w globals.css. */}
-        <div style={{ display: 'flex', width: SPINE_WIDTH, height: heroHeight, borderRadius: 4, background: CARD.brand }} />
-        <div style={{ display: 'flex', flexDirection: 'column', width: TEXT_WIDTH }}>
-          <div
-            style={{
-              display: 'flex',
-              fontFamily: DISPLAY_FAMILY,
-              fontSize: HEAD_SIZE,
-              lineHeight: HEAD_LINE_HEIGHT,
-              fontWeight: 700,
-              letterSpacing: -1.6,
-              color: CARD.ink,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {headline}
-          </div>
-          {subline && (
-            <div
-              style={{
-                display: 'flex',
-                fontSize: SUB_SIZE,
-                lineHeight: SUB_LINE_HEIGHT,
-                fontWeight: 600,
-                letterSpacing: -0.6,
-                color: CARD.inkMuted,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {subline}
+        <BrandMark path={path} />
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            fontFamily: DISPLAY_FAMILY,
+            fontWeight: 700,
+            fontSize: headSize,
+            lineHeight: 0.98,
+            letterSpacing: -2.5,
+            color: INK.ink,
+          }}
+        >
+          {headline.map((line) => (
+            <div key={line} style={{ display: 'flex', whiteSpace: 'nowrap' }}>
+              {line}
             </div>
-          )}
+          ))}
         </div>
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginLeft: TEXT_INDENT }}>
-        {chips?.map((chip) => (
-          <div
-            key={chip}
-            style={{
-              display: 'flex',
-              padding: '10px 22px',
-              borderRadius: 999,
-              border: `2px solid ${CARD.line}`,
-              background: CARD.panel,
-              fontFamily: DISPLAY_FAMILY,
-              fontSize: 28,
-              fontWeight: 700,
-              color: CARD.brand,
-            }}
-          >
-            {chip}
-          </div>
-        ))}
-        {footer && (
-          <div
-            style={{
-              display: 'flex',
-              marginLeft: chips?.length ? 10 : 0,
-              fontSize: chips?.length ? 28 : 32,
-              fontWeight: 600,
-              color: CARD.inkMuted,
-            }}
-          >
-            {footer}
-          </div>
+        {subline ? (
+          <div style={{ display: 'flex', fontSize: 30, fontWeight: 700, color: INK.muted, whiteSpace: 'nowrap' }}>{subline}</div>
+        ) : (
+          <div style={{ display: 'flex' }} />
         )}
       </div>
-    </div>
+      <Collage stickers={stickers} hero={hero} dy={dy} />
+    </Frame>
   );
 }
 

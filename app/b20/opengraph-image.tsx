@@ -3,7 +3,8 @@ import { PageShareCard, PAGE_OG_CACHE_HEADERS } from '../components/og/PageShare
 import { ogFonts } from '../components/og/fonts';
 
 /**
- * Karta /b20 i podstron (create, tools, [address]).
+ * Karta /b20 i podstron (create, tools, [address]). Naklejki z opisow
+ * stron: stala podaz i brak admina (create), adres vanity i paragony (tools).
  *
  * Tresc stala, bez liczb z bazy - CDN trzyma ja tydzien. force-dynamic z tego
  * samego powodu co app/opengraph-image.tsx (prerender przy buildzie trafia
@@ -19,10 +20,18 @@ export const contentType = 'image/png';
 export default async function Image() {
   return new ImageResponse(
     <PageShareCard
-      eyebrow="MYSPHERE B20"
-      headline="Every B20 token on Base."
-      subline="Who made it, and whether it trades."
-      footer="Create one, mine an address, or just look it up."
+      path="/b20"
+      headline={['Every B20', 'token on', 'Base.']}
+      subline="Who made it, and does it trade."
+      stickers={[
+        { label: 'Create' },
+        { label: 'No admin' },
+        { label: 'Vanity' },
+        { label: 'Fixed supply' },
+        { label: 'Pools' },
+        { label: 'Receipts' },
+      ]}
+      hero={{ label: 'B20', sub: "Base's own token standard" }}
     />,
     { ...size, headers: PAGE_OG_CACHE_HEADERS, fonts: await ogFonts() }
   );

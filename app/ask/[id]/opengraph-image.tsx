@@ -27,7 +27,13 @@ export default async function Image({ params }: { params: { id: string } }) {
 
   if (!share) {
     return new ImageResponse(
-      <PageShareCard eyebrow="MYSPHERE ASKS" headline="Ask with a budget." subline="Answers stay sealed. Payouts onchain." />,
+      <PageShareCard
+        path="/ask"
+        headline={['Ask with', 'a budget.']}
+        subline="Answers stay sealed. Payouts onchain."
+        stickers={[{ label: 'Sealed' }, { label: 'Seats' }, { label: 'Deadline' }, { label: 'Escrow' }, { label: 'Tx hash' }, { label: 'Paid out' }]}
+        hero={{ label: 'Your question', sub: 'with a budget' }}
+      />,
       { ...size, fonts }
     );
   }
@@ -39,8 +45,8 @@ export default async function Image({ params }: { params: { id: string } }) {
   const state = !checked
     ? null
     : open
-      ? { label: `OPEN · ${left} ${left === 1 ? 'SEAT' : 'SEATS'} LEFT`, open: true }
-      : { label: ask.status === 'resolved' ? 'RESOLVED' : 'CLOSED', open: false };
+      ? { label: `Open · ${left} ${left === 1 ? 'seat' : 'seats'} left`, open: true }
+      : { label: ask.status === 'resolved' ? 'Resolved' : 'Closed', open: false };
 
   return new ImageResponse(
     <AskShareCard

@@ -1,5 +1,6 @@
 import { ImageResponse } from 'next/og';
-import { DISPLAY_FAMILY, BODY_FAMILY, ogFonts } from '../../components/og/fonts';
+import { ogFonts } from '../../components/og/fonts';
+import { TipShareCard } from '../../components/og/SocialCards';
 import { getTipReceipt } from '../../utils/tips/getTipReceipt';
 import { getName } from '../../utils/identity/getName';
 import { shortAddress } from '../../utils/posts/getPostForShare';
@@ -83,73 +84,9 @@ export default async function Image({ params }: { params: { txHash: string } }) 
   const amount = tip ? formatAmount(tip.amount) : '—';
   const token = tip?.token ?? '';
 
+  // Rysunek: TipShareCard (app/components/og/SocialCards.tsx).
   return new ImageResponse(
-    (
-      <div
-        style={{
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          background: '#F1EDFA',
-          padding: '72px',
-          /**
-           * Nunito jako domyslny kroj kadru, Baloo 2 punktowo na naglowku i
-           * liczbach - te same role, co --font-soft-body i --font-soft-display
-           * w app/layout.tsx. Pliki dojezdzaja przez app/components/og/fonts.ts;
-           * uzasadnienie, dlaczego to w koncu dalo sie zrobic, jest tam.
-           */
-          fontFamily: BODY_FAMILY,
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div
-            style={{ display: 'flex', width: 14, height: 14, borderRadius: 7, background: '#1E7A55' }}
-          />
-          <div style={{ display: 'flex', fontSize: 24, letterSpacing: 5, color: '#1E7A55' }}>
-            SETTLED ONCHAIN
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 20 }}>
-            <div
-              style={{
-                display: 'flex',
-                fontFamily: DISPLAY_FAMILY,
-                fontSize: 150,
-                fontWeight: 700,
-                color: '#C2410C',
-                lineHeight: 1,
-              }}
-            >
-              {amount}
-            </div>
-            <div
-              style={{
-                display: 'flex',
-                fontFamily: DISPLAY_FAMILY,
-                fontSize: 44,
-                fontWeight: 600,
-                color: '#6B6486',
-              }}
-            >
-              {token}
-            </div>
-          </div>
-          <div style={{ display: 'flex', fontSize: 38, color: '#2E2A44', marginTop: 26 }}>
-            {from} → {to}
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', fontSize: 22, color: '#6B6486' }}>
-          {tip
-            ? `Verifiable on ${tip.network} · mysphere.fun`
-            : 'Receipt not found · mysphere.fun'}
-        </div>
-      </div>
-    ),
+    <TipShareCard amount={amount} token={token} from={from} to={to} network={tip ? tip.network : null} />,
     { ...size, fonts: await ogFonts() }
   );
 }

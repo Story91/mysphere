@@ -7,7 +7,7 @@ import content from '../_content/verify.md';
 export const metadata: Metadata = pageMeta({
   title: 'Verify it onchain',
   description: 'How to verify every MySphere money claim yourself: which block explorer, which hash, which contract, and what is an off-chain reading instead.',
-  image: '/Docs/opengraph-image.png',
+  image: '/Docs/opengraph-image',
 });
 
 export default function VerifyDocPage() {

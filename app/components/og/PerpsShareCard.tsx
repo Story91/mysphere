@@ -1,36 +1,24 @@
-import { DISPLAY_FAMILY, BODY_FAMILY } from './fonts';
+import { DISPLAY_FAMILY } from './fonts';
+import { BrandMark, Collage, Disc, Frame, INK, type StickerSpec } from './sticker';
 import type { PerpMarketSnapshot } from '../../api/launchpad/flashFeed';
 
 /**
- * Karta /perps (i /startpad/perps) - rynki perpow, na ktorych da sie startowac
- * memy, z zywymi liczbami Flash.
+ * Karta /perps (i /startpad/perps) - rynki perpow z zywymi liczbami Flash,
+ * w stylu naklejek (app/components/og/sticker.tsx).
  *
- * Kazdy kafel: krotka nazwa ("ETH 2x"), NAV udzialu w dolarach i zmiana 24h.
- * Lista kafli = `markets` z app/startpad/config.ts, wiec nowy rynek pojawia
- * sie tu sam - do osmiu w dwoch rzedach, dalej kafel "+N more". Brak odpowiedzi Flash zostawia kafle z kreskami - karta ma sie
- * narysowac zawsze, a nie wymyslac liczb.
+ * Kazda naklejka rynku: krotka nazwa ("ETH 2x") i pod nia NAV udzialu oraz
+ * zmiana 24h w barwie kierunku. Miejsc w kolazu jest szesc - przy wiekszej
+ * liczbie rynkow pokazujemy szesc, ktore NAJMOCNIEJ sie ruszyly (bez danych
+ * na koncu), bo ruch jest powodem, dla ktorego ktos patrzy na te karte.
+ * Fioletowy bohater "$YOUR MEME" zostaje: to ten sam produkt, co na karcie
+ * glownej.
  *
- * Kierunek ceny w barwach startpada (--sp-up / --sp-down), tak jak na karcie
- * tokena: 3.17:1 i 3.29:1 wobec tla, oba ponad progiem dla 34 px / 700.
+ * Naklejki z liczbami sa zawsze biale: zielen i braz kierunku na bursztynie
+ * schodza ponizej 3:1. Brak odpowiedzi Flash = naklejki z kreskami; karta ma
+ * sie narysowac zawsze, a nie wymyslac liczb.
  */
 
-const CARD = {
-  bg: '#F1EDFA',
-  ink: '#2E2A44',
-  inkMuted: '#6B6486',
-  brand: '#5F4EC2',
-  up: '#0B9A51',
-  down: '#C76B12',
-  line: '#B9B1D8',
-  panel: '#FFFFFF',
-} as const;
-
-const PADDING = 72;
-const GAP = 14;
-const PER_ROW = 4;
-/** Dwa rzedy po cztery. Przy wiekszej liczbie rynkow ostatni kafel mowi "+N more". */
-const MAX_TILES = PER_ROW * 2;
-const TILE_WIDTH = Math.floor((1200 - PADDING * 2 - GAP * (PER_ROW - 1)) / PER_ROW);
+const MAX_MARKETS = 6;
 
 /**
  * "ETH 2x Long" -> "ETH 2x", "Flash ETH 2x Short" -> "ETH 2x Short".
@@ -54,109 +42,77 @@ function changeLabel(pct: number | null): string {
   return `${sign}${Math.abs(pct).toFixed(2)}%`;
 }
 
-function Tile({ perp }: { perp: PerpMarketSnapshot }) {
-  const tone = perp.change24hPct === null ? CARD.inkMuted : perp.change24hPct >= 0 ? CARD.up : CARD.down;
-  return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        width: TILE_WIDTH,
-        padding: '14px 20px',
-        borderRadius: 16,
-        border: `1px solid ${CARD.line}`,
-        background: CARD.panel,
-      }}
-    >
-      <div style={{ display: 'flex', fontFamily: DISPLAY_FAMILY, fontSize: 28, fontWeight: 700, color: CARD.brand, whiteSpace: 'nowrap' }}>
-        {shortName(perp)}
+function marketSticker(perp: PerpMarketSnapshot): StickerSpec {
+  const tone = perp.change24hPct === null ? INK.muted : perp.change24hPct >= 0 ? INK.up : INK.down;
+  return {
+    label: shortName(perp),
+    size: 34,
+    tone: 'paper',
+    sub: (
+      <div style={{ display: 'flex', gap: 10 }}>
+        <span style={{ color: INK.ink }}>{navLabel(perp.priceUsd)}</span>
+        <span style={{ color: tone }}>{changeLabel(perp.change24hPct)}</span>
       </div>
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: 2 }}>
-        <div style={{ display: 'flex', fontFamily: DISPLAY_FAMILY, fontSize: 26, fontWeight: 700, color: CARD.ink }}>
-          {navLabel(perp.priceUsd)}
-        </div>
-        <div style={{ display: 'flex', fontSize: 20, fontWeight: 700, color: tone }}>{changeLabel(perp.change24hPct)}</div>
-      </div>
-    </div>
-  );
+    ),
+    subColor: INK.ink,
+  };
 }
 
 export function PerpsShareCard({ perps }: { perps: PerpMarketSnapshot[] }) {
-  const overflow = perps.length > MAX_TILES;
-  const shown = overflow ? perps.slice(0, MAX_TILES - 1) : perps;
-  const rows: PerpMarketSnapshot[][] = [];
-  for (let i = 0; i < shown.length; i += PER_ROW) rows.push(shown.slice(i, i + PER_ROW));
+  // Najwiekszy ruch pierwszy; rynek bez danych zawsze na koncu (abs(-1) = 1
+  // wpychal go przed rynek, ktory ruszyl sie o 0.01%).
+  const move = (p: PerpMarketSnapshot) => (p.change24hPct === null ? -1 : Math.abs(p.change24hPct));
+  const byMove = [...perps].sort((a, b) => move(b) - move(a));
+  const shown = byMove.slice(0, MAX_MARKETS);
 
   return (
-    <div
-      style={{
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-between',
-        background: CARD.bg,
-        padding: PADDING,
-        fontFamily: BODY_FAMILY,
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', fontSize: 24, fontWeight: 700, letterSpacing: 5, color: CARD.brand }}>MYSPHERE PERPS</div>
-        <div style={{ display: 'flex', fontSize: 22, letterSpacing: 2, color: CARD.inkMuted }}>BASE · FLASH 2X · NAV & 24H</div>
-      </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column' }}>
+    <Frame>
+      <Disc />
+      <div
+        style={{
+          position: 'absolute',
+          left: 72,
+          top: 64,
+          bottom: 64,
+          width: 560,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+        }}
+      >
+        <BrandMark path="/perps" />
         <div
           style={{
             display: 'flex',
+            flexDirection: 'column',
             fontFamily: DISPLAY_FAMILY,
-            fontSize: 72,
-            lineHeight: 1.08,
             fontWeight: 700,
-            letterSpacing: -1.4,
-            color: CARD.ink,
-            whiteSpace: 'nowrap',
+            fontSize: 104,
+            lineHeight: 0.98,
+            letterSpacing: -2.5,
+            color: INK.ink,
           }}
         >
-          Memes on 2x leverage.
+          <div style={{ display: 'flex' }}>Memes</div>
+          <div style={{ display: 'flex' }}>on 2x</div>
+          <div style={{ display: 'flex' }}>leverage.</div>
         </div>
-        <div style={{ display: 'flex', fontSize: 30, fontWeight: 600, color: CARD.inkMuted, marginTop: 4, whiteSpace: 'nowrap' }}>
-          Launch a meme paired with a perp. Buy it with ETH.
+        <div style={{ display: 'flex', fontSize: 30, fontWeight: 700, color: INK.muted, whiteSpace: 'nowrap' }}>
+          Live NAV and 24h move, from Flash.
         </div>
       </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: GAP }}>
-        {rows.map((row, index) => (
-          <div key={index} style={{ display: 'flex', gap: GAP }}>
-            {row.map((perp) => (
-              <Tile key={perp.id} perp={perp} />
-            ))}
-            {overflow && index === rows.length - 1 && (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: TILE_WIDTH,
-                  borderRadius: 16,
-                  border: `2px dashed ${CARD.line}`,
-                  fontFamily: DISPLAY_FAMILY,
-                  fontSize: 28,
-                  fontWeight: 700,
-                  color: CARD.brand,
-                }}
-              >
-                +{perps.length - shown.length} more
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
+      {/* Bohater nizej niz na kartach stron: naklejki rynkow maja po dwie
+          linijki i w standardowym miejscu zaslanial liczby Bitcoina. */}
+      <Collage
+        stickers={shown.map(marketSticker)}
+        hero={{ label: '$YOUR MEME', sub: 'paired with a perp', size: 36 }}
+        heroAt={{ x: 830, y: 345, r: -3 }}
+      />
+    </Frame>
   );
 }
 
-/** Liczby Flash zmieniaja sie co minute - CDN trzyma kartę 10 minut. */
+/** Liczby Flash zmieniaja sie co minute - CDN trzyma karte 10 minut. */
 export const PERPS_OG_CACHE_HEADERS = {
   'Cache-Control': 'public, max-age=120, s-maxage=600, stale-while-revalidate=1800',
 };

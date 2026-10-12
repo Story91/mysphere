@@ -7,7 +7,7 @@ import content from '../_content/feed.md';
 export const metadata: Metadata = pageMeta({
   title: 'Feed, posts & tips',
   description: 'How MySphere\'s feed works: posting across nine networks, tipping authors on the eight EVM ones and in SOL under Solana posts, and selling part of a post through a one-time paid unlock, with onchain receipts.',
-  image: '/Docs/opengraph-image.png',
+  image: '/Docs/opengraph-image',
 });
 
 export default function FeedDocPage() {

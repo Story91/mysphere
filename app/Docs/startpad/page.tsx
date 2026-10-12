@@ -7,7 +7,7 @@ import content from '../_content/startpad.md';
 export const metadata: Metadata = pageMeta({
   title: 'Startpad launchpad',
   description: 'How the Startpad bonding-curve launchpad mints, prices, and graduates B20 tokens: the curve math, the fees, and where it runs today.',
-  image: '/Docs/opengraph-image.png',
+  image: '/Docs/opengraph-image',
 });
 
 export default function StartpadDocPage() {

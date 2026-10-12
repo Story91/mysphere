@@ -7,7 +7,7 @@ import content from '../_content/asks.md';
 export const metadata: Metadata = pageMeta({
   title: 'Asks & escrow',
   description: 'How MySphere Asks work: a question with a budget, seats and a deadline, with sealed answers and two funding modes: an owner-less escrow contract on Base or pay-on-resolve from your wallet.',
-  image: '/Docs/opengraph-image.png',
+  image: '/Docs/opengraph-image',
 });
 
 export default function AsksDocPage() {

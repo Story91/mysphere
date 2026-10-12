@@ -8,7 +8,7 @@ export const metadata: Metadata = pageMeta({
   title: 'Solana: bags, tips & replies',
   description:
     'How posting on Solana works on MySphere: the memo receipt, Proof of Bags, tips in SOL and paid replies from a link, how to reply from X, and how to check each one on a Solana explorer.',
-  image: '/Docs/opengraph-image.png',
+  image: '/Docs/opengraph-image',
 });
 
 export default function SolanaDocPage() {

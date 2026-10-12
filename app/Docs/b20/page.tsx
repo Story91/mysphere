@@ -7,7 +7,7 @@ import content from '../_content/b20.md';
 export const metadata: Metadata = pageMeta({
   title: 'B20 tokens',
   description: 'What a B20 token is: Base\'s admin-less, network-native ERC-20 standard with a self-describing address, and how Startpad uses it for the whole curve supply.',
-  image: '/Docs/opengraph-image.png',
+  image: '/Docs/opengraph-image',
 });
 
 export default function B20DocPage() {

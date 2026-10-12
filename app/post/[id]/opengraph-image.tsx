@@ -1,6 +1,7 @@
 import { ImageResponse } from 'next/og';
 import { getPostForShare, getPostTipTotals, shortAddress } from '../../utils/posts/getPostForShare';
-import { ogFonts, DISPLAY_FAMILY, BODY_FAMILY } from '../../components/og/fonts';
+import { ogFonts } from '../../components/og/fonts';
+import { PostShareCard } from '../../components/og/SocialCards';
 import { SOLANA_NETWORK_LABEL } from '../../basechat/Solana/config/solanaChain';
 
 /**
@@ -102,123 +103,18 @@ export default async function Image({ params }: { params: { id: string } }) {
   // w stopce liczy wylacznie napiwki z kolekcji `tips` (sieci EVM).
   const isSolana = post?.network === 'solana';
 
+  // Rysunek: PostShareCard (app/components/og/SocialCards.tsx). Kwota
+  // napiwkow idzie na bursztynowa naklejke - jedyna liczba, ktora kazdy moze
+  // sprawdzic u zrodla.
   return new ImageResponse(
-    (
-      <div
-        style={{
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          background: '#F1EDFA', // --soft-bg, jasne tlo produktu
-          padding: '72px',
-          /**
-           * Nunito jako domyslny kroj kadru, Baloo 2 punktowo na tresci posta
-           * i liczbach - te same role, co --font-soft-body i --font-soft-display
-           * w app/layout.tsx. Pliki dojezdzaja przez app/components/og/fonts.ts;
-           * uzasadnienie, dlaczego to w koncu dalo sie zrobic, jest tam.
-           */
-          fontFamily: BODY_FAMILY,
-        }}
-      >
-        {/* Pasek marki. Blekit Base zostaje dokladnie taki, jaki byl na
-            granacie - to tozsamosc lancucha, a nie odcien dobrany pod tlo, i
-            na jasnym #F1EDFA trzyma 4.99:1. Poza nim i kwota w stopce reszta
-            jest cicha, zeby czytelna byla tresc posta, a nie ramka wokol niej. */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div
-            style={{
-              width: '14px',
-              height: '14px',
-              borderRadius: '999px',
-              background: '#0052FF',
-            }}
-          />
-          <div
-            style={{
-              fontSize: '26px',
-              fontWeight: 600,
-              color: '#2E2A44', // --soft-ink, 11.9:1
-              letterSpacing: '-0.01em',
-            }}
-          >
-            MySphere
-          </div>
-        </div>
-
-        <div
-          style={{
-            display: 'flex',
-            /**
-             * Tresc posta zostaje w Nunito, mimo ze zajmuje slot bohatera.
-             * To jedyny na wszystkich kartach napis pisany przez UZYTKOWNIKA,
-             * a nie przez nas: do 220 znakow ciaglej prozy. Baloo 2 ma
-             * zaokraglone konce kresek i jest krojem naglowkowym - caly akapit
-             * zlozony nim robi sie ciezki i zaczyna krzyczec zamiast dac sie
-             * przeczytac. Baloo 2 dostaja na tej karcie liczby (napiwek,
-             * polubienia, komentarze), bo one sa etykietami, nie zdaniem.
-             */
-            fontFamily: BODY_FAMILY,
-            fontSize: content.length > 120 ? '44px' : '56px',
-            lineHeight: 1.25,
-            color: '#2E2A44', // --soft-ink, 11.9:1 - bohater karty
-            fontWeight: 600,
-            letterSpacing: '-0.02em',
-          }}
-        >
-          {content}
-        </div>
-
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            fontSize: '24px',
-            color: '#6B6486', // --soft-ink-muted, 4.8:1 - AA takze w miniaturze
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ display: 'flex' }}>{author}</div>
-            {/* Cichy podpis sieci w kolorze autora - to nie kwota (pomarancz)
-                ani stan (zielen), tylko informacja, gdzie lezy kwit. */}
-            {isSolana && <div style={{ display: 'flex' }}>{`· on ${SOLANA_NETWORK_LABEL}`}</div>}
-          </div>
-          {post && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '28px' }}>
-              {/* Kwota idzie PRZED lajkami i na pomaranczu. To jedyna liczba na
-                  tej karcie, ktora kazdy moze sprawdzic u zrodla - i jedyna, dla
-                  ktorej ktos wysle ten link dalej.
-                  Dawna zielen #00E28A byla policzona pod ciemny granat i na
-                  jasnym tle nie utrzymywala sie; jej miejsce zajmuje #C2410C
-                  (--soft-accent-deep, 4.50:1), ktory w tym systemie znaczy
-                  KWOTE i nic wiecej - ta sama zasada, co w konsoli operatora
-                  (app/admin/ops/OpsConsole.tsx). To nie jest kolor "zamiast
-                  zielonego": zielen zostala rozdzielona wedle znaczenia, a
-                  status na tej karcie dostalby #1E7A55, nie pomarancz. */}
-              {tips && (
-                <div
-                  style={{
-                    display: 'flex',
-                    fontFamily: DISPLAY_FAMILY,
-                    color: '#C2410C', // --soft-accent-deep, 4.50:1 - KWOTA
-                    fontWeight: 600,
-                    fontSize: '28px',
-                  }}
-                >
-                  {tips} in tips
-                </div>
-              )}
-              <div style={{ display: 'flex', fontFamily: DISPLAY_FAMILY }}>{post.likes} likes</div>
-              <div style={{ display: 'flex', fontFamily: DISPLAY_FAMILY }}>
-                {post.commentCount} comments
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    ),
+    <PostShareCard
+      author={author}
+      content={content}
+      tips={tips}
+      likes={post ? post.likes : null}
+      comments={post ? post.commentCount : null}
+      networkNote={isSolana ? `on ${SOLANA_NETWORK_LABEL}` : null}
+    />,
     { ...size, fonts: await ogFonts() }
   );
 }

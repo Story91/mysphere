@@ -2,7 +2,8 @@ import { ImageResponse } from 'next/og';
 import { getProfile } from '../../utils/profile/getProfile';
 import { getName } from '../../utils/identity/getName';
 import { shortAddress } from '../../utils/posts/getPostForShare';
-import { ogFonts, DISPLAY_FAMILY, BODY_FAMILY } from '../../components/og/fonts';
+import { ogFonts } from '../../components/og/fonts';
+import { ProfileShareCard } from '../../components/og/SocialCards';
 
 /**
  * Karta OG per profil.
@@ -73,102 +74,19 @@ export default async function Image({ params }: { params: { address: string } })
     .filter(([, amount]) => amount > 0)
     .sort((a, b) => b[1] - a[1])[0];
 
-  const stats: { value: string; label: string }[] = [
-    { value: String(profile?.postCount ?? 0), label: 'POSTS' },
-    { value: String(profile?.likesReceived ?? 0), label: 'LIKES' },
-    { value: String(profile?.tips.receivedCount ?? 0), label: 'TIPS IN' },
+  const stats: { value: string; label: string; amount?: boolean }[] = [
+    { value: String(profile?.postCount ?? 0), label: 'posts' },
+    { value: String(profile?.likesReceived ?? 0), label: 'likes' },
+    { value: String(profile?.tips.receivedCount ?? 0), label: 'tips in' },
   ];
 
   if (topTip) {
-    stats.push({ value: `${formatAmount(topTip[1])} ${topTip[0]}`, label: 'RECEIVED' });
+    stats.push({ value: `${formatAmount(topTip[1])} ${topTip[0]}`, label: 'received', amount: true });
   }
 
+  // Rysunek: ProfileShareCard (app/components/og/SocialCards.tsx).
   return new ImageResponse(
-    (
-      <div
-        style={{
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          background: '#F1EDFA',
-          padding: '72px',
-          /**
-           * Nunito jako domyslny kroj kadru, Baloo 2 punktowo na naglowku i
-           * liczbach - te same role, co --font-soft-body i --font-soft-display
-           * w app/layout.tsx. Pliki dojezdzaja przez app/components/og/fonts.ts;
-           * uzasadnienie, dlaczego to w koncu dalo sie zrobic, jest tam.
-           */
-          fontFamily: BODY_FAMILY,
-        }}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <div
-            style={{
-              display: 'flex',
-              fontSize: 22,
-              letterSpacing: 4,
-              color: '#6B6486',
-              marginBottom: 28,
-            }}
-          >
-            MYSPHERE
-          </div>
-          <div
-            style={{
-              display: 'flex',
-              fontSize: 78,
-              fontWeight: 700,
-              color: '#2E2A44',
-              lineHeight: 1.05,
-            }}
-          >
-            {name}
-          </div>
-          {basename && (
-            <div style={{ display: 'flex', fontSize: 26, color: '#6B6486', marginTop: 14 }}>
-              {shortAddress(address)}
-            </div>
-          )}
-        </div>
-
-        <div style={{ display: 'flex', gap: 20 }}>
-          {stats.map((stat) => (
-            <div
-              key={stat.label}
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                padding: '22px 30px',
-                borderRadius: 16,
-                // Obwodka ciemniejsza od tla, wypelnienie kryjace - na lawendzie
-                // biala poswiata nie odcina kafla, tylko go gasi (patrz naglowek).
-                border: '1px solid #B9B1D8',
-                background: '#FFFFFF',
-                minWidth: 190,
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  fontFamily: DISPLAY_FAMILY,
-                  fontSize: 40,
-                  fontWeight: 700,
-                  // RECEIVED to kwota, wiec pomaranczowy; reszta to zwykle liczby.
-                  color: stat.label === 'RECEIVED' ? '#C2410C' : '#2E2A44',
-                }}
-              >
-                {stat.value}
-              </div>
-              <div style={{ display: 'flex', fontSize: 18, letterSpacing: 2, color: '#6B6486', marginTop: 6 }}>
-                {stat.label}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    ),
+    <ProfileShareCard name={name} address={basename ? shortAddress(address) : null} stats={stats} />,
     { ...size, fonts: await ogFonts() }
   );
 }

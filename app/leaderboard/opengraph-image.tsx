@@ -2,7 +2,8 @@ import { ImageResponse } from 'next/og';
 import { getLeaderboard, formatReceived } from '../utils/tips/getLeaderboard';
 import { getIdentities } from '../utils/identity/getIdentities';
 import { shortAddress } from '../utils/posts/getPostForShare';
-import { ogFonts, DISPLAY_FAMILY, BODY_FAMILY } from '../components/og/fonts';
+import { ogFonts } from '../components/og/fonts';
+import { LeaderboardShareCard } from '../components/og/SocialCards';
 
 /**
  * Karta OG rankingu.
@@ -56,14 +57,10 @@ export const dynamic = 'force-dynamic';
  */
 
 /**
- * Medale niosa MIEJSCE, a nie ozdobe, wiec musza zostac trzema rozroznialnymi
- * metalami. Dawne, rozjasnione odcienie byly liczone pod ciemny granat i na
- * jasnym tle zlewalyby sie z podlozem, wiec kazdy zostal przyciemniony.
- * Wzgledem #F1EDFA: zloto #A16207 4.27:1, srebro #5A6478 5.17:1,
- * braz #A0522D 4.88:1. Zloto siada ponizej 4.5:1, ale niesie pojedyncza cyfre
- * w 38px o grubosci 700, czyli liczy sie jako duzy tekst - tam prog to 3:1.
+ * Od 2026-10-12 miejsce niesie naklejka: pierwsza bursztynowa, reszta biala,
+ * numer w srodku. Metalowe barwy medali (zloto/srebro/braz) zniknely razem
+ * ze starym ukladem.
  */
-const MEDALS = ['#A16207', '#5A6478', '#A0522D'];
 
 export default async function Image() {
   const board = await getLeaderboard(3);
@@ -84,95 +81,20 @@ export default async function Image() {
 
   const totalLine = formatReceived(board.totalReceived, 2);
 
+  // Rysunek: LeaderboardShareCard (app/components/og/SocialCards.tsx).
   return new ImageResponse(
-    (
-      <div
-        style={{
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          background: '#F1EDFA',
-          padding: '68px 72px',
-          /**
-           * Nunito jako domyslny kroj kadru, Baloo 2 punktowo na naglowku i
-           * liczbach - te same role, co --font-soft-body i --font-soft-display
-           * w app/layout.tsx. Pliki dojezdzaja przez app/components/og/fonts.ts;
-           * uzasadnienie, dlaczego to w koncu dalo sie zrobic, jest tam.
-           */
-          fontFamily: BODY_FAMILY,
-        }}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', fontSize: 22, letterSpacing: 5, color: '#6B6486' }}>
-            MYSPHERE · {board.windowDays === null ? 'ALL TIME' : `LAST ${board.windowDays} DAYS`}
-          </div>
-          <div
-            style={{
-              display: 'flex',
-              fontFamily: DISPLAY_FAMILY,
-              fontSize: 72,
-              fontWeight: 700,
-              color: '#2E2A44',
-              marginTop: 14,
-            }}
-          >
-            Who got paid
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-          {board.entries.length === 0 ? (
-            <div style={{ display: 'flex', fontSize: 34, color: '#6B6486' }}>
-              Nobody yet — the list is open.
-            </div>
-          ) : (
-            board.entries.map((entry, index) => (
-              <div
-                key={entry.address}
-                style={{ display: 'flex', alignItems: 'center', gap: 26, fontSize: 38 }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    fontFamily: DISPLAY_FAMILY,
-                    width: 34,
-                    color: MEDALS[index] ?? '#6B6486',
-                    fontWeight: 700,
-                  }}
-                >
-                  {index + 1}
-                </div>
-                <div style={{ display: 'flex', flex: 1, color: '#2E2A44' }}>{names[index]}</div>
-                <div
-                  style={{
-                    display: 'flex',
-                    fontFamily: DISPLAY_FAMILY,
-                    color: '#C2410C',
-                    fontWeight: 600,
-                  }}
-                >
-                  {formatReceived(entry.received, 1)}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
-        <div style={{ display: 'flex', fontSize: 22, color: '#6B6486' }}>
-          {board.totalTips > 0
-            ? `${totalLine} settled across ${board.totalTips} tips · every number verifiable onchain`
-            : 'Settled payments only · no points, no activity score'}
-        </div>
-      </div>
-    ),
+    <LeaderboardShareCard
+      windowLabel={board.windowDays === null ? 'All time' : `Last ${board.windowDays} days`}
+      rows={board.entries.map((entry, index) => ({ name: names[index], amount: formatReceived(entry.received, 1) }))}
+      footer={
+        board.totalTips > 0
+          ? `${totalLine} settled across ${board.totalTips} tips`
+          : 'Settled payments only - no points, no activity score'
+      }
+    />,
     {
       ...size,
       fonts: await ogFonts(),
-      // Godzina w cache CDN, doba na serwowanie nieswiezego w tle. Podglad linku
-      // pobierany jest raz na wklejenie, wiec kazde renderowanie od zera byloby
-      // czystym marnotrawstwem - a jednoczesnie karta ma nadazac za rankingiem.
       headers: {
         'Cache-Control': 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400',
       },
