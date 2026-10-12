@@ -54,6 +54,7 @@ import PoolTradeBox from './PoolTradeBox';
 import { canonicalPoolKey, V4_BY_CHAIN, v4QuoterAbi } from './v4Swap';
 import { buildMessageShareText, encodeTradeMessage, messageByteLength, TRADE_MESSAGE_MAX_BYTES } from './tradeMessage';
 import { buildShareUrl, safeSymbol, shareIntentUrl } from '../shareText';
+import { fetchPerpPoolKey, type ZapPoolKey } from '../perpZap';
 
 /**
  * Panel handlu NA STRONIE tokena - koniec z odsylaniem do boardu. Wzorce
@@ -111,7 +112,6 @@ function MessageField({
 }
 
 type Side = 'buy' | 'sell';
-type ZapPoolKey = { currency0: Address; currency1: Address; fee: number; tickSpacing: number; hooks: Address };
 type Busy = 'buy' | 'approve' | 'sell' | 'graduate' | 'settle' | 'harvest' | 'claim' | 'buyback' | null;
 type ClaimSource = 'launch' | 'hookEth' | 'hookToken' | 'vaultEth' | 'vaultToken';
 
@@ -216,19 +216,13 @@ export default function TradePanel({
     // `busy` w zaleznosciach celowo: po kazdej transakcji saldo sie zmienia.
   }, [readClient, account, busy]);
 
-  // Klucz puli Flash dla perpa tego rynku (druga noga zapa) - z naszej trasy,
-  // ktora bierze go z API Flash. Zap sam sprawdza, ze pula laczy USDC z perpem.
+  // Klucz puli Flash dla perpa tego rynku (druga noga zapa) - patrz perpZap.ts.
   useEffect(() => {
     if (!PERP_ZAP_ADDRESS || !QUOTE_ASSET) return;
-    const perp = QUOTE_ASSET.address.toLowerCase();
     let cancelled = false;
-    fetch(`/api/launchpad/perps?chainId=${LAUNCHPAD_CHAIN.id}`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((body: { perps?: Array<{ address: string; poolKey: ZapPoolKey | null }> } | null) => {
-        const key = body?.perps?.find((p) => p.address.toLowerCase() === perp)?.poolKey ?? null;
-        if (!cancelled) setPerpPoolKey(key);
-      })
-      .catch(() => {});
+    void fetchPerpPoolKey(LAUNCHPAD_CHAIN.id, QUOTE_ASSET.address).then((key) => {
+      if (!cancelled) setPerpPoolKey(key);
+    });
     return () => {
       cancelled = true;
     };

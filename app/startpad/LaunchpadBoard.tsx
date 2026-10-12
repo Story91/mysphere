@@ -57,7 +57,12 @@ import {
   ACTIVE_MARKET_ID,
   STATE_VIEW_ADDRESS,
   type LaunchpadToken,
+  ETH_USDC_POOL,
+  PERP_ZAP_ADDRESS,
+  QUOTE_ASSET,
+  perpZapAbi,
 } from './config';
+import { fetchPerpPoolKey } from './perpZap';
 import { fetchLogos, recallLogos, rememberLogos } from './logos';
 import { SPHERE_TOKEN_ADDRESS } from './sphere/sphereConfig';
 import { tokenAccent } from './metadata';
@@ -132,6 +137,8 @@ function toWei(value: string): bigint | null {
  * `suppressHydrationWarning` - po stronie klienta etykieta moze byc inna
  * i to jest oczekiwane, a nie blad hydratacji.
  */
+// Czym placi okno kupna na tablicy: na rynku perpa z zapem ETH (PerpBuyZap), inaczej waluta rynku.
+const BUY_SYMBOL = QUOTE_ASSET && PERP_ZAP_ADDRESS ? 'ETH' : NATIVE_SYMBOL;
 const NET = ACTIVE_LAUNCHPAD_NETWORK.label;
 
 /**
@@ -1318,17 +1325,17 @@ function TradePanel({
 
   return <>
     {canSell && <div className="mt-5 flex items-center gap-1 rounded-xl bg-sp-brand-soft p-1">
-      {(canBuy ? (['buy', 'sell'] as const) : (['sell'] as const)).map((item) => <button key={item} type="button" onClick={() => setSide(item)} className={`flex-1 rounded-lg px-3 py-2 text-[12px] font-extrabold capitalize ${effectiveSide === item ? 'bg-sp-surface text-soft-primary-deep shadow-sm' : 'text-sp-shade/45'}`}>{item === 'buy' ? `Buy with ${NATIVE_SYMBOL}` : 'Sell token'}</button>)}
+      {(canBuy ? (['buy', 'sell'] as const) : (['sell'] as const)).map((item) => <button key={item} type="button" onClick={() => setSide(item)} className={`flex-1 rounded-lg px-3 py-2 text-[12px] font-extrabold capitalize ${effectiveSide === item ? 'bg-sp-surface text-soft-primary-deep shadow-sm' : 'text-sp-shade/45'}`}>{item === 'buy' ? `Buy with ${BUY_SYMBOL}` : 'Sell token'}</button>)}
     </div>}
     {!canBuy && canSell && <p className="mt-2 text-[11px] leading-[1.4] text-sp-shade/50">Buying is closed, the curve is full. Selling stays open until the pool opens.</p>}
     {!canSell && <p className="mt-5 rounded-xl bg-sp-brand-soft p-3 text-[11px] leading-[1.4] text-sp-shade/55">Curve trading ended at graduation. Swaps happen in the Uniswap v4 pool now.</p>}
     {canSell && (effectiveSide === 'buy' ? <>
-      <div className="mt-4 flex items-end justify-between"><span className="text-[12px] font-extrabold text-sp-ink">{NATIVE_SYMBOL} amount</span>{/* SALDO, a nie sama nota o poslizgu. Panel ma przyciski 25/50/100% i Max,
+      <div className="mt-4 flex items-end justify-between"><span className="text-[12px] font-extrabold text-sp-ink">{BUY_SYMBOL} amount</span>{/* SALDO, a nie sama nota o poslizgu. Panel ma przyciski 25/50/100% i Max,
           ktore licza z salda - ale samego salda nie pokazywal, wiec nie bylo od
           czego ich odniesc. Na stronie tokena stoi to od poczatku; tutaj
           brakowalo. */}
-        <span className="text-[11px] text-sp-shade/45">{ethBalance ? `Balance ${Number(formatEther(ethBalance.value)).toLocaleString('en-US', { maximumFractionDigits: 4 })} ${NATIVE_SYMBOL}` : `${(DEFAULT_SLIPPAGE_BPS / 100).toFixed(1)}% slippage buffer`}</span></div>
-      <div className="mt-2 flex gap-2"><div className="relative flex-1"><input inputMode="decimal" value={buyAmount} onChange={(event) => setBuyAmount(event.target.value)} className={`${FIELD} pr-14`} /><span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[12px] font-extrabold text-sp-shade/40">{NATIVE_SYMBOL}</span></div><button type="button" disabled={busy === 'buy'} onClick={onBuy} className="inline-flex items-center gap-2 rounded-xl bg-soft-primary px-4 text-[13px] font-extrabold text-sp-on-brand disabled:opacity-60">{busy === 'buy' ? 'Buying...' : 'Buy'}<ArrowUpRight className="h-4 w-4" aria-hidden="true" /></button></div>
+        <span className="text-[11px] text-sp-shade/45">{ethBalance ? `Balance ${Number(formatEther(ethBalance.value)).toLocaleString('en-US', { maximumFractionDigits: 4 })} ${BUY_SYMBOL}` : `${(DEFAULT_SLIPPAGE_BPS / 100).toFixed(1)}% slippage buffer`}</span></div>
+      <div className="mt-2 flex gap-2"><div className="relative flex-1"><input inputMode="decimal" value={buyAmount} onChange={(event) => setBuyAmount(event.target.value)} className={`${FIELD} pr-14`} /><span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[12px] font-extrabold text-sp-shade/40">{BUY_SYMBOL}</span></div><button type="button" disabled={busy === 'buy'} onClick={onBuy} className="inline-flex items-center gap-2 rounded-xl bg-soft-primary px-4 text-[13px] font-extrabold text-sp-on-brand disabled:opacity-60">{busy === 'buy' ? 'Buying...' : 'Buy'}<ArrowUpRight className="h-4 w-4" aria-hidden="true" /></button></div>
       <div className="mt-2 flex flex-wrap gap-1.5">
         {(['25', '50', '100'] as const).map((pct) => <button key={pct} type="button" disabled={spendable <= 0n} onClick={() => setBuyFraction(BigInt(pct), 100n)} className="rounded-full border border-sp-shade/10 px-2.5 py-1 text-[10.5px] font-bold text-sp-shade/60 hover:border-soft-primary disabled:opacity-40">{pct}%</button>)}
         <button type="button" disabled={spendable <= 0n} onClick={() => setBuyFraction(1n, 1n)} className="rounded-full border border-sp-shade/10 px-2.5 py-1 text-[10.5px] font-bold text-sp-shade/60 hover:border-soft-primary disabled:opacity-40">Max</button>
@@ -3289,10 +3296,40 @@ export default function LaunchpadBoard() {
       setNotice({ kind: 'error', text: `Enter an ${NATIVE_SYMBOL} amount greater than zero, written as a decimal number.` });
       return;
     }
+    if (QUOTE_ASSET && !PERP_ZAP_ADDRESS) {
+      setNotice({ kind: 'error', text: `This market trades in ${NATIVE_SYMBOL}. Open the token page to buy with ${NATIVE_SYMBOL}.` });
+      return;
+    }
     if (!(await ensureSepolia())) return;
     setBusy('buy');
     setNotice(null);
     try {
+      // RYNEK PERPA: okno tablicy kupuje za ETH przez PerpBuyZap (ETH -> USDC ->
+      // perp -> buyFor). 11.10.2026 wysylalo tu ETH starym `buy` do launchpada
+      // Q, ktory przyjmuje tylko perpa - kazde kupno rewertowalo.
+      if (QUOTE_ASSET && PERP_ZAP_ADDRESS) {
+        const perpPool = await fetchPerpPoolKey(LAUNCHPAD_CHAIN.id, QUOTE_ASSET.address);
+        if (!perpPool) throw new Error(`The ETH route to ${NATIVE_SYMBOL} is unavailable right now. Try again in a moment.`);
+        const deadline = BigInt(Math.floor(Date.now() / 1000) + 900);
+        const zapCall = { address: PERP_ZAP_ADDRESS, abi: perpZapAbi, functionName: 'buyWithEth' as const, value, account: address };
+        const route = [selDep.launchpad as Address, selected.address as Address, ETH_USDC_POOL, perpPool] as const;
+        const { result } = await readClient.simulateContract({ ...zapCall, args: [...route, 1n, 1n, deadline, address] });
+        const minPerp = (result[0] * BigInt(10_000 - DEFAULT_SLIPPAGE_BPS)) / 10_000n;
+        const minTokens = (result[1] * BigInt(10_000 - DEFAULT_SLIPPAGE_BPS)) / 10_000n;
+        const args = [...route, minPerp > 0n ? minPerp : 1n, minTokens > 0n ? minTokens : 1n, deadline, address] as const;
+        const gas = await readClient.estimateContractGas({ ...zapCall, args }).catch(() => undefined);
+        const zapHash = await walletClient.writeContract({ ...zapCall, args, chain: LAUNCHPAD_CHAIN, ...(gas ? { gas: (gas * 120n) / 100n } : {}) });
+        pushPendingTrade({ hash: zapHash, token: selected, side: 'buy', eth: Number(formatEther(result[0])) });
+        const zapReceipt = await readClient.waitForTransactionReceipt({ hash: zapHash });
+        if (zapReceipt.status !== 'success') {
+          dropPendingTrade(zapHash);
+          throw new Error('The buy transaction reverted.');
+        }
+        setNotice({ kind: 'success', text: `Bought with ETH. ${zapHash.slice(0, 10)}...` });
+        setTradeOpen(false);
+        void loadBoard();
+        return;
+      }
       const quote = await readClient.readContract({ address: selDep.launchpad as Address, abi: launchpadAbi, functionName: 'quoteBuy', args: [selected.address, value] });
       // Ten sam bufor, co na stronie tokena. Stalo tu 0,5% na sztywno, czyli
       // dokladnie ta wartosc, ktora 13 sierpnia wywalala co czwarta transakcje
