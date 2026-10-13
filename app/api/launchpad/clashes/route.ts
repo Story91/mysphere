@@ -154,6 +154,7 @@ async function refresh(): Promise<Clash[]> {
       state,
       raised: state === 'Graduated' ? m.rVirt * 4 : raised,
       priceInPerp,
+      sinceLaunchPct: (priceInPerp / (m.rVirt / T0) - 1) * 100,
       mcapUsd: f === null ? null : priceInPerp * f.nav * T0,
       perpChange24h: f?.change ?? null,
       launchpad: m.launchpad as Address,

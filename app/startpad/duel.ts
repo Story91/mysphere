@@ -24,6 +24,11 @@ export type ClashToken = {
   state: 'Curve' | 'Locked' | 'Graduated';
   raised: number;
   priceInPerp: number;
+  /**
+   * Ruch ceny mema od startu, w PERPIE (%): czysty efekt handlu, bez NAV perpa.
+   * Obie strony startuja z tej samej ceny w perpie, wiec to uczciwa miara sily.
+   */
+  sinceLaunchPct: number;
   /** Kapitalizacja w USD = cena w perpie * NAV perpa * 1e9 tokenow. */
   mcapUsd: number | null;
   /** Zmiana perpa z 24 h (Flash) - to ona przesuwa szale bez handlu. */
