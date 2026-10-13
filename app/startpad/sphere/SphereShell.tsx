@@ -69,7 +69,7 @@ export function EnforcedBadge() {
 
 export function TeamRunBadge() {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-sp-shade/10 px-2 py-0.5 text-[9.5px] font-extrabold uppercase tracking-[0.06em] text-sp-shade/60">
+    <span className="inline-flex items-center gap-1 rounded-full bg-sp-shade/10 px-2 py-0.5 text-[12px] font-semibold text-sp-shade/60">
       <Users className="h-3 w-3" aria-hidden="true" /> Team-run, on-chain
     </span>
   );

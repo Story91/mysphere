@@ -35,7 +35,7 @@ import AbiConsole from '../AbiConsole';
 import { SPHERE_LIVE, SPHERE_REWARDS_ADDRESS, sphereRewardsAbi } from '../sphereConfig';
 import { ActionButton, StatRow, useSphereCreator, useSphereRead } from '../sphereActions';
 import { TeamRunBadge } from '../SphereShell';
-import { ActionCard, AddressPill, AdvancedSection, BigStat, KeeperSection, LearnMore, PageHero } from '../SphereUI';
+import { ActionCard, AddressPill, AdvancedSection, BigStat, KeeperSection, LearnMore, PageHero, Reveal } from '../SphereUI';
 import { SphereRewardsClaimStandalone } from '../season/SphereRewardsClaim';
 
 /** Klasy karty 1:1 z ActionCard - sekcja historii ma wygladac jak reszta huba. */
@@ -295,6 +295,15 @@ export default function SphereRewardsPanel() {
           miejsce, w ktore ktos zajrzy po swoja nagrode; skarbonka ETH nizej. */}
       <SphereRewardsClaimStandalone />
 
+      {/* Zastrzezenie o scentralizowaniu zostaje NA WIERZCHU - zmienia znaczenie
+          liczb wyzej, wiec nie chowa sie pod rozwijak. Pelniejszy opis i historia
+          pobran leza nizej. */}
+      <p className="text-[12.5px] leading-[1.55] text-sp-shade/65">
+        Only <span className="font-mono">CONSUMER</span> can pull ETH out, to any address it names. Treat every pull as a
+        discretionary decision of the operational Safe, not a rewards programme.
+      </p>
+
+      <Reveal title="Pull history and ledger" hint="Every pull from the vault, with destination and transaction">
       <div className="flex flex-wrap items-center gap-2">
         <AddressPill address={rewards} label="vault" />
         {/* CONSUMER, a nie "key holder"/"Rewards Safe" - nazwa z kontraktu
@@ -373,6 +382,7 @@ export default function SphereRewardsPanel() {
         </div>
         <p className="mt-2 text-[10px] font-bold text-sp-shade/40">{scanRange}</p>
       </div>
+      </Reveal>
 
       <KeeperSection>
       <div className="grid gap-3 sm:grid-cols-2">

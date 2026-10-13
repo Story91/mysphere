@@ -44,7 +44,7 @@ function TimelineMark({ label, date, align }: { label: string; date: string; ali
   const alignClass = align === 'left' ? 'text-left' : align === 'right' ? 'text-right' : 'text-center';
   return (
     <div className={alignClass}>
-      <p className="text-[9px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/40">{label}</p>
+      <p className="text-[12px] font-semibold text-sp-shade/60">{label}</p>
       <p className="mt-0.5 text-[11px] font-extrabold text-sp-ink">{date}</p>
     </div>
   );
@@ -226,7 +226,7 @@ export default function SphereVestingPanel() {
       {/* OS CZASU: jedyna rzecz, ktora trzeba tu zrozumiec ------------------ */}
       <section className="sph-card rounded-card border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
         <div className="flex items-baseline justify-between gap-3">
-          <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/50">Unlock schedule</p>
+          <p className="text-[12px] font-semibold text-sp-shade/60">Unlock schedule</p>
           <p className="font-soft-display text-[13px] font-extrabold text-sp-brand">
             {state ? `${progress.toFixed(progress < 10 ? 2 : 1)}% elapsed` : '—'}
           </p>
@@ -253,7 +253,7 @@ export default function SphereVestingPanel() {
                 aria-hidden="true"
               />
               <span
-                className="absolute top-[-3px] h-[18px] w-[18px] -translate-x-1/2 rounded-full border-[3px] border-white bg-sp-brand shadow-[0_2px_8px_rgba(124,107,218,0.45)]"
+                className="absolute top-[-3px] h-[18px] w-[18px] -translate-x-1/2 rounded-full border-[3px] border-white bg-sp-brand shadow-[0_2px_8px_rgba(14,17,22,0.3)]"
                 style={{ left: `${progress}%` }}
                 aria-hidden="true"
               />

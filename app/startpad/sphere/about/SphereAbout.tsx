@@ -24,7 +24,7 @@
 import { ExternalLink, Flame, FlaskConical } from 'lucide-react';
 import { formatEther, type Address } from 'viem';
 import { SPHERE_EXPLORER_URL } from '../sphereChain';
-import { Disclosure } from '../SphereUI';
+import { Disclosure, Reveal } from '../SphereUI';
 import { EnforcedBadge, KeeperTriggeredBadge, TeamRunBadge, formatUtc, useSphereChainFacts } from '../SphereShell';
 import {
   SPHERE_BUYBACK_ADDRESS,
@@ -78,7 +78,7 @@ function Live({ value, decimals = 0, suffix }: { value: bigint | null | undefine
 function Figure({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <span className="inline-flex min-w-0 flex-col gap-0.5">
-      <span className="text-[9.5px] font-extrabold uppercase tracking-[0.07em] text-sp-shade/40">{label}</span>
+      <span className="text-[12px] font-semibold text-sp-shade/60">{label}</span>
       <span className="font-soft-display text-[16px] font-extrabold leading-none text-sp-ink [overflow-wrap:anywhere]">
         {children}
       </span>
@@ -253,7 +253,7 @@ export default function SphereAbout() {
         <h2 className="text-[15px] font-extrabold text-sp-ink">Where every fee goes</h2>
         <div className="mt-3 grid gap-4">
           <div>
-            <p className="mb-1.5 text-[11px] font-extrabold uppercase tracking-[0.06em] text-sp-shade/45">
+            <p className="mb-1.5 text-[12px] font-semibold text-sp-shade/60">
               Curve fee (1% of every trade before graduation)
             </p>
             <SplitBar
@@ -265,7 +265,7 @@ export default function SphereAbout() {
             />
           </div>
           <div>
-            <p className="mb-1.5 text-[11px] font-extrabold uppercase tracking-[0.06em] text-sp-shade/45">
+            <p className="mb-1.5 text-[12px] font-semibold text-sp-shade/60">
               Pool hook fee in ETH (1% of every swap after graduation)
             </p>
             <SplitBar
@@ -281,7 +281,7 @@ export default function SphereAbout() {
               tej karcie, ktora dotyczy go osobiscie, wiec dostaje kafel. */}
           {facts?.pool && (
             <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-2xl bg-sp-brand/[0.07] px-4 py-3">
-              <span className="text-[11px] font-extrabold uppercase tracking-[0.07em] text-sp-shade/50">
+              <span className="text-[12px] font-semibold text-sp-shade/60">
                 What a swap costs you today
               </span>
               <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
@@ -385,6 +385,8 @@ export default function SphereAbout() {
         </div>
       </Card>
 
+      {/* Adresy i probe na Sepolii to material referencyjny - zwiniete (2026-10-14). */}
+      <Reveal title="Contracts and the pre-launch rehearsal" hint="Deployed addresses, and what was proven on Sepolia before mainnet">
       <Card>
         <h2 className="text-[15px] font-extrabold text-sp-ink">Contracts</h2>
         <div className="mt-3 grid gap-2">
@@ -465,6 +467,7 @@ export default function SphereAbout() {
           </Disclosure>
         </div>
       </Card>
+      </Reveal>
     </div>
   );
 }

@@ -27,11 +27,11 @@
 import { useEffect, useState } from 'react';
 import { formatEther, type Address } from 'viem';
 import { useAccount, usePublicClient } from 'wagmi';
-import { ArrowRight, ChevronDown, Coins, Copy, Flame, GraduationCap, Timer, Waves } from 'lucide-react';
+import { ArrowRight, Coins, Copy, Flame, GraduationCap, Timer, Waves } from 'lucide-react';
 import { launchpadAbi } from '../config';
 import { SPHERE_CHAIN, SPHERE_EXPLORER_URL, SPHERE_LAUNCHPAD_ADDRESS, SPHERE_NATIVE_SYMBOL, SPHERE_VAULT_ADDRESS } from './sphereChain';
 import { formatIn, formatUtc, useSphereChainFacts, type SphereChainFacts } from './SphereShell';
-import { AddressPill, BigStat, Disclosure, MeterBar, PageHero, StatShell, StatValue } from './SphereUI';
+import { AddressPill, BigStat, Disclosure, MeterBar, PageHero, Reveal, StatShell, StatValue } from './SphereUI';
 import {
   SPHERE_ESCROW_ADDRESS,
   SPHERE_LIVE,
@@ -94,7 +94,7 @@ function HashPill({ label, hash }: { label: string; hash: string }) {
 function FactRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-sp-shade/[0.07] py-2 first:border-t-0 first:pt-0">
-      <span className="text-[11px] font-extrabold uppercase tracking-[0.06em] text-sp-shade/40">{label}</span>
+      <span className="text-[12px] font-semibold text-sp-shade/60">{label}</span>
       <span className="text-right text-[11.5px] font-bold text-sp-shade/70">{children}</span>
     </div>
   );
@@ -414,7 +414,6 @@ export default function SphereOverview() {
   const [burned, setBurned] = useState<bigint | null>(null);
   const [myBalance, setMyBalance] = useState<bigint | null>(null);
   const facts = useSphereChainFacts();
-  const [detailsOpen, setDetailsOpen] = useState(false);
 
   useEffect(() => {
     const rewardsAddr = SPHERE_REWARDS_ADDRESS;
@@ -555,34 +554,12 @@ export default function SphereOverview() {
 
       {/* SZCZEGOLY ----------------------------------------------------------- */}
       {facts && (
-        <div>
-          <button
-            type="button"
-            onClick={() => setDetailsOpen((open) => !open)}
-            aria-expanded={detailsOpen}
-            aria-controls="sphere-details"
-            className="flex w-full items-center justify-between gap-3 rounded-card border border-sp-shade/10 bg-sp-surface px-4 py-3.5 text-left transition-colors [transition-duration:var(--dur-press)] hover:bg-sp-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sp-brand"
-          >
-            <span>
-              <span className="block text-[14px] font-semibold text-sp-ink">The numbers behind it</span>
-              <span className="block text-[12px] text-sp-shade/60">Pool, burn sources, reward stream, who holds which role</span>
-            </span>
-            <ChevronDown
-              className={`h-4 w-4 shrink-0 text-sp-shade/60 transition-transform [transition-duration:var(--dur-sheet)] ease-drawer ${detailsOpen ? 'rotate-180' : ''}`}
-              aria-hidden="true"
-            />
-          </button>
-          <div id="sphere-details" className="board-expand" data-open={detailsOpen}>
-            <div>
-              <div className="grid gap-4 pt-4">
-                <LifecycleSection facts={facts} />
-                <BurnSection facts={facts} />
-                <DistributorSection facts={facts} />
-                <SafeSection facts={facts} />
-              </div>
-            </div>
-          </div>
-        </div>
+        <Reveal title="The numbers behind it" hint="Pool, burn sources, reward stream, who holds which role">
+          <LifecycleSection facts={facts} />
+          <BurnSection facts={facts} />
+          <DistributorSection facts={facts} />
+          <SafeSection facts={facts} />
+        </Reveal>
       )}
     </div>
   );

@@ -42,7 +42,7 @@ import { Clock, Gift, Loader2 } from 'lucide-react';
 import { fetchLogos, recallLogos } from '../../logos';
 import { SPHERE_CHAIN, SPHERE_EXPLORER_URL } from '../sphereChain';
 import { SPHERE_DISTRIBUTOR_ADDRESS, SPHERE_TOKEN_ADDRESS } from '../sphereConfig';
-import { Disclosure } from '../SphereUI';
+import { Disclosure, Reveal } from '../SphereUI';
 import { EXCLUDED_TOKENS } from './epochMath';
 import StreamLane from './StreamLane';
 
@@ -509,7 +509,7 @@ function PendingCreatorList({
 
   return (
     <div className="mt-3">
-      <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/45">
+      <p className="text-[12px] font-semibold text-sp-shade/60">
         Proposed for epoch #{dist.pendingEpochId} - {rows.length} {rows.length === 1 ? 'creator' : 'creators'}, {fmt(total, 2)} SPHERE
       </p>
       <p className="mt-0.5 text-[10px] text-sp-shade/40">
@@ -545,7 +545,7 @@ function PendingCreatorList({
                 share of epoch
               </span>
             </span>
-            <span className="rounded-full bg-sp-shade/8 px-2.5 py-1 text-[9.5px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/45">
+            <span className="rounded-full bg-sp-shade/8 px-2.5 py-1 text-[12px] font-semibold text-sp-shade/60">
               {live ? 'awaiting activation' : 'locked until activation'}
             </span>
           </div>
@@ -884,7 +884,7 @@ export default function SphereRewardsClaim({ dist }: { dist: DistributorState | 
             ['Fully unlocked (UTC)', utcStamp(endsAt)],
           ].map(([label, value]) => (
             <div key={label} className="rounded-2xl bg-sp-sunken p-3">
-              <p className="text-[9.5px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/45">{label}</p>
+              <p className="text-[12px] font-semibold text-sp-shade/60">{label}</p>
               <p className="mt-1 font-soft-display text-[18px] font-extrabold leading-none text-sp-ink">
                 {value} {label === 'Proposed this epoch' && <span className="text-[11px] text-sp-shade/45">SPHERE</span>}
               </p>
@@ -974,7 +974,7 @@ export default function SphereRewardsClaim({ dist }: { dist: DistributorState | 
           ['Fully unlocked (UTC)', utcStamp(dist.activatedAt + dist.streamSeconds)],
         ].map(([label, value]) => (
           <div key={label} className="rounded-2xl bg-sp-sunken p-3">
-            <p className="text-[9.5px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/45">{label}</p>
+            <p className="text-[12px] font-semibold text-sp-shade/60">{label}</p>
             <p className="mt-1 font-soft-display text-[18px] font-extrabold leading-none text-sp-ink">
               {value} {label === 'This epoch' && <span className="text-[11px] text-sp-shade/45">SPHERE</span>}
             </p>
@@ -997,8 +997,12 @@ export default function SphereRewardsClaim({ dist }: { dist: DistributorState | 
       <NextEpochStrip dist={dist} next={next} account={account} />
       <PendingCreatorList dist={dist} next={next} logos={logos} />
       {rows.length > 0 && (
-        <div className="mt-3">
-          <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/45">
+        <div className="mt-4">
+          {/* Dostarczanie cudzych nagrod jest permissionless, ale zwyklego
+              goscia nie interesuje - stoi zwiniete (2026-10-14). */}
+          <Reveal title="Deliver rewards for creators" hint="Anyone can press this - the gas is the only cost">
+            <div>
+          <p className="text-[12px] font-semibold text-sp-shade/60">
             Deliver rewards - anyone can press this
           </p>
           <p className="mt-0.5 text-[10px] text-sp-shade/40">
@@ -1018,6 +1022,8 @@ export default function SphereRewardsClaim({ dist }: { dist: DistributorState | 
             Paid one epoch in arrears: this stream settles{shown ? ` season epoch ${shown.epoch}` : ' the last closed epoch'} from its
             published manifest. The leaderboard below is the epoch in progress - it pays out after it closes.
           </p>
+            </div>
+          </Reveal>
         </div>
       )}
       <p className="mt-3 text-[11.5px] text-sp-shade/60">{note}</p>
@@ -1097,7 +1103,7 @@ export default function SphereRewardsClaim({ dist }: { dist: DistributorState | 
           ['Claimed', fmt(claimedWei, 2)],
         ].map(([label, value]) => (
           <div key={label} className="rounded-2xl bg-sp-sunken p-3">
-            <p className="text-[9.5px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/45">{label}</p>
+            <p className="text-[12px] font-semibold text-sp-shade/60">{label}</p>
             <p className="mt-1 font-soft-display text-[18px] font-extrabold leading-none text-sp-ink">
               {value} <span className="text-[11px] text-sp-shade/45">SPHERE</span>
             </p>

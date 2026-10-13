@@ -56,7 +56,7 @@ import { ChevronDown, ChevronUp, Info, Loader2, Trophy } from 'lucide-react';
 // etykieta nie moze podazac za wybrana siecia tablicy.
 import { SPHERE_CHAIN, SPHERE_NATIVE_SYMBOL } from '../sphereChain';
 import { SPHERE_DISTRIBUTOR_ADDRESS, SPHERE_SAFE_ADDRESS, sphereDistributorReadsAbi } from '../sphereConfig';
-import { AddressPill, BigStat, Disclosure, LearnMore, PageHero } from '../SphereUI';
+import { AddressPill, BigStat, Disclosure, LearnMore, PageHero, Reveal } from '../SphereUI';
 import { EPOCH_BLOCKS, SEASON_GENESIS_BLOCK } from './epochMath';
 import SphereRewardsClaim, {
   TokenGlyph,
@@ -130,7 +130,7 @@ type EpochsData = { currentEpochIndex: number; epochs: PastEpoch[] };
 /** Stan naleznosci konta w JEDNEJ epoce (tylko przy wdrozonym dystrybutorze). */
 type AccountEpochLine = { accrued: bigint; status: 'claimed' | 'claimable' | 'streaming' };
 
-const BRAND = '#7c6bda';
+const BRAND = '#0d9488';
 
 /** Podium czyta sie w jednej klatce - medal zamiast numeru. */
 const MEDALS = ['🥇', '🥈', '🥉'];
@@ -394,7 +394,7 @@ function PoolLedger({ dist }: { dist: DistributorState | null }) {
       <div className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-6">
         {tiles.map((t) => (
           <div key={t.label} className="rounded-2xl bg-sp-sunken p-3">
-            <p className="text-[9.5px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/45">{t.label}</p>
+            <p className="text-[12px] font-semibold text-sp-shade/60">{t.label}</p>
             <p className="mt-1 font-soft-display text-[17px] font-extrabold leading-none text-sp-ink">{t.value}</p>
             <p className="mt-1 text-[9.5px] font-bold leading-snug text-sp-shade/40">{t.hint}</p>
           </div>
@@ -406,7 +406,7 @@ function PoolLedger({ dist }: { dist: DistributorState | null }) {
         <div className="h-2 flex-1 overflow-hidden rounded-full bg-sp-shade/10">
           <div className="h-full rounded-full bg-sp-up transition-[width] duration-700" style={{ width: `${Math.min(100, paidPct)}%` }} />
         </div>
-        <span className="shrink-0 text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/45">
+        <span className="shrink-0 text-[12px] font-semibold text-sp-shade/60">
           {sphereAmt(dist.totalClaimed)} / {sphereAmt(dist.totalCumulative)} paid out
         </span>
       </div>
@@ -917,7 +917,7 @@ export default function SphereSeasonPanel() {
           </span>
         }
       >
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {/* Pula nagrod na pierwszym miejscu: od 6.09.2026 (8.34M ze skarbca) to
               jest liczba, po ktora tworca tu przychodzi. Wolne saldo dystrybutora,
               czyli dokladnie to, co automat wezmie jako pule nastepnej epoki. */}
@@ -941,6 +941,40 @@ export default function SphereSeasonPanel() {
                 : 'claimed from the distributor'
             }
           />
+          <BigStat label="Creators" value={totals ? totals.creators : null} decimals={0} hint="scoring this epoch" />
+        </div>
+
+        {/* Pasek postepu epoki - zegar sezonu pod liczbami. */}
+        <div className="mt-3 flex items-center gap-3">
+          <div className="h-2 flex-1 overflow-hidden rounded-full bg-sp-shade/10">
+            <div className="sph-progress h-full rounded-full bg-sp-brand" style={{ width: `${progress}%` }} />
+          </div>
+          <span className="shrink-0 text-[12px] font-semibold text-sp-shade/60">
+            {data ? `${progress.toFixed(2)}% elapsed` : 'syncing'}
+          </span>
+        </div>
+
+      </PageHero>
+
+      {/* PUSTY STAN, KTORY SIE TLUMACZY - znika sam, gdy cokolwiek zapunktuje. */}
+      {data && data.creators.length === 0 && (
+        <ZeroEpochNotice data={data} scoredTokens={scoredTokens} excludedVolumeWei={excludedVolumeWei} />
+      )}
+
+      {/* CLAIM - nagrody w SPHERE tego konta (dystrybutor) ------------------- */}
+      <SphereRewardsClaim dist={dist} />
+
+      {/* LEADERBOARD - z zapasem na cichy tydzien (patrz LeaderboardSection) -- */}
+      <LeaderboardSection data={data} scoredTokens={scoredTokens} epochs={epochs} logos={logos} />
+
+      {/* SZCZEGOLY SEZONU - decyzja wlasciciela 2026-10-14: na wierzchu tylko
+          to, po co czlowiek tu przychodzi (pula, wyplaty, jego nagroda, tablica).
+          Pozostale liczby, ksiega puli, wykres i poprzednie epoki leza tutaj. */}
+      <Reveal
+        title="The numbers behind the season"
+        hint="Volume, protocol revenue, pool ledger, daily chart, past epochs"
+      >
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <BigStat
             label={`External volume (${SPHERE_NATIVE_SYMBOL})`}
             value={totals ? Number(formatEther(BigInt(totals.externalVolumeEth))) : null}
@@ -956,7 +990,6 @@ export default function SphereSeasonPanel() {
             // jest decyzja Safe'a, wiec podpis mowi "discretionary".
             hint="this epoch · collected by the Safe · funding the pool is discretionary"
           />
-          <BigStat label="Creators" value={totals ? totals.creators : null} decimals={0} hint="scoring this epoch" />
           <BigStat
             label="Tokens scoring"
             value={data ? scoredTokens : null}
@@ -964,17 +997,6 @@ export default function SphereSeasonPanel() {
             hint={totals ? `of ${totals.tokens} with volume · >48h old to enter` : '>48h old to enter'}
           />
         </div>
-
-        {/* Pasek postepu epoki - zegar sezonu pod liczbami. */}
-        <div className="mt-3 flex items-center gap-3">
-          <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/60">
-            <div className="sph-progress h-full rounded-full bg-sp-brand" style={{ width: `${progress}%` }} />
-          </div>
-          <span className="shrink-0 text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/45">
-            {data ? `${progress.toFixed(2)}% elapsed` : 'syncing'}
-          </span>
-        </div>
-
         {/* KOTWICA EPOKI: dokladne okno blokow. Bez tego "Epoch 4" jest slowem,
             ktorego czytelnik nie moze sprawdzic. Zdanie o tym, ze to okno
             BLOKOW, a nie tydzien kalendarzowy, zeszlo do rozwijki w "Previous
@@ -990,13 +1012,6 @@ export default function SphereSeasonPanel() {
             <AddressPill address={SPHERE_SAFE_ADDRESS} label="revenue safe" />
           </p>
         )}
-      </PageHero>
-
-      {/* PUSTY STAN, KTORY SIE TLUMACZY - znika sam, gdy cokolwiek zapunktuje. */}
-      {data && data.creators.length === 0 && (
-        <ZeroEpochNotice data={data} scoredTokens={scoredTokens} excludedVolumeWei={excludedVolumeWei} />
-      )}
-
       {/* KSIEGA PULI: ile obiecane, ile wyplacone, ile czeka --------------- */}
       <PoolLedger dist={dist} />
 
@@ -1012,7 +1027,7 @@ export default function SphereSeasonPanel() {
                 <XAxis dataKey="dayLabel" tickLine={false} axisLine={false} tick={{ fontSize: 10.5, fill: 'rgba(0,0,0,0.45)' }} />
                 <YAxis width={44} tickLine={false} axisLine={false} tick={{ fontSize: 10.5, fill: 'rgba(0,0,0,0.45)' }} />
                 <Tooltip
-                  cursor={{ fill: 'rgba(124,107,218,0.08)' }}
+                  cursor={{ fill: 'rgba(13,148,136,0.08)' }}
                   formatter={(v: number) => [`${v.toFixed(4)} ${SPHERE_NATIVE_SYMBOL}`, 'Volume']}
                   contentStyle={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.1)', fontSize: 11.5 }}
                 />
@@ -1105,14 +1120,10 @@ export default function SphereSeasonPanel() {
         )}
       </section>
 
-      {/* CLAIM - nagrody w SPHERE tego konta (dystrybutor) ------------------- */}
-      <SphereRewardsClaim dist={dist} />
-
-      {/* LEADERBOARD - z zapasem na cichy tydzien (patrz LeaderboardSection) -- */}
-      <LeaderboardSection data={data} scoredTokens={scoredTokens} epochs={epochs} logos={logos} />
-
       {/* POPRZEDNIE EPOKI: manifesty + gwarancja kumulatywnosci ------------- */}
       <PastEpochsSection data={epochs} failed={epochsFailed} />
+
+      </Reveal>
 
       <LearnMore>How scoring works - volume, trader multiplier and the 30% fee cap</LearnMore>
     </div>

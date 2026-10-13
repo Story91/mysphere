@@ -246,11 +246,11 @@ export default function AbiConsole({ title, address, abi }: { title: string; add
       </button>
       {open && (
         <div className="mt-3 grid gap-2.5">
-          <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/40">Reads</p>
+          <p className="text-[12px] font-semibold text-sp-shade/60">Reads</p>
           {reads.map((fn) => (
             <ReadRow key={fnLabel(fn)} address={address} abi={abi} fn={fn} />
           ))}
-          <p className="mt-1 text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/40">Writes</p>
+          <p className="mt-1 text-[12px] font-semibold text-sp-shade/60">Writes</p>
           {writes.map((fn) => (
             <WriteRow key={fnLabel(fn)} address={address} abi={abi} fn={fn} />
           ))}

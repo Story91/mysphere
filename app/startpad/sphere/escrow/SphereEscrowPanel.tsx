@@ -49,7 +49,7 @@ import {
 } from '../sphereConfig';
 import { ActionButton, StatRow, useSphereRead } from '../sphereActions';
 import { EnforcedBadge } from '../SphereShell';
-import { ActionCard, AddressPill, AdvancedSection, BigStat, KeeperSection, LearnMore, PageHero } from '../SphereUI';
+import { ActionCard, AddressPill, AdvancedSection, BigStat, KeeperSection, LearnMore, PageHero, Reveal } from '../SphereUI';
 
 const HERO_ICON = <Landmark className="h-6 w-6 text-sp-brand" aria-hidden="true" />;
 const TAGLINE = "SPHERE's creator stream - immutable routing";
@@ -353,6 +353,9 @@ export default function SphereEscrowPanel() {
         </div>
       </PageHero>
 
+      {/* KSIEGA I ADRESY - zwiniete (2026-10-14). Na wierzchu zostaja trzy
+          liczby i akcje; wszystko, co dalo sie policzyc, lezy tutaj. */}
+      <Reveal title="Ledger and addresses" hint="What has flowed through the escrow, routing targets, fee split">
       {/* KIERUNKI - zamrozone w konstruktorze --------------------------------- */}
       <div className="flex flex-wrap items-center gap-2">
         <AddressPill address={escrow} label="Escrow" />
@@ -428,6 +431,7 @@ export default function SphereEscrowPanel() {
         </div>
         <p className="mt-2 text-[10px] font-bold text-sp-shade/40">{scanRange}</p>
       </div>
+      </Reveal>
 
       {/* AKCJE - dla gosci zwiniete pod KeeperSection, tworca widzi od razu */}
       <KeeperSection>

@@ -69,7 +69,7 @@ export default function StreamLane({
     <div className="sph-lane rounded-2xl bg-sp-sunken p-4" data-active={active && !done ? 'true' : 'false'}>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-[9.5px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/45">
+          <p className="text-[12px] font-semibold text-sp-shade/60">
             {active ? (done ? 'fully unlocked' : 'unlocking now') : 'will unlock'}
           </p>
           <p className="mt-1 font-mono text-[28px] font-extrabold leading-none text-sp-ink tabular-nums sm:text-[34px]">
@@ -78,7 +78,7 @@ export default function StreamLane({
           </p>
         </div>
         <div className="text-right">
-          <p className="text-[9.5px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/45">flow rate</p>
+          <p className="text-[12px] font-semibold text-sp-shade/60">flow rate</p>
           <p className="mt-1 font-mono text-[15px] font-extrabold text-sp-brand tabular-nums">+{fmt(perHour, 3)} / h</p>
           <p className="text-[10px] text-sp-shade/45">
             {active
@@ -92,14 +92,14 @@ export default function StreamLane({
 
       {/* Tor: krople plyna od dystrybutora do portfela; wypelnienie = postep strumienia. */}
       <div className="mt-3 flex items-center gap-2">
-        <span className="text-[9px] font-extrabold uppercase tracking-[0.06em] text-sp-shade/40">distributor</span>
+        <span className="text-[12px] font-semibold text-sp-shade/60">distributor</span>
         <div className="sph-lane-track relative h-3 flex-1 overflow-hidden rounded-full bg-sp-shade/10">
           <span className="sph-lane-fill absolute inset-y-0 left-0 rounded-full bg-sp-brand/25" style={{ width: `${pct}%` }} aria-hidden="true" />
           {[0, 1, 2, 3, 4].map((i) => (
             <span key={i} className="sph-drop" style={{ animationDelay: `${i * -0.9}s` }} aria-hidden="true" />
           ))}
         </div>
-        <span className="text-[9px] font-extrabold uppercase tracking-[0.06em] text-sp-shade/40">your wallet</span>
+        <span className="text-[12px] font-semibold text-sp-shade/60">your wallet</span>
       </div>
       <p className="mt-1.5 text-[10px] text-sp-shade/40">
         {active

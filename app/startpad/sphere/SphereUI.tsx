@@ -12,9 +12,9 @@
  */
 
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { useSphereCreator } from './sphereActions';
-import { ArrowUpRight, Copy, ExternalLink } from 'lucide-react';
+import { ArrowUpRight, ChevronDown, Copy, ExternalLink } from 'lucide-react';
 import { SPHERE_EXPLORER_URL } from './sphereChain';
 import NumberTicker from './NumberTicker';
 
@@ -246,6 +246,55 @@ export function Disclosure({
       </summary>
       <div className="border-t border-sp-shade/10 px-3.5 py-3 text-[11.5px] leading-relaxed text-sp-shade/60">{children}</div>
     </details>
+  );
+}
+
+/**
+ * Rozwijana sekcja szczegolow - przycisk-karta z tytulem i jednym zdaniem o tym,
+ * co jest w srodku, a pod nim plynnie rozwijana tresc (`.board-expand`).
+ *
+ * Wlasciciel (2026-10-14): na podstronach $SPHERE stalo wszystko naraz i nikt
+ * nie wiedzial, co robic. Na wierzchu zostaje to, po co czlowiek przychodzi,
+ * a ksiegi, wykresy i rozbicia leza tutaj. Tresc jest zawsze zamontowana
+ * (odczyty z lancucha nie zaleza od rozwiniecia), tylko ukryta.
+ */
+export function Reveal({
+  title,
+  hint,
+  children,
+  defaultOpen = false,
+}: {
+  title: string;
+  hint?: string;
+  children: ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const id = useId();
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        aria-controls={id}
+        className="flex w-full items-center justify-between gap-3 rounded-card border border-sp-shade/10 bg-sp-surface px-4 py-3.5 text-left transition-colors [transition-duration:var(--dur-press)] hover:bg-sp-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sp-brand"
+      >
+        <span>
+          <span className="block text-[14px] font-semibold text-sp-ink">{title}</span>
+          {hint && <span className="block text-[12px] text-sp-shade/60">{hint}</span>}
+        </span>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-sp-shade/60 transition-transform [transition-duration:var(--dur-sheet)] ease-drawer ${open ? 'rotate-180' : ''}`}
+          aria-hidden="true"
+        />
+      </button>
+      <div id={id} className="board-expand" data-open={open}>
+        <div>
+          <div className="grid gap-4 pt-4">{children}</div>
+        </div>
+      </div>
+    </div>
   );
 }
 
