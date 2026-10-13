@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
-import { Space_Grotesk, Outfit, Baloo_2, Nunito } from 'next/font/google';
+import { Space_Grotesk, Outfit, Baloo_2, Nunito, Bricolage_Grotesque, Instrument_Sans } from 'next/font/google';
 import './globals.css';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
@@ -53,6 +53,23 @@ const softBodyFont = Nunito({
   weight: ['400', '600', '700', '800'],
   display: 'swap',
   variable: '--font-soft-body',
+});
+
+/**
+ * Kroje "tablicy zlecen" - kierunek stron Ask i $SPHERE (scope `.board`
+ * w globals.css). Nie zastepuja kierunku Soft Social: wchodza tylko tam, gdzie
+ * wrapper `.board` podmieni --font-soft-display / --font-soft-body.
+ */
+const boardDisplayFont = Bricolage_Grotesque({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-board-display',
+});
+
+const boardBodyFont = Instrument_Sans({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-board-body',
 });
 
 // Kanoniczny adres produkcyjny. Jedno miejsce, bo uzywaja go i metadane, i
@@ -182,7 +199,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     // a wyszukiwarki dostawaly zly jezyk strony.
     <html
       lang="en"
-      className={`${bodyFont.variable} ${headingFont.variable} ${softDisplayFont.variable} ${softBodyFont.variable}`}
+      className={`${bodyFont.variable} ${headingFont.variable} ${softDisplayFont.variable} ${softBodyFont.variable} ${boardDisplayFont.variable} ${boardBodyFont.variable}`}
     >
       <body className="min-h-screen bg-white">
         {/* ===== MOTYW SIECI STARTPADA =====

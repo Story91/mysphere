@@ -39,7 +39,7 @@ import { ActionCard, AddressPill, AdvancedSection, BigStat, KeeperSection, Learn
 import { SphereRewardsClaimStandalone } from '../season/SphereRewardsClaim';
 
 /** Klasy karty 1:1 z ActionCard - sekcja historii ma wygladac jak reszta huba. */
-const CARD = 'sph-card rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4';
+const CARD = 'sph-card rounded-card border border-sp-shade/10 bg-sp-surface p-4';
 
 /** Wei -> liczba dla NumberTicker; null zostaje null (szkielet ladowania). */
 function toNumber(wei: bigint | undefined): number | null {

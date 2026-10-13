@@ -96,29 +96,29 @@ export default async function AskPage({ params }: Props) {
   const solBadge = solRailBadge(ask);
 
   return (
-    <div className="min-h-screen bg-soft-bg px-4 pb-24 pt-6 font-soft sm:pt-10">
-      <div className="mx-auto w-full max-w-[640px]">
+    <div className="board min-h-screen px-4 pb-24 pt-6 font-soft sm:pt-10">
+      <div className="mx-auto w-full max-w-[600px]">
         <Link
           href="/asks"
-          className="mb-4 inline-flex items-center gap-1 text-[12.5px] font-semibold text-soft-primary-deep underline underline-offset-2"
+          className="mb-4 inline-flex items-center gap-1 text-[13px] font-semibold text-soft-ink-muted transition-colors [transition-duration:var(--dur-press)] hover:text-soft-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
         >
           ← All asks
         </Link>
 
         <article className="rounded-card border border-soft-line bg-soft-surface p-5 shadow-card sm:p-6">
-          <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-            <p className="font-soft-display text-[11px] font-bold uppercase tracking-[0.12em] text-soft-ink-faint">
+          <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+            <p className="text-[12.5px] font-semibold text-soft-ink-muted">
               Ask by {shortAskAuthor(ask.author)}
             </p>
-            {/* Ta sama odznaka co na karcie w feedzie (AskRailBadge), tylko
-                zlozona tutaj - AskCard.tsx jest 'use client'. */}
+            {/* Ta sama odznaka co na wierszu i karcie w feedzie (AskRailBadge),
+                tylko zlozona tutaj - AskCard.tsx jest 'use client'. */}
             {solBadge && (
               <span className="inline-flex items-center gap-1">
-                <span className="rounded-full border border-soft-ask/30 bg-soft-ask-soft px-2 py-0.5 text-[10px] font-semibold text-soft-ask-deep">
+                <span className="rounded-md border border-soft-ask/30 bg-soft-ask-soft px-1.5 py-px text-[10.5px] font-semibold text-soft-ask-deep">
                   {solBadge.label}
                 </span>
                 {solBadge.devnet && (
-                  <span className="rounded-full border border-soft-line-strong bg-soft-sunken px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-soft-ink">
+                  <span className="rounded-md border border-soft-line-strong bg-soft-sunken px-1.5 py-px text-[10.5px] font-semibold text-soft-ink">
                     devnet
                   </span>
                 )}
@@ -126,49 +126,43 @@ export default async function AskPage({ params }: Props) {
             )}
           </div>
 
-          <h1 className="font-soft-display text-[20px] font-bold leading-[1.3] text-soft-ink sm:text-[24px]">
+          <h1 className="font-soft-display text-[22px] font-bold leading-[1.3] text-soft-ink sm:text-[26px]">
             {ask.question}
           </h1>
 
           {/* Kwota za odpowiedz jest tu najwiekszym drukiem - to jedyna liczba,
-              ktora dotyczy czytajacego. Bursztyn WYLACZNIE na niej i na
-              budzecie, bo to kwoty; liczby miejsc i odpowiedzi nie sa. */}
-          <dl className="mt-5 grid grid-cols-2 gap-4 border-t border-soft-line pt-4 sm:grid-cols-4">
+              ktora dotyczy czytajacego. Bursztyn WYLACZNIE na kwotach (stawka
+              i budzet); miejsca i odpowiedzi to zwykly atrament. */}
+          <div className="mt-5 flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-t border-soft-line pt-4">
             <div>
-              <dt className="text-[11px] font-semibold uppercase tracking-[0.1em] text-soft-ink-faint">
-                Per answer
-              </dt>
-              <dd className="font-soft-display text-[19px] font-bold tabular-nums text-soft-accent-deep">
+              <p className="font-soft-display text-[34px] font-bold leading-none tabular-nums text-soft-accent-deep">
                 {shareAmount(ask, 'perAnswer')}
-              </dd>
+              </p>
+              <p className="mt-1 text-[12px] text-soft-ink-soft">per answer</p>
             </div>
-            <div>
-              <dt className="text-[11px] font-semibold uppercase tracking-[0.1em] text-soft-ink-faint">
-                Budget
-              </dt>
-              <dd className="font-soft-display text-[19px] font-bold tabular-nums text-soft-accent-deep">
-                {shareAmount(ask, 'budget')}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-[11px] font-semibold uppercase tracking-[0.1em] text-soft-ink-faint">
-                Seats
-              </dt>
-              {/* "2 of 3" tylko, gdy zajete miejsca znamy (rekordy przyjec albo
-                  Ask sprzed pieczeci); inaczej sama liczba miejsc. */}
-              <dd className="font-soft-display text-[19px] font-bold tabular-nums text-soft-ink">
-                {shareSeatsLabel(share)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-[11px] font-semibold uppercase tracking-[0.1em] text-soft-ink-faint">
-                Answers in
-              </dt>
-              <dd className="font-soft-display text-[19px] font-bold tabular-nums text-soft-ink">
-                {ask.answerCount}
-              </dd>
-            </div>
-          </dl>
+            <dl className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-[12.5px] text-soft-ink-muted">
+              <div className="flex items-baseline gap-1.5">
+                <dt>Budget</dt>
+                <dd className="font-soft-display text-[15px] font-semibold tabular-nums text-soft-accent-deep">
+                  {shareAmount(ask, 'budget')}
+                </dd>
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <dt>Seats</dt>
+                {/* "2 of 3" tylko, gdy zajete miejsca znamy (rekordy przyjec albo
+                    Ask sprzed pieczeci); inaczej sama liczba miejsc. */}
+                <dd className="font-soft-display text-[15px] font-semibold tabular-nums text-soft-ink">
+                  {shareSeatsLabel(share)}
+                </dd>
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <dt>Answers</dt>
+                <dd className="font-soft-display text-[15px] font-semibold tabular-nums text-soft-ink">
+                  {ask.answerCount}
+                </dd>
+              </div>
+            </dl>
+          </div>
 
           <p className="mt-4 text-[13px] leading-[1.55] text-soft-ink-muted">
             {shareStateLine(share, now)}{' '}
@@ -182,7 +176,7 @@ export default async function AskPage({ params }: Props) {
                       href={funding.href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="font-semibold text-soft-primary-deep underline underline-offset-2"
+                      className="font-semibold text-soft-ink underline underline-offset-2"
                     >
                       {funding.linkLabel}
                     </a>
@@ -205,22 +199,22 @@ export default async function AskPage({ params }: Props) {
           </p>
 
           {/* Odpowiadanie wymaga portfela i podpisu, wiec mieszka na /asks.
-              Ta strona nie dubluje tamtego panelu - prowadzi do niego. */}
-          {open && (
-            <Link
-              href="/asks"
-              className="mt-5 inline-flex items-center justify-center rounded-lg bg-soft-primary px-4 py-2.5 font-soft-display text-[13.5px] font-semibold text-white transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2"
-            >
-              Answer this ask
-            </Link>
-          )}
-
-          <ShareAskActions askId={ask.id} perAnswer={shareAmount(ask, 'perAnswer')} />
+              Ta strona nie dubluje tamtego panelu - prowadzi do niego. Jedna
+              wypelniona akcja; udostepnianie stoi obok jako obwodka. */}
+          <ShareAskActions askId={ask.id} perAnswer={shareAmount(ask, 'perAnswer')}>
+            {open && (
+              <Link
+                href="/asks"
+                className="inline-flex items-center justify-center rounded-pill bg-soft-primary px-4 py-2 font-soft-display text-[13px] font-semibold text-soft-on-primary transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface"
+              >
+                Answer this ask
+              </Link>
+            )}
+          </ShareAskActions>
         </article>
 
-        <p className="mt-4 px-1 text-[11.5px] leading-[1.5] text-soft-ink-faint">
-          Answers stay sealed until the author resolves. Only the number of answers is public, never
-          their contents.
+        <p className="mt-4 px-1 text-[12px] leading-[1.5] text-soft-ink-soft">
+          Answers stay sealed until the author resolves. Only the number of answers is public.
         </p>
       </div>
     </div>

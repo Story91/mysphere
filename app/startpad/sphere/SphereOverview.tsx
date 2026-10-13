@@ -24,22 +24,10 @@
  * ze burn nie odpala sie sam i ze palenie nie rusza totalSupply.
  */
 
-import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { formatEther, type Address } from 'viem';
 import { useAccount, usePublicClient } from 'wagmi';
-import {
-  ArrowRight,
-  BookOpen,
-  Coins,
-  Copy,
-  Flame,
-  GraduationCap,
-  Landmark,
-  Timer,
-  Trophy,
-  Waves,
-} from 'lucide-react';
+import { ArrowRight, ChevronDown, Coins, Copy, Flame, GraduationCap, Timer, Waves } from 'lucide-react';
 import { launchpadAbi } from '../config';
 import { SPHERE_CHAIN, SPHERE_EXPLORER_URL, SPHERE_LAUNCHPAD_ADDRESS, SPHERE_NATIVE_SYMBOL, SPHERE_VAULT_ADDRESS } from './sphereChain';
 import { formatIn, formatUtc, useSphereChainFacts, type SphereChainFacts } from './SphereShell';
@@ -65,7 +53,7 @@ const FUTURE_TOKEN = '0xB200000000000000000000BA5eDb84c678432476';
 function HeroStat({ icon, label, value, decimals, suffix }: { icon: React.ReactNode; label: string; value: number | null; decimals?: number; suffix?: string }) {
   return (
     <StatShell className="sm:p-4">
-      <p className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/50">
+      <p className="flex items-center gap-1.5 text-[12px] font-semibold text-sp-shade/60">
         {icon} {label}
       </p>
       <div className="mt-1 font-soft-display font-extrabold text-sp-ink">
@@ -76,40 +64,6 @@ function HeroStat({ icon, label, value, decimals, suffix }: { icon: React.ReactN
         )}
       </div>
     </StatShell>
-  );
-}
-
-/**
- * Pastylka "liczba + po co ona" w hero. Zastapila akapit, ktory tlumaczyl
- * mechanike buybacku slowo w slowo tak samo jak sekcja "Burned forever".
- * Wartosc jest juz sformatowana, wiec pastylka nie tyka - hero ma trzy
- * tykajace liczniki obok i czwarty ruch tylko by je zaglaszal.
- */
-function HeroChip({ icon, value, label }: { icon: React.ReactNode; value: string; label: string }) {
-  return (
-    <span className="inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1.5 backdrop-blur-sm">
-      {icon}
-      <span className="text-[12px] font-extrabold text-sp-ink">{value}</span>
-      <span className="text-[10.5px] font-bold text-sp-shade/50">{label}</span>
-    </span>
-  );
-}
-
-function ActionTile({ href, icon, title, hint }: { href: string; icon: React.ReactNode; title: string; hint: string }) {
-  return (
-    <Link
-      href={href}
-      className="sph-card group flex items-center justify-between gap-3 rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4"
-    >
-      <span className="flex items-center gap-3">
-        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sp-brand/10 text-sp-brand">{icon}</span>
-        <span>
-          <span className="block text-[14px] font-extrabold text-sp-ink">{title}</span>
-          <span className="block text-[11px] font-bold text-sp-shade/50">{hint}</span>
-        </span>
-      </span>
-      <ArrowRight className="h-4 w-4 text-sp-shade/30 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-sp-brand" aria-hidden="true" />
-    </Link>
   );
 }
 
@@ -206,7 +160,7 @@ function LifecycleSection({ facts }: { facts: SphereChainFacts }) {
         />
       </div>
 
-      <div className="mt-4 rounded-2xl bg-white/70 p-3.5 backdrop-blur-sm">
+      <div className="mt-4 rounded-xl bg-sp-sunken p-3.5">
         <FactRow label="Launched">{facts.startedAt ? formatUtc(facts.startedAt) : '-'}</FactRow>
         {pool && (
           <>
@@ -266,35 +220,19 @@ function BurnSection({ facts }: { facts: SphereChainFacts }) {
         <BigStat label="Graduation seed" value={toNum(burn?.fromGraduationSeed)} decimals={0} suffix="SPHERE" hint="leftover, never bought" />
       </div>
 
-      {/* Udzial spalonego w podazy jako DLUGOSC. Ta sama liczba stala wczesniej
-          w plakietce naglowka i ginela obok czterech innych plakietek. */}
+      {/* Udzial spalonego w podazy jako DLUGOSC. Zastrzezenia, ktore zmieniaja
+          znaczenie tych liczb (palenie to przelew na 0xdEaD, burn nie odpala sie
+          sam), stoja na wierzchu strony, w hero - nie tutaj, pod rozwijakiem. */}
       {burn && (
-        <div className="mt-4 rounded-2xl bg-white/70 p-3.5 backdrop-blur-sm">
+        <div className="mt-4 rounded-xl bg-sp-sunken p-3.5">
           <MeterBar
             pct={share}
             tone="down"
             left={`${Number(formatEther(burn.dead)).toLocaleString('en-US', { maximumFractionDigits: 0 })} burned`}
             right={`of ${Number(formatEther(burn.supply)).toLocaleString('en-US', { maximumFractionDigits: 0 })} supply`}
           />
-          {/* Zastrzezenie, ktore zmienia ZNACZENIE liczby wyzej - zostaje na
-              wierzchu: palenie to przelew na 0xdEaD, wiec totalSupply sie nie
-              rusza i "5.93% spalone" nie znaczy "podaz spadla". */}
-          <p className="mt-2.5 text-[11px] font-bold leading-relaxed text-sp-shade/55">
-            Burns are transfers to 0xdEaD, so total supply stays 1B - the dead balance is what shrinks
-            the circulating side.
-          </p>
         </div>
       )}
-
-      {/* Zastrzezenie nr 2 - i to jest cala roznica miedzy "pali sie samo"
-          a prawda. Nie schodzi pod rozwijak w zadnej wersji tej strony. */}
-      <p className="mt-3 flex items-start gap-2 rounded-2xl bg-sp-down/[0.07] px-3.5 py-2.5 text-[11.5px] font-bold leading-relaxed text-sp-shade/70">
-        <Flame className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sp-down" aria-hidden="true" />
-        <span>
-          The burn is not automatic. Someone has to call settle() and then executeBuyback() and pay the
-          gas - until then the pot just sits there.
-        </span>
-      </p>
 
       {pending && (
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -363,7 +301,7 @@ function DistributorSection({ facts }: { facts: SphereChainFacts }) {
         <BigStat label="Still claimable" value={toNum(outstanding)} decimals={2} suffix="SPHERE" hint="earned, not yet taken" />
         <BigStat label="Held by contract" value={toNum(d.held)} decimals={0} suffix="SPHERE" hint="funds future epochs" />
       </div>
-      <div className="mt-4 rounded-2xl bg-white/70 p-3.5 backdrop-blur-sm">
+      <div className="mt-4 rounded-xl bg-sp-sunken p-3.5">
         <MeterBar
           pct={claimedPct}
           tone="up"
@@ -425,7 +363,7 @@ function SafeSection({ facts }: { facts: SphereChainFacts }) {
   // jak stwierdzenie o protokole, a jest tylko awaria odczytu.
   if (rows.length === 0) return null;
   return (
-    <section className="sph-card rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
+    <section className="sph-card rounded-card border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-[15px] font-extrabold text-sp-ink">
           {r.allSame ? 'Five role labels, one address' : 'Who holds which role'}
@@ -476,6 +414,7 @@ export default function SphereOverview() {
   const [burned, setBurned] = useState<bigint | null>(null);
   const [myBalance, setMyBalance] = useState<bigint | null>(null);
   const facts = useSphereChainFacts();
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   useEffect(() => {
     const rewardsAddr = SPHERE_REWARDS_ADDRESS;
@@ -546,113 +485,105 @@ export default function SphereOverview() {
 
   // `null` az do pierwszego udanego odczytu - zero znaczyloby "sprawdzone, nic nie ma".
   const feesWaiting = claimables ? Number(formatEther(claimables.rewards + claimables.escrow)) : null;
-  const hookBurned = facts?.burn ? Number(formatEther(facts.burn.fromHookBuyback)) : null;
-  const potWaiting = facts?.hookPending ? Number(formatEther(facts.hookPending.buybackEth)) : null;
 
   return (
-    <div className="sph-stagger grid gap-4">
+    <div className="grid gap-4">
       {/* HERO ---------------------------------------------------------------- */}
-      <section className="sph-hero rounded-[24px] border border-sp-shade/10 p-5 sm:p-7">
-        <div className="sph-orb left-[-40px] top-[-60px] h-48 w-48 bg-sp-brand/40" aria-hidden="true" />
-        <div className="sph-orb bottom-[-70px] right-[-30px] h-56 w-56 bg-sp-up/30 [animation-delay:-7s]" aria-hidden="true" />
-
-        <div className="relative">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              {/* "Burns itself" bylo nieprawda o mechanice, nie o skali: nic nie
-                  pali sie samo, ktos musi zaplacic gaz za settle() i
-                  executeBuyback(). Naglowek mowi teraz to, co robi kontrakt,
-                  a liczba pod spodem broni skali - 14,5 mln SPHERE naprawde
-                  kupiono i spalono, wiec nie schodzimy tez ponizej prawdy. */}
-              <h2 className="font-soft-display text-[30px] font-extrabold leading-tight text-sp-ink sm:text-[38px]">
-                The launchpad&apos;s own token.
-                <span className="block bg-gradient-to-r from-sp-brand to-sp-up bg-clip-text text-transparent">
-                  Its fees buy it back. Anyone can fire the burn.
-                </span>
-              </h2>
-              <p className="mt-2 inline-flex flex-wrap items-center gap-2 rounded-full bg-white/70 px-3 py-1 font-mono text-[11px] font-bold text-sp-shade/60 backdrop-blur-sm">
-                {SPHERE_TOKEN_ADDRESS ? SPHERE_TOKEN_ADDRESS : `${FUTURE_TOKEN.slice(0, 10)}…${FUTURE_TOKEN.slice(-8)}`}
-                <span className="rounded-full bg-sp-brand/10 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.08em] text-sp-brand">
-                  {SPHERE_TOKEN_ADDRESS ? 'live' : 'address locked · launch soon'}
-                </span>
-                {facts && <StagePill stage={facts.stage} />}
-              </p>
-              {/* Bylo: akapit powtarzajacy mechanike settle()/executeBuyback()
-                  slowo w slowo za sekcja "Burned forever" nizej. Zostaja same
-                  liczby - opis mechanizmu ma tam swoj rozwijak. */}
-              {hookBurned !== null && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <HeroChip
-                    icon={<Flame className="h-3.5 w-3.5 text-sp-down" aria-hidden="true" />}
-                    value={`${hookBurned.toLocaleString('en-US', { maximumFractionDigits: 0 })} SPHERE`}
-                    label="bought & burned by the hook"
-                  />
-                  {potWaiting !== null && (
-                    <HeroChip
-                      icon={<Coins className="h-3.5 w-3.5 text-sp-brand" aria-hidden="true" />}
-                      value={`${potWaiting.toLocaleString('en-US', { maximumFractionDigits: 6 })} ${SPHERE_NATIVE_SYMBOL}`}
-                      label="waiting in the buyback pot"
-                    />
-                  )}
-                </div>
-              )}
-            </div>
-            <Flame className="sph-flame hidden h-16 w-16 text-sp-brand/70 sm:block" aria-hidden="true" />
+      {/* Decyzja wlasciciela 2026-10-14: "za duzo informacji, ludzie nie wiedza,
+          co robic". Hero mowi jedno zdanie, pokazuje trzy liczby i ma jedno
+          dzialanie - kup. Statystyki puli, zrodel spalenia, strumienia nagrod i
+          rol adresow siedza w rozwijanej sekcji nizej, a kafle z linkami do
+          podstron znikly: te sama droge niesie pasek zakladek u gory. */}
+      <section className="rounded-card border border-sp-shade/10 bg-sp-surface p-5 sm:p-7">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="font-soft-display text-[28px] font-extrabold leading-[1.1] tracking-[-0.02em] text-sp-ink sm:text-[36px]">
+              The launchpad&apos;s own token
+            </h2>
+            <p className="mt-2 text-[14px] leading-[1.5] text-sp-shade/70">
+              Its fees buy it back. Anyone can fire the burn.
+            </p>
           </div>
-
-          <div className="mt-5 grid gap-3 sm:grid-cols-3">
-            <HeroStat icon={<Flame className="h-3.5 w-3.5 text-sp-down" aria-hidden="true" />} label="Burned forever" value={burned !== null ? Number(formatEther(burned)) : null} suffix="SPHERE" />
-            <HeroStat icon={<Coins className="h-3.5 w-3.5 text-sp-up" aria-hidden="true" />} label="Fees waiting" value={feesWaiting} decimals={4} suffix={SPHERE_NATIVE_SYMBOL} />
-            <HeroStat icon={<Timer className="h-3.5 w-3.5 text-sp-brand" aria-hidden="true" />} label="Epoch progress" value={weekProgress} decimals={1} suffix="%" />
+          <div className="flex flex-wrap items-center gap-2">
+            {SPHERE_TOKEN_ADDRESS ? (
+              <AddressPill address={SPHERE_TOKEN_ADDRESS} label="token" />
+            ) : (
+              <span className="rounded-full bg-sp-shade/5 px-2.5 py-1 font-mono text-[10.5px] font-bold text-sp-shade/60">
+                {FUTURE_TOKEN.slice(0, 10)}…{FUTURE_TOKEN.slice(-8)} · launch soon
+              </span>
+            )}
+            {facts && <StagePill stage={facts.stage} />}
           </div>
-
-          {/* KUP / TWOJE SALDO - jedyne CTA, ktorego szuka zwykly gosc. */}
-          {SPHERE_TOKEN_ADDRESS && (
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              {/* Zwykle <a>, nie next/link: siec Startpada liczy sie RAZ, przy
-                  ladowaniu config.ts. Miekkie przejscie zignorowaloby ?c= i ktos
-                  z zapisanym Arc trafialby na token Base podpiety pod Arc - ten
-                  sam blad, co w tasmie StartpadTicker. */}
-              <a
-                href={`/startpad/${SPHERE_TOKEN_ADDRESS}?c=${SPHERE_CHAIN.id}`}
-                className="inline-flex items-center gap-2 rounded-full bg-sp-brand px-5 py-2.5 text-[13px] font-extrabold text-sp-on-brand transition-transform hover:scale-[1.03]"
-              >
-                Buy $SPHERE <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </a>
-              {myBalance !== null && (
-                <span className="rounded-full bg-white/70 px-4 py-2 text-[12px] font-extrabold text-sp-shade/70 backdrop-blur-sm">
-                  You hold {Number(formatEther(myBalance)).toLocaleString('en-US', { maximumFractionDigits: 0 })} SPHERE
-                </span>
-              )}
-            </div>
-          )}
         </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-3">
+          <HeroStat icon={<Flame className="h-3.5 w-3.5 text-sp-down" aria-hidden="true" />} label="Burned forever" value={burned !== null ? Number(formatEther(burned)) : null} suffix="SPHERE" />
+          <HeroStat icon={<Coins className="h-3.5 w-3.5 text-sp-up" aria-hidden="true" />} label="Fees waiting" value={feesWaiting} decimals={4} suffix={SPHERE_NATIVE_SYMBOL} />
+          <HeroStat icon={<Timer className="h-3.5 w-3.5 text-sp-shade/60" aria-hidden="true" />} label="Epoch progress" value={weekProgress} decimals={1} suffix="%" />
+        </div>
+
+        {/* Dwa zastrzezenia, ktore zmieniaja ZNACZENIE liczb wyzej, wiec nie
+            schodza pod rozwijak: burn nie odpala sie sam (ktos placi gaz za
+            settle() i executeBuyback()), a palenie to przelew na 0xdEaD, wiec
+            totalSupply sie nie rusza. */}
+        <p className="mt-4 text-[12.5px] leading-[1.55] text-sp-shade/65">
+          The burn is not automatic: someone has to call settle() and then executeBuyback() and pay the
+          gas. Burned tokens sit at 0xdEaD, so total supply stays 1B.
+        </p>
+
+        {/* KUP / TWOJE SALDO - jedyne CTA, ktorego szuka zwykly gosc. */}
+        {SPHERE_TOKEN_ADDRESS && (
+          <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2">
+            {/* Zwykle <a>, nie next/link: siec Startpada liczy sie RAZ, przy
+                ladowaniu config.ts. Miekkie przejscie zignorowaloby ?c= i ktos
+                z zapisanym Arc trafialby na token Base podpiety pod Arc - ten
+                sam blad, co w tasmie StartpadTicker. */}
+            <a
+              href={`/startpad/${SPHERE_TOKEN_ADDRESS}?c=${SPHERE_CHAIN.id}`}
+              className="inline-flex items-center gap-2 rounded-pill bg-sp-brand px-5 py-2.5 text-[13.5px] font-bold text-sp-on-brand transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97]"
+            >
+              Buy $SPHERE <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </a>
+            {myBalance !== null && (
+              <span className="text-[13px] font-semibold tabular-nums text-sp-shade/70">
+                You hold {Number(formatEther(myBalance)).toLocaleString('en-US', { maximumFractionDigits: 0 })} SPHERE
+              </span>
+            )}
+          </div>
+        )}
       </section>
 
-      {/* STATY Z LANCUCHA ---------------------------------------------------- */}
+      {/* SZCZEGOLY ----------------------------------------------------------- */}
       {facts && (
-        <>
-          <LifecycleSection facts={facts} />
-          <BurnSection facts={facts} />
-          <DistributorSection facts={facts} />
-          <SafeSection facts={facts} />
-        </>
+        <div>
+          <button
+            type="button"
+            onClick={() => setDetailsOpen((open) => !open)}
+            aria-expanded={detailsOpen}
+            aria-controls="sphere-details"
+            className="flex w-full items-center justify-between gap-3 rounded-card border border-sp-shade/10 bg-sp-surface px-4 py-3.5 text-left transition-colors [transition-duration:var(--dur-press)] hover:bg-sp-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sp-brand"
+          >
+            <span>
+              <span className="block text-[14px] font-semibold text-sp-ink">The numbers behind it</span>
+              <span className="block text-[12px] text-sp-shade/60">Pool, burn sources, reward stream, who holds which role</span>
+            </span>
+            <ChevronDown
+              className={`h-4 w-4 shrink-0 text-sp-shade/60 transition-transform [transition-duration:var(--dur-sheet)] ease-drawer ${detailsOpen ? 'rotate-180' : ''}`}
+              aria-hidden="true"
+            />
+          </button>
+          <div id="sphere-details" className="board-expand" data-open={detailsOpen}>
+            <div>
+              <div className="grid gap-4 pt-4">
+                <LifecycleSection facts={facts} />
+                <BurnSection facts={facts} />
+                <DistributorSection facts={facts} />
+                <SafeSection facts={facts} />
+              </div>
+            </div>
+          </div>
+        </div>
       )}
-
-      {/* AKCJE --------------------------------------------------------------- */}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <ActionTile href="/startpad/sphere/season" icon={<Trophy className="h-5 w-5" aria-hidden="true" />} title="Season" hint="Weekly creator leaderboard · live" />
-        <ActionTile href="/startpad/sphere/escrow" icon={<Landmark className="h-5 w-5" aria-hidden="true" />} title="Escrow" hint="Creator stream · release splits" />
-        <ActionTile href="/startpad/sphere/rewards" icon={<Coins className="h-5 w-5" aria-hidden="true" />} title="Rewards vault" hint="Fee inflows · pull to treasury" />
-        <ActionTile href="/startpad/sphere/vesting" icon={<Timer className="h-5 w-5" aria-hidden="true" />} title="Vesting" hint="Treasury lock · 30d cliff / 12m" />
-      </div>
-
-      <Link
-        href="/startpad/sphere/about"
-        className="sph-card flex items-center justify-center gap-2 rounded-[20px] border border-dashed border-sp-shade/20 bg-sp-surface p-3.5 text-[12.5px] font-extrabold text-sp-shade/60 hover:text-sp-brand"
-      >
-        <BookOpen className="h-4 w-4" aria-hidden="true" /> How it works - tokenomics, fee flows & the honest fine print
-      </Link>
     </div>
   );
 }

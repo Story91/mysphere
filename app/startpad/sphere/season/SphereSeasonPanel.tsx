@@ -289,7 +289,7 @@ function ZeroEpochNotice({
   const excludedTokens = Math.max(0, data.totals.tokens - scoredTokens);
   const nothingAtAll = data.totals.tokens === 0;
   return (
-    <section className="sph-card rounded-[20px] border border-sp-brand/25 bg-sp-brand/[0.05] p-4 sm:p-5">
+    <section className="sph-card rounded-card border border-sp-brand/25 bg-sp-brand/[0.05] p-4 sm:p-5">
       <h3 className="flex items-center gap-2 text-[13.5px] font-extrabold text-sp-ink">
         <Info className="h-4 w-4 text-sp-brand" aria-hidden="true" />
         Nothing scored this epoch - and that is the real number, not a broken page
@@ -381,7 +381,7 @@ function PoolLedger({ dist }: { dist: DistributorState | null }) {
   ];
 
   return (
-    <section className="sph-card rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
+    <section className="sph-card rounded-card border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="text-[13.5px] font-extrabold text-sp-ink">Reward pool ledger (SPHERE)</h3>
         <AddressPill address={SPHERE_DISTRIBUTOR_ADDRESS} label="distributor" />
@@ -559,7 +559,7 @@ function PastEpochsSection({ data, failed }: { data: EpochsData | null; failed: 
   }, [account, claimedAmt, rootedDesc]);
 
   return (
-    <section className="sph-card rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
+    <section className="sph-card rounded-card border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="text-[13.5px] font-extrabold text-sp-ink">Previous epochs</h3>
         <span className="rounded-full bg-sp-up/10 px-2.5 py-1 text-[9.5px] font-extrabold uppercase tracking-[0.08em] text-sp-up">
@@ -716,7 +716,7 @@ function LeaderboardSection({
   const showingPast = view === 'past' && fallback !== null;
 
   return (
-    <section className="sph-card rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
+    <section className="sph-card rounded-card border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="text-[13.5px] font-extrabold text-sp-ink">Creator leaderboard</h3>
         <a
@@ -890,7 +890,7 @@ export default function SphereSeasonPanel() {
 
   if (error) {
     return (
-      <p className="rounded-[20px] border border-sp-shade/10 bg-sp-surface p-5 text-[12.5px] text-sp-down">
+      <p className="rounded-card border border-sp-shade/10 bg-sp-surface p-5 text-[12.5px] text-sp-down">
         Season data unavailable: {error}. The indexer scans Base logs - retry in a moment.
       </p>
     );
@@ -1001,7 +1001,7 @@ export default function SphereSeasonPanel() {
       <PoolLedger dist={dist} />
 
       {/* WYKRES: wolumen dzienny --------------------------------------------- */}
-      <section className="sph-card rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
+      <section className="sph-card rounded-card border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
         <h3 className="text-[13.5px] font-extrabold text-sp-ink">Daily external volume ({SPHERE_NATIVE_SYMBOL})</h3>
         <p className="mt-0.5 text-[10.5px] text-sp-shade/50">Season-eligible volume: creators&apos; tokens, self-trades excluded.</p>
         <div className="mt-3 h-56 w-full">

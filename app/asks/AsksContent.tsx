@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { HandCoins, Lock, PenLine } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useAccount, useChainId, useConfig, usePublicClient, useSwitchChain } from 'wagmi';
 import { getWalletClient } from 'wagmi/actions';
 import { base } from 'wagmi/chains';
-import AskCard, { formatAskAmount, formatAskMoney } from '../basechat/components/AskCard';
+import { formatAskAmount, formatAskMoney } from '../basechat/components/AskCard';
+import AskRow from './AskRow';
 import AskClaimPanel from '../basechat/components/AskClaimPanel';
 import AskComposer, { type AskDraft } from '../basechat/components/AskComposer';
 import AskSolanaWallet, { SolanaAnswerPayee } from '../basechat/components/AskSolanaWallet';
@@ -273,101 +274,72 @@ export default function AsksPage() {
     const isOpen = openAskId === ask.id;
 
     return (
-      <div key={ask.id} className="flex flex-col gap-2">
-        <AskCard
+      <AskRow
+        key={ask.id}
+        ask={ask}
+        resolveRate={rates[ask.author]}
+        isAuthor={isAuthor}
+        expanded={isOpen}
+        onToggle={() => setOpenAskId((current) => (current === ask.id ? null : ask.id))}
+      >
+        <AskThread
           ask={ask}
-          resolveRate={rates[ask.author]}
+          viewer={viewer}
+          sessionViewer={sessionAddress ?? null}
           isAuthor={isAuthor}
-          onAnswer={() => setOpenAskId((current) => (current === ask.id ? null : ask.id))}
+          isSignedIn={isAuthenticated}
+          onSignIn={signIn}
+          onPatch={patchAsk}
+          onClose={() => setOpenAskId(null)}
         />
-        {isOpen && (
-          <AskThread
-            ask={ask}
-            viewer={viewer}
-            sessionViewer={sessionAddress ?? null}
-            isAuthor={isAuthor}
-            isSignedIn={isAuthenticated}
-            onSignIn={signIn}
-            onPatch={patchAsk}
-            onClose={() => setOpenAskId(null)}
-          />
-        )}
-      </div>
+      </AskRow>
     );
   };
 
+  const askButton = !composerOpen && (
+    <button
+      type="button"
+      onClick={() => setComposerOpen(true)}
+      className="inline-flex shrink-0 items-center gap-1.5 rounded-pill bg-soft-primary px-4 py-2.5 font-soft-display text-[13px] font-semibold text-soft-on-primary transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-bg"
+    >
+      <Plus className="h-4 w-4" aria-hidden="true" />
+      Ask
+    </button>
+  );
+
   return (
     <main className="min-h-screen bg-soft-bg font-soft">
-      <div className="mx-auto w-full max-w-[640px] px-4 py-10 sm:px-5">
-        {/* ================= NAGLOWEK =================
-            Jeden rzad: tytul + akcja. Dwa akapity wstepu zamienily sie w jedno
-            zdanie i pasek trzech krokow - bo trzy kroki to jest CALY mechanizm
-            tego produktu, a sciana tekstu nad lista tylko odsuwala Aski w dol.
-            Szczegoly (escrow, warianty platnosci) mowia karty i kompozytor,
-            kazde o sobie. */}
-        <header className="mb-7">
-          <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
-            <div className="min-w-0">
-              <h1 className="font-soft-display text-[30px] font-bold leading-[1.1] tracking-[-0.02em] text-soft-ink sm:text-[38px]">
-                Open asks
-              </h1>
-              <p className="mt-2 max-w-[46ch] text-[14px] leading-[1.6] text-soft-ink-muted">
-                A question with a budget, seats and a deadline. Answers stay sealed until the
-                author picks the ones that get paid.
-              </p>
-            </div>
-            {!composerOpen && (
-              <button
-                type="button"
-                onClick={() => setComposerOpen(true)}
-                className="shrink-0 rounded-lg bg-soft-primary px-4 py-2.5 font-soft-display text-[13px] font-semibold text-white shadow-card transition-transform duration-150 ease-out active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-bg"
-              >
-                Ask something
-              </button>
-            )}
-          </div>
-          {/* Kolejnosc krokow niesie informacje (to jest sekwencja, nie ozdoba),
-              a srodkowy krok dostaje jedyny akcent - pieczec to sedno produktu. */}
-          <ol className="mt-4 flex flex-wrap items-center gap-x-1.5 gap-y-2" aria-label="How an Ask works">
-            <li className="flex items-center gap-1.5 rounded-full border border-soft-line bg-soft-surface px-2.5 py-1 text-[11.5px] font-medium text-soft-ink-muted">
-              <PenLine className="h-3.5 w-3.5 text-soft-ink-faint" aria-hidden="true" />
-              Post with a budget
-            </li>
-            <li aria-hidden="true" className="text-[11px] text-soft-ink-faint/70">›</li>
-            <li className="flex items-center gap-1.5 rounded-full border border-soft-primary/25 bg-soft-primary/[0.06] px-2.5 py-1 text-[11.5px] font-medium text-soft-primary-deep">
-              <Lock className="h-3.5 w-3.5" aria-hidden="true" />
-              Answers arrive sealed
-            </li>
-            <li aria-hidden="true" className="text-[11px] text-soft-ink-faint/70">›</li>
-            <li className="flex items-center gap-1.5 rounded-full border border-soft-line bg-soft-surface px-2.5 py-1 text-[11.5px] font-medium text-soft-ink-muted">
-              <HandCoins className="h-3.5 w-3.5 text-soft-ink-faint" aria-hidden="true" />
-              Pay the ones you pick
-            </li>
-            <li>
+      <div className="mx-auto w-full max-w-[680px] px-4 pb-16 pt-6 sm:px-5">
+        {/* Naglowek w jednym rzedzie: tytul, jedno zdanie, akcja. Wstep, trzy
+            pigulki "jak to dziala" i drugi link zeszly - ludzie nie wiedzieli,
+            co robic, bo przed pierwszym Askiem stalo pieciu rzeczy do
+            przeczytania. Pierwszy ekran mowi: tu sa oferty, odpowiedz albo
+            zapytaj. Reszte mowi rozwiniety wiersz i kompozytor. */}
+        <header className="mb-5 flex items-end justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="font-soft-display text-[28px] font-bold leading-none tracking-[-0.02em] text-soft-ink sm:text-[34px]">
+              Open asks
+            </h1>
+            <p className="mt-2 text-[13.5px] leading-[1.5] text-soft-ink-muted">
+              Questions with a budget. Answer one, get paid if the author picks you.{' '}
               <Link
                 href="/re-definition#ask"
-                className="px-1.5 py-1 text-[11.5px] font-semibold text-soft-primary-deep underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+                className="font-semibold text-soft-ink underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
               >
-                How an Ask works
+                How it works
               </Link>
-            </li>
-          </ol>
+            </p>
+          </div>
+          {askButton}
         </header>
 
-        {/* ================= DO ODBIORU =================
-            Stoi NAD lista, bo dotyczy pieniedzy, ktore juz naleza do patrzacego
-            i o ktorych nie dowie sie znikad indziej - resolve() przypisuje
-            salda, nie wysyla tokenow. Panel milczy, gdy nie ma czego odebrac,
-            ale NIE milczy, gdy odczytu nie udalo sie wykonac. */}
-        <AskClaimPanel className="mb-7" />
+        {/* DO ODBIORU - nad lista, bo to pieniadze, ktore juz naleza do
+            patrzacego. Panel milczy, gdy nie ma czego odebrac. */}
+        <AskClaimPanel className="mb-5" />
 
-        {/* ================= ZAKLADANIE =================
-            Kompozytor pojawia sie w tym miejscu dopiero po "Ask something"
-            w naglowku. Stala karta-zaproszenie zeszla ze strony: powtarzala
-            naglowek trzecim akapitem i odsuwala liste, a jej jedyna zywa czesc
-            (przycisk) miesci sie w jednym rzedzie z tytulem. */}
+        {/* Kompozytor pojawia sie dopiero po "Ask". */}
         {composerOpen && (
-          <section className="mb-7">
+          <section className="mb-5">
             <AskComposer
               onSubmit={handleCreate}
               onCancel={() => setComposerOpen(false)}
@@ -380,25 +352,24 @@ export default function AsksPage() {
               escrowFeeBps={askFlow.feeBps}
               progressNote={askFlow.progressNote}
               // Skarbiec wybierany Z LISTY, nie wklejany z palca - adres
-              // z literowka daje Aska o czyms, czego nie ma. Odczyt idzie przez
-              // wlasna trase (wspolny cache), a jego awaria nie blokuje
-              // zakladania: kompozytor pokazuje wtedy sam komunikat.
+              // z literowka daje Aska o czyms, czego nie ma.
               loadVaults={loadListedVaults}
             />
           </section>
         )}
 
-        {/* ================= WLASNIE ZALOZONE ================= */}
+        {/* NOWY ASK ZOSTAJE NA EKRANIE, nawet gdy lista sie nie wczytala
+            (indeks zlozony jeszcze czeka na deploy) - trzymamy to, co WIEMY,
+            ze powstalo. Karta pochodzi z odpowiedzi serwera, nie ze szkicu. */}
         {created.length > 0 && (
-          <section className="mb-7">
-            <h2 className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-soft-ink-faint">
+          <section className="mb-5">
+            <h2 className="mb-2 font-soft-display text-[13px] font-semibold text-soft-ink-muted">
               Posted from this device
             </h2>
-            <div className="flex flex-col gap-4">{created.map(renderAsk)}</div>
+            <div className="flex flex-col gap-2.5">{created.map(renderAsk)}</div>
           </section>
         )}
 
-        {/* ================= LISTA ================= */}
         {phase === 'loading' && <LoadingList />}
 
         {phase === 'failed' && (
@@ -413,7 +384,7 @@ export default function AsksPage() {
             <button
               type="button"
               onClick={retry}
-              className="rounded-lg bg-soft-primary px-4 py-2 font-soft-display text-[13px] font-semibold text-white transition-transform duration-150 ease-out active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface"
+              className="rounded-pill bg-soft-primary px-4 py-2 font-soft-display text-[13px] font-semibold text-soft-on-primary transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface"
             >
               Try again
             </button>
@@ -421,20 +392,18 @@ export default function AsksPage() {
         )}
 
         {phase === 'ready' && listed.length === 0 && (
-          <div className="rounded-card border border-soft-line bg-soft-surface p-5 shadow-card">
-            <h2 className="mb-1.5 font-soft-display text-[16px] font-bold text-soft-ink">
+          <div className="rounded-card border border-dashed border-soft-line-strong px-5 py-10 text-center">
+            <h2 className="font-soft-display text-[17px] font-bold text-soft-ink">
               Nothing open right now
             </h2>
-            <p className="mb-4 text-[13.5px] leading-[1.6] text-soft-ink-muted">
-              No one has an open Ask at this moment. When someone does, their question, budget,
-              seats and countdown show up here.
+            <p className="mx-auto mt-1.5 max-w-[34ch] text-[13.5px] leading-[1.55] text-soft-ink-muted">
+              Post a question with a budget and answers will show up here, sealed until you pick.
             </p>
-            {/* Pusty ekran jest zaproszeniem do dzialania, nie tylko raportem. */}
             {!composerOpen && (
               <button
                 type="button"
                 onClick={() => setComposerOpen(true)}
-                className="rounded-lg bg-soft-primary px-4 py-2 font-soft-display text-[13px] font-semibold text-white transition-transform duration-150 ease-out active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface"
+                className="mt-4 rounded-pill bg-soft-primary px-4 py-2 font-soft-display text-[13px] font-semibold text-soft-on-primary transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-bg"
               >
                 Ask the first one
               </button>
@@ -443,70 +412,58 @@ export default function AsksPage() {
         )}
 
         {phase === 'ready' && listed.length > 0 && (
-          <div className="flex flex-col gap-4">{listed.map(renderAsk)}</div>
+          <div className="flex flex-col gap-2.5">{listed.map(renderAsk)}</div>
         )}
 
-        {/* ===== HISTORIA =====
-            Rozstrzygniety Ask znikal z produktu calkowicie - nie widzial go
-            ani autor, ani ludzie, ktorzy na niego odpowiedzieli i chcieli
-            zobaczyc swoja wyplate. Na produkcie, ktorego teza brzmi
-            "rozliczone platnosci sa zapisem", chowanie kazdej rozliczonej
-            sprawy bylo odwrotnoscia tezy.
-
-            Stoi POD otwartymi, bo otwarte sa powodem wejscia. Historia jest
-            dowodem, ze to nie jest pusty rynek - i dziala tylko wtedy, gdy
-            nie zaslania zaproszenia. */}
+        {/* HISTORIA - rozstrzygniete Aski sa dowodem, ze to nie pusty rynek.
+            Stoi POD otwartymi i jest zwarta: nie moze zaslaniac zaproszenia.
+            Zdanie o odslonietych odpowiedziach siedzi w `title` naglowka, a nie
+            w akapicie - i nie mowi "paid", bo przy escrow resolve() tylko
+            przypisuje salda (patrz AskFundingNote). */}
         {phase === 'ready' && resolved !== null && resolved.length > 0 && (
-          <div className="mt-10">
-            <h2 className="mb-1.5 font-soft-display text-[15px] font-semibold uppercase tracking-[0.14em] text-soft-ink-faint">
+          <section className="mt-10">
+            <h2
+              className="mb-2 font-soft-display text-[13px] font-semibold text-soft-ink-muted"
+              title="Resolved by their authors. Every answer is unsealed, and each accepted one is recorded with its transaction."
+            >
               Settled
             </h2>
-            {/* Nie "paid": przy escrow resolve() tylko przypisuje salda, a
-                tokeny wychodza przy claim() (zasada przy zdaniu o `funding`
-                w AskCard.tsx). Prawda w obu wariantach: /accept odrzuca
-                przyjecie bez hasha przelewu, a /escrow-resolve zapisuje hash
-                transakcji resolve() przy kazdej przyznanej odpowiedzi.
-                ink-muted, nie ink-soft: ink-soft ma na bieli 3.43:1 i przy
-                13.5px nie trzyma AA. */}
-            <p className="mb-4 text-[13.5px] leading-[1.6] text-soft-ink-muted">
-              Resolved by their authors. Every answer is unsealed, and each accepted one is
-              recorded with its transaction.
-            </p>
-            <div className="flex flex-col gap-4">{resolved.map(renderAsk)}</div>
-          </div>
+            <div className="flex flex-col gap-2.5">{resolved.map(renderAsk)}</div>
+          </section>
         )}
 
         {/* Awaria historii NIE zabiera listy otwartych - to osobne zapytanie
-            i osobna wiadomosc. Milczenie tutaj znaczyloby "nic sie nigdy nie
+            i osobna wiadomosc. Milczenie znaczyloby "nic sie nigdy nie
             rozliczylo", czyli nieprawde o produkcie. */}
         {phase === 'ready' && resolvedFailed && (
-          <p className="mt-10 text-[13px] leading-[1.6] text-soft-ink-soft">
+          <p className="mt-10 text-[13px] leading-[1.6] text-soft-ink-muted">
             Settled asks could not be loaded. This is a failed read, not an empty history. The
             open ones above are unaffected.
           </p>
         )}
       </div>
-      {/* Wyjscie z tej strony na telefonie. Dolny pasek feedu jest jego
-          wewnetrznym przelacznikiem paneli i tu nie dziala - bez tego /asks
-          bylo na telefonie slepym zaulkiem: gorna belka chowa sie pod
-          hamburgerem, wiec droga powrotna istniala, ale nie bylo jej widac. */}
     </main>
   );
 }
 
-/** Ksztalt karty bez tresci - zeby nie sugerowac danych, ktorych jeszcze nie ma. */
+/** Ksztalt wiersza bez tresci - zeby nie sugerowac danych, ktorych jeszcze nie ma. */
 function LoadingList() {
   return (
-    <div className="flex flex-col gap-4" aria-busy="true" aria-label="Loading open asks">
-      {[0, 1].map((index) => (
+    <div className="flex flex-col gap-2.5" aria-busy="true" aria-label="Loading open asks">
+      {[0, 1, 2].map((index) => (
         <div
           key={index}
-          className="rounded-card border border-soft-line bg-soft-surface p-5 shadow-card"
+          className="flex items-start gap-4 rounded-card border border-soft-line bg-soft-surface px-4 py-3.5 shadow-card sm:px-5"
         >
-          <div className="mb-4 h-3 w-24 rounded-pill bg-soft-sunken" />
-          <div className="mb-2 h-3.5 w-full rounded-pill bg-soft-sunken" />
-          <div className="mb-5 h-3.5 w-3/4 rounded-pill bg-soft-sunken" />
-          <div className="h-12 w-full rounded-pill bg-soft-sunken" />
+          <div className="w-[88px] shrink-0 sm:w-[104px]">
+            <div className="mb-1.5 h-6 w-16 rounded-md bg-soft-sunken" />
+            <div className="h-2.5 w-14 rounded-md bg-soft-sunken" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="mb-1.5 h-3.5 w-full rounded-md bg-soft-sunken" />
+            <div className="mb-3 h-3.5 w-2/3 rounded-md bg-soft-sunken" />
+            <div className="h-2.5 w-1/2 rounded-md bg-soft-sunken" />
+          </div>
         </div>
       ))}
     </div>
@@ -651,7 +608,7 @@ class SolAcceptError extends Error {
 }
 
 const panelClass =
-  'rounded-card border border-soft-line bg-soft-surface p-4 font-soft shadow-card sm:p-5';
+  'rounded-xl bg-soft-bg p-4 font-soft sm:p-5';
 const fieldClass =
   'w-full rounded-lg border border-soft-line bg-soft-surface px-3 py-2 font-soft text-[14px] text-soft-ink placeholder:text-soft-ink-faint focus:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary';
 const buttonClass =

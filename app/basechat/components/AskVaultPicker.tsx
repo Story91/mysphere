@@ -107,12 +107,9 @@ export default function AskVaultPicker({
   );
 
   return (
-    <div className="mt-4">
-      <label className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-soft-ink-faint">
-        About a vault
-        <span className="ml-1.5 font-soft text-[11px] font-normal normal-case tracking-normal text-soft-ink-faint">
-          optional
-        </span>
+    <div>
+      <label className="block text-[12px] font-semibold text-soft-ink-muted">
+        Pick a listed vault
 
         {phase.kind === 'ready' && phase.vaults.length > 0 && (
           <select

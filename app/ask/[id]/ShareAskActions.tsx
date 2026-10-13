@@ -27,9 +27,12 @@ import { useState } from 'react';
 export default function ShareAskActions({
   askId,
   perAnswer,
+  children,
 }: {
   askId: string;
   perAnswer: string;
+  /** Wiodaca akcja strony (np. "Answer this ask") - stoi PRZED udostepnianiem. */
+  children?: React.ReactNode;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -63,21 +66,24 @@ export default function ShareAskActions({
   };
 
   const button =
-    'inline-flex items-center justify-center rounded-lg px-3.5 py-2 font-soft-display text-[12.5px] font-semibold transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface';
+    'inline-flex items-center justify-center rounded-pill px-4 py-2 font-soft-display text-[13px] font-semibold transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface';
 
   return (
-    <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-soft-line pt-4">
+    <div className="flex flex-wrap items-center gap-2">
+      {children}
+      {/* Jedna wypelniona akcja na ekran: odpowiedz. Udostepnianie jest
+          obwodka, kopiowanie bez obwodki - nie przyciagaja oka do siebie. */}
       <button
         type="button"
         onClick={() => void share()}
-        className={`${button} bg-soft-primary text-white`}
+        className={`${button} border border-soft-line-strong bg-soft-surface text-soft-ink hover:bg-soft-sunken`}
       >
-        Share this ask
+        Share
       </button>
       <button
         type="button"
         onClick={() => void copy()}
-        className={`${button} border border-soft-line bg-soft-surface text-soft-ink-muted hover:text-soft-ink`}
+        className={`${button} text-soft-ink-muted hover:text-soft-ink`}
       >
         {copied ? 'Link copied' : 'Copy link'}
       </button>

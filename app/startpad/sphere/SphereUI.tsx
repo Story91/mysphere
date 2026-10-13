@@ -33,12 +33,12 @@ export function PageHero({
   children?: ReactNode;
 }) {
   return (
-    <section className="sph-hero rounded-[24px] border border-sp-shade/10 p-5 sm:p-6">
+    <section className="sph-hero rounded-card border border-sp-shade/10 p-5 sm:p-6">
       <div className="sph-orb left-[-50px] top-[-70px] h-44 w-44 bg-sp-brand/35" aria-hidden="true" />
       <div className="relative">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="flex items-center gap-2 font-soft-display text-[24px] font-extrabold leading-tight text-sp-ink sm:text-[28px]">
+            <h2 className="flex items-center gap-2 font-soft-display text-[20px] font-extrabold leading-tight tracking-[-0.01em] text-sp-ink sm:text-[22px]">
               {icon}
               {title}
             </h2>
@@ -142,7 +142,7 @@ export function StatValue({
  */
 export function StatShell({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`min-w-0 rounded-2xl bg-white/70 p-3.5 backdrop-blur-sm ${className}`} style={{ containerType: 'inline-size' }}>
+    <div className={`min-w-0 rounded-xl bg-sp-sunken p-3.5 ${className}`} style={{ containerType: 'inline-size' }}>
       {children}
     </div>
   );
@@ -168,7 +168,7 @@ export function BigStat({
     tone === 'brand' ? 'text-sp-brand' : tone === 'up' ? 'text-sp-up' : tone === 'down' ? 'text-sp-down' : 'text-sp-ink';
   return (
     <StatShell>
-      <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/50">{label}</p>
+      <p className="text-[12px] font-semibold text-sp-shade/60">{label}</p>
       <div className={`mt-1 font-soft-display font-extrabold ${toneClass}`}>
         {value === null ? (
           <span className="sph-skeleton inline-block h-6 w-20 align-middle" />
@@ -176,7 +176,7 @@ export function BigStat({
           <StatValue value={value} decimals={decimals} suffix={suffix} max={27} />
         )}
       </div>
-      {hint && <p className="mt-1 text-[10px] font-bold leading-tight text-sp-shade/40">{hint}</p>}
+      {hint && <p className="mt-1 text-[11px] leading-tight text-sp-shade/55">{hint}</p>}
     </StatShell>
   );
 }
@@ -204,7 +204,7 @@ export function MeterBar({
       <div className="h-2 w-full overflow-hidden rounded-full bg-sp-shade/10">
         <div className={`h-full rounded-full ${fill} transition-[width] duration-700 ease-out`} style={{ width: `${width}%` }} />
       </div>
-      <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 text-[10px] font-extrabold uppercase tracking-[0.06em] text-sp-shade/45">
+      <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 text-[11.5px] font-semibold text-sp-shade/60">
         <span>{left}</span>
         <span>{right}</span>
       </div>
@@ -233,8 +233,8 @@ export function Disclosure({
 }) {
   const shell =
     variant === 'card'
-      ? 'sph-card rounded-[20px] border border-sp-shade/10 bg-sp-surface'
-      : 'rounded-2xl border border-sp-shade/10 bg-sp-shade/[0.03]';
+      ? 'sph-card rounded-card border border-sp-shade/10 bg-sp-surface'
+      : 'rounded-xl border border-sp-shade/10 bg-sp-shade/[0.03]';
   return (
     <details className={`group ${shell}`}>
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3.5 py-2.5 text-[11.5px] font-extrabold text-sp-shade/60 transition-colors hover:text-sp-brand [&::-webkit-details-marker]:hidden">
@@ -264,7 +264,7 @@ export function ActionCard({
   children?: ReactNode;
 }) {
   return (
-    <div className="sph-card flex flex-col justify-between gap-3 rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4">
+    <div className="sph-card flex flex-col justify-between gap-3 rounded-card border border-sp-shade/10 bg-sp-surface p-4">
       <div>
         <p className="flex flex-wrap items-center gap-2 text-[13.5px] font-extrabold text-sp-ink">
           {title} {badge}
@@ -312,7 +312,7 @@ export function LearnMore({ children }: { children: ReactNode }) {
   return (
     <Link
       href="/startpad/sphere/about"
-      className="sph-card flex items-center justify-between gap-2 rounded-[20px] border border-dashed border-sp-shade/20 bg-sp-surface px-4 py-3 text-[11.5px] font-bold text-sp-shade/55 hover:text-sp-brand"
+      className="sph-card flex items-center justify-between gap-2 rounded-card border border-dashed border-sp-shade/20 bg-sp-surface px-4 py-3 text-[11.5px] font-bold text-sp-shade/55 hover:text-sp-brand"
     >
       <span>{children}</span>
       <ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -333,7 +333,7 @@ export function KeeperSection({ children }: { children: ReactNode }) {
   if (isCreator) return <>{children}</>;
   return (
     <details className="group">
-      <summary className="sph-card flex cursor-pointer list-none items-center justify-between rounded-[20px] border border-sp-shade/10 bg-sp-surface px-4 py-3 text-[12.5px] font-extrabold text-sp-shade/60 transition-colors hover:text-sp-brand [&::-webkit-details-marker]:hidden">
+      <summary className="sph-card flex cursor-pointer list-none items-center justify-between rounded-card border border-sp-shade/10 bg-sp-surface px-4 py-3 text-[12.5px] font-extrabold text-sp-shade/60 transition-colors hover:text-sp-brand [&::-webkit-details-marker]:hidden">
         Keeper operations - anyone can run these, gas is the only cost
         <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-sp-shade/40 group-open:hidden">show</span>
         <span className="hidden text-[10px] font-bold uppercase tracking-[0.08em] text-sp-shade/40 group-open:inline">hide</span>
@@ -354,7 +354,7 @@ export function AdvancedSection({ children }: { children: ReactNode }) {
   if (!isCreator) return null;
   return (
     <details className="group">
-      <summary className="sph-card flex cursor-pointer list-none items-center justify-between rounded-[20px] border border-sp-shade/10 bg-sp-surface px-4 py-3 text-[12.5px] font-extrabold text-sp-shade/60 transition-colors hover:text-sp-brand [&::-webkit-details-marker]:hidden">
+      <summary className="sph-card flex cursor-pointer list-none items-center justify-between rounded-card border border-sp-shade/10 bg-sp-surface px-4 py-3 text-[12.5px] font-extrabold text-sp-shade/60 transition-colors hover:text-sp-brand [&::-webkit-details-marker]:hidden">
         Advanced - full contract console
         <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-sp-shade/40 group-open:hidden">show</span>
         <span className="hidden text-[10px] font-bold uppercase tracking-[0.08em] text-sp-shade/40 group-open:inline">hide</span>

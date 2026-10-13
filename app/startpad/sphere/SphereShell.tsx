@@ -3,7 +3,7 @@
 /**
  * Wspolna rama stron /startpad/sphere/* - naglowek, zakladki podstron,
  * baner stanu pre-launch. Konwencje wizualne 1:1 z LaunchpadBoard
- * (karty rounded-[20px], tokeny sp-*, pastylka sieci).
+ * (karty rounded-card, tokeny sp-*, pastylka sieci).
  *
  * Od 2026-09-10 mieszka tu takze JEDNO zrodlo faktow lancuchowych huba
  * (useSphereChainFacts) - hub i /about mowia tymi samymi liczbami, bo
@@ -12,7 +12,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ArrowLeft, Flame, Hand, ShieldCheck, Users } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ArrowLeft, ChevronDown, Flame, Hand, ShieldCheck, Users } from 'lucide-react';
 import type { Address, ContractFunctionParameters } from 'viem';
 import { LAUNCH_STATE } from '../config';
 import { useSphereRead } from './sphereActions';
@@ -34,15 +35,25 @@ import './sphere-motion.css';
 
 // Zakladka Buy prowadzi na strone handlu tokenem (?c=8453, zeby link wygrywal
 // z zapamietana siecia goscia) i istnieje tylko po launchu.
-const TABS = [
+const PRIMARY_TABS = [
   { href: '/startpad/sphere', label: 'Overview' },
   ...(SPHERE_TOKEN_ADDRESS ? [{ href: `/startpad/${SPHERE_TOKEN_ADDRESS}?c=8453`, label: 'Buy' }] : []),
   { href: '/startpad/sphere/season', label: 'Season' },
-  { href: '/startpad/sphere/escrow', label: 'Escrow' },
-  { href: '/startpad/sphere/rewards', label: 'Rewards' },
-  { href: '/startpad/sphere/vesting', label: 'Vesting' },
-  { href: '/startpad/sphere/about', label: 'About' },
 ];
+
+/**
+ * Trzy podstrony skarbca i keeperow schowane pod jednym wpisem. Siedem rownych
+ * zakladek nie miescilo sie na telefonie i kazalo goscowi zgadywac, ktora jest
+ * dla niego; Escrow, Rewards i Vesting to narzedzia opiekunow, nie pierwszy ruch
+ * kupujacego. Zadna trasa nie znika - zmienia sie tylko miejsce linku.
+ */
+const TREASURY_TABS = [
+  { href: '/startpad/sphere/escrow', label: 'Escrow', hint: 'Creator stream, release splits' },
+  { href: '/startpad/sphere/rewards', label: 'Rewards vault', hint: 'Fee inflows, pull to treasury' },
+  { href: '/startpad/sphere/vesting', label: 'Vesting', hint: 'Treasury lock, 30d cliff / 12m' },
+];
+
+const ABOUT_TAB = { href: '/startpad/sphere/about', label: 'About' };
 
 /**
  * Dwuklasowe plakietki uczciwosci (spec sekcja 5): tylko to, co wymusza
@@ -437,10 +448,77 @@ export function formatIn(unixSeconds: number): string {
   return h > 0 ? `in ${h} h ${mins % 60} min` : `in ${mins} min`;
 }
 
+function TreasuryMenu({ pathname }: { pathname: string | null }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const active = TREASURY_TABS.some((tab) => pathname === tab.href);
+
+  // Przejscie na inna strone zamyka menu.
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (event: MouseEvent) => {
+      if (!ref.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onPointer);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onPointer);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        data-active={active}
+        aria-expanded={open}
+        aria-haspopup="true"
+        onClick={() => setOpen((value) => !value)}
+        className={`sph-tab isolate inline-flex items-center gap-1 whitespace-nowrap px-3.5 py-2 text-[12px] font-extrabold ${active ? 'text-sp-brand' : 'text-sp-shade/60 hover:text-sp-brand'}`}
+      >
+        Treasury
+        <ChevronDown
+          className={`h-3 w-3 transition-transform [transition-duration:var(--dur-dropdown)] ease-out-strong ${open ? 'rotate-180' : ''}`}
+          aria-hidden="true"
+        />
+      </button>
+      <div
+        className={`absolute right-0 top-full z-30 mt-2 w-60 origin-top-right rounded-card border border-sp-shade/10 bg-sp-surface p-1.5 shadow-float transition-[opacity,transform] [transition-duration:var(--dur-dropdown)] ease-out-strong ${
+          open ? 'scale-100 opacity-100' : 'pointer-events-none scale-95 opacity-0'
+        }`}
+        aria-hidden={!open}
+      >
+        {TREASURY_TABS.map((tab) => (
+          <Link
+            key={tab.href}
+            href={tab.href}
+            tabIndex={open ? 0 : -1}
+            aria-current={pathname === tab.href ? 'page' : undefined}
+            className={`block rounded-lg px-3 py-2 transition-colors [transition-duration:var(--dur-press)] hover:bg-sp-sunken ${pathname === tab.href ? 'bg-sp-sunken' : ''}`}
+          >
+            <span className="block text-[13px] font-semibold text-sp-ink">{tab.label}</span>
+            <span className="block text-[11.5px] text-sp-shade/60">{tab.hint}</span>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function SphereShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const aboutActive = pathname === ABOUT_TAB.href;
   return (
-    <div className="sphere-shell mx-auto w-full max-w-5xl px-4 pb-16 pt-6 sm:px-6">
+    <div className="board min-h-screen">
+    <div className="sphere-shell mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Link
@@ -453,14 +531,11 @@ export default function SphereShell({ children }: { children: React.ReactNode })
             <Flame className="sph-flame h-5 w-5 text-sp-brand" aria-hidden="true" /> $SPHERE
           </h1>
         </div>
-        {/* PASEK ZAKLADEK MUSI SIE PRZEWIJAC NA TELEFONIE.
-            Siedem zakladek nie miesci sie w 375 px (zmierzone: 454 px tresci w
-            348 px kontenera), a `overflow-hidden` po prostu je UCINAL - Vesting
-            i About byly na telefonie nieosiagalne, bez zadnego sladu, ze tam sa.
-            `overflow-x-auto` z `snap` zamienia to w przewijana szyne; na szerokim
-            ekranie nic sie nie zmienia, bo tresc i tak sie miesci. */}
-        <nav className="-mx-1 flex max-w-full items-stretch gap-0 overflow-x-auto scroll-smooth rounded-full border border-sp-shade/10 bg-sp-surface px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:overflow-visible sm:px-0">
-          {TABS.map((tab) => {
+        {/* Pasek ma pieciu wpisow (bylo siedem), wiec miesci sie w 375 px bez
+            przewijania - a menu "Treasury" musi wystawac poza pasek, czego
+            overflow-x-auto by nie zniosl. */}
+        <nav className="flex max-w-full items-stretch rounded-lg border border-sp-shade/10 bg-sp-surface px-1">
+          {PRIMARY_TABS.map((tab) => {
             const active = pathname === tab.href;
             return (
               <Link
@@ -468,12 +543,21 @@ export default function SphereShell({ children }: { children: React.ReactNode })
                 href={tab.href}
                 data-active={active}
                 aria-current={active ? 'page' : undefined}
-                className={`sph-tab isolate shrink-0 snap-start whitespace-nowrap px-3.5 py-2 text-[12px] font-extrabold ${active ? 'text-sp-brand' : 'text-sp-shade/60 hover:text-sp-brand'}`}
+                className={`sph-tab isolate shrink-0 whitespace-nowrap px-3.5 py-2 text-[12px] font-extrabold ${active ? 'text-sp-brand' : 'text-sp-shade/60 hover:text-sp-brand'}`}
               >
                 {tab.label}
               </Link>
             );
           })}
+          <TreasuryMenu pathname={pathname} />
+          <Link
+            href={ABOUT_TAB.href}
+            data-active={aboutActive}
+            aria-current={aboutActive ? 'page' : undefined}
+            className={`sph-tab isolate shrink-0 whitespace-nowrap px-3.5 py-2 text-[12px] font-extrabold ${aboutActive ? 'text-sp-brand' : 'text-sp-shade/60 hover:text-sp-brand'}`}
+          >
+            {ABOUT_TAB.label}
+          </Link>
         </nav>
       </div>
 
@@ -487,7 +571,7 @@ export default function SphereShell({ children }: { children: React.ReactNode })
           nie o kontraktach. Zamiast "wybrac jedna liczbe z trzech" wyrzucamy
           liczbe: jej miejsce jest w docs/, gdzie stoi obok daty. */}
       {!SPHERE_LIVE && (
-        <div className="mb-4 rounded-[20px] border border-sp-brand/30 bg-sp-brand-soft p-4">
+        <div className="mb-4 rounded-card border border-sp-brand/30 bg-sp-brand-soft p-4">
           <p className="text-[13px] font-extrabold text-sp-ink">No SPHERE addresses in this build</p>
           <p className="mt-1 text-[12px] leading-relaxed text-sp-shade/70">
             This build carries no SPHERE contract addresses, so the page cannot read a single number
@@ -499,7 +583,7 @@ export default function SphereShell({ children }: { children: React.ReactNode })
 
       {/* Stan posredni: peryferia wdrozone, token jeszcze przed launch(). */}
       {SPHERE_LIVE && !SPHERE_TOKEN_ADDRESS && (
-        <div className="mb-4 rounded-[20px] border border-sp-brand/30 bg-sp-brand-soft p-4">
+        <div className="mb-4 rounded-card border border-sp-brand/30 bg-sp-brand-soft p-4">
           <p className="text-[13px] font-extrabold text-sp-ink">Contracts live · token not launched yet</p>
           <p className="mt-1 text-[12px] leading-relaxed text-sp-shade/70">
             The SPHERE peripheral contracts (escrow, rewards, vesting) are deployed on Base
@@ -510,6 +594,7 @@ export default function SphereShell({ children }: { children: React.ReactNode })
       )}
 
       <div className="sph-stagger">{children}</div>
+    </div>
     </div>
   );
 }

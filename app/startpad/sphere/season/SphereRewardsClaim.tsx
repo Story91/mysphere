@@ -822,7 +822,7 @@ export default function SphereRewardsClaim({ dist }: { dist: DistributorState | 
 
   if (!dist) return null;
 
-  const card = 'sph-card rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 sm:p-5';
+  const card = 'sph-card rounded-card border border-sp-shade/10 bg-sp-surface p-4 sm:p-5';
   const head = (
     <h3 className="flex items-center gap-2 text-[13.5px] font-extrabold text-sp-ink">
       <Gift className="h-4 w-4 text-sp-brand" aria-hidden="true" /> Your SPHERE rewards

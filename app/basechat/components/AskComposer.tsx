@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { ChevronRight, X } from 'lucide-react';
 import {
   ASK_DURATIONS,
   MAX_SEATS,
@@ -352,6 +353,7 @@ export default function AskComposer({
 
   const fieldClass =
     'w-full rounded-lg border border-soft-line bg-soft-surface px-3 py-2 font-soft text-[14px] text-soft-ink placeholder:text-soft-ink-faint focus:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary';
+  const labelClass = 'block text-[12px] font-semibold text-soft-ink-muted';
 
   /** Oplata jako procent. `null` = nie znamy jej, wiec jej nie nazywamy liczba. */
   const feePercent =
@@ -376,27 +378,34 @@ export default function AskComposer({
       onSubmit={handleSubmit}
       className={`rounded-card border border-soft-line bg-soft-surface p-4 font-soft shadow-card sm:p-5 ${className}`}
     >
-      {/* Morska kropka to ten sam znak Aska co na pasku stanu AskCard i w
-          naglowku raila - kompozytor stoi w feedzie obok kompozytora postu
-          na identycznej bialej karcie i tylko po niej widac, ktory to tryb. */}
-      <h2 className="mb-1 flex items-center gap-2 font-soft-display text-[17px] font-bold text-soft-ink">
-        <span className="h-2 w-2 shrink-0 rounded-full bg-soft-ask" aria-hidden="true" />
-        Ask something
-      </h2>
-      <p className="mb-4 text-[12px] leading-[1.5] text-soft-ink-faint">
-        A question with a budget, seats and a deadline. Answers stay sealed until you resolve.
-      </p>
+      {/* Morska kropka to ten sam znak Aska co w wierszu i w naglowku raila.
+          Naglowek nie ma juz podtytulu: trzy pola i przycisk tlumacza sie same,
+          a mechanike (zapieczetowane odpowiedzi, wyplata) mowia opisy nizej. */}
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2 font-soft-display text-[16px] font-bold text-soft-ink">
+          <span className="h-2 w-2 shrink-0 rounded-full bg-soft-ask" aria-hidden="true" />
+          New ask
+        </h2>
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            aria-label="Close"
+            className="-mr-1.5 inline-flex h-8 w-8 items-center justify-center rounded-lg text-soft-ink-muted transition-[background-color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken active:scale-[0.94] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
+        )}
+      </div>
 
-      <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-soft-ink-faint">
-        Question
-        <textarea
-          value={question}
-          onChange={(event) => setQuestion(event.target.value)}
-          rows={3}
-          placeholder="What do you need judged?"
-          className={`mt-1.5 block resize-y ${fieldClass} font-normal normal-case tracking-normal`}
-        />
-      </label>
+      <textarea
+        value={question}
+        onChange={(event) => setQuestion(event.target.value)}
+        rows={3}
+        aria-label="Question"
+        placeholder="What do you need judged?"
+        className={`block resize-y ${fieldClass}`}
+      />
 
       {/* ===== ZACZATKI - TYLKO NA PUSTYM FORMULARZU =====
           Znikaja, gdy tylko ktos zacznie pisac. Pigulka podmieniajaca budzet
@@ -409,36 +418,20 @@ export default function AskComposer({
           z budzetem, miejscami i terminem. Uzasadnienie doboru tematow stoi
           w app/utils/asks/templates.ts. */}
       {question === '' && budgetText === '' && ASK_TEMPLATES_SAFE.length > 0 && (
-        <div className="mt-2">
-          <p className="mb-1.5 text-[11px] text-soft-ink-faint">Or start from one of these:</p>
-          <div className="flex flex-wrap gap-1.5">
-            {ASK_TEMPLATES_SAFE.map((template) => (
-              <button
-                key={template.id}
-                type="button"
-                disabled={disabled || pending}
-                onClick={() => applyTemplate(template)}
-                className="rounded-pill border border-soft-line bg-soft-bg px-2.5 py-1 font-soft-display text-[11.5px] font-semibold text-soft-ink-muted transition-[background-color,border-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:border-soft-primary/60 hover:text-soft-primary-deep active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary disabled:opacity-50 disabled:active:scale-100"
-              >
-                {template.chip}
-              </button>
-            ))}
-          </div>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <span className="mr-0.5 text-[12px] text-soft-ink-soft">Try:</span>
+          {ASK_TEMPLATES_SAFE.map((template) => (
+            <button
+              key={template.id}
+              type="button"
+              disabled={disabled || pending}
+              onClick={() => applyTemplate(template)}
+              className="rounded-pill border border-soft-line bg-soft-bg px-2.5 py-1 font-soft-display text-[11.5px] font-semibold text-soft-ink-muted transition-[background-color,border-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:border-soft-line-strong hover:text-soft-ink active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary disabled:opacity-50 disabled:active:scale-100"
+            >
+              {template.chip}
+            </button>
+          ))}
         </div>
-      )}
-
-      {/* ===== SKARBIEC Z LISTY =====
-          Stoi POD pytaniem, bo dotyczy tego, o co pytamy, a nie tego, ile za to
-          placimy. Cala mechanika (odczyt, awaria, ponowna proba) siedzi w
-          `AskVaultPicker` - tutaj zostaje sam wybor. Bez `loadVaults` tego bloku
-          nie ma i formularz jest co do piksela taki jak przed ta zmiana. */}
-      {loadVaults && (
-        <AskVaultPicker
-          loadVaults={loadVaults}
-          selected={vault}
-          onSelect={setVault}
-          disabled={disabled || pending}
-        />
       )}
 
       {/* ===== SZYNA =====
@@ -446,84 +439,80 @@ export default function AskComposer({
           Farcastera wybor znika calkiem - opcja, ktorej nie da sie zaplacic,
           jest gorsza niz jej brak (ta sama zasada co zakladka Solany). */}
       {solWallet.available && (
-        <fieldset className="mt-4">
-          <legend className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-soft-ink-faint">
-            Pay in
-          </legend>
-          <div className="grid grid-cols-2 gap-1 rounded-pill border border-soft-line bg-soft-sunken p-1" role="radiogroup">
-            <RailChoice
-              active={!isSol}
-              onSelect={() => pickRail('usdc-base')}
-              disabled={pending}
-              token="USDC"
-              network="on Base"
-            />
-            <RailChoice
-              active={isSol}
-              onSelect={() => pickRail('sol-solana')}
-              disabled={pending}
-              token="SOL"
-              network="on Solana"
-            />
-          </div>
-        </fieldset>
+        <div
+          className="mt-4 grid grid-cols-2 gap-1 rounded-lg bg-soft-sunken p-1"
+          role="radiogroup"
+          aria-label="Pay in"
+        >
+          <RailChoice
+            active={!isSol}
+            onSelect={() => pickRail('usdc-base')}
+            disabled={pending}
+            token="USDC"
+            network="on Base"
+          />
+          <RailChoice
+            active={isSol}
+            onSelect={() => pickRail('sol-solana')}
+            disabled={pending}
+            token="SOL"
+            network="on Solana"
+          />
+        </div>
       )}
 
-      <div className="mt-3 grid grid-cols-2 gap-3">
-        <label className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-soft-ink-faint">
-          {isSol ? 'Budget in SOL' : 'Budget'}
+      <div className="mt-3 grid grid-cols-[minmax(0,1fr)_96px] gap-3">
+        <label className={labelClass}>
+          {isSol ? 'Budget in SOL' : 'Budget in USDC'}
           <input
             value={budgetText}
             onChange={(event) => setBudgetText(event.target.value)}
             inputMode="decimal"
             placeholder={isSol ? '0.05' : '6.00'}
-            className={`mt-1.5 block ${fieldClass} font-normal normal-case tracking-normal tabular-nums`}
+            className={`mt-1 block ${fieldClass} font-normal tabular-nums`}
           />
         </label>
 
-        <label className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-soft-ink-faint">
+        <label className={labelClass}>
           Seats
           <input
             value={seatsText}
             onChange={(event) => setSeatsText(event.target.value)}
             inputMode="numeric"
             placeholder="3"
-            className={`mt-1.5 block ${fieldClass} font-normal normal-case tracking-normal tabular-nums`}
+            className={`mt-1 block ${fieldClass} font-normal tabular-nums`}
           />
         </label>
       </div>
 
-      <fieldset className="mt-4">
-        <legend className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-soft-ink-faint">
-          Deadline
-        </legend>
-        <div className="flex flex-wrap gap-2">
-          {ASK_DURATIONS.map((duration) => {
-            const active = duration.ms === durationMs;
-            return (
-              <button
-                key={duration.ms}
-                type="button"
-                onClick={() => setDurationMs(duration.ms)}
-                aria-pressed={active}
-                className={`rounded-pill border px-3 py-1.5 text-[12px] font-semibold transition-transform duration-150 ease-out active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
-                  active
-                    ? 'border-soft-primary bg-soft-primary text-white'
-                    : 'border-soft-line bg-soft-surface text-soft-ink-muted'
-                }`}
-              >
-                {duration.label}
-              </button>
-            );
-          })}
-        </div>
+      <fieldset className="mt-3 flex flex-wrap items-center gap-1.5">
+        <legend className="sr-only">Deadline</legend>
+        <span className="mr-1 text-[12px] font-semibold text-soft-ink-muted" aria-hidden="true">
+          Ends in
+        </span>
+        {ASK_DURATIONS.map((duration) => {
+          const active = duration.ms === durationMs;
+          return (
+            <button
+              key={duration.ms}
+              type="button"
+              onClick={() => setDurationMs(duration.ms)}
+              aria-pressed={active}
+              className={`rounded-pill border px-3 py-1.5 text-[12px] font-semibold transition-[background-color,border-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
+                active
+                  ? 'border-soft-primary bg-soft-primary text-soft-on-primary'
+                  : 'border-soft-line bg-soft-surface text-soft-ink-muted hover:border-soft-line-strong'
+              }`}
+            >
+              {duration.label}
+            </button>
+          );
+        })}
       </fieldset>
 
       {/* Liczba, dla ktorej ktos w ogole usiadzie do odpowiedzi. */}
       <div className="mt-4 flex items-baseline justify-between gap-3 rounded-lg bg-soft-sunken px-3 py-2.5">
-        <span className="text-[11px] uppercase tracking-[0.12em] text-soft-ink-faint">
-          Per answer
-        </span>
+        <span className="text-[12px] font-semibold text-soft-ink-muted">Per answer</span>
         <span className="font-soft-display text-[20px] font-bold tabular-nums text-soft-accent-deep">
           {isSol ? `${formatLamports(perAnswerLamports)} SOL` : formatAskMoney(perAnswer)}
         </span>
@@ -531,18 +520,21 @@ export default function AskComposer({
       {isSol && (
         // Minimum nazwane ZANIM ktos je przekroczy - 0.005 SOL chroni pierwszy
         // przelew na puste konto przed odrzuceniem za rent.
-        <p className="mt-1.5 px-1 text-[11px] leading-[1.5] text-soft-ink-faint">
+        <p className="mt-1.5 px-1 text-[11.5px] leading-[1.5] text-soft-ink-soft">
           At least {formatLamports(MIN_PER_ANSWER_LAMPORTS)} SOL per answer, so the first payment to a new
           wallet always lands.
         </p>
       )}
 
-      {/* ================= FINANSOWANIE ================= */}
+      {/* ================= FINANSOWANIE =================
+          Przelacznik z JEDNYM opisem - tym wybranego wariantu. Dwie duze karty
+          z dwoma akapitami kazda zjadaly pol formularza; zdania zostaly te same
+          (kazde ma pokrycie w AskEscrow.sol), widac je tylko po jednym. */}
       {isSol ? (
         <div className="mt-4 flex flex-col gap-2.5">
           {/* Zdanie o pieniadzach dla SOL - to samo, ktore potem mowi karta.
               Nie ma tu wyboru escrow, bo escrow SOL nie istnieje. */}
-          <p className="break-words text-[11.5px] leading-[1.5] text-soft-ink-muted">
+          <p className="break-words text-[12px] leading-[1.5] text-soft-ink-muted">
             Paid on accept in SOL. Nothing is locked. You pay each answer you accept from the Solana
             wallet linked to your account.
           </p>
@@ -550,45 +542,68 @@ export default function AskComposer({
         </div>
       ) : escrowAvailable ? (
         <fieldset className="mt-4">
-          <legend className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-soft-ink-faint">
-            The money
-          </legend>
-          <div className="flex flex-col gap-2">
-            <FundingChoice
+          <legend className="sr-only">The money</legend>
+          <div className="grid grid-cols-2 gap-1 rounded-lg bg-soft-sunken p-1" role="radiogroup">
+            <Segment
               active={effectiveFunding === 'escrowed'}
               onSelect={() => setFunding('escrowed')}
-              title="Lock the budget now"
-              // Kazde zdanie tutaj ma pokrycie w AskEscrow.sol. Nie skracaj go
-              // do "funded" - to, ze pieniadze wychodza z portfela teraz, i to,
-              // ze nie wracaja za darmo, sa dla autora rownie wazne.
-              body={`The full budget leaves your wallet when you post and sits in a contract with no owner, no pause and no rescue function. Before the deadline you can only close this Ask by filling every seat; after it, unused seats come back${
-                feePercent ? ` minus ${feePercent}` : ' minus a fee'
-              }.`}
+              label="Lock budget now"
             />
-            <FundingChoice
+            <Segment
               active={effectiveFunding === 'on-resolve'}
               onSelect={() => setFunding('on-resolve')}
-              title="Pay as you accept"
-              body="Nothing moves now. You pay each answer you accept, yourself, from your own wallet. Nothing is held for the people answering; all they have is your resolve record."
+              label="Pay as you accept"
             />
           </div>
+          <p className="mt-2 break-words text-[12px] leading-[1.5] text-soft-ink-muted">
+            {effectiveFunding === 'escrowed'
+              ? // Kazde zdanie tutaj ma pokrycie w AskEscrow.sol. Nie skracaj go do
+                // "funded" - to, ze pieniadze wychodza z portfela teraz, i to, ze
+                // nie wracaja za darmo, sa dla autora rownie wazne.
+                `The full budget leaves your wallet when you post and sits in a contract with no owner, no pause and no rescue function. Before the deadline you can only close this Ask by filling every seat; after it, unused seats come back${
+                  feePercent ? ` minus ${feePercent}` : ' minus a fee'
+                }.`
+              : 'Nothing moves now. You pay each answer you accept, yourself, from your own wallet. Nothing is held for the people answering; all they have is your resolve record.'}
+          </p>
         </fieldset>
       ) : (
-        <p className="mt-4 text-[11.5px] leading-[1.5] text-soft-ink-faint">
+        <p className="mt-4 text-[12px] leading-[1.5] text-soft-ink-muted">
           {escrowUnavailableReason ??
             'Escrow is not available here, so this Ask holds nothing up front.'}{' '}
           You pay each answer you accept, yourself, from your own wallet.
         </p>
       )}
 
-      <p className="mt-3 text-[11.5px] leading-[1.5] text-soft-ink-faint">
+      {/* Skarbiec to rzadki dodatek, nie krok formularza - stoi zwiniety.
+          Cala mechanike (odczyt, awaria, ponowna proba) niesie AskVaultPicker. */}
+      {loadVaults && (
+        <details className="group mt-3 rounded-lg border border-soft-line">
+          <summary className="flex cursor-pointer list-none items-center gap-1.5 px-3 py-2.5 text-[12px] font-semibold text-soft-ink-muted transition-colors [transition-duration:var(--dur-press)] hover:text-soft-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary [&::-webkit-details-marker]:hidden">
+            <ChevronRight
+              className="h-3.5 w-3.5 transition-transform [transition-duration:var(--dur-dropdown)] ease-out-strong group-open:rotate-90"
+              aria-hidden="true"
+            />
+            {vault ? 'About a vault: attached' : 'About a vault? (optional)'}
+          </summary>
+          <div className="px-3 pb-3">
+            <AskVaultPicker
+              loadVaults={loadVaults}
+              selected={vault}
+              onSelect={setVault}
+              disabled={disabled || pending}
+            />
+          </div>
+        </details>
+      )}
+
+      <p className="mt-3 text-[11.5px] leading-[1.5] text-soft-ink-soft">
         {effectiveFunding === 'escrowed'
-          ? 'Posting sends two transactions: one to approve the USDC, one to lock it. The Ask is only created after the second one is confirmed.'
+          ? 'Two transactions: approve the USDC, then lock it. The Ask exists only after the second confirms.'
           : isSol
             ? 'Posting does not move any SOL.'
             : 'Posting does not move any money.'}{' '}
-        Let the deadline pass without resolving and your resolve rate drops on the front of every Ask
-        you post afterwards.
+        Letting the deadline pass without resolving lowers your resolve rate on every Ask you post
+        afterwards.
       </p>
 
       {progressNote && (
@@ -619,10 +634,8 @@ export default function AskComposer({
             Cancel
           </button>
         )}
-        {/* Pigulka z `shadow-chip`, jak przycisk na AskCard i w railu, i w tym
-            samym `primary-deep`: biel na zwyklym `soft-primary` ma 4.22:1 i przy
-            13px nie trzyma AA. `disabled:` stoi w arkuszu Tailwinda 3.4 PO
-            `hover:`, wiec wylaczony przycisk pod kursorem zostaje szary. */}
+        {/* `disabled:` stoi w arkuszu Tailwinda 3.4 PO `hover:`, wiec wylaczony
+            przycisk pod kursorem zostaje szary. */}
         <button
           type="submit"
           disabled={blocked}
@@ -636,23 +649,18 @@ export default function AskComposer({
 }
 
 /**
- * Jeden wybor finansowania.
- *
- * `role="radio"` na przycisku, a nie `<input type="radio">`: opis kazdego
- * wariantu ma dwa zdania i musi byc CZESCIA etykiety, zeby czytnik ekranu
- * przeczytal go razem z nazwa. Cale pole jest klikalne z tego samego powodu -
- * to nie jest wybor rozmiaru, tylko decyzja o tym, kiedy wychodza pieniadze.
+ * Segment przelacznika finansowania. `role="radio"` na przycisku, a nie
+ * <input type="radio">: opis wybranego wariantu stoi pod przelacznikiem i jest
+ * wspolny dla obu, wiec sam segment niesie tylko nazwe.
  */
-function FundingChoice({
+function Segment({
   active,
   onSelect,
-  title,
-  body,
+  label,
 }: {
   active: boolean;
   onSelect: () => void;
-  title: string;
-  body: string;
+  label: string;
 }) {
   return (
     <button
@@ -660,22 +668,11 @@ function FundingChoice({
       role="radio"
       aria-checked={active}
       onClick={onSelect}
-      className={`rounded-lg border p-3 text-left transition-transform duration-150 ease-out active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
-        active ? 'border-soft-primary bg-soft-primary/[0.06]' : 'border-soft-line bg-soft-surface'
+      className={`rounded-[7px] px-3 py-1.5 font-soft-display text-[12.5px] font-semibold transition-[background-color,box-shadow,color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
+        active ? 'bg-soft-surface text-soft-ink shadow-chip' : 'text-soft-ink-muted hover:text-soft-ink'
       }`}
     >
-      <span className="flex items-center gap-2">
-        <span
-          className={`h-3 w-3 shrink-0 rounded-full border-2 ${
-            active ? 'border-soft-primary bg-soft-primary' : 'border-soft-line-strong'
-          }`}
-          aria-hidden="true"
-        />
-        <span className="font-soft-display text-[13px] font-semibold text-soft-ink">{title}</span>
-      </span>
-      <span className="mt-1 block break-words text-[11.5px] leading-[1.5] text-soft-ink-muted">
-        {body}
-      </span>
+      {label}
     </button>
   );
 }

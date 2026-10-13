@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import AsksContent from './AsksContent';
+import BoardTabs, { type BoardTab } from './BoardTabs';
 import CuratorsContent from '../curators/CuratorsContent';
 import MoneyContent from '../money/MoneyContent';
 import LeaderboardContent from '../leaderboard/LeaderboardContent';
@@ -144,78 +144,48 @@ export function generateMetadata({ searchParams }: { searchParams: SearchParams 
   };
 }
 
-/** Jedna pigulka przelacznika. Aktywna wyglada jak aktywny wpis w belce. */
-function TabPill({ href, active, children }: { href: string; active: boolean; children: React.ReactNode }) {
-  return (
-    <Link
-      href={href}
-      aria-current={active ? 'page' : undefined}
-      className={`inline-flex items-center justify-center rounded-pill px-5 py-2 font-soft-display text-[13.5px] font-bold transition-[background-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-sunken ${
-        active ? 'bg-soft-primary text-white shadow-chip' : 'text-soft-ink-muted hover:bg-soft-surface'
-      }`}
-    >
-      {children}
-    </Link>
-  );
-}
+const TABS: BoardTab[] = [
+  { id: 'asks', label: 'Asks', href: '/asks' },
+  { id: 'money', label: 'Money', href: '/asks?tab=money' },
+  { id: 'paid', label: 'Paid', href: '/asks?tab=paid' },
+  { id: 'curators', label: 'Curators', href: '/asks?tab=curators' },
+];
 
 /**
- * Szerokosc kolumny przelacznika sledzi aktywna zakladke, zeby pigulki staly
+ * Szerokosc kolumny przelacznika sledzi aktywna zakladke, zeby segmenty staly
  * nad lewa krawedzia tresci, a nie obok niej.
  */
 const TAB_COLUMN: Record<Tab, string> = {
-  asks: 'max-w-[640px]',
+  asks: 'max-w-[680px]',
   money: 'max-w-[640px]',
   paid: 'max-w-[620px]',
   curators: 'max-w-[760px]',
 };
 
+/**
+ * Wrapper `.board` (globals.css) przemalowuje cala strone na kierunek "tablicy
+ * zlecen" przez podmiane tokenow - zaden komponent wewnatrz nie zna nowych
+ * kolorow. Przelacznik stoi ZAWSZE w tym samym miejscu drzewa (pierwsze dziecko
+ * wrappera), zeby wskaznik sie przesuwal zamiast sie odmontowywac.
+ */
 export default function AsksPage({ searchParams }: { searchParams: SearchParams }) {
   const tab = currentTab(searchParams);
 
-  const switcher = (
-    <nav
-      aria-label="Asks views"
-      /* flex-wrap, bo cztery pigulki przy 320px nie mieszcza sie w jednym
-         rzedzie - maja sie zlamac, a nie wyjechac poza ekran. */
-      className="inline-flex flex-wrap items-center gap-1 rounded-card border border-soft-line bg-soft-sunken p-1 sm:rounded-pill"
-    >
-      <TabPill href="/asks" active={tab === 'asks'}>
-        Asks
-      </TabPill>
-      <TabPill href="/asks?tab=money" active={tab === 'money'}>
-        Money
-      </TabPill>
-      <TabPill href="/asks?tab=paid" active={tab === 'paid'}>
-        Paid
-      </TabPill>
-      <TabPill href="/asks?tab=curators" active={tab === 'curators'}>
-        Curators
-      </TabPill>
-    </nav>
-  );
-
-  // Money i Paid nie nios wlasnego <main> - dostaja go tutaj, razem
-  // z przelacznikiem w srodku, zeby na stronie stal dokladnie jeden <main>.
-  if (tab === 'money' || tab === 'paid') {
-    return (
-      <main className="min-h-screen bg-soft-bg font-soft">
-        <div className={`mx-auto w-full px-4 pb-6 pt-10 sm:px-5 ${TAB_COLUMN[tab]}`}>{switcher}</div>
-        {tab === 'paid' ? <LeaderboardContent /> : <MoneyContent />}
-      </main>
-    );
-  }
-
   return (
-    <>
-      {/* Przelacznik stoi NAD trescia zakladki, ktora niesie WLASNY <main>
-          z tlem i min-h-screen (AsksContent / CuratorsContent); ten pasek to
-          <nav> nad nim. */}
-      <div className="bg-soft-bg pt-8">
-        <div className={`mx-auto w-full px-4 sm:px-5 ${TAB_COLUMN[tab]}`}>{switcher}</div>
+    <div className="board min-h-screen">
+      <div className={`mx-auto w-full px-4 pt-6 sm:px-5 ${TAB_COLUMN[tab]}`}>
+        <BoardTabs tabs={TABS} active={tab} label="Asks views" />
       </div>
 
-      {tab === 'curators' ? <CuratorsContent /> : <AsksContent />}
-    </>
+      {/* Money i Paid nie nios wlasnego <main> - dostaja go tutaj, zeby na
+          stronie stal dokladnie jeden <main>. Asks i Curators nios wlasny. */}
+      {tab === 'money' || tab === 'paid' ? (
+        <main className="font-soft">{tab === 'paid' ? <LeaderboardContent /> : <MoneyContent />}</main>
+      ) : tab === 'curators' ? (
+        <CuratorsContent />
+      ) : (
+        <AsksContent />
+      )}
+    </div>
   );
 }

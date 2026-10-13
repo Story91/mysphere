@@ -232,3 +232,32 @@
 @media (prefers-reduced-motion: reduce) {
   .sph-drop { animation: none; opacity: 0.5; left: 50%; }
 }
+
+
+/* ---- TABLICA ZLECEN (.board): hub $SPHERE bez poswiat i kaskady ---------- */
+/* Wlasciciel (2026-10-14): za duzo ruchu i ozdob. Zostaje ruch odpowiadajacy na
+   dzialanie (nacisniecie, rozwiniecie); znika wejscie sekcji z dolu, plywajace
+   poswiaty i unoszenie kart. */
+.board .sph-hero {
+  background: rgb(var(--sp-surface));
+}
+.board .sph-orb {
+  display: none;
+}
+.board .sph-stagger > * {
+  opacity: 1;
+  transform: none;
+  animation: none;
+}
+.board .sph-card:hover {
+  transform: none;
+  box-shadow: 0 2px 10px rgba(14, 17, 22, 0.08);
+}
+.board .sph-drop {
+  background: rgb(var(--sp-up-vivid));
+  box-shadow: 0 0 8px rgb(var(--sp-up-vivid) / 0.6);
+}
+.board .sph-tab::after {
+  border-radius: 8px;
+  background: rgb(var(--sp-shade) / 0.07);
+}

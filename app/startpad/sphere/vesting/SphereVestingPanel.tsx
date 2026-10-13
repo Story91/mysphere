@@ -224,7 +224,7 @@ export default function SphereVestingPanel() {
       </PageHero>
 
       {/* OS CZASU: jedyna rzecz, ktora trzeba tu zrozumiec ------------------ */}
-      <section className="sph-card rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
+      <section className="sph-card rounded-card border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
         <div className="flex items-baseline justify-between gap-3">
           <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-sp-shade/50">Unlock schedule</p>
           <p className="font-soft-display text-[13px] font-extrabold text-sp-brand">

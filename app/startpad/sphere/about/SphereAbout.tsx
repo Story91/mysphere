@@ -38,7 +38,7 @@ import {
 } from '../sphereConfig';
 
 function Card({ children }: { children: React.ReactNode }) {
-  return <section className="sph-card rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">{children}</section>;
+  return <section className="sph-card rounded-card border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">{children}</section>;
 }
 
 function AddrLink({ address, label, pendingText = 'not deployed yet' }: { address: Address | null; label: string; pendingText?: string }) {

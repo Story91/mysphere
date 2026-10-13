@@ -63,9 +63,9 @@ const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
 /** Widok stanu karty. Osobny od `AskStatus`, bo termin mija bez zapisu w bazie. */
-type AskView = 'open' | 'expired' | 'resolved';
+export type AskView = 'open' | 'expired' | 'resolved';
 
-function viewOf(ask: Ask, now: number): AskView {
+export function viewOf(ask: Ask, now: number): AskView {
   if (ask.status === 'resolved') return 'resolved';
   if (ask.status === 'expired' || isExpired(ask, now)) return 'expired';
   return 'open';
@@ -188,6 +188,52 @@ export function useNow(deadline: number, running: boolean): number | null {
   return now;
 }
 
+/**
+ * Zdanie o pieniadzach przy Asku - wspolne dla karty feedu i wiersza /asks,
+ * zeby oba mowily to samo tymi samymi slowami. Wynika z `funding` i z niczego
+ * innego (zasady w komentarzu przy <p> w AskCard nizej: przy 'escrowed' nigdy
+ * "paid out", przy 'on-resolve' nigdy slowo escrow, przy SOL nigdy escrow).
+ */
+export function AskFundingNote({
+  ask,
+  view,
+  className = '',
+}: {
+  ask: Ask;
+  view: AskView;
+  className?: string;
+}) {
+  const isSolAskCard = solRailBadge(ask) !== null;
+  return (
+    <p className={`break-words text-[11.5px] leading-[1.5] text-soft-ink-muted ${className}`}>
+      {ask.funding === 'escrowed' ? (
+        <>
+          {view === 'resolved'
+            ? `Awarded from escrow on ${ask.network}. Each accepted answer collects its share from the contract.`
+            : `The whole budget is locked in an escrow contract on ${ask.network}, out of the author's reach.`}
+          {ask.escrowTxHash && (
+            <>
+              {' '}
+              <a
+                href={`https://basescan.org/tx/${ask.escrowTxHash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-soft-primary-deep underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+              >
+                Check the deposit
+              </a>
+            </>
+          )}
+        </>
+      ) : isSolAskCard ? (
+        'Paid on accept in SOL. Nothing is locked: the author pays each accepted answer from their Solana wallet.'
+      ) : (
+        `Not held in escrow: the author pays each accepted answer on ${ask.network} when they resolve.`
+      )}
+    </p>
+  );
+}
+
 export type AskCardProps = {
   ask: Ask;
   /** Nazwa autora, jesli wolajacy ja rozwiazal. Bez niej pokazujemy skrocony adres. */
@@ -229,7 +275,6 @@ export default function AskCard({
   const left = ask.deadline - reference;
 
   const author = authorName || (ask.author ? getSlicedAddress(ask.author) : 'unknown address');
-  const isSolAskCard = solRailBadge(ask) !== null;
 
   /**
    * Pasek stanu. Trzy stany, trzy rozne natezenia - i ZADEN z nich nie jest
@@ -398,34 +443,7 @@ export default function AskCard({
         {/* `ink-muted`, a nie `ink-faint`: to zdanie mowi, gdzie leza
             pieniadze, wiec ma byc do przeczytania (5.5:1), a nie znakiem
             wodnym. */}
-        <p className="mt-3 break-words text-[11.5px] leading-[1.5] text-soft-ink-muted">
-          {ask.funding === 'escrowed' ? (
-            <>
-              {view === 'resolved'
-                ? `Awarded from escrow on ${ask.network}. Each accepted answer collects its share from the contract.`
-                : `The whole budget is locked in an escrow contract on ${ask.network}, out of the author's reach.`}
-              {ask.escrowTxHash && (
-                <>
-                  {' '}
-                  <a
-                    href={`https://basescan.org/tx/${ask.escrowTxHash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-semibold text-soft-primary-deep underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
-                  >
-                    Check the deposit
-                  </a>
-                </>
-              )}
-            </>
-          ) : isSolAskCard ? (
-            // Ask SOL: tylko przy przyjeciu, z portfela Solany autora. Nigdy
-            // slowo escrow - dla SOL go nie ma.
-            'Paid on accept in SOL. Nothing is locked: the author pays each accepted answer from their Solana wallet.'
-          ) : (
-            `Not held in escrow: the author pays each accepted answer on ${ask.network} when they resolve.`
-          )}
-        </p>
+        <AskFundingNote ask={ask} view={view} className="mt-3" />
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-soft-line/60 pt-4">
           <span className="min-w-0 break-words text-[12px] text-soft-ink-muted">{answers}</span>
@@ -494,7 +512,7 @@ function Cell({ label, value, money = false }: { label: string; value: string; m
  * Trzy przypadki i trzy rozne komunikaty: nie sprawdzalismy (nic nie rysujemy),
  * nie ma z czego liczyc (mowimy to wprost), jest historia (liczba).
  */
-function ResolveRateBadge({ rate }: { rate?: ResolveRate | null }) {
+export function ResolveRateBadge({ rate }: { rate?: ResolveRate | null }) {
   if (!rate) return null;
 
   if (rate.rate === null || rate.settled === 0) {

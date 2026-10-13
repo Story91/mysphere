@@ -54,7 +54,7 @@ import { ActionCard, AddressPill, AdvancedSection, BigStat, KeeperSection, Learn
 const HERO_ICON = <Landmark className="h-6 w-6 text-sp-brand" aria-hidden="true" />;
 const TAGLINE = "SPHERE's creator stream - immutable routing";
 /** Klasy karty 1:1 z ActionCard - sekcje statystyk maja wygladac jak reszta huba. */
-const CARD = 'sph-card rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4';
+const CARD = 'sph-card rounded-card border border-sp-shade/10 bg-sp-surface p-4';
 
 /**
  * Krotka liczba ETH do podpisu kafla - liczby > slowa. Drobne, ale REALNE
@@ -295,7 +295,7 @@ export default function SphereEscrowPanel() {
             <BigStat label="Claimable now" value={null} />
           </div>
         </PageHero>
-        <p className="sph-card rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 text-[11.5px] font-bold text-sp-shade/50">
+        <p className="sph-card rounded-card border border-sp-shade/10 bg-sp-surface p-4 text-[11.5px] font-bold text-sp-shade/50">
           Not deployed yet - actions unlock the moment the escrow address lands in config.
         </p>
         <LearnMore>How the escrow routing works</LearnMore>
