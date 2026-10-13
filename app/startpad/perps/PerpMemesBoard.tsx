@@ -358,7 +358,7 @@ export default function PerpMemesBoard() {
 
   const tabs: Array<{ id: Tab; label: string; icon: JSX.Element; count: number | null }> = [
     { id: 'memes', label: 'Memes', icon: <Rocket className="h-3.5 w-3.5" aria-hidden="true" />, count: loading ? null : inScope.length },
-    { id: 'clash', label: 'Clash', icon: <Swords className="h-3.5 w-3.5" aria-hidden="true" />, count: clashCount },
+    { id: 'clash', label: 'Bull vs Bear', icon: <Swords className="h-3.5 w-3.5" aria-hidden="true" />, count: clashCount },
     { id: 'calls', label: 'Calls', icon: <Megaphone className="h-3.5 w-3.5" aria-hidden="true" />, count: calls === null ? null : scopedCalls.length },
     { id: 'raids', label: 'Raids', icon: <Users className="h-3.5 w-3.5" aria-hidden="true" />, count: raids === null ? null : openRaids.length },
   ];

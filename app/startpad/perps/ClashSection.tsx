@@ -20,7 +20,7 @@ const TONE: Record<ClashSide, { bar: string; ring: string; text: string }> = {
 
 export default function ClashSection({ embedded = false }: { embedded?: boolean }) {
   const [clashes, setClashes] = useState<Clash[] | null>(null);
-  const [launching, setLaunching] = useState(false);
+  const [launching, setLaunching] = useState<null | 'bullbear' | 'clash'>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -52,23 +52,28 @@ export default function ClashSection({ embedded = false }: { embedded?: boolean 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="flex items-center gap-2 text-[18px] font-extrabold text-sp-ink">
-            <Swords className="h-5 w-5 text-soft-primary" aria-hidden="true" /> Asset Clash
+            <Swords className="h-5 w-5 text-soft-primary" aria-hidden="true" /> Bull vs Bear and Asset Clash
           </h2>
           <p className="mt-0.5 max-w-[580px] text-[12.5px] leading-[1.5] text-sp-shade/60">
-            One meme, two assets. ETH vs Nvidia, Bitcoin vs Apple: each side rides its own 2x perp, so the market decides who carries the meme harder.
-            Pick your asset.
+            One meme, two sides. Bull vs Bear: $XBULL rides ETH2xL, $XBEAR rides ETH2xS, so ETH moving moves the scoreboard. Asset Clash: ETH vs Nvidia,
+            Bitcoin vs Apple, each side on its own 2x perp.
           </p>
         </div>
-        <button type="button" onClick={() => setLaunching(true)} className="inline-flex items-center gap-2 rounded-full bg-sp-ink px-4 py-2.5 text-[13px] font-extrabold text-white">
-          <Swords className="h-4 w-4" aria-hidden="true" /> Start a clash
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => setLaunching('bullbear')} className="inline-flex items-center gap-2 rounded-full bg-soft-primary px-4 py-2.5 text-[13px] font-extrabold text-sp-on-brand">
+            <Swords className="h-4 w-4" aria-hidden="true" /> Start Bull vs Bear
+          </button>
+          <button type="button" onClick={() => setLaunching('clash')} className="inline-flex items-center gap-2 rounded-full bg-sp-ink px-4 py-2.5 text-[13px] font-extrabold text-white">
+            Asset Clash
+          </button>
+        </div>
       </div>
 
       {clashes === null ? (
         <p className="mt-4 text-[12.5px] text-sp-shade/45">Reading clashes from Base...</p>
       ) : clashes.length === 0 ? (
         <div className="mt-4 rounded-[16px] border border-dashed border-sp-shade/20 px-4 py-6 text-center text-[13px] text-sp-shade/55">
-          No clashes yet. Crypto or Wall Street: the first one sets the arena.
+          No duels yet. Start the first Bull vs Bear and set the arena.
         </div>
       ) : (
         <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -77,7 +82,7 @@ export default function ClashSection({ embedded = false }: { embedded?: boolean 
           ))}
         </div>
       )}
-      {launching && <ClashLaunchModal onClose={() => setLaunching(false)} />}
+      {launching && <ClashLaunchModal preset={launching === 'bullbear' ? 'bullbear' : undefined} onClose={() => setLaunching(null)} />}
     </section>
   );
 }

@@ -32,7 +32,7 @@ function toBase64(text: string): string {
   return btoa(bin);
 }
 
-export default function ClashLaunchModal({ onClose }: { onClose: () => void }) {
+export default function ClashLaunchModal({ onClose, preset }: { onClose: () => void; preset?: 'bullbear' }) {
   const { address } = useAccount();
   const chainId = useChainId();
   const { switchChainAsync } = useSwitchChain();
@@ -41,7 +41,11 @@ export default function ClashLaunchModal({ onClose }: { onClose: () => void }) {
 
   const markets = LAUNCHPAD_NETWORKS[CHAIN_ID]?.markets ?? [];
   const [sideA, setSideA] = useState(markets.find((m) => m.id === 'eth2xl')?.id ?? markets[0]?.id ?? '');
-  const [sideB, setSideB] = useState(markets.find((m) => m.id === 'nvda2xl')?.id ?? markets[1]?.id ?? '');
+  const [sideB, setSideB] = useState(
+    preset === 'bullbear' && markets.some((m) => m.id === 'eth2xs')
+      ? 'eth2xs'
+      : (markets.find((m) => m.id === 'nvda2xl')?.id ?? markets[1]?.id ?? '')
+  );
   const [name, setName] = useState('');
   const [ticker, setTicker] = useState('');
   const [description, setDescription] = useState('');
