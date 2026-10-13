@@ -15,7 +15,7 @@
     "n": 3,
     "at": "2026-10-15T08:35:00Z",
     "topic": "perps",
-    "text": "Six perps have a launchpad on MySphere: ETH2xL, BTC2xL, NVDA2xL, AAPL2xL, META2xL and SPCX2xL.\n\nAll long. The short side has no market yet, so we left it out."
+    "text": "Seven perps have a launchpad on MySphere: ETH2xL, BTC2xL, NVDA2xL, AAPL2xL, META2xL, SPCX2xL and ETH2xS, the one short.\n\nThe short market is much smaller than the long ones. Flash limits how much of it can be bought at once, so size your bear-side buys with that in mind."
   },
   {
     "n": 4,
