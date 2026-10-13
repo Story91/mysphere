@@ -1354,11 +1354,21 @@ export default function TradePanel({
         </div>
       )}
 
-      {isConnected && (
+      {/* Bez nic do odebrania - jedna linia zamiast pieciu wierszy zer i akapitu. */}
+      {isConnected && !hasClaims && (
+        <div className="mt-4 flex items-center justify-between border-t border-sp-shade/10 pt-3 text-[11.5px]">
+          <span className="font-extrabold text-sp-ink">Your claims</span>
+          <span className="flex items-center gap-1.5 text-sp-shade/45">
+            Nothing to claim yet <CheckCircle2 className="h-3.5 w-3.5 text-sp-shade/20" aria-hidden="true" />
+          </span>
+        </div>
+      )}
+
+      {isConnected && hasClaims && (
         <div className="mt-4 border-t border-sp-shade/10 pt-4">
           <div className="flex items-center justify-between">
             <span className="text-[12px] font-extrabold text-sp-ink">Your claims</span>
-            <CheckCircle2 className={`h-4 w-4 ${hasClaims ? 'text-sp-up-vivid' : 'text-sp-shade/20'}`} aria-hidden="true" />
+            <CheckCircle2 className="h-4 w-4 text-sp-up-vivid" aria-hidden="true" />
           </div>
           {/* Krzywa placi w ETH, ale hook i vault po graduacji nabijaja
               takze strone tokenowa - stary opis `in ${NATIVE_SYMBOL}, not tokens` klamal. */}

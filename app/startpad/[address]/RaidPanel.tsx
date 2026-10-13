@@ -21,6 +21,9 @@ const BTN = 'rounded-full px-3 py-1.5 text-[11.5px] font-extrabold disabled:opac
 
 type Mine = { deposit: bigint; settled: boolean };
 
+const RAID_BLURB =
+  'Pool ETH with your crew, the leader fires one buy at T-0, everyone claims their share. The leader sets the price protection, so join raids from people you trust.';
+
 function clock(seconds: number): string {
   const s = Math.max(0, seconds);
   const m = Math.floor(s / 60);
@@ -28,7 +31,21 @@ function clock(seconds: number): string {
   return `${m}:${String(s % 60).padStart(2, '0')}`;
 }
 
-export default function RaidPanel({ core, onAfterTx }: { core: CoreState; onAfterTx: () => void }) {
+export type RaidSummary = { visible: boolean; open: number };
+
+export default function RaidPanel({
+  core,
+  onAfterTx,
+  embedded = false,
+  onSummary,
+}: {
+  core: CoreState;
+  onAfterTx: () => void;
+  /** Wewnatrz zakladek pod wykresem: bez wlasnej karty i naglowka. */
+  embedded?: boolean;
+  /** Czy panel jest w ogole widoczny i ile raidow mozna teraz dolaczyc - do etykiety zakladki. */
+  onSummary?: (summary: RaidSummary) => void;
+}) {
   const vault = raidVaultOf(LAUNCHPAD_CHAIN.id);
   const { address: account } = useAccount();
   const chainId = useChainId();
@@ -85,7 +102,13 @@ export default function RaidPanel({ core, onAfterTx }: { core: CoreState; onAfte
     };
   }, [load]);
 
-  if (!usable || (core.state !== 'Curve' && raids.length === 0)) return null;
+  const visible = usable && (core.state === 'Curve' || raids.length > 0);
+  const openCount = raids.filter((r) => r.status === 'Open' && now < r.expiresAt).length;
+  useEffect(() => {
+    onSummary?.({ visible, open: openCount });
+  }, [onSummary, visible, openCount]);
+
+  if (!visible) return null;
 
   const ensure = async () => {
     if (!account || !walletClient || !client || !vault) {
@@ -175,21 +198,22 @@ export default function RaidPanel({ core, onAfterTx }: { core: CoreState; onAfte
     `Raid on $${core.symbol} 🏴‍☠️ ${r.note ? `"${r.note}" ` : ''}\nPool ${Number(formatEther(BigInt(r.totalEth))).toFixed(4)} ETH, one buy at T-0. Join the crew:\nhttps://mysphere.fun/startpad/${core.token.toLowerCase()}${QUOTE_ASSET ? `?m=${encodeURIComponent((typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('m')) || '')}` : ''}`;
 
   return (
-    <section className="rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 sm:p-5">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="flex items-center gap-2 text-[13px] font-extrabold text-sp-ink">
-          <Swords className="h-4 w-4 text-soft-primary" aria-hidden="true" /> Raids
-        </h2>
+    <section className={embedded ? 'p-4 sm:p-5' : 'rounded-[20px] border border-sp-shade/10 bg-sp-surface p-4 sm:p-5'}>
+      <div className={`flex gap-3 ${embedded ? 'items-start justify-between' : 'items-center justify-between'}`}>
+        {embedded ? (
+          <p className="max-w-[520px] text-[11.5px] leading-[1.5] text-sp-shade/55">{RAID_BLURB}</p>
+        ) : (
+          <h2 className="flex items-center gap-2 text-[13px] font-extrabold text-sp-ink">
+            <Swords className="h-4 w-4 text-soft-primary" aria-hidden="true" /> Raids
+          </h2>
+        )}
         {core.state === 'Curve' && !creating && (
-          <button type="button" onClick={() => setCreating(true)} className={`${BTN} bg-sp-ink text-white`}>
+          <button type="button" onClick={() => setCreating(true)} className={`${BTN} shrink-0 bg-sp-ink text-white`}>
             Start a raid
           </button>
         )}
       </div>
-      <p className="mt-1 text-[11px] leading-[1.45] text-sp-shade/50">
-        Pool ETH with your crew, the leader fires one buy at T-0, everyone claims their share. The leader sets the price protection, so join raids from
-        people you trust.
-      </p>
+      {!embedded && <p className="mt-1 text-[11px] leading-[1.45] text-sp-shade/50">{RAID_BLURB}</p>}
 
       {creating && (
         <div className="mt-3 space-y-2 rounded-xl bg-sp-sunken p-3">

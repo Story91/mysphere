@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Address } from 'viem';
+import type { RaidSummary } from './RaidPanel';
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -54,7 +55,7 @@ const FIELD =
 
 const EXPLORER = LAUNCHPAD_EXPLORER_URL;
 
-type Tab = 'trades' | 'holders' | 'info';
+type Tab = 'trades' | 'holders' | 'raids' | 'info';
 
 const PAGE_SIZE = 15;
 
@@ -93,6 +94,8 @@ export default function DetailTabs({
   isCreator,
   profileRequest,
   onProfileSaved,
+  raidPanel = null,
+  raidSummary = null,
 }: {
   core: CoreState;
   tokenAddress: Address | null;
@@ -111,8 +114,16 @@ export default function DetailTabs({
   /** Licznik zadan z naglowka: tworca kliknal pusta ikonke linku. */
   profileRequest: number;
   onProfileSaved: (profile: TokenProfileView) => void;
+  /** Panel raidow - montowany zawsze (polling, licznik), widoczny tylko w swojej zakladce. */
+  raidPanel?: ReactNode;
+  raidSummary?: RaidSummary | null;
 }) {
   const [tab, setTab] = useState<Tab>('trades');
+  const raidsVisible = raidSummary?.visible === true;
+  const openRaids = raidSummary?.open ?? 0;
+  useEffect(() => {
+    if (tab === 'raids' && !raidsVisible) setTab('trades');
+  }, [tab, raidsVisible]);
   const [page, setPage] = useState(0);
   const editorRef = useRef<HTMLDivElement | null>(null);
 
@@ -212,13 +223,14 @@ export default function DetailTabs({
   return (
     <section className="overflow-hidden rounded-[20px] border border-sp-shade/10 bg-sp-surface">
       <div className="flex items-center justify-between gap-3 border-b border-sp-shade/10 px-4 py-3 sm:px-5" role="tablist" aria-label="Token history tabs">
-        <div className="flex items-center gap-1">
+        <div className="flex min-w-0 items-center gap-1 overflow-x-auto">
           {(
             [
               ['trades', `Trades${trades.length ? ` (${trades.length})` : ''}`],
               ['holders', `Holders${holders.length ? ` (${holders.length >= 20 ? '20+' : holders.length})` : ''}`],
+              ...(raidsVisible ? ([['raids', `Raids${openRaids ? ` (${openRaids})` : ''}`]] as const) : []),
               ['info', 'Info'],
-            ] as const
+            ] as ReadonlyArray<readonly [Tab, string]>
           ).map(([value, label]) => (
             <button
               key={value}
@@ -226,8 +238,14 @@ export default function DetailTabs({
               role="tab"
               aria-selected={tab === value}
               onClick={() => setTab(value)}
-              className={`rounded-full px-3.5 py-2 text-[12px] font-extrabold transition-colors ${tab === value ? 'bg-soft-primary text-sp-on-brand' : 'text-sp-shade/50 hover:text-soft-primary-deep'}`}
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-[12px] font-extrabold transition-colors ${tab === value ? 'bg-soft-primary text-sp-on-brand' : 'text-sp-shade/50 hover:text-soft-primary-deep'}`}
             >
+              {value === 'raids' && openRaids > 0 && (
+                <span className="relative flex h-2 w-2" aria-hidden="true">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-500 opacity-60 motion-reduce:hidden" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
+                </span>
+              )}
               {label}
             </button>
           ))}
@@ -408,6 +426,8 @@ export default function DetailTabs({
           </div>
         </>
       )}
+
+      {raidPanel && <div hidden={tab !== 'raids'}>{raidPanel}</div>}
 
       {tab === 'info' && (
         <div className="space-y-5 p-4 sm:p-5">

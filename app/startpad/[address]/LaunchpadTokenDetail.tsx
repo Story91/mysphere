@@ -70,7 +70,7 @@ import { applyClaimLogs, claimsNeedReload } from './liveClaims';
 import { hasPool, poolPriceWeiFromSqrt, readPoolPriceWei } from './poolPrice';
 import { POOL_SWAP_EVENT } from './poolSwaps';
 import { useTokenHistory, type LiveLaunchpadLog } from './useTokenHistory';
-import RaidPanel from './RaidPanel';
+import RaidPanel, { type RaidSummary } from './RaidPanel';
 
 const EXPLORER = LAUNCHPAD_EXPLORER_URL;
 
@@ -153,6 +153,7 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
    * ustawiona na `true` nie wywolalaby zadnego efektu.
    */
   const [profileRequest, setProfileRequest] = useState(0);
+  const [raidSummary, setRaidSummary] = useState<RaidSummary | null>(null);
 
   const loadCore = useCallback(async () => {
     if (!readClient || !tokenAddress) return;
@@ -591,7 +592,10 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
               onAddSocials={() => setProfileRequest((count) => count + 1)}
             />
 
-            <div className="mt-5 grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+            {/* `auto_1fr`: prawa kolumna (row-span-2) bywa wyzsza niz wykres z
+                zakladkami. Przy domyslnych wierszach grid rozkladal ten nadmiar
+                tez na wiersz wykresu i pod wykresem robila sie pusta dziura. */}
+            <div className="mt-5 grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:grid-rows-[auto_1fr]">
               <div className="min-w-0 lg:col-start-1 lg:row-start-1">
                 <PriceChart
                   trades={history.trades}
@@ -609,7 +613,6 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
               <div className="min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1">
                 <div className="space-y-4 lg:sticky lg:top-4">
                   <TradePanel core={core} ethUsd={ethUsd} onAfterTx={() => void loadCore()} />
-                  <RaidPanel core={core} onAfterTx={() => void loadCore()} />
                   <StatsCard core={core} tokenAddress={tokenAddress} ethUsd={ethUsd} trades={history.trades} balances={history.balances} historyComplete={historyComplete} poolPriceWei={poolPriceWei} burnedWei={burnedWei} copied={copied} onCopy={() => void copyAddress()} />
                   {/* Pod panelem handlu, bo tu padaja pytania, na ktore ten
                       przewodnik odpowiada: co znaczy "Locked", czemu kupno
@@ -634,6 +637,8 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
                   isCreator={isCreator}
                   profileRequest={profileRequest}
                   onProfileSaved={setProfile}
+                  raidSummary={raidSummary}
+                  raidPanel={<RaidPanel core={core} embedded onSummary={setRaidSummary} onAfterTx={() => void loadCore()} />}
                 />
               </div>
             </div>
