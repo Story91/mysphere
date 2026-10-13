@@ -839,36 +839,31 @@ function resolveActiveNetwork(): LaunchpadNetwork {
   return networkForMarket(LAUNCHPAD_NETWORKS[chainId], resolveMarketId(chainId));
 }
 
-const MARKET_KEY = (chainId: number) => `startpad.market.${chainId}`;
-
 /**
- * Rynek Q z `?m=` (wygrywa) albo z pamieci tej sieci. `?m=eth` albo nieznane
- * id = rynek ETH. Zapamietany, zeby przejscie z tablicy na strone tokena i z
- * powrotem nie wyrzucalo z rynku perpa.
+ * Rynek Q WYLACZNIE z `?m=`. Brak parametru, `?m=eth` albo nieznane id =
+ * rynek ETH sieci (na Base: B20).
+ *
+ * Do 2026-10-14 rynek byl tez zapamietywany w localStorage. Memy perpow zyja
+ * na stronie Perps i linkuja do tokenow z `?m=eth2xl`, wiec jedna wizyta na
+ * memie zapisywala ETH2xL, a kazde pozniejsze wejscie na sam `/startpad`
+ * otwieralo tablice perpa zamiast B20. Linki do rynkow perpow zawsze niosa
+ * `?m=`, a strona tokena bez niego sama znajduje rynek (`findTokenMarket`).
  */
 function resolveMarketId(chainId: number): string | null {
   const markets = LAUNCHPAD_NETWORKS[chainId]?.markets ?? [];
   if (markets.length === 0) return null;
-  let id: string | null = null;
   try {
     const fromUrl = new URLSearchParams(window.location.search).get('m');
-    if (fromUrl !== null) {
-      id = markets.some((m) => m.id === fromUrl) ? fromUrl : null;
-      window.localStorage.setItem(MARKET_KEY(chainId), id ?? '');
-    } else {
-      const stored = window.localStorage.getItem(MARKET_KEY(chainId));
-      id = stored && markets.some((m) => m.id === stored) ? stored : null;
-    }
+    return fromUrl !== null && markets.some((m) => m.id === fromUrl) ? fromUrl : null;
   } catch {
-    // Tryb prywatny / zepsuty adres - rynek ETH.
+    // Zepsuty adres - rynek ETH.
+    return null;
   }
-  return id;
 }
 
 /** Przelacza rynek aktywnej sieci (null = ETH) - przeladowanie pod nowym adresem, jak przy sieci. */
 export function setLaunchpadMarket(chainId: number, marketId: string | null) {
   try {
-    window.localStorage.setItem(MARKET_KEY(chainId), marketId ?? '');
     window.localStorage.setItem(STORAGE_KEY, String(chainId));
   } catch {
     // Wybor przeniesie sam adres.
@@ -876,7 +871,8 @@ export function setLaunchpadMarket(chainId: number, marketId: string | null) {
   const url = new URL(window.location.href);
   if (chainId === DEFAULT_LAUNCHPAD_CHAIN_ID) url.searchParams.delete('c');
   else url.searchParams.set('c', String(chainId));
-  url.searchParams.set('m', marketId ?? 'eth');
+  if (marketId) url.searchParams.set('m', marketId);
+  else url.searchParams.delete('m');
   window.location.assign(url.toString());
 }
 

@@ -1553,6 +1553,15 @@ export default function LaunchpadBoard() {
   );
   useEffect(() => setNetState(ACTIVE_LAUNCHPAD_NETWORK), []);
 
+  // Rynek perpa zostaje w module po nawigacji klienckiej (np. mem z Perps ->
+  // "Startpad" w menu). Sam `/startpad` bez `?m=` to zawsze rynek ETH sieci,
+  // wiec module trzeba przeliczyc pelnym przeladowaniem.
+  useEffect(() => {
+    if (!ACTIVE_MARKET_ID) return;
+    if (new URLSearchParams(window.location.search).get('m') !== null) return;
+    setLaunchpadMarket(ACTIVE_LAUNCHPAD_NETWORK.chain.id, null);
+  }, []);
+
   const router = useRouter();
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
