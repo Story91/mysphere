@@ -7,7 +7,7 @@ import { base } from 'viem/chains';
 import { useAccount, useChainId, usePublicClient, useSwitchChain, useWalletClient } from 'wagmi';
 import { Swords, X } from 'lucide-react';
 import { LAUNCHPAD_NETWORKS, launchpadAbi, quoteLaunchpadAbi } from '../config';
-import { clashSymbol, cleanClashTicker, newClashId, perpBaseOf, type ClashSide } from '../duel';
+import { clashSymbol, cleanClashTicker, isBullBear, newClashId, sideWord, type ClashSide } from '../duel';
 import { resizeImageFile } from '../logoUpload';
 import { tradeErrorMessage } from '../[address]/detailShared';
 import PerpAvatar from './PerpAvatar';
@@ -54,15 +54,20 @@ export default function ClashLaunchModal({ onClose }: { onClose: () => void }) {
 
   const marketOf = (side: ClashSide) => markets.find((m) => m.id === (side === 'a' ? sideA : sideB));
   const clean = cleanClashTicker(ticker);
+  const bullBear = isBullBear(marketOf('a')?.quote.symbol, marketOf('b')?.quote.symbol);
+  const setBullBear = () => {
+    setSideA('eth2xl');
+    setSideB('eth2xs');
+  };
   const locked = Boolean(done.a);
   const ready = name.trim().length > 0 && clean.length >= 2 && sideA !== sideB && Boolean(marketOf('a')) && Boolean(marketOf('b'));
   const symbolOf = (side: ClashSide) => {
     const m = marketOf(side);
-    return m ? clashSymbol(clean || 'TICKER', m.quote.symbol) : '';
+    return m ? clashSymbol(clean || 'TICKER', m.quote.symbol, bullBear) : '';
   };
   const nameOf = (side: ClashSide) => {
     const m = marketOf(side);
-    return `${name.trim()} on ${m ? perpBaseOf(m.quote.symbol) : ''}`;
+    return m ? `${name.trim()} ${bullBear ? (sideWord(m.quote.symbol, true) === 'BULL' ? 'Bull' : 'Bear') : 'on ' + sideWord(m.quote.symbol, false)}` : name.trim();
   };
 
   const pickFile = async (file: File | undefined) => {
@@ -171,6 +176,21 @@ export default function ClashLaunchModal({ onClose }: { onClose: () => void }) {
           Two transactions, you are the creator of both.
         </p>
 
+        <div className="mt-3 flex gap-2">
+          <button
+            type="button"
+            disabled={locked || !markets.some((m) => m.id === 'eth2xs')}
+            onClick={setBullBear}
+            className={`rounded-full border px-3 py-1.5 text-[12px] font-extrabold disabled:opacity-40 ${bullBear ? 'border-soft-primary bg-sp-brand-soft text-soft-primary-deep' : 'border-sp-shade/10 text-sp-shade/60'}`}
+          >
+            Bull vs Bear (ETH2xL vs ETH2xS)
+          </button>
+        </div>
+        {bullBear && (
+          <p className="mt-2 text-[11px] leading-[1.45] text-sp-shade/55">
+            The short market is much smaller than the long ones: Flash limits how much of ETH2xS can be bought at once, so large buys on the bear side may fail.
+          </p>
+        )}
         <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-end gap-2">
           <div>
             <div className="mb-1 flex justify-center">{marketOf('a') && <PerpAvatar symbol={marketOf('a')!.quote.symbol} size={40} glow />}</div>

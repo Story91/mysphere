@@ -59,8 +59,27 @@ export function perpBaseOf(perpSymbol: string): string {
   return perpSymbol.replace(/\d+x[LS]$/i, '').replace(/MAX[LS]$/i, '').toUpperCase();
 }
 
-export function clashSymbol(ticker: string, perpSymbol: string): string {
-  return `${ticker}${perpBaseOf(perpSymbol)}`;
+/**
+ * BULL VS BEAR = szczegolny przypadek starcia: ETH2xL (long) kontra ETH2xS
+ * (short). Tickery TICKERBULL / TICKERBEAR zamiast TICKERETH / TICKERETH.
+ */
+export function isShortPerp(perpSymbol: string): boolean {
+  return /2x[S]$/i.test(perpSymbol) || /MAXS$/i.test(perpSymbol);
+}
+
+export function isBullBear(a: string | undefined, b: string | undefined): boolean {
+  if (!a || !b) return false;
+  return (isShortPerp(a) !== isShortPerp(b)) && perpBaseOf(a) === perpBaseOf(b);
+}
+
+/** Slowo strony: bull/bear w Bull vs Bear, inaczej baza aktywa (ETH, NVDA...). */
+export function sideWord(perpSymbol: string, bullBear: boolean): string {
+  if (!bullBear) return perpBaseOf(perpSymbol);
+  return isShortPerp(perpSymbol) ? 'BEAR' : 'BULL';
+}
+
+export function clashSymbol(ticker: string, perpSymbol: string, bullBear = false): string {
+  return `${ticker}${sideWord(perpSymbol, bullBear)}`;
 }
 
 /** Kto prowadzi: strona z wieksza kapitalizacja w USD (null = remis albo brak danych). */

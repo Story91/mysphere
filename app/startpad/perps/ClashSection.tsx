@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Swords } from 'lucide-react';
-import { clashLeader, perpBaseOf, type Clash, type ClashSide, type ClashToken } from '../duel';
+import { clashLeader, isBullBear, sideWord, type Clash, type ClashSide, type ClashToken } from '../duel';
 import { formatUsd } from '../useEthUsd';
 import PerpAvatar from './PerpAvatar';
 import ClashLaunchModal from './ClashLaunchModal';
@@ -82,7 +82,7 @@ export default function ClashSection({ embedded = false }: { embedded?: boolean 
   );
 }
 
-function Side({ token, side, leading }: { token: ClashToken | null; side: ClashSide; leading: boolean }) {
+function Side({ token, side, leading, bullBear }: { token: ClashToken | null; side: ClashSide; leading: boolean; bullBear: boolean }) {
   const tone = TONE[side];
   if (!token) {
     return <div className="flex-1 rounded-[14px] border border-dashed border-sp-shade/20 p-3 text-center text-[11.5px] text-sp-shade/45">Side not launched yet</div>;
@@ -102,11 +102,11 @@ function Side({ token, side, leading }: { token: ClashToken | null; side: ClashS
       <div className="text-[10.5px] font-bold uppercase tracking-[0.06em] text-sp-shade/40">market cap</div>
       {ch !== null && (
         <div className={`mt-1.5 text-[11px] font-extrabold ${ch >= 0 ? 'text-sp-up' : 'text-sp-down-deep'}`}>
-          {perpBaseOf(token.perpSymbol)} 2x today {ch >= 0 ? '+' : ''}
+          {bullBear ? token.perpSymbol : `${sideWord(token.perpSymbol, false)} 2x`} today {ch >= 0 ? '+' : ''}
           {ch.toFixed(2)}%
         </div>
       )}
-      <div className={`mt-2.5 rounded-full px-2 py-1 text-center text-[11.5px] font-extrabold text-white ${tone.bar}`}>Back {perpBaseOf(token.perpSymbol)}</div>
+      <div className={`mt-2.5 rounded-full px-2 py-1 text-center text-[11.5px] font-extrabold text-white ${tone.bar}`}>Back {sideWord(token.perpSymbol, bullBear)}</div>
     </Link>
   );
 }
@@ -116,8 +116,9 @@ function ClashCard({ clash }: { clash: Clash }) {
   const a = clash.a?.mcapUsd ?? 0;
   const b = clash.b?.mcapUsd ?? 0;
   const aShare = a + b > 0 ? (a / (a + b)) * 100 : 50;
-  const aBase = clash.a ? perpBaseOf(clash.a.perpSymbol) : 'A';
-  const bBase = clash.b ? perpBaseOf(clash.b.perpSymbol) : 'B';
+  const bullBear = isBullBear(clash.a?.perpSymbol, clash.b?.perpSymbol);
+  const aBase = clash.a ? sideWord(clash.a.perpSymbol, bullBear) : 'A';
+  const bBase = clash.b ? sideWord(clash.b.perpSymbol, bullBear) : 'B';
   return (
     <div id={`clash-${clash.id}`} className="rounded-[18px] border border-sp-shade/10 bg-sp-surface p-3.5">
       <div className="flex items-center gap-2.5">
@@ -129,7 +130,7 @@ function ClashCard({ clash }: { clash: Clash }) {
         )}
         <div className="min-w-0">
           <div className="truncate text-[15px] font-extrabold text-sp-ink">
-            ${clash.ticker}: {aBase} vs {bBase}
+            ${clash.ticker}: {bullBear ? 'Bull vs Bear' : `${aBase} vs ${bBase}`}
           </div>
           {clash.description && <div className="truncate text-[11.5px] text-sp-shade/50">{clash.description}</div>}
         </div>
@@ -146,8 +147,8 @@ function ClashCard({ clash }: { clash: Clash }) {
         </span>
       </div>
       <div className="mt-3 flex gap-2.5">
-        <Side token={clash.a} side="a" leading={leader === 'a'} />
-        <Side token={clash.b} side="b" leading={leader === 'b'} />
+        <Side token={clash.a} side="a" leading={leader === 'a'} bullBear={bullBear} />
+        <Side token={clash.b} side="b" leading={leader === 'b'} bullBear={bullBear} />
       </div>
     </div>
   );
