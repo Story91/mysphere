@@ -414,9 +414,18 @@ export default function PerpMemesBoard() {
             <Stat label="Leverage" value={sel.leverage ? `${sel.leverage.toFixed(2)}x` : '--'} />
           </>
         ) : (
-          <p className="max-w-[440px] text-[12.5px] leading-[1.45] text-sp-shade/60">
-            Memes paired with Flash 2x perps. Buy any of them with plain ETH in one transaction: your meme rides the curve, the pair rides 2x.
-          </p>
+          <div className="flex items-center gap-3">
+            <span className="flex shrink-0 items-center gap-1" aria-label="MySphere and Flash">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/brand/mysphere.png" alt="MySphere" width={30} height={30} className="h-[30px] w-[30px] object-contain" />
+              <span className="text-[12px] font-extrabold text-sp-shade/40">×</span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/brand/flash.png" alt="Flash" width={30} height={30} className="h-[30px] w-[30px] object-contain" />
+            </span>
+            <p className="max-w-[420px] text-[12.5px] leading-[1.45] text-sp-shade/60">
+              Memes paired with Flash 2x perps. Buy any of them with plain ETH in one transaction: your meme rides the curve, the pair rides 2x.
+            </p>
+          </div>
         )}
         <Stat label="Memes" value={loading ? '--' : String(inScope.length)} />
         <Stat label="Raised" value={loading ? '--' : formatUsd(raisedUsd)} />
