@@ -899,6 +899,10 @@ export function perpSellZapsOf(chainId: number): string[] {
 export const PERP_ZAP_ADDRESS: `0x${string}` | null = QUOTE_ASSET
   ? PERP_ZAP_V2_BY_CHAIN[ACTIVE_LAUNCHPAD_NETWORK.chain.id] ?? PERP_BUY_ZAP_BY_CHAIN[ACTIVE_LAUNCHPAD_NETWORK.chain.id] ?? null
   : null;
+/** Zap sieci niezaleznie od aktywnego rynku (widoki wielu rynkow, np. /perps). */
+export function perpZapOf(chainId: number): `0x${string}` | null {
+  return PERP_ZAP_V2_BY_CHAIN[chainId] ?? PERP_BUY_ZAP_BY_CHAIN[chainId] ?? null;
+}
 /** Czy zap aktywnej sieci umie sprzedawac za ETH (v2). */
 export const PERP_ZAP_SELLS = QUOTE_ASSET !== null && PERP_ZAP_V2_BY_CHAIN[ACTIVE_LAUNCHPAD_NETWORK.chain.id] !== undefined;
 /** Bezhakowa pula natywne ETH/USDC v4 na Base (fee 500, tickSpacing 10) - pierwszy krok zapa. */

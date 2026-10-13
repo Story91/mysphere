@@ -18,7 +18,7 @@ const TONE: Record<ClashSide, { bar: string; ring: string; text: string }> = {
   b: { bar: 'bg-amber-500', ring: 'border-amber-500/60 bg-amber-500/[0.08]', text: 'text-amber-600' },
 };
 
-export default function ClashSection() {
+export default function ClashSection({ embedded = false }: { embedded?: boolean }) {
   const [clashes, setClashes] = useState<Clash[] | null>(null);
   const [launching, setLaunching] = useState(false);
 
@@ -42,7 +42,13 @@ export default function ClashSection() {
   }, []);
 
   return (
-    <section className="mt-5 rounded-[22px] border border-sp-shade/10 bg-gradient-to-br from-soft-primary/[0.07] via-sp-surface to-amber-500/[0.07] p-4 sm:p-5">
+    <section
+      className={
+        embedded
+          ? ''
+          : 'mt-5 rounded-[22px] border border-sp-shade/10 bg-gradient-to-br from-soft-primary/[0.07] via-sp-surface to-amber-500/[0.07] p-4 sm:p-5'
+      }
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="flex items-center gap-2 text-[18px] font-extrabold text-sp-ink">

@@ -42,6 +42,9 @@ export const INSTRUMENT_NAMES: Record<string, string> = {
 };
 
 const CRYPTO = new Set(['BTC', 'ETH', 'SOL', 'USDC']);
+// Tickery, pod ktorymi CDN log oddaje CUDZE logo: SPCX (SpaceX, spolka prywatna)
+// zwracal 2026-10-13 logo AXS. Lepszy kafel z literami niz falszywy znak.
+const NO_CDN = new Set(['SPCX']);
 const LOCAL_FILES: Record<string, string> = { ETH: '/icons/eth.svg', USDC: '/icons/usdc.svg', ARC: '/arc.jpg' };
 
 export function instrumentBase(symbol: string): string {
@@ -144,7 +147,7 @@ export default function FeedIcon({ base, size = 36, className = '' }: { base: st
   else if (LOCAL_FILES[key]) {
     // eslint-disable-next-line @next/next/no-img-element
     inner = <img src={LOCAL_FILES[key]} alt="" width={size} height={size} className="shrink-0 rounded-full object-cover" />;
-  } else if (!broken && !CRYPTO.has(key) && /^[A-Z.]{1,6}$/.test(key)) {
+  } else if (!broken && !CRYPTO.has(key) && !NO_CDN.has(key) && /^[A-Z.]{1,6}$/.test(key)) {
     inner = (
       // eslint-disable-next-line @next/next/no-img-element
       <img

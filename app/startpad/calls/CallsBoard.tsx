@@ -11,7 +11,7 @@ import PerpAvatar from '../perps/PerpAvatar';
  * srednia cena wejscia). Plakietka "Verified human" = Coinbase Verification.
  */
 
-type Call = {
+export type Call = {
   txHash: string;
   token: string;
   symbol: string;
@@ -174,7 +174,7 @@ export default function CallsBoard() {
   );
 }
 
-function CallCard({ call }: { call: Call }) {
+export function CallCard({ call }: { call: Call }) {
   const up = (call.multiple ?? 1) >= 1;
   return (
     <div className="flex flex-col rounded-[18px] border border-sp-shade/10 bg-sp-surface p-4">
