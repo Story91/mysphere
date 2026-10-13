@@ -9,6 +9,8 @@ import { Swords, X } from 'lucide-react';
 import { LAUNCHPAD_NETWORKS, launchpadAbi, quoteLaunchpadAbi } from '../config';
 import { clashSymbol, cleanClashTicker, isBullBear, newClashId, sideWord, type ClashSide } from '../duel';
 import { resizeImageFile } from '../logoUpload';
+import { browserStorage, clearPendingProfile, postProfileWithRetry, savePendingProfile, sendTokenProfile } from '../profileSync';
+import useSiweAuth from '../../utils/auth/useSiweAuth';
 import { tradeErrorMessage } from '../[address]/detailShared';
 import PerpAvatar from './PerpAvatar';
 
@@ -38,6 +40,7 @@ export default function ClashLaunchModal({ onClose, preset }: { onClose: () => v
   const { switchChainAsync } = useSwitchChain();
   const { data: walletClient } = useWalletClient();
   const client = usePublicClient({ chainId: CHAIN_ID });
+  const { isAuthenticated: hasSession, signIn } = useSiweAuth();
 
   const markets = LAUNCHPAD_NETWORKS[CHAIN_ID]?.markets ?? [];
   const [sideA, setSideA] = useState(markets.find((m) => m.id === 'eth2xl')?.id ?? markets[0]?.id ?? '');
@@ -88,8 +91,24 @@ export default function ClashLaunchModal({ onClose, preset }: { onClose: () => v
   const metadataFor = (side: ClashSide) => {
     const payload: Record<string, unknown> = { name: nameOf(side), duel: { id: clashId, side, ticker: clean } };
     if (description.trim()) payload.description = description.trim().slice(0, 280);
-    if (image) payload.image = image;
+    // OBRAZ NIE IDZIE NA LANCUCH: metadane sa w storage launchpada, a 8 KB logo
+    // kosztowalo ~8,6 mln gazu (24 KB nie miescilo sie w bloku) - 14.10 start
+    // zawisl w portfelu. Logo leci do profilu (Blob/Firestore) po starcie, jak
+    // w zwyklym modalu startu.
     return `data:application/json;base64,${toBase64(JSON.stringify(payload))}`;
+  };
+
+  /** Logo i opis do profilu tokena (osobne zadanie - blad zapisu nie cofa startu). */
+  const saveProfile = (token: Address) => {
+    if (!image && !description.trim()) return;
+    const payload = { address: token, chainId: CHAIN_ID, logoUrl: image, description: description.trim() };
+    savePendingProfile(browserStorage(), { ...payload, savedAt: Date.now() });
+    const withSession = hasSession ? Promise.resolve(true) : signIn().catch(() => false);
+    void withSession
+      .then(() => postProfileWithRetry(() => sendTokenProfile(payload), { expectLogo: payload.logoUrl !== null }))
+      .then((outcome) => {
+        if (outcome === 'saved') clearPendingProfile(browserStorage(), CHAIN_ID, token);
+      });
   };
 
   const launchSide = async (side: ClashSide): Promise<Address | null> => {
@@ -118,7 +137,11 @@ export default function ClashLaunchModal({ onClose, preset }: { onClose: () => v
     for (const log of receipt.logs) {
       try {
         const ev = decodeEventLog({ abi: launchpadAbi, data: log.data as Hex, topics: log.topics as [Hex, ...Hex[]] });
-        if (ev.eventName === 'Launched') return (ev.args as { token: Address }).token;
+        if (ev.eventName === 'Launched') {
+          const token = (ev.args as { token: Address }).token;
+          saveProfile(token);
+          return token;
+        }
       } catch {
         // inne logi transakcji
       }
@@ -221,7 +244,7 @@ export default function ClashLaunchModal({ onClose, preset }: { onClose: () => v
         </label>
         <textarea value={description} onChange={(e) => setDescription(e.target.value.slice(0, 280))} rows={2} className={`${FIELD} mt-1.5`} disabled={locked} />
         <label className="mt-3 block text-[12px] font-extrabold text-sp-ink">
-          Image <span className="font-bold text-sp-shade/40">(optional, stored onchain at 128 px)</span>
+          Image <span className="font-bold text-sp-shade/40">(optional, shown on the board)</span>
         </label>
         <div className="mt-1.5 flex items-center gap-3">
           {image && (

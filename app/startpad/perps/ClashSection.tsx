@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { Swords } from 'lucide-react';
 import { clashLeader, isBullBear, sideWord, type Clash, type ClashSide, type ClashToken } from '../duel';
 import { formatUsd } from '../useEthUsd';
+import { fetchLogos } from '../logos';
+import { DEFAULT_LAUNCHPAD_CHAIN_ID } from '../config';
 import PerpAvatar from './PerpAvatar';
 import ClashLaunchModal from './ClashLaunchModal';
 
@@ -20,7 +22,12 @@ const TONE: Record<ClashSide, { bar: string; ring: string; text: string }> = {
 
 export default function ClashSection({ embedded = false }: { embedded?: boolean }) {
   const [clashes, setClashes] = useState<Clash[] | null>(null);
+  const [logos, setLogos] = useState<Record<string, string>>({});
   const [launching, setLaunching] = useState<null | 'bullbear' | 'clash'>(null);
+
+  useEffect(() => {
+    void fetchLogos(DEFAULT_LAUNCHPAD_CHAIN_ID).then(setLogos).catch(() => {});
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -78,7 +85,7 @@ export default function ClashSection({ embedded = false }: { embedded?: boolean 
       ) : (
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           {clashes.map((c) => (
-            <ClashCard key={c.id} clash={c} />
+            <ClashCard key={c.id} clash={c} logo={logos[c.a?.address.toLowerCase() ?? ''] ?? logos[c.b?.address.toLowerCase() ?? '']} />
           ))}
         </div>
       )}
@@ -116,7 +123,7 @@ function Side({ token, side, leading, bullBear }: { token: ClashToken | null; si
   );
 }
 
-function ClashCard({ clash }: { clash: Clash }) {
+function ClashCard({ clash, logo }: { clash: Clash; logo?: string }) {
   const leader = clashLeader(clash);
   const a = clash.a?.mcapUsd ?? 0;
   const b = clash.b?.mcapUsd ?? 0;
@@ -127,9 +134,9 @@ function ClashCard({ clash }: { clash: Clash }) {
   return (
     <div id={`clash-${clash.id}`} className="rounded-[18px] border border-sp-shade/10 bg-sp-surface p-3.5">
       <div className="flex items-center gap-2.5">
-        {clash.image ? (
+        {logo ?? clash.image ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={clash.image} alt="" width={36} height={36} className="h-9 w-9 rounded-full object-cover" />
+          <img src={(logo ?? clash.image) as string} alt="" width={36} height={36} className="h-9 w-9 rounded-full object-cover" />
         ) : (
           <span className="flex h-9 w-9 items-center justify-center rounded-full bg-sp-brand-soft text-[12px] font-extrabold text-soft-primary-deep">{clash.ticker.slice(0, 2)}</span>
         )}
