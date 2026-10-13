@@ -1,0 +1,362 @@
+[
+  {
+    "n": 1,
+    "at": "2026-10-14T08:10:00Z",
+    "topic": "hub",
+    "text": "The Perps page is live: mysphere.fun/perps\n\nA strip of six Flash perps along the top, each with its 24h move. Click one and the page filters to memes on that perp. Memes, Clash, Calls and Raids sit in tabs underneath.\n\nBuying is one tap, with plain ETH."
+  },
+  {
+    "n": 2,
+    "at": "2026-10-14T16:25:00Z",
+    "topic": "perps",
+    "text": "What a Flash perp token is: a 2x leveraged position wrapped in an ERC-20, funded by a loan on Morpho and priced by NAV.\n\nETH2xL moves about twice as much as ETH in a day. That works in both directions, and a big move against it can take most of the value."
+  },
+  {
+    "n": 3,
+    "at": "2026-10-15T08:35:00Z",
+    "topic": "perps",
+    "text": "Six perps have a launchpad on MySphere: ETH2xL, BTC2xL, NVDA2xL, AAPL2xL, META2xL and SPCX2xL.\n\nAll long. The short side has no market yet, so we left it out."
+  },
+  {
+    "n": 4,
+    "at": "2026-10-15T16:15:00Z",
+    "topic": "perps",
+    "text": "A perp meme is a normal Startpad token with one change: its curve is priced in a perp instead of ETH.\n\nSay the curve holds ETH2xL. Then the meme's dollar price follows the meme and also ETH at 2x, whether anyone trades it or not."
+  },
+  {
+    "n": 5,
+    "at": "2026-10-16T08:20:00Z",
+    "topic": "zap",
+    "text": "Quick buy on the Perps page: every row has a button with your amount on it. 0.001, 0.01 or 0.05 ETH, remembered in your browser.\n\nOne tap sends ETH through USDC into the perp and buys the meme in the same transaction. The most price movement you accept is 3%."
+  },
+  {
+    "n": 6,
+    "at": "2026-10-16T16:40:00Z",
+    "topic": "zap",
+    "text": "The route behind quick buy: ETH to USDC on Uniswap v4, USDC to the perp through Flash's hook pool, then the perp into the meme's curve.\n\nThree steps, one transaction, no approvals. The zap keeps nothing between calls. Whatever it can't spend goes back to you."
+  },
+  {
+    "n": 7,
+    "at": "2026-10-17T08:05:00Z",
+    "topic": "zap",
+    "text": "One-click buys are heavy on gas. We simulated the whole route against live Base and one buy used about 4.5 million gas.\n\nAt the gas price we saw that day it came to a few cents. If Base gets busy, it costs more."
+  },
+  {
+    "n": 8,
+    "at": "2026-10-17T16:30:00Z",
+    "topic": "zap",
+    "text": "Price protection on a one-click buy sits on two legs. The first is how much perp your ETH has to buy. The second is how many meme tokens that perp has to get you.\n\nIf either comes in under your limit, the whole thing reverts and you only pay gas."
+  },
+  {
+    "n": 9,
+    "at": "2026-10-18T08:45:00Z",
+    "topic": "curve",
+    "text": "Every perp meme runs the same curve. 1 billion tokens, 800 million sold along the curve, 200 million kept for the pool.\n\nThere's no mint function. Supply is fixed at launch."
+  },
+  {
+    "n": 10,
+    "at": "2026-10-18T16:10:00Z",
+    "topic": "curve",
+    "text": "A perp meme graduates once its curve has collected 7,500 units of the perp. For the 2x perps that's roughly $7,000 to $8,000, because they trade near $1.\n\nNobody votes. The curve closes itself, and anyone can call graduate()."
+  },
+  {
+    "n": 11,
+    "at": "2026-10-19T08:30:00Z",
+    "topic": "curve",
+    "text": "Whoever calls graduate() on a full curve earns 1.5% of the raise. It's paid in the pair asset, so for an ETH2xL meme it's ETH2xL.\n\nOn a 7,500 ETH2xL raise that's 112.5 ETH2xL. Expect people to race for it."
+  },
+  {
+    "n": 12,
+    "at": "2026-10-19T16:20:00Z",
+    "topic": "curve",
+    "text": "After graduation the liquidity goes into a Uniswap v4 pool and the LP position is locked. There's no function to take it out, for us or for the creator.\n\nWhat the pool earns is a different matter. Fees can be claimed, the principal can't."
+  },
+  {
+    "n": 13,
+    "at": "2026-10-20T08:15:00Z",
+    "topic": "curve",
+    "text": "The fee on a curve trade is 1%. 70% of it goes to the creator, 30% to the protocol. Creators claim in the pair asset, so on ETH2xL memes they're paid in ETH2xL.\n\nThat means a creator's earnings move with the perp until they claim."
+  },
+  {
+    "n": 14,
+    "at": "2026-10-20T16:35:00Z",
+    "topic": "hub",
+    "text": "How we show a perp meme's dollar price: its price in the perp, times the perp's NAV. The NAV comes from Flash's API.\n\nIf that API is down, the dollar figures turn into dashes. We'd rather show nothing than guess."
+  },
+  {
+    "n": 15,
+    "at": "2026-10-21T08:40:00Z",
+    "topic": "hub",
+    "text": "The Perps page has four tabs. Memes is the list. Clash puts one meme on two perps. Calls scores buys that came with a message. Raids pools ETH with your crew.\n\nThe perp filter at the top applies to Memes, Calls and Raids."
+  },
+  {
+    "n": 16,
+    "at": "2026-10-21T16:15:00Z",
+    "topic": "hub",
+    "text": "Meme rows are grouped by stage instead of by hype: New, Graduating and In pool. Graduating means past the halfway mark of the raise, or already locked.\n\nPick the column that matches what you want to do."
+  },
+  {
+    "n": 17,
+    "at": "2026-10-22T08:25:00Z",
+    "topic": "calls",
+    "text": "A call on MySphere is a buy with a message attached, up to 64 bytes. The message rides inside the transaction, so it sits onchain next to your entry price.\n\nThe Calls page scores each one: the price now divided by the price you paid."
+  },
+  {
+    "n": 18,
+    "at": "2026-10-22T16:30:00Z",
+    "topic": "calls",
+    "text": "You can't edit or delete a call. The message is part of the buy transaction, and the price you paid is in the same transaction.\n\nThat's the whole reason it works as a track record."
+  },
+  {
+    "n": 19,
+    "at": "2026-10-23T08:10:00Z",
+    "topic": "calls",
+    "text": "Calls from wallets with a Coinbase verification get a check mark. We read it from the attestation Coinbase publishes on Base, and we skip any that are revoked or expired.\n\nThe badge says one person with a Coinbase account stands behind the wallet. It says nothing about whether the call is any good."
+  },
+  {
+    "n": 20,
+    "at": "2026-10-23T16:25:00Z",
+    "topic": "calls",
+    "text": "Calls cover the last 7 days. The score is a multiple of what you paid, in the token's own currency: ETH for normal memes, the perp for perp memes.\n\nA call on an ETH2xL meme can score 2x while the dollar value stays flat, if the perp fell by half. Read the unit."
+  },
+  {
+    "n": 21,
+    "at": "2026-10-24T08:35:00Z",
+    "topic": "clash",
+    "text": "Asset Clash: one meme launched twice, on two different perps. $PEPEETH on ETH2xL and $PEPENVDA on NVDA2xL, say. The market decides which asset carries the meme better.\n\nYou start it from the Clash tab. It takes two transactions."
+  },
+  {
+    "n": 22,
+    "at": "2026-10-24T16:20:00Z",
+    "topic": "clash",
+    "text": "How a clash finds its pair: both tokens carry the same id in their metadata, and the same wallet has to have launched both. Different perps, same creator, same id.\n\nThere's no registry and no backend that could be edited later. Copy the id onto a token from another wallet and it simply doesn't match."
+  },
+  {
+    "n": 23,
+    "at": "2026-10-25T09:00:00Z",
+    "topic": "clash",
+    "text": "What we tested before shipping Clash and Raids: a local Uniswap v4 deployment, then the full flow simulated against live Base state.\n\nWhat we didn't test: real money from a real wallet through the page. If you try either one, tell us what breaks."
+  },
+  {
+    "n": 24,
+    "at": "2026-10-25T16:15:00Z",
+    "topic": "raids",
+    "text": "A raid is a shared buy. One person opens it on a token, the crew sends ETH in, and at T-0 the leader fires a single purchase for the whole pool.\n\nEveryone claims tokens in proportion to what they put in."
+  },
+  {
+    "n": 25,
+    "at": "2026-10-26T08:20:00Z",
+    "topic": "raids",
+    "text": "Raid safety valves: members can leave until T-0 and take their ETH back. If the leader cancels, or hasn't fired when the raid expires, everyone can refund in full. In our app that window is an hour after T-0.\n\nThe contract has no owner and no pause. Nobody can park your ETH in it."
+  },
+  {
+    "n": 26,
+    "at": "2026-10-26T16:35:00Z",
+    "topic": "raids",
+    "text": "The part of a raid you have to trust is the leader. Only they can fire, and they set the price protection for the whole pool.\n\nThe leader can't withdraw the ETH, but a loose price limit can cost the crew money. Join raids led by someone you'd trust with that."
+  },
+  {
+    "n": 27,
+    "at": "2026-10-27T08:15:00Z",
+    "topic": "raids",
+    "text": "Raids can't fire in a token's first five minutes. On a normal Startpad token one address can buy at most 16 million tokens in that window, and a raid is one address.\n\nThe app sets T-0 after the window by itself, so you can't make that mistake."
+  },
+  {
+    "n": 28,
+    "at": "2026-10-27T16:25:00Z",
+    "topic": "raids",
+    "text": "If a raid's buy fills the curve, the unspent part comes back and is split the same way as the tokens: in proportion to each deposit.\n\nIt can be ETH or the perp, depending on the market. Claim collects everything in one transaction."
+  },
+  {
+    "n": 29,
+    "at": "2026-10-28T08:30:00Z",
+    "topic": "zap",
+    "text": "Selling a perp meme back to ETH is one transaction too. The zap sells to the curve, turns the perp into USDC, then USDC into ETH, and sends the ETH to your wallet.\n\nIt needs one approval for the zap the first time. After that it's a single click."
+  },
+  {
+    "n": 30,
+    "at": "2026-10-28T16:20:00Z",
+    "topic": "zap",
+    "text": "A small thing that took longer than it should have: when you sell through the zap, the curve contract logs the zap as the seller, not you.\n\nSo the zap emits its own event with your address, and the page reads the real seller from the token transfer in the same transaction. Otherwise every sale would look like one wallet."
+  },
+  {
+    "n": 31,
+    "at": "2026-10-29T08:25:00Z",
+    "topic": "zap",
+    "text": "After a perp meme graduates it trades in its own Uniswap v4 pool, paired with the perp. The page still lets you pay in ETH: one swap through three pools, ETH to USDC to the perp to the meme.\n\nWe compared how we encode the ETH-to-perp part with the swap Flash's own API builds, byte for byte. They match."
+  },
+  {
+    "n": 32,
+    "at": "2026-10-29T16:15:00Z",
+    "topic": "incident",
+    "text": "Between Sep 30 and Oct 11 no new token could be launched on our old launchpad. Every launch reverted.\n\nBase's Cobalt hardfork added functions to every B20 token, and our factory told token types apart by probing one of them. After Cobalt, all of them answered. Trading on existing tokens never stopped."
+  },
+  {
+    "n": 33,
+    "at": "2026-10-30T08:35:00Z",
+    "topic": "incident",
+    "text": "The fix for the launch outage was a second launchpad, because the first one's factory address can't be changed. That's the price of having no admin keys.\n\nThe new factory reads the token type from the token's address instead of calling anything on it. Old tokens stay on the old launchpad and keep working."
+  },
+  {
+    "n": 34,
+    "at": "2026-10-30T16:25:00Z",
+    "topic": "incident",
+    "text": "A rule we added after Cobalt: before any Base hardfork, we run a launch against mainnet state with eth_call and see whether it reverts.\n\nIt's a ten-minute check and we hadn't run it. Denim, the next hardfork, also changes how B20 transfers behave, so we'll run it the day the date is out."
+  },
+  {
+    "n": 35,
+    "at": "2026-10-31T08:20:00Z",
+    "topic": "contracts",
+    "text": "The contracts behind one-click trading and raids are both on Base. The zap is at 0x338dbB64FAD7D506b9DF52De764e806e3954Be2b, the raid vault at 0x000fF26384921f6886f82125559Ccb1270df5d1d.\n\nNeither has an owner, a pause switch or an upgrade path."
+  },
+  {
+    "n": 36,
+    "at": "2026-10-31T16:10:00Z",
+    "topic": "contracts",
+    "text": "What the zap can do with your money: receive ETH, swap, and hand everything back in the same transaction. It has no withdraw function, no admin, and it holds no balance between calls.\n\nIf you send it tokens by mistake, they're stuck. Don't."
+  },
+  {
+    "n": 37,
+    "at": "2026-11-01T08:30:00Z",
+    "topic": "perps",
+    "text": "Leverage on a Flash perp isn't fixed at 2x. It's a target with a band. When we looked, ETH2xL ran at 2.12x against a 2x target, with an allowed range up to 2.4x.\n\nThe Perps page shows the live figure in the header once you pick a perp."
+  },
+  {
+    "n": 38,
+    "at": "2026-11-01T16:20:00Z",
+    "topic": "perps",
+    "text": "A caution about 2x tokens that has nothing to do with us: in a market that goes up and down without getting anywhere, leveraged tokens tend to lose value, because they rebalance as the price moves.\n\nA perp meme inherits that. If you plan to hold, look at the perp's chart first."
+  },
+  {
+    "n": 39,
+    "at": "2026-11-02T09:10:00Z",
+    "topic": "perps",
+    "text": "Flash mints perp tokens at NAV through a Uniswap hook, not at whatever a thin pool says. When we checked, the issuer fee was 0.05%.\n\nVery large orders are limited, and Flash's quote API says when a size is too big to fill. Our buy simulates first, so it fails before anything is sent."
+  },
+  {
+    "n": 40,
+    "at": "2026-11-02T16:15:00Z",
+    "topic": "hub",
+    "text": "Each perp has its own launchpad contract, because the curve is denominated in that perp. A meme on ETH2xL raises ETH2xL, a meme on NVDA2xL raises NVDA2xL.\n\nThat's why the Perps page converts everything to dollars before it sorts. Units of different perps can't be compared."
+  },
+  {
+    "n": 41,
+    "at": "2026-11-03T08:25:00Z",
+    "topic": "launch",
+    "text": "Launching a perp meme: pick the perp on the Perps page, press Launch, upload a logo, name it. The launch transaction creates the token and starts the curve.\n\nYou don't need any of the perp to launch. A pre-buy at launch is the one thing that does."
+  },
+  {
+    "n": 42,
+    "at": "2026-11-03T16:30:00Z",
+    "topic": "launch",
+    "text": "One limit we haven't solved: the pre-buy in the launch transaction needs the perp itself in your wallet, not ETH. The launch runs from your wallet, so the zap can't sit in the middle of it.\n\nWorkaround: launch with no pre-buy, then buy with ETH from the list."
+  },
+  {
+    "n": 43,
+    "at": "2026-11-04T08:40:00Z",
+    "topic": "verified",
+    "text": "Token pages show how many of the top 100 holders have a Coinbase verification, as a fraction. Something like 3/20.\n\nIt only counts wallets that verified. A low number doesn't prove bots, plenty of real people never did it."
+  },
+  {
+    "n": 44,
+    "at": "2026-11-04T16:20:00Z",
+    "topic": "verified",
+    "text": "How the verified check works: Coinbase's indexer contract on Base maps a wallet to an attestation id, and we read that attestation from the Ethereum Attestation Service. We check the schema, the issuer, and that it isn't revoked or expired.\n\nResults are cached for ten minutes."
+  },
+  {
+    "n": 45,
+    "at": "2026-11-05T08:30:00Z",
+    "topic": "hub",
+    "text": "There's no safety score on the Perps page. We have no way to know which memes are good, and a number next to a ticker would suggest we do.\n\nWhat we can show is arithmetic: how far along the curve is, how much has traded, how old it is."
+  },
+  {
+    "n": 46,
+    "at": "2026-11-05T16:15:00Z",
+    "topic": "raids",
+    "text": "The smallest deposit a raid accepts is 0.00001 ETH. A raid can run for at most seven days from creation. In the app, T-0 is 5, 15, 30 or 60 minutes out.\n\nThe first two limits are in the contract. The T-0 menu is just what the form offers."
+  },
+  {
+    "n": 47,
+    "at": "2026-11-06T08:25:00Z",
+    "topic": "zap",
+    "text": "On a young curve a single buy can move the price several percent. Quick buy accepts up to 3%, and if the price moves further between your tap and the block, the transaction reverts.\n\nA revert costs gas but never the buy amount."
+  },
+  {
+    "n": 48,
+    "at": "2026-11-06T16:30:00Z",
+    "topic": "clash",
+    "text": "Clash tickers are built from yours: 2 to 7 letters plus the perp's base asset. PEPE becomes PEPEETH on ETH2xL and PEPENVDA on NVDA2xL.\n\nThe logo is stored onchain at 128 px, so it travels with the token."
+  },
+  {
+    "n": 49,
+    "at": "2026-11-07T08:20:00Z",
+    "topic": "hub",
+    "text": "The market cap on perp meme rows is an estimate. We take the curve's current price in the perp and multiply by the perp's NAV and by 1 billion tokens.\n\nAfter graduation the pool price is what matters. For now the page shows the price at the end of the curve for graduated memes."
+  },
+  {
+    "n": 50,
+    "at": "2026-11-07T16:15:00Z",
+    "topic": "hub",
+    "text": "Volume on the Perps page counts curve trades only, in the perp's units converted to dollars. Swaps in the Uniswap pool after graduation aren't in that number yet.\n\nA graduated meme can look quiet there while its pool is busy."
+  },
+  {
+    "n": 51,
+    "at": "2026-11-08T08:30:00Z",
+    "topic": "curve",
+    "text": "Between the raise filling up and someone calling graduate(), a token is Locked. Buying is closed. Selling still works.\n\nWe kept sells open on purpose: if nobody graduates a token for a while, holders aren't stuck."
+  },
+  {
+    "n": 52,
+    "at": "2026-11-08T16:25:00Z",
+    "topic": "curve",
+    "text": "Creators get no free supply. A pre-buy at launch fills on the same curve, with the same fee and the same cap as everyone else, and it sits in the same transaction as the launch so nobody can get in front of it.\n\nWe couldn't give ourselves an edge either."
+  },
+  {
+    "n": 53,
+    "at": "2026-11-09T08:45:00Z",
+    "topic": "calls",
+    "text": "Every call card has a Share button that writes the post for you: the ticker, your message, the score so far and a link to the token.\n\nIt opens X's compose window. Nothing goes out until you press Post there."
+  },
+  {
+    "n": 54,
+    "at": "2026-11-09T16:35:00Z",
+    "topic": "hub",
+    "text": "The Perps page keeps its state in the address, so you can link someone to exactly one view. /perps?perp=nvda2xl for a single perp, add &tab=calls for the calls on it.\n\nYour quick-buy amount isn't in the link. It stays in your browser."
+  },
+  {
+    "n": 55,
+    "at": "2026-11-10T08:30:00Z",
+    "topic": "perps",
+    "text": "The perps are Flash's product. Flash issues them, rebalances them and runs the contracts behind them. We read their API for prices and call their pools.\n\nIf something breaks on their side, perp memes feel it. Their docs are at tryflash.app/docs."
+  },
+  {
+    "n": 56,
+    "at": "2026-11-10T16:15:00Z",
+    "topic": "contracts",
+    "text": "Our contracts are tested and simulated against live Base. They are not audited. That covers the launchpads, the zap and the raid vault.\n\nSize your buys accordingly."
+  },
+  {
+    "n": 57,
+    "at": "2026-11-11T08:25:00Z",
+    "topic": "perps",
+    "text": "If ETH drops 20%, ETH2xL drops about 40%, and the perp sitting in an ETH2xL meme's curve loses that much in dollars with it.\n\nThe meme can still gain in perp terms. Which of the two you're looking at decides how the same day reads."
+  },
+  {
+    "n": 58,
+    "at": "2026-11-11T16:30:00Z",
+    "topic": "clash",
+    "text": "A clash scoreboard compares two dollar market caps. Each side is priced in its own perp, so a 4% jump in Nvidia moves the NVDA side's number without a single trade.\n\nCount a lead only if there are buyers behind it too."
+  },
+  {
+    "n": 59,
+    "at": "2026-11-12T08:20:00Z",
+    "topic": "roadmap",
+    "text": "On the list, no dates promised: selling to ETH from the quick-trade window on the main board, a live pool price for graduated memes on the Perps page, and verified source for the contracts on Basescan.\n\nWe'd rather say what's missing than let you find it."
+  },
+  {
+    "n": 60,
+    "at": "2026-11-12T16:10:00Z",
+    "topic": "wrap",
+    "text": "That's a month of Perps posts: mechanics, caveats, no price talk. If anything here doesn't match what you see on the page, tell us and we'll fix whichever one is wrong.\n\nmysphere.fun/perps"
+  }
+]
