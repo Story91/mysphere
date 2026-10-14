@@ -106,7 +106,7 @@ export default function SoftSignInHero({
   //
   // NA TELEFONIE BEZ ZMIAN - wszystkie nowe klasy sa za prefiksem `lg`.
   return (
-    <section className="relative overflow-hidden rounded-card bg-gradient-to-b from-[#8E7BE8] via-[#7C6BDA] to-[#6656BE] px-6 py-10 text-center font-soft lg:flex lg:min-h-full lg:items-center lg:px-12 lg:py-14 lg:text-left">
+    <section className="relative overflow-hidden rounded-card bg-soft-ink px-6 py-10 text-center font-soft lg:flex lg:min-h-full lg:items-center lg:px-12 lg:py-14 lg:text-left">
       {/* ===== UKLAD NA DESKTOPIE: OBOK SIEBIE, NIE POD SOBA =====
           Ten ekran renderuje sie teraz na PELNEJ szerokosci kolumny glownej
           (patrz basechat/page.tsx, "EKRAN POWITALNY: NAD FEEDEM I POZA JEGO

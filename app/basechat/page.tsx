@@ -77,7 +77,7 @@ import { loadListedVaults } from '../utils/asks/listedVaults';
 import type { Ask } from '../utils/asks/types';
 // Bars3Icon jako MenuIcon: dolna zakladka otwiera liste przejsc, nie profil,
 // wiec sylwetka czlowieka byla tam obietnica innego ekranu.
-import { HomeIcon, Bars3Icon as MenuIcon, ChartBarIcon } from '@heroicons/react/24/solid';
+import { HomeIcon, Bars3Icon as MenuIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 import { LayoutGrid, UserCircle, Rss, Eye, Users, Compass } from 'lucide-react';
 // GlassIcons juz tu nie wchodzi - nawigacja desktopu idzie przez
 // SoftSectionList (patrz komentarz przy liscie w kolumnie bocznej).
@@ -3268,7 +3268,7 @@ function BaseChatContent() {
           </motion.div>
         )}
         
-        <div className="min-h-screen relative">
+        <div className="board min-h-screen relative">
           {/* ===== TLO STRONY - kierunek Soft Social =====
               Bylo tu prawie czarne #050B20 z gradientem. Na telefonie feed
               chodzil juz na jasnym `bg-soft-bg` (klasa max-lg: nizej), wiec ta
@@ -5086,137 +5086,114 @@ function BaseChatContent() {
           otwarta. */}
       <nav
         aria-label="Sections"
-        className="fixed bottom-0 left-0 right-0 lg:hidden bg-soft-surface/95 border-t border-soft-line z-40"
+        className="board fixed bottom-0 left-0 right-0 z-40 border-t border-soft-line bg-soft-surface/90 backdrop-blur-md lg:hidden"
       >
-        {/* items-end + wypukly StartPad w srodku - ten sam wzor co w globalnym
-            MobileBottomNav (app/components/MobileBottomNav.tsx): podniesiony
-            fioletowy krazek z rakieta wystaje ponad pasek. Tam piec etykiet
-            miesci sie przy 320px w tych samych rozmiarach, wiec i tutaj sie
-            zmieszcza. */}
-        <div className="flex items-end justify-around px-2 pb-3 pt-2">
-          {/* ===== "MENU", A NIE "PROFILE" =====
-              Ten przycisk otwiera lewy panel, w ktorym stoi teraz WYLACZNIE
-              nawigacja. Podpisany "Profile" obiecywal profil, a dawal liste
-              przejsc - i konkurowal nazwa z pozycja "My Profile" w srodku tej
-              listy, ktora prowadzi do prawdziwego, pelnego profilu. Jedna
-              nazwa nie moze znaczyc dwoch roznych ekranow. */}
-          <button
-            onClick={() => setActiveMobilePanel('left')}
-            aria-current={activeMobilePanel === 'left' ? 'page' : undefined}
-            className="flex min-h-[44px] min-w-[44px] flex-col items-center rounded-card p-1.5 transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
-          >
-            <div className={`p-1 rounded-full ${activeMobilePanel === 'left' ? 'bg-soft-sunken' : ''}`}>
-              <MenuIcon
-                className="w-6 h-6"
-                color={activeMobilePanel === 'left' ? '#7C6BDA' : '#8D86AB'}
-              />
-            </div>
-            <span className={`mt-1 font-soft text-[11.5px] font-bold ${activeMobilePanel === 'left' ? 'text-soft-primary-deep' : 'text-soft-ink-soft'}`}>Menu</span>
-          </button>
-          <button
-            onClick={() => setActiveMobilePanel('main')}
-            aria-current={activeMobilePanel === 'main' ? 'page' : undefined}
-            className="flex min-h-[44px] min-w-[44px] flex-col items-center rounded-card p-1.5 transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
-          >
-            <div className={`p-1 rounded-full ${activeMobilePanel === 'main' ? 'bg-soft-sunken' : ''}`}>
-              <HomeIcon
-                className="w-6 h-6"
-                color={activeMobilePanel === 'main' ? '#7C6BDA' : '#8D86AB'}
-              />
-            </div>
-            <span className={`mt-1 font-soft text-[11.5px] font-bold ${activeMobilePanel === 'main' ? 'text-soft-primary-deep' : 'text-soft-ink-soft'}`}>Feed</span>
-          </button>
+        {/* REDESIGN 2026-10-14: ten sam wzor co globalny MobileBottomNav - piec
+            rownych kolumn i cienki wskaznik na gornej krawedzi, ktory slizga sie
+            do aktywnego panelu. Wypukly krazek StartPad z rozowa odznaka zniknal.
+            Tu nadal przelaczamy PANELE tej strony (Menu / Feed / Trends), a
+            StartPad i Asks to zwykle linki - dlatego wskaznik stoi tylko na
+            panelach (indeksy 0, 1, 3) i chowa sie, gdy aktywnego panelu nie ma.
 
-          {/* ===== STARTPAD W SRODKU - JAK W GLOBALNYM PASKU =====
-              Ten sam podniesiony przycisk co w MobileBottomNav: feed byl
-              jedyna strona bez drogi do launchpada w zasiegu kciuka.
-              To <Link>, nie przycisk panelu - /startpad to osobna trasa,
-              wiec ma dzialac srodkowym przyciskiem myszy i w nowej karcie. */}
+            "Menu", a nie "Profile": lewy panel to wylacznie nawigacja, a podpis
+            "Profile" konkurowal z pozycja "My Profile" w srodku tej listy. */}
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute -top-px left-0 h-[2px] w-1/5 rounded-full bg-soft-ink transition-transform [transition-duration:var(--dur-sheet)] ease-drawer"
+          style={{
+            transform: `translateX(${(activeMobilePanel === 'left' ? 0 : activeMobilePanel === 'main' ? 1 : 3) * 100}%)`,
+          }}
+        />
+        <div className="grid grid-cols-5 px-1 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-1.5">
+          {(
+            [
+              { id: 'left', label: 'Menu', icon: MenuIcon },
+              { id: 'main', label: 'Feed', icon: HomeIcon },
+            ] as const
+          ).map((item) => {
+            const active = activeMobilePanel === item.id;
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setActiveMobilePanel(item.id)}
+                aria-current={active ? 'page' : undefined}
+                className="flex min-h-[48px] flex-col items-center justify-center gap-0.5 rounded-lg py-1 outline-none transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.94] focus-visible:ring-2 focus-visible:ring-soft-primary"
+              >
+                <span className={active ? 'text-soft-ink' : 'text-soft-ink-muted'}>
+                  <Icon className="h-[22px] w-[22px]" color="currentColor" />
+                </span>
+                <span className={`font-soft text-[11px] font-semibold ${active ? 'text-soft-ink' : 'text-soft-ink-muted'}`}>
+                  {item.label}
+                </span>
+              </button>
+            );
+          })}
+
+          {/* STARTPAD: zwykla pozycja z kropka "nowosc". To <Link>, nie przycisk
+              panelu - /startpad to osobna trasa, wiec ma dzialac srodkowym
+              przyciskiem myszy i w nowej karcie. */}
           <Link
             href="/startpad"
-            aria-label="StartPad - new"
-            className="relative -mt-6 flex flex-col items-center"
+            className="flex min-h-[48px] flex-col items-center justify-center gap-0.5 rounded-lg py-1 outline-none transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.94] focus-visible:ring-2 focus-visible:ring-soft-primary"
           >
-            <span className="relative flex h-14 w-14 items-center justify-center rounded-full bg-soft-primary text-white shadow-[0_10px_28px_rgba(124,107,218,0.55)] ring-4 ring-soft-surface transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-95">
-              <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <span className="relative text-soft-ink-muted">
+              <svg className="h-[22px] w-[22px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" />
                 <path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" />
                 <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" />
                 <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
               </svg>
-              <span className="absolute -right-1.5 -top-1.5 rounded-full bg-[#ff4d7d] px-1.5 py-0.5 text-[8px] font-extrabold uppercase leading-none text-white shadow-[0_2px_6px_rgba(255,77,125,0.5)]">
-                New
-              </span>
+              <span className="absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-soft-ask ring-2 ring-soft-surface" aria-hidden="true" />
+              <span className="sr-only"> (new)</span>
             </span>
-            <span className="mt-1 font-soft text-[11px] font-extrabold text-soft-primary-deep">StartPad</span>
+            <span className="font-soft text-[11px] font-semibold text-soft-ink-muted">StartPad</span>
           </Link>
 
-          <button
-            onClick={() => setActiveMobilePanel('right')}
-            aria-current={activeMobilePanel === 'right' ? 'page' : undefined}
-            className="flex min-h-[44px] min-w-[44px] flex-col items-center rounded-card p-1.5 transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
-          >
-            <div className={`p-1 rounded-full ${activeMobilePanel === 'right' ? 'bg-soft-sunken' : ''}`}>
-              <ChartBarIcon
-                className="w-6 h-6"
-                color={activeMobilePanel === 'right' ? '#7C6BDA' : '#8D86AB'}
-              />
-            </div>
-            <span className={`mt-1 font-soft text-[11.5px] font-bold ${activeMobilePanel === 'right' ? 'text-soft-primary-deep' : 'text-soft-ink-soft'}`}>Trends</span>
-          </button>
+          {(
+            [{ id: 'right', label: 'Trends', icon: ChartBarIcon }] as const
+          ).map((item) => {
+            const active = activeMobilePanel === item.id;
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setActiveMobilePanel(item.id)}
+                aria-current={active ? 'page' : undefined}
+                className="flex min-h-[48px] flex-col items-center justify-center gap-0.5 rounded-lg py-1 outline-none transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.94] focus-visible:ring-2 focus-visible:ring-soft-primary"
+              >
+                <span className={active ? 'text-soft-ink' : 'text-soft-ink-muted'}>
+                  <Icon className="h-[22px] w-[22px]" color="currentColor" />
+                </span>
+                <span className={`font-soft text-[11px] font-semibold ${active ? 'text-soft-ink' : 'text-soft-ink-muted'}`}>
+                  {item.label}
+                </span>
+              </button>
+            );
+          })}
 
-          {/* ===== CZWARTA POZYCJA: ASKS =====
-              Powstala strona /asks, trasy API, karta i kompozytor - i NIC do
-              nich nie prowadzilo. Na telefonie w ogole nie bylo drogi: dolny
-              pasek mial trzy przyciski i zaden nie wychodzil poza feed.
-
-              To NIE jest `SoftDock`, tylko recznie napisany <nav> - i wlasnie
-              dlatego czwarty przycisk dodany kiedys do SoftDock nie pojawil sie
-              w produkcji. SoftDock nie ma juz zadnego uzycia: jedyna trasa, ktora
-              go renderowala (prototyp /basechat/soft), zostala usunieta.
-
-              Dlaczego Asks, a nie Follows (pierwotny pomysl): Ask ma byc
-              JEDNOSTKA tego produktu, a nie widokiem pobocznym. Follows
-              prowadzi do tresci, ktora i tak jest w feedzie pod zakladka;
-              Asks prowadzi do jedynej rzeczy, ktorej nie da sie zobaczyc
-              nigdzie indziej.
-
-              To <Link>, nie przycisk panelu: Asks to osobna trasa, wiec ma
-              dzialac srodkowym przyciskiem myszy i w nowej karcie.
-
-              Piata pozycja (StartPad) stoi w srodku jako wypukly krazek -
-              ten sam wzor i rozmiary co w globalnym MobileBottomNav, ktory
-              miesci piec etykiet przy 320px. */}
+          {/* ASKS: osobna trasa, wiec <Link> (srodkowy przycisk i nowa karta).
+              Jest TU recznie, a nie w SoftDock - SoftDock nie ma zadnego uzycia,
+              wiec czwarty przycisk dodany tam nigdy nie pojawil sie w produkcji. */}
           <Link
             href="/asks"
             aria-label="Asks"
-            className="flex min-h-[44px] min-w-[44px] flex-col items-center rounded-card p-1.5 transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
+            className="flex min-h-[48px] flex-col items-center justify-center gap-0.5 rounded-lg py-1 outline-none transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.94] focus-visible:ring-2 focus-visible:ring-soft-primary"
           >
-            <div className="p-1 rounded-full">
-              {/* Znak zapytania w kolku - Ask to pytanie z kwota. Wektor,
-                  nie emoji: emoji renderuje sie inaczej na kazdym systemie. */}
-              <svg
-                className="w-6 h-6"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#8D86AB"
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
+            <span className="text-soft-ink-muted">
+              <svg className="h-[22px] w-[22px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <circle cx="12" cy="12" r="9" />
                 <path d="M9.5 9a2.5 2.5 0 1 1 3.2 2.4c-.6.2-.9.7-.9 1.3v.3" />
                 <path d="M12 16.5h.01" />
               </svg>
-            </div>
-            <span className="mt-1 font-soft text-[11.5px] font-bold text-soft-ink-soft">Asks</span>
+            </span>
+            <span className="font-soft text-[11px] font-semibold text-soft-ink-muted">Asks</span>
           </Link>
         </div>
       </nav>
 
       {/* Padding for mobile footer */}
-      <div className="h-20 lg:h-0" />
+      <div className="h-16 lg:h-0" />
     </BanPage>
   </>
   );

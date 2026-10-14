@@ -17,10 +17,13 @@ export default function BoardTabs({
   tabs,
   active,
   label,
+  className = 'max-w-[380px]',
 }: {
   tabs: BoardTab[];
   active: string;
   label: string;
+  /** Maksymalna szerokosc przelacznika - dla dwoch zakladek wystarcza wezszy. */
+  className?: string;
 }) {
   const index = Math.max(
     0,
@@ -30,7 +33,7 @@ export default function BoardTabs({
   return (
     <nav
       aria-label={label}
-      className="w-full max-w-[380px] rounded-[12px] bg-soft-sunken p-1"
+      className={`w-full rounded-[12px] bg-soft-sunken p-1 ${className}`}
     >
       <div
         className="relative grid"

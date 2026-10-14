@@ -42,7 +42,7 @@ export default function SoftProfileHeader({
 
   return (
     <div className="lg:hidden">
-      <div className="relative -mx-4 overflow-hidden rounded-b-card bg-gradient-to-b from-[#8E7BE8] via-[#7C6BDA] to-[#6656BE] px-4 pb-6 pt-5">
+      <div className="relative -mx-4 overflow-hidden rounded-b-card bg-soft-ink px-4 pb-6 pt-5">
         {onEdit && (
           <button
             type="button"

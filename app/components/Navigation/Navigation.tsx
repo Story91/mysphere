@@ -31,7 +31,29 @@ import { NotificationsBell } from './NotificationsBell';
 type NavLink = {
   href: string;
   label: string;
+  /** Jedno zdanie pod nazwa w rozwijanym menu "More". */
+  hint?: string;
 };
+
+/**
+ * Wpisy schowane pod jednym rozwijanym "More" (2026-10-14).
+ *
+ * Wlasciciel: belka rosla z kazdym modulem, a Asks, $SPHERE i How to strony,
+ * do ktorych sie wraca, ale ktore nie musza stac na stale w rzedzie. Jedna
+ * pozycja zamiast trzech zostawia miejsce na to, co ma byc na wierzchu (feed,
+ * Startpad, Perps). Zadna trasa sie nie zmienia - zmienia sie tylko miejsce
+ * linku. Kolejnosc w menu: instrukcja, potem moduly.
+ *
+ * Wpis znika z grupy, gdy jego trasa jest wylaczona (isRouteDisabled), a cala
+ * grupa znika, gdy nie ma w niej nic.
+ */
+const MORE_GROUP: Record<string, string> = {
+  '/how': 'How it works, docs and the manifesto',
+  '/asks': 'Questions with a budget, your money, curators',
+  '/startpad/sphere': 'The launchpad token: burns, rewards, vesting',
+};
+const MORE_ORDER = ['/how', '/asks', '/startpad/sphere'];
+const MORE_ID = '__more';
 
 const MOBILE_MENU_ID = 'mobile-nav-menu';
 
@@ -42,7 +64,11 @@ export function usesBoardTheme(pathname: string | null): boolean {
     pathname === '/asks' ||
     pathname.startsWith('/asks/') ||
     pathname.startsWith('/ask/') ||
-    pathname.startsWith('/startpad/sphere')
+    pathname.startsWith('/startpad/sphere') ||
+    pathname === '/basechat' ||
+    pathname.startsWith('/basechat/') ||
+    pathname === '/how' ||
+    pathname.startsWith('/how/')
   );
 }
 
@@ -55,17 +81,111 @@ export function usesBoardTheme(pathname: string | null): boolean {
  * zmienia szerokosci). Pierwszy pomiar idzie bez przejscia - wskaznik nie ma
  * wyjezdzac z lewego rogu przy wejsciu na strone.
  */
-function DesktopTabs({
+function MoreMenu({
   links,
   isActive,
+  pathname,
 }: {
   links: NavLink[];
   isActive: (href: string) => boolean;
+  pathname: string | null;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLLIElement>(null);
+  const active = links.some((link) => isActive(link.href));
+
+  // Przejscie na inna strone zamyka menu.
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (event: MouseEvent) => {
+      if (!ref.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onPointer);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onPointer);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  return (
+    <li ref={ref} className="relative">
+      <button
+        type="button"
+        data-href={MORE_ID}
+        aria-expanded={open}
+        aria-haspopup="true"
+        onClick={() => setOpen((value) => !value)}
+        className={`relative inline-flex items-center gap-1 rounded-lg px-3 py-2 font-soft-display text-[13.5px] font-semibold outline-none transition-colors [transition-duration:var(--dur-press)] focus-visible:ring-2 focus-visible:ring-soft-primary ${
+          active || open ? 'text-soft-ink' : 'text-soft-ink-muted hover:text-soft-ink'
+        }`}
+      >
+        More
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2.4}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={`h-3 w-3 transition-transform [transition-duration:var(--dur-dropdown)] ease-out-strong ${open ? 'rotate-180' : ''}`}
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
+      <div
+        aria-hidden={!open}
+        className={`absolute left-0 top-full z-30 mt-3 w-72 origin-top-left rounded-card border border-soft-line bg-soft-surface p-1.5 shadow-float transition-[opacity,transform] [transition-duration:var(--dur-dropdown)] ease-out-strong ${
+          open ? 'scale-100 opacity-100' : 'pointer-events-none scale-95 opacity-0'
+        }`}
+      >
+        {links.map((link) => {
+          const current = isActive(link.href);
+          return (
+            <Link
+              key={link.href}
+              href={link.href}
+              tabIndex={open ? 0 : -1}
+              aria-current={current ? 'page' : undefined}
+              className={`block rounded-lg px-3 py-2.5 outline-none transition-colors [transition-duration:var(--dur-press)] hover:bg-soft-sunken focus-visible:ring-2 focus-visible:ring-soft-primary ${
+                current ? 'bg-soft-sunken' : ''
+              }`}
+            >
+              <span className="block font-soft-display text-[14px] font-semibold text-soft-ink">{link.label}</span>
+              {link.hint && <span className="block text-[12px] leading-snug text-soft-ink-muted">{link.hint}</span>}
+            </Link>
+          );
+        })}
+      </div>
+    </li>
+  );
+}
+
+function DesktopTabs({
+  links,
+  moreLinks,
+  isActive,
+  pathname,
+}: {
+  links: NavLink[];
+  moreLinks: NavLink[];
+  isActive: (href: string) => boolean;
+  pathname: string | null;
 }) {
   const listRef = useRef<HTMLUListElement>(null);
   const [bar, setBar] = useState<{ x: number; w: number } | null>(null);
   const [animate, setAnimate] = useState(false);
-  const activeHref = links.find((link) => isActive(link.href))?.href ?? null;
+  const activeHref =
+    links.find((link) => isActive(link.href))?.href ??
+    (moreLinks.some((link) => isActive(link.href)) ? MORE_ID : null);
 
   const measure = useCallback(() => {
     const list = listRef.current;
@@ -73,14 +193,18 @@ function DesktopTabs({
       setBar(null);
       return;
     }
-    const el = Array.from(list.querySelectorAll<HTMLAnchorElement>('a[data-href]')).find(
+    const el = Array.from(list.querySelectorAll<HTMLElement>('[data-href]')).find(
       (node) => node.dataset.href === activeHref
     );
     if (!el) {
       setBar(null);
       return;
     }
-    setBar({ x: el.offsetLeft, w: el.offsetWidth });
+    // Wzgledem LISTY, nie offsetParent: przycisk "More" siedzi w <li relative>,
+    // wiec jego offsetLeft liczy sie od tego <li>, a nie od paska.
+    const box = el.getBoundingClientRect();
+    const origin = list.getBoundingClientRect();
+    setBar({ x: box.left - origin.left, w: box.width });
   }, [activeHref]);
 
   useLayoutEffect(() => {
@@ -119,6 +243,7 @@ function DesktopTabs({
             </li>
           );
         })}
+        {moreLinks.length > 0 && <MoreMenu links={moreLinks} isActive={isActive} pathname={pathname} />}
         <li
           aria-hidden="true"
           className={`pointer-events-none absolute bottom-0.5 left-0 h-[2px] list-none rounded-full bg-soft-ink ${
@@ -139,6 +264,7 @@ export default function Navigation() {
   const pathname = usePathname();
   const router = useRouter();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [moreOpenMobile, setMoreOpenMobile] = useState(false);
 
   const handleNotificationsClick = () => {
     router.push('/basechat?view=notifications');
@@ -231,9 +357,15 @@ export default function Navigation() {
     { href: '/how', label: 'How' },
   ];
 
-  const navLinks: NavLink[] = allNavLinks.filter(
+  const visibleLinks: NavLink[] = allNavLinks.filter(
     (link) => link.href === '#' || !isRouteDisabled(link.href)
   );
+  // Wpisy z grupy "More" wychodza z glownego rzedu i dostaja podpis w menu.
+  const navLinks = visibleLinks.filter((link) => !(link.href in MORE_GROUP));
+  const moreLinks: NavLink[] = MORE_ORDER.flatMap((href) => {
+    const found = visibleLinks.find((link) => link.href === href);
+    return found ? [{ ...found, label: href === '/how' ? 'How it works' : found.label, hint: MORE_GROUP[href] }] : [];
+  });
 
   const isActiveLink = (href: string) => {
     if (!pathname) return false;
@@ -242,6 +374,8 @@ export default function Navigation() {
     if (href === '/startpad' && pathname.startsWith('/startpad/sphere')) return false;
     return pathname === href || pathname.startsWith(href + '/');
   };
+
+  const moreActive = moreLinks.some((link) => isActiveLink(link.href));
 
   return (
     <div className={`sticky top-0 z-50 ${usesBoardTheme(pathname) ? 'board' : ''}`}>
@@ -264,7 +398,7 @@ export default function Navigation() {
                 />
               </Link>
 
-              <DesktopTabs links={navLinks} isActive={isActiveLink} />
+              <DesktopTabs links={navLinks} moreLinks={moreLinks} isActive={isActiveLink} pathname={pathname} />
 
               {/* Mobile Menu Button */}
               <button
@@ -316,6 +450,55 @@ export default function Navigation() {
                   </Link>
                 );
               })}
+              {moreLinks.length > 0 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setMoreOpenMobile((open) => !open)}
+                    aria-expanded={moreOpenMobile || moreActive}
+                    className={`flex items-center justify-between rounded-lg px-3 py-3 font-soft-display text-[15px] font-semibold outline-none transition-colors [transition-duration:var(--dur-press)] focus-visible:ring-2 focus-visible:ring-soft-primary ${
+                      moreActive ? 'text-soft-ink' : 'text-soft-ink-muted hover:bg-soft-sunken hover:text-soft-ink'
+                    }`}
+                  >
+                    More
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2.4}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className={`h-4 w-4 transition-transform [transition-duration:var(--dur-sheet)] ease-drawer ${moreOpenMobile || moreActive ? 'rotate-180' : ''}`}
+                    >
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                  </button>
+                  <div className="board-expand" data-open={moreOpenMobile || moreActive}>
+                    <div>
+                      <div className="ml-3 flex flex-col border-l border-soft-line pl-2">
+                        {moreLinks.map((link) => {
+                          const active = isActiveLink(link.href);
+                          return (
+                            <Link
+                              key={link.href}
+                              href={link.href}
+                              onClick={() => setIsMobileMenuOpen(false)}
+                              aria-current={active ? 'page' : undefined}
+                              className={`rounded-lg px-3 py-2.5 outline-none transition-colors [transition-duration:var(--dur-press)] focus-visible:ring-2 focus-visible:ring-soft-primary ${
+                                active ? 'bg-soft-sunken' : 'hover:bg-soft-sunken'
+                              }`}
+                            >
+                              <span className="block font-soft-display text-[15px] font-semibold text-soft-ink">{link.label}</span>
+                              {link.hint && <span className="block text-[12px] leading-snug text-soft-ink-muted">{link.hint}</span>}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
             </nav>
           )}
         </div>

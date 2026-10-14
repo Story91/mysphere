@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import ReDefinitionContent, { RE_DEFINITION_METADATA } from '../re-definition/ReDefinitionContent';
+import BoardTabs from '../asks/BoardTabs';
 // Oba importy sa bez web3.js i bez 'use client' - czytaja tylko zmienne
 // srodowiskowe, wiec strona dalej nie wysyla ani kilobajta JS-a.
 import { IS_SOLANA_MAINNET } from '../basechat/Solana/config/solanaChain';
@@ -317,7 +318,7 @@ function Step({ meta, children }: { meta: StepMeta; children: React.ReactNode })
   return (
     // `scroll-mt`, bo do kazdego kroku prowadzi teraz kotwica ze skorowidza,
     // a belka nawigacji jest przyklejona na gorze.
-    <section id={meta.id} className="scroll-mt-24 border-t border-soft-line/70 py-10">
+    <section id={meta.id} className="scroll-mt-24 border-t border-soft-line py-8">
       <div className="mb-3 flex items-baseline gap-3">
         {/* Numer jest tu POPRAWNY, w przeciwienstwie do /re-definition.
             Tam sekcje sa stanami tej samej kwoty, nie krokami, wiec numer nic
@@ -330,7 +331,7 @@ function Step({ meta, children }: { meta: StepMeta; children: React.ReactNode })
         <span className="w-[26px] shrink-0 font-soft-display text-[13px] font-bold tabular-nums text-soft-primary-deep">
           {meta.n}
         </span>
-        <h2 className="font-soft-display text-[22px] font-bold leading-[1.2] tracking-[-0.01em] text-soft-ink sm:text-[26px]">
+        <h2 className="font-soft-display text-[20px] font-bold leading-[1.25] tracking-[-0.01em] text-soft-ink sm:text-[24px]">
           {meta.title}
         </h2>
       </div>
@@ -379,10 +380,10 @@ function Hi({ children }: { children: React.ReactNode }) {
 function Cost({ lead, children }: { lead: string; children: React.ReactNode }) {
   return (
     <p className="mb-4 flex flex-wrap items-baseline gap-x-2.5 gap-y-1.5">
-      <span className="rounded-pill border border-soft-line bg-soft-surface px-2.5 py-1 font-soft text-[11px] font-bold uppercase tracking-[0.08em] text-soft-ink">
+      <span className="rounded-pill border border-soft-line-strong bg-soft-surface px-2.5 py-1 font-soft text-[12px] font-bold text-soft-ink">
         {lead}
       </span>
-      <span className="font-soft text-[12.5px] font-semibold leading-[1.5] text-soft-ink-soft">
+      <span className="font-soft text-[12.5px] font-semibold leading-[1.5] text-soft-ink-muted">
         {children}
       </span>
     </p>
@@ -397,13 +398,13 @@ function Cost({ lead, children }: { lead: string; children: React.ReactNode }) {
  * calosci nie dalo sie zobaczyc naraz - a to wlasnie calosc jest odpowiedzia.
  * Ten blok mowi ja na jednym ekranie, a kazdy wiersz jest kotwica do kroku.
  */
-function StepIndex() {
+function StepIndex({ className = '' }: { className?: string }) {
   return (
     <nav
       aria-label="The twelve steps"
-      className="mt-10 rounded-card border border-soft-line bg-soft-surface p-4 shadow-card sm:p-5"
+      className={`rounded-card border border-soft-line bg-soft-surface p-4 shadow-card ${className}`}
     >
-      <p className="mb-2 font-soft text-[11px] font-bold uppercase tracking-[0.16em] text-soft-ink-faint">
+      <p className="mb-2 font-soft-display text-[13px] font-semibold text-soft-ink-muted">
         Twelve steps, and what each one costs
       </p>
       <ol>
@@ -416,7 +417,7 @@ function StepIndex() {
                 w poziomie. */}
             <a
               href={`#${step.id}`}
-              className="grid grid-cols-[26px_1fr] items-baseline gap-x-3 gap-y-0.5 py-2.5 transition-colors [transition-duration:var(--dur-press)] ease-out-strong hover:text-soft-primary-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary sm:grid-cols-[26px_1fr_auto]"
+              className="grid grid-cols-[26px_1fr] items-baseline gap-x-3 gap-y-0.5 py-2 transition-colors [transition-duration:var(--dur-press)] ease-out-strong hover:text-soft-primary-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary sm:grid-cols-[26px_1fr_auto]"
             >
               <span className="font-soft-display text-[12px] font-bold tabular-nums text-soft-primary-deep">
                 {step.n}
@@ -424,7 +425,7 @@ function StepIndex() {
               <span className="min-w-0 font-soft-display text-[14px] font-semibold leading-[1.35] text-soft-ink">
                 {step.title}
               </span>
-              <span className="col-start-2 font-soft text-[11.5px] font-semibold text-soft-ink-soft sm:col-start-3 sm:text-right">
+              <span className="col-start-2 font-soft text-[11.5px] font-semibold text-soft-ink-muted">
                 {step.cost}
               </span>
             </a>
@@ -451,18 +452,26 @@ function Go({ href, children }: { href: string; children: React.ReactNode }) {
 function HowContent() {
   return (
     <main className="min-h-screen bg-soft-bg font-soft">
-      <div className="mx-auto max-w-[760px] px-5 py-14 sm:px-8 sm:py-20">
-        <p className="mb-4 font-soft text-[11px] font-bold uppercase tracking-[0.18em] text-soft-ink-faint">
-          How it works
-        </p>
+      {/* REDESIGN 2026-10-14: na szerokim ekranie skorowidz krokow stoi z boku i
+          jedzie razem ze scrollem (sticky), wiec cena kazdego kroku jest pod
+          reka, a czytany tekst ma waska, wygodna kolumne. Na telefonie skorowidz
+          jest zwiniety pod naglowkiem - dwanascie wierszy przed pierwsza trescia
+          to byl ekran, ktorego nikt nie dokonczyl. */}
+      <div className="mx-auto max-w-[1040px] px-5 py-8 sm:px-8 sm:py-12 lg:grid lg:grid-cols-[272px_minmax(0,1fr)] lg:gap-12">
+        <aside className="hidden lg:block">
+          <div className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto">
+            <StepIndex />
+          </div>
+        </aside>
 
-        <h1 className="mb-5 font-soft-display text-[34px] font-bold leading-[1.1] tracking-[-0.02em] text-soft-ink sm:text-[44px]">
+        <div className="min-w-0 max-w-[760px]">
+        <h1 className="mb-4 font-soft-display text-[30px] font-bold leading-[1.1] tracking-[-0.02em] text-soft-ink sm:text-[40px]">
           Everything here costs somebody money.
           <br />
           That is the point.
         </h1>
 
-        <p className="mb-4 max-w-[58ch] text-[16px] leading-[1.65] text-soft-ink-muted">
+        <p className="mb-3 max-w-[58ch] text-[16px] leading-[1.6] text-soft-ink-muted">
           Most feeds measure attention, which is free to give and therefore
           proves nothing. This one measures payments, which are not. Below is
           everything you can do here today: what it costs, what you sign, and
@@ -470,34 +479,45 @@ function HowContent() {
         </p>
 
         <p className="max-w-[58ch] text-[14px] leading-[1.6] text-soft-ink-soft">
-          Nothing on this page is a plan. If it is written here, it works right
-          now. Where the thing that works has never had anyone go through it,
-          the step says so in the step. What is still being built is listed
-          on{' '}
+          Nothing on this page is a plan: where a step has never had anyone go
+          through it, the step says so. What is still being built is on{' '}
           <Link
             href="/how?tab=re-definition"
-            className="font-semibold text-soft-primary-deep underline decoration-soft-line underline-offset-4 hover:text-soft-primary"
+            className="font-semibold text-soft-ink underline decoration-soft-line-strong underline-offset-4 hover:decoration-soft-ink"
           >
             Re-Definition
           </Link>
-          , with its status next to it.
-        </p>
-
-        <p className="mt-3 max-w-[58ch] text-[14px] leading-[1.6] text-soft-ink-soft">
-          The deeper version, with the flow, the fees and the onchain proof for
-          each part, is what the{' '}
+          , with its status. Flows, fees and onchain proof for each part are in
+          the{' '}
           <Link
             href="/Docs"
-            className="font-semibold text-soft-primary-deep underline decoration-soft-line underline-offset-4 hover:text-soft-primary"
+            className="font-semibold text-soft-ink underline decoration-soft-line-strong underline-offset-4 hover:decoration-soft-ink"
           >
             documentation
-          </Link>{' '}
-          is for.
+          </Link>
+          .
         </p>
 
-        <StepIndex />
+        <details className="group mt-6 rounded-card border border-soft-line bg-soft-surface lg:hidden">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 font-soft-display text-[14px] font-semibold text-soft-ink [&::-webkit-details-marker]:hidden">
+            All twelve steps and what they cost
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2.4}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4 transition-transform [transition-duration:var(--dur-sheet)] ease-drawer group-open:rotate-180"
+            >
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </summary>
+          <StepIndex className="rounded-none border-0 border-t shadow-none" />
+        </details>
 
-        <div className="mt-10">
+        <div className="mt-6">
           {/* ---------------------------------------------------------- */}
           <Step meta={STEPS[0]}>
             <P lead>
@@ -974,8 +994,8 @@ function HowContent() {
             tego nie da sie "wykonac", to sie czyta przed wykonaniem reszty.
             Naglowek dostaje ten sam stopien co kroki; wczesniej byl 15-punktowa
             wersalikowa etykieta, wiec caly blok czytal sie jak stopka. */}
-        <section className="scroll-mt-24 border-t border-soft-line/70 py-10">
-          <h2 className="mb-4 font-soft-display text-[22px] font-bold leading-[1.2] tracking-[-0.01em] text-soft-ink sm:text-[26px]">
+        <section className="scroll-mt-24 border-t border-soft-line py-8">
+          <h2 className="mb-4 font-soft-display text-[20px] font-bold leading-[1.25] tracking-[-0.01em] text-soft-ink sm:text-[24px]">
             Two things worth knowing before you spend anything
           </h2>
           <div className="max-w-[64ch]">
@@ -1001,6 +1021,7 @@ function HowContent() {
           </P>
           </div>
         </section>
+        </div>
       </div>
     </main>
   );
@@ -1008,50 +1029,30 @@ function HowContent() {
 
 /* ------------------------------------------------------------------ */
 
-/** Jedna pigulka przelacznika. Aktywna wyglada jak aktywny wpis w belce. */
-function TabPill({ href, active, children }: { href: string; active: boolean; children: React.ReactNode }) {
-  return (
-    <Link
-      href={href}
-      aria-current={active ? 'page' : undefined}
-      className={`inline-flex items-center justify-center rounded-pill px-5 py-2 font-soft-display text-[13.5px] font-bold transition-[background-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-sunken ${
-        active ? 'bg-soft-primary text-white shadow-chip' : 'text-soft-ink-muted hover:bg-soft-surface'
-      }`}
-    >
-      {children}
-    </Link>
-  );
-}
-
 export default function HowPage({ searchParams }: { searchParams: SearchParams }) {
   const manifesto = isReDefinitionTab(searchParams);
 
   return (
-    <>
-      {/* Przelacznik stoi NAD trescia obu zakladek. Kazda z nich niesie WLASNY
-          <main> z tlem i min-h-screen, wiec w DOM jest zawsze dokladnie jeden
-          <main>; ten pasek to <nav> nad nim. Szerokosc kolumny sledzi aktywna
-          zakladke (instrukcja 760, manifest 1080), zeby pigulki staly nad lewa
-          krawedzia tresci, a nie obok niej. */}
-      <div className="bg-soft-bg pt-8">
-        <div
-          className={`mx-auto w-full px-5 sm:px-8 ${manifesto ? 'max-w-[1080px]' : 'max-w-[760px]'}`}
-        >
-          <nav
-            aria-label="How views"
-            className="inline-flex items-center gap-1 rounded-pill border border-soft-line bg-soft-sunken p-1"
-          >
-            <TabPill href="/how" active={!manifesto}>
-              How
-            </TabPill>
-            <TabPill href="/how?tab=re-definition" active={manifesto}>
-              Re-Definition
-            </TabPill>
-          </nav>
+    <div className="board">
+      {/* Przelacznik stoi NAD trescia obu zakladek (te same segmenty co na
+          /asks). Kazda zakladka niesie WLASNY <main>, wiec w DOM jest zawsze
+          dokladnie jeden <main>; ten pasek to <nav> nad nim. Szerokosc kolumny
+          sledzi aktywna zakladke (instrukcja 1040, manifest 1080). */}
+      <div className="bg-soft-bg pt-6">
+        <div className={`mx-auto w-full px-5 sm:px-8 ${manifesto ? 'max-w-[1080px]' : 'max-w-[1040px]'}`}>
+          <BoardTabs
+            label="How views"
+            active={manifesto ? 're-definition' : 'how'}
+            className="max-w-[260px]"
+            tabs={[
+              { id: 'how', label: 'How', href: '/how' },
+              { id: 're-definition', label: 'Re-Definition', href: '/how?tab=re-definition' },
+            ]}
+          />
         </div>
       </div>
 
       {manifesto ? <ReDefinitionContent /> : <HowContent />}
-    </>
+    </div>
   );
 }

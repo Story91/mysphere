@@ -50,7 +50,7 @@ export default function SoftTabs({
               'active:scale-[0.97] outline-none',
               'focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-bg',
               isActive
-                ? 'bg-soft-primary font-bold text-white shadow-[0_4px_12px_rgba(124,107,218,0.3)]'
+                ? 'bg-soft-primary font-bold text-white shadow-chip'
                 : 'bg-soft-surface font-semibold text-soft-ink-muted',
             ].join(' ')}
           >
