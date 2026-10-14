@@ -71,6 +71,9 @@ import { hasPool, poolPriceWeiFromSqrt, readPoolPriceWei } from './poolPrice';
 import { POOL_SWAP_EVENT } from './poolSwaps';
 import { useTokenHistory, type LiveLaunchpadLog } from './useTokenHistory';
 import RaidPanel, { type RaidSummary } from './RaidPanel';
+import ClashStrip from '../perps/ClashStrip';
+import { useClashes } from '../perps/useClashes';
+import { rivalHref, stripViewOf } from '../perps/clashStripLogic';
 
 const EXPLORER = LAUNCHPAD_EXPLORER_URL;
 
@@ -154,6 +157,8 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
    */
   const [profileRequest, setProfileRequest] = useState(0);
   const [raidSummary, setRaidSummary] = useState<RaidSummary | null>(null);
+  // Licznik potwierdzonych transakcji z panelu handlu: pasek areny uzbraja nim komunikat "You backed".
+  const [tradeTick, setTradeTick] = useState(0);
 
   const loadCore = useCallback(async () => {
     if (!readClient || !tokenAddress) return;
@@ -546,6 +551,11 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
     window.setTimeout(() => setCopied(false), 1600);
   };
 
+  // Pasek areny tylko dla tokenow z `duel` w metadanych: montowany warunkowo, bo kazdy jego
+  // montaz subskrybuje wspolny poller starc (a zwykle tokeny nie maja po co go budzic).
+  const metadataUri = core?.config.metadataURI;
+  const hasDuel = useMemo(() => parseMetadataUri(metadataUri).duel !== null, [metadataUri]);
+
   if (notFound) return <TokenNotFound address={address} />;
 
   return (
@@ -592,6 +602,8 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
               onAddSocials={() => setProfileRequest((count) => count + 1)}
             />
 
+            {hasDuel && <ClashStrip token={core.token} balance={core.balance} tradeTick={tradeTick} />}
+
             {/* `auto_1fr`: prawa kolumna (row-span-2) bywa wyzsza niz wykres z
                 zakladkami. Przy domyslnych wierszach grid rozkladal ten nadmiar
                 tez na wiersz wykresu i pod wykresem robila sie pusta dziura. */}
@@ -612,7 +624,14 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
 
               <div className="min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1">
                 <div className="space-y-4 lg:sticky lg:top-4">
-                  <TradePanel core={core} ethUsd={ethUsd} onAfterTx={() => void loadCore()} />
+                  <TradePanel
+                    core={core}
+                    ethUsd={ethUsd}
+                    onAfterTx={() => {
+                      setTradeTick((count) => count + 1);
+                      void loadCore();
+                    }}
+                  />
                   <StatsCard core={core} tokenAddress={tokenAddress} ethUsd={ethUsd} trades={history.trades} balances={history.balances} historyComplete={historyComplete} poolPriceWei={poolPriceWei} burnedWei={burnedWei} copied={copied} onCopy={() => void copyAddress()} />
                   {/* Pod panelem handlu, bo tu padaja pytania, na ktore ten
                       przewodnik odpowiada: co znaczy "Locked", czemu kupno
@@ -677,25 +696,9 @@ function TokenHeader({
   const image = pickTokenImage({ profileLogoUrl: profile?.logoUrl, metadataUri: core.config.metadataURI });
   const chainMeta = parseMetadataUri(core.config.metadataURI);
   const description = profile?.description ?? chainMeta.description;
-  // Asset Clash: druga strona tego samego starcia (para sprawdzana po tworcy w /api/launchpad/clashes).
+  // Asset Clash: pigulka z druga strona starcia siedzi w osobnym komponencie (patrz `TwinPill`),
+  // montowanym tylko dla tokenow z `duel` - hook nie moze byc warunkowy.
   const duelId = chainMeta.duel?.id ?? null;
-  const duelSide = chainMeta.duel?.side ?? null;
-  const [twin, setTwin] = useState<{ address: string; symbol: string; market: string } | null>(null);
-  useEffect(() => {
-    if (!duelId || !duelSide) return;
-    let cancelled = false;
-    fetch(`/api/launchpad/clashes?id=${duelId}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((body: { clashes?: Array<{ a: { address: string; symbol: string; marketId: string } | null; b: { address: string; symbol: string; marketId: string } | null }> } | null) => {
-        const c = body?.clashes?.[0];
-        const other = duelSide === 'a' ? c?.b : c?.a;
-        if (!cancelled && other) setTwin({ address: other.address, symbol: other.symbol, market: other.marketId });
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [duelId, duelSide]);
   /* ---- SPAROWANY INDEKS. Metadane mowia "AAPL/USD"; czy rynek na tym feedzie
      istnieje, sprawdzamy w fabryce. Jest -> link do rynku. Nie ma -> link do
      prefilowanego kreatora (kaucje placi ten, kto kliknie). Feed spoza naszej
@@ -740,15 +743,7 @@ function TokenHeader({
                   ⚡ on {QUOTE_ASSET.symbol}
                 </a>
               )}
-              {twin && (
-                <a
-                  href={`/startpad/${twin.address.toLowerCase()}?m=${twin.market}`}
-                  className="rounded-full bg-amber-500/15 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] text-amber-600"
-                  title="Asset Clash"
-                >
-                  ⚔️ vs ${twin.symbol}
-                </a>
-              )}
+              {duelId && <TwinPill token={core.token} />}
             </div>
             <p className="mt-0.5 truncate text-[13px] text-sp-shade/50">
               {core.name} · launched {timeAgo(core.startedAt)}
@@ -818,6 +813,25 @@ function TokenHeader({
         </div>
       </div>
     </header>
+  );
+}
+
+/**
+ * "vs $TWIN" w naglowku: druga strona starcia z tego samego wspolnego pollera co pasek areny
+ * (jedno zrodlo, zero osobnych fetchy). Bez pary nie rysuje nic. Zwykly <a> z pelnym
+ * przeladowaniem, bo rynek (siec) jest wybierany raz przy ladowaniu modulu z ?m=.
+ */
+function TwinPill({ token }: { token: string }) {
+  const view = stripViewOf(useClashes(), token);
+  if (!view) return null;
+  return (
+    <a
+      href={rivalHref(view.rival)}
+      className="rounded-full bg-amber-500/15 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] text-amber-600"
+      title="Asset Clash"
+    >
+      ⚔️ vs ${view.rival.symbol}
+    </a>
   );
 }
 
