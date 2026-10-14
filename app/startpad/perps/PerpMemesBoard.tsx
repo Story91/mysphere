@@ -8,6 +8,7 @@ import { ArrowDownRight, ArrowUpRight, ChevronLeft, Megaphone, Rocket, Swords, U
 import { DEFAULT_LAUNCHPAD_CHAIN_ID, LAUNCH_STATE, LAUNCHPAD_NETWORKS, launchpadAbi } from '../config';
 import { fetchBoardStatsFor } from '../boardStats';
 import { fetchLogos } from '../logos';
+import { pickTokenImage } from '../metadata';
 import { formatUsd } from '../useEthUsd';
 import { zapBuyWithEth } from '../perpZap';
 import { tradeErrorMessage } from '../[address]/detailShared';
@@ -35,6 +36,8 @@ const NETWORK = LAUNCHPAD_NETWORKS[CHAIN_ID];
 const T0 = 1_000_000_000;
 const PRESETS = ['0.001', '0.01', '0.05'] as const;
 const PRESET_KEY = 'mysphere:perps:quickbuy';
+/** token(lower) -> logo z `metadataURI` w lancuchu (null = metadane bez obrazka). */
+const chainLogoCache = new Map<string, string | null>();
 
 type Perp = {
   id: string;
@@ -220,6 +223,23 @@ export default function PerpMemesBoard() {
           allowFailure: true,
           contracts: addresses.map((token) => ({ address: m.launchpad as Address, abi: launchpadAbi, functionName: 'launchOf' as const, args: [token] as const })),
         });
+        // Logo z lancucha dla tokenow bez wpisu w Blobie: start sprzed poprawki modalu niesie
+        // obrazek w `metadataURI` (strona tokena go pokazuje przez pickTokenImage), a Blob go nie
+        // zna - bez tego wiersz mial same inicjaly. Metadane sa niezmienne, wiec cache na stale;
+        // blad odczytu nie wpisuje nic, zeby kolejne odswiezenie sprobowalo jeszcze raz.
+        const needChain = addresses.filter((t) => !logos[t.toLowerCase()] && !chainLogoCache.has(t.toLowerCase()));
+        if (needChain.length > 0) {
+          const metas = await client
+            .multicall({
+              allowFailure: true,
+              contracts: needChain.map((token) => ({ address: m.launchpad as Address, abi: launchpadAbi, functionName: 'metadataURI' as const, args: [token] as const })),
+            })
+            .catch(() => []);
+          needChain.forEach((t, i) => {
+            const r = metas[i];
+            if (r?.status === 'success') chainLogoCache.set(t.toLowerCase(), pickTokenImage({ metadataUri: r.result as string }).url);
+          });
+        }
         const target = m.rVirt * 4;
         const out: Meme[] = [];
         addresses.forEach((token, i) => {
@@ -247,7 +267,7 @@ export default function PerpMemesBoard() {
             volume: activity?.volume ?? 0,
             traders: buyers?.size ?? 0,
             startedAt: Number(startedAt) || info.startedAt,
-            logo: logos[token.toLowerCase()],
+            logo: logos[token.toLowerCase()] ?? chainLogoCache.get(token.toLowerCase()) ?? undefined,
           });
         });
         return out;
