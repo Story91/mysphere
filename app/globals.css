@@ -163,7 +163,7 @@
   /* Bursztyn: tylko kwoty. `deep` 6:1 na bieli. */
   --soft-accent: 217 119 6;
   --soft-accent-soft: 254 243 214;
-  --soft-accent-deep: 146 84 6; /* #925406 */
+  --soft-accent-deep: 180 83 9; /* #b45309 - 4.7:1 na papierze, zywszy od poprzedniego brazu */
 
   --soft-info: 29 78 216;
   --soft-info-soft: 219 234 254;
