@@ -1,9 +1,10 @@
 import 'server-only';
+import { cache } from 'react';
 import { createPublicClient, formatEther, http, parseEther, type Address } from 'viem';
 import { list } from '@vercel/blob';
-import { erc20Abi, LAUNCHPAD_NETWORKS, launchpadAbi, LAUNCH_STATE, networkForMarket, type LaunchpadNetwork } from '../config';
+import { DEFAULT_LAUNCHPAD_CHAIN_ID, erc20Abi, LAUNCHPAD_NETWORKS, launchpadAbi, LAUNCH_STATE, networkForMarket, type LaunchpadNetwork } from '../config';
 import { findTokenLaunch } from '../deployments';
-import { pickTokenImage, tokenAccent } from '../metadata';
+import { parseMetadataUri, pickTokenImage, tokenAccent, type TokenMetadata } from '../metadata';
 import { rpcCandidates } from '../../api/launchpad/historyRpc';
 import { readHistory } from '../../api/launchpad/historyStore';
 import {
@@ -13,7 +14,7 @@ import {
   WEI,
   type TradeEntry,
 } from '../[address]/detailShared';
-import { formatMultiple } from '../shareText';
+import { formatMultiple, orderClashPair, parseClashPair } from '../shareText';
 import { flashItems, flashPriceUsd } from '../../api/launchpad/flashFeed';
 
 /**
@@ -107,6 +108,13 @@ export type TokenCardData = {
    * ETH. `name` i `change24hPct` z API Flash - bez nich karta pisze sam ticker.
    */
   perp: { symbol: string; name: string | null; navUsd: number | null; change24hPct: number | null } | null;
+  /**
+   * Para pojedynku z NIEZMIENNYCH metadanych startu (`duel {id, side, ticker}`),
+   * albo null, gdy token nie jest czescia pojedynku. Plakat starcia
+   * (/perps/clash/<a>-<b>/) sprawdza po tym polu, ze dwa adresy z linku to
+   * naprawde jedna para - bez skanowania lancucha.
+   */
+  duel: TokenMetadata['duel'];
 };
 
 type LaunchTuple = readonly [Address, number, bigint, bigint, number, `0x${string}`];
@@ -391,6 +399,8 @@ export async function loadTokenCard(
           change24hPct: typeof flash?.change24hPct === 'number' ? flash.change24hPct : null,
         }
       : null,
+    // `metadataUri` jest juz odczytany wyzej; parsowanie jest czyste i tanie.
+    duel: parseMetadataUri(metadataUri).duel,
   };
 }
 
@@ -401,3 +411,48 @@ export function chainHintFrom(value: string | string[] | undefined): number | nu
   const chainId = Number(raw);
   return LAUNCHPAD_NETWORKS[chainId] ? chainId : null;
 }
+
+/** Obie strony pojedynku, juz uporzadkowane: `a` to strona 'a' z metadanych, `b` - strona 'b'. */
+export type ClashPairCards = { id: string; ticker: string; a: TokenCardData; b: TokenCardData };
+
+/**
+ * Para z adresu plakatu /perps/clash/<a>-<b>/ - BEZ SKANU LANCUCHA.
+ *
+ * ===========================================================================
+ * DLACZEGO ADRES NIESIE OBA TOKENY, A NIE ID STARCIA
+ * ===========================================================================
+ * /api/launchpad/clashes sklada pary skanem siedmiu launchpadow od ich bloku
+ * startu - na zimnej instancji to 45-60 s, a crawler X-a tyle nie czeka. Tu sa
+ * dwa odczyty `loadTokenCard` (kazdy: jedno `launchOf` i `metadataURI`),
+ * a to, ze to jedna para, wynika z niezmiennych metadanych obu tokenow -
+ * patrz `orderClashPair` w shareText.ts.
+ *
+ * Kolejnosc w adresie nie ma znaczenia: strony porzadkuje `duel.side`.
+ * Gdy ktorys token nie istnieje albo para sie nie zgadza - null, a wolajacy
+ * decyduje (strona: notFound(), karta OG: ogolna karta /perps).
+ *
+ * `cache()` z Reacta: generateMetadata i sama strona pytaja o to samo w jednym
+ * zadaniu, a bez niego kazde placiloby za wlasne odczyty z lancucha.
+ */
+export const loadClashPair = cache(async (pairParam: string, withLogo = false): Promise<ClashPairCards | null> => {
+  const pair = parseClashPair(pairParam);
+  if (!pair) return null;
+
+  // Siec Base od razu jako wskazowka: pojedynki zyja tylko tam, a bez niej
+  // `loadTokenCard` pytalby naraz wszystkie trzy sieci.
+  const load = (address: string) =>
+    loadTokenCard(address, DEFAULT_LAUNCHPAD_CHAIN_ID, { withLogo }).catch(() => null);
+
+  let cards = await Promise.all(pair.map(load));
+  // Jedno ponowienie: `loadTokenCard` zamienia padniete RPC w null, a 404
+  // zbuforowany przez ISR na dwie minuty to link, ktory nie rozwinie sie
+  // u nikogo, kto wklei go w tym oknie.
+  if (cards.some((card) => card === null)) {
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    cards = await Promise.all(cards.map((card, index) => card ?? load(pair[index])));
+  }
+
+  const [first, second] = cards;
+  if (!first || !second) return null;
+  return orderClashPair(first, second);
+});

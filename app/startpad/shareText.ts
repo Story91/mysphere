@@ -251,3 +251,140 @@ export function shareIntentUrl(target: ShareTarget, input: { text: string; url: 
       return `https://www.reddit.com/submit?${params({ url: input.url, title: input.text })}`;
   }
 }
+
+/**
+ * ===========================================================================
+ * PLAKAT POJEDYNKU (Bull vs Bear / Asset Clash)
+ * ===========================================================================
+ * Adres /perps/clash/<tokenA>-<tokenB>/ niesie OBA adresy tokenow, a nie id
+ * starcia: karta OG nie moze skanowac lancucha (zimny skan to 45-60 s, a
+ * crawler X-a nie czeka), wiec to, ze dwa tokeny sa jedna para, sprawdza sie
+ * po niezmiennych metadanych obu (`duel`), a nie w rejestrze.
+ *
+ * Teksty NIE mowia o cenach ani zwrotach - to plakat zaproszenia do wyboru
+ * strony, nie wynik. Dlatego nie ma tu `buildShareText` z "x2.4 since launch".
+ */
+
+/**
+ * Adres plakatu pojedynku. Ukosnik na koncu jest obowiazkowy (trailingSlash).
+ *
+ * `round` to przelamywacz cache'u: X trzyma pierwsza pobrana wersje strony pod
+ * danym adresem, wiec link z `?r=` dostaje swiezy odczyt. Strona plakatu nie
+ * czyta tego parametru (zostaje w ISR) - sluzy wylacznie rozroznieniu adresow.
+ */
+export function buildClashUrl(tokenA: string, tokenB: string, round?: number | string): string {
+  const a = tokenA.trim().toLowerCase();
+  const b = tokenB.trim().toLowerCase();
+  const tag = round === undefined ? '' : String(round).trim();
+  const suffix = tag === '' ? '' : `?r=${encodeURIComponent(tag)}`;
+  return `${SITE_URL}/perps/clash/${a}-${b}/${suffix}`;
+}
+
+/** Nazwa strony w zdaniu: "Bull"/"Bear" pisane po ludzku, reszta (ETH, NVDA) jak podano. */
+function clashSideText(side: string, fallback: string): string {
+  const cleaned = side.replace(/[^A-Za-z0-9]/g, '').slice(0, MAX_SYMBOL);
+  if (cleaned === '') return fallback;
+  if (/^(bull|bear)$/i.test(cleaned)) return cleaned.charAt(0).toUpperCase() + cleaned.slice(1).toLowerCase();
+  return cleaned;
+}
+
+/**
+ * Zdanie do posta: "$MORE: Bull vs Bear. Pick a side." albo "$MORE: ETH vs NVDA.
+ * Pick a side." Ticker i strony przychodza z metadanych obcego tworcy, wiec
+ * przechodza przez to samo sito co symbol tokena. Zadnych liczb, hasztagow ani
+ * emoji.
+ */
+export function buildClashShareText(input: { ticker: string; sideA: string; sideB: string }): string {
+  const a = clashSideText(input.sideA, 'A');
+  const b = clashSideText(input.sideB, 'B');
+  return `$${safeSymbol(input.ticker)}: ${a} vs ${b}. Pick a side.`;
+}
+
+const CLASH_PAIR_RE = /^(0x[0-9a-f]{40})-(0x[0-9a-f]{40})$/i;
+
+/**
+ * Segment `<a>-<b>` z adresu na dwa adresy malymi literami, albo null.
+ * Tolerancyjnie co do wielkosci liter, kodowania procentowego i ukosnika na
+ * koncu; ten sam adres dwa razy nie jest para.
+ */
+export function parseClashPair(param: string): [string, string] | null {
+  let raw: string;
+  try {
+    raw = decodeURIComponent(param);
+  } catch {
+    return null;
+  }
+  const match = CLASH_PAIR_RE.exec(raw.trim().replace(/\/+$/, ''));
+  if (!match) return null;
+  const first = match[1].toLowerCase();
+  const second = match[2].toLowerCase();
+  return first === second ? null : [first, second];
+}
+
+/** Minimum, ktorego `orderClashPair` potrzebuje od karty tokena (TokenCardData to spelnia). */
+export type ClashPairSide = {
+  address: string;
+  chainId: number;
+  creator: string;
+  duel: { id: string; side: 'a' | 'b'; ticker: string } | null;
+  perp: { symbol: string } | null;
+};
+
+/**
+ * Czy dwa wczytane tokeny sa jednym pojedynkiem - i w jakiej kolejnosci.
+ *
+ * Te same warunki, co skladanie par w /api/launchpad/clashes (wspolne `duel.id`,
+ * ten sam tworca, dwa ROZNE rynki perpow), plus strony przeciwne i siec Base.
+ * `a` to strona 'a' z metadanych niezaleznie od kolejnosci w adresie. Cokolwiek
+ * innego - null: nikt nie ma dostac plakatu pary, ktora nie jest para.
+ */
+export function orderClashPair<T extends ClashPairSide>(
+  x: T,
+  y: T
+): { id: string; ticker: string; a: T; b: T } | null {
+  if (!x.duel || !y.duel) return null;
+  if (x.duel.id !== y.duel.id || x.duel.side === y.duel.side) return null;
+  if (x.chainId !== DEFAULT_LAUNCHPAD_CHAIN_ID || y.chainId !== DEFAULT_LAUNCHPAD_CHAIN_ID) return null;
+  if (x.address.toLowerCase() === y.address.toLowerCase()) return null;
+  if (!x.creator || x.creator.toLowerCase() !== y.creator.toLowerCase()) return null;
+  if (!x.perp || !y.perp || x.perp.symbol.toLowerCase() === y.perp.symbol.toLowerCase()) return null;
+
+  const [a, b] = x.duel.side === 'a' ? [x, y] : [y, x];
+  return { id: a.duel!.id, ticker: a.duel!.ticker, a, b };
+}
+
+export type ClashRope = {
+  /** Obie strony cos zebraly - tylko wtedy wolno pokazac procenty i "prowadzi". */
+  traded: boolean;
+  aPct: number;
+  bPct: number;
+};
+
+/**
+ * Podzial liny na plakacie: kto ile ZEBRAL na krzywej.
+ *
+ * Gdy ktoras strona ma 0 (albo brak danych), lina jest 50/50 i plakat mowi
+ * "Pick a side" - procent z jednej strony wyszedlby 100/0 i udawalby wynik.
+ * Gdy znamy NAV obu perpow, kwoty ida w dolarach, bo jednostka ETH2xL i NVDA2xL
+ * to rozne pieniadze; bez tego - w jednostkach perpa. Dolarow na plakacie nie
+ * ma w ogole, to tylko waga. Procent miesci sie w 1..99, zeby lina miala dwa
+ * kolory.
+ */
+export function clashRopeShare(
+  a: { raised: number; navUsd?: number | null },
+  b: { raised: number; navUsd?: number | null }
+): ClashRope {
+  const positive = (n: number | null | undefined) => (typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : 0);
+  const raisedA = positive(a.raised);
+  const raisedB = positive(b.raised);
+  if (raisedA <= 0 || raisedB <= 0) return { traded: false, aPct: 50, bPct: 50 };
+
+  const navA = positive(a.navUsd);
+  const navB = positive(b.navUsd);
+  const weighted = navA > 0 && navB > 0;
+  const weightA = weighted ? raisedA * navA : raisedA;
+  const weightB = weighted ? raisedB * navB : raisedB;
+
+  const aPct = Math.min(99, Math.max(1, Math.round((weightA / (weightA + weightB)) * 100)));
+  return { traded: true, aPct, bPct: 100 - aPct };
+}
