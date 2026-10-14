@@ -6,6 +6,7 @@ import { decodeTradeMessage } from '../../../startpad/[address]/tradeMessage';
 import { stateViewAbi } from '../../../startpad/[address]/poolPrice';
 import { rpcCandidates } from '../historyRpc';
 import { verifiedHumans } from '../humanCheck';
+import { CALLS_LIMIT, parseTokensParam, selectCalls } from '../../../startpad/perps/cheers';
 
 /**
  * GET /api/launchpad/calls - "Calls": kupna z wiadomoscia jako sprawdzalne
@@ -18,6 +19,12 @@ import { verifiedHumans } from '../humanCheck';
  *
  * Skan: Bought ze wszystkich launchpadow Base z ostatnich 7 dni, przyrostowo
  * w pamieci instancji; wejscie transakcji tylko dla kupien (cache po hashu).
+ *
+ * `?tokens=0xa,0xb` (do 40 adresow, bledne pomijane) zaweza `calls` do tych tokenow
+ * (okrzyki druzyn na karcie starcia). Filtr dziala PRZED przycieciem do 100 wierszy,
+ * a lista jest wtedy od najnowszego: w cichym pojedynku najlepsze 100 calli z calej
+ * Base nie zawiera ani jednej jego wiadomosci. `leaders` i `head` zostaja globalne.
+ * Cache trzyma pelna liste, wiec kazdy wariant zapytania kosztuje ten sam jeden skan.
  */
 
 export const runtime = 'nodejs';
@@ -51,7 +58,9 @@ type Buy = {
 const scannedTo = new Map<string, bigint>();
 const buys = new Map<string, Buy>(); // txHash-token
 const messages = new Map<string, string | null>(); // txHash -> wiadomosc albo null
-let cached: { at: number; body: unknown } | null = null;
+type CallRow = { token: Address; ts: number; [key: string]: unknown };
+type Snapshot = { rows: CallRow[]; leaders: unknown[]; head: string };
+let cached: { at: number; data: Snapshot } | null = null;
 
 const makeClient = (url: string | undefined) =>
   createPublicClient({ chain: base, transport: http(url, { fetchOptions: { cache: 'no-store' } }) });
@@ -80,7 +89,7 @@ function poolPrice(sqrtPriceX96: bigint, quote: Address | null, token: Address):
   return quoteIs0 ? (p > 0 ? 1 / p : 0) : p;
 }
 
-async function refresh() {
+async function refresh(): Promise<Snapshot> {
   const deps = deployments();
   const net = LAUNCHPAD_NETWORKS[CHAIN_ID]!;
   let client: ReturnType<typeof makeClient> | null = null;
@@ -140,7 +149,7 @@ async function refresh() {
   }
 
   const calls = [...buys.values()].filter((b) => messages.get(b.txHash));
-  if (calls.length === 0) return { ok: true, calls: [], leaders: [], head: head.toString() };
+  if (calls.length === 0) return { rows: [], leaders: [], head: head.toString() };
 
   const depOf = new Map(deps.map((d) => [d.launchpad.toLowerCase(), d]));
   const tokens = [...new Map(calls.map((c) => [c.token.toLowerCase(), c])).values()];
@@ -225,14 +234,19 @@ async function refresh() {
     byBuyer.set(r.buyer, e);
   }
   const leaders = [...byBuyer.values()].sort((a, b) => b.best - a.best).slice(0, 20);
-  return { ok: true, calls: rows.slice(0, 100), leaders, head: head.toString() };
+  return { rows, leaders, head: head.toString() };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    if (!cached || Date.now() - cached.at > TTL_MS) cached = { at: Date.now(), body: await refresh() };
+    if (!cached || Date.now() - cached.at > TTL_MS) cached = { at: Date.now(), data: await refresh() };
   } catch {
     if (!cached) return NextResponse.json({ ok: false, error: 'rpc' }, { status: 502 });
   }
-  return NextResponse.json(cached.body, { headers: { 'Cache-Control': 'public, max-age=30, stale-while-revalidate=120' } });
+  const { rows, leaders, head } = cached.data;
+  const only = parseTokensParam(new URL(request.url).searchParams.get('tokens'));
+  return NextResponse.json(
+    { ok: true, calls: selectCalls(rows, only, CALLS_LIMIT), leaders, head },
+    { headers: { 'Cache-Control': 'public, max-age=30, stale-while-revalidate=120' } }
+  );
 }

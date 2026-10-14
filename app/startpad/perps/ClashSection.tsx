@@ -1,15 +1,17 @@
 'use client';
 
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import Link from 'next/link';
-import { Swords } from 'lucide-react';
+import { BadgeCheck, Share2, Swords } from 'lucide-react';
 import { clashKoWinner, clashPhase, clashSharePct, clashVerdict, isBullBear, sideWord, type Clash, type ClashSide, type ClashToken } from '../duel';
 import { formatUsd } from '../useEthUsd';
 import { fetchLogos } from '../logos';
 import { DEFAULT_LAUNCHPAD_CHAIN_ID } from '../config';
+import { buildClashShareText, buildClashUrl, shareIntentUrl } from '../shareText';
 import ClashLaunchModal from './ClashLaunchModal';
 import { ClashBar, MemeAvatar, TONE } from './ClashBar';
 import { useClashes } from './useClashes';
+import { cheerTokens, cheersFromCalls, dayRound, type Cheer } from './cheers';
 
 /**
  * Asset Clash / Bull vs Bear na /perps: jeden mem na dwoch perpach, podany jak
@@ -23,10 +25,49 @@ import { useClashes } from './useClashes';
  * na 50/50 i banner mowi "waiting for the first blow" - zamiast "BEAR LEADS" z
  * samej roznicy NAV. Potem dwaj sedziowie (kapitalizacja i handel) i KO, gdy
  * jedna strona pierwsza zapelni krzywa.
+ *
+ * Pod stronami "Cheers": dwa ostatnie okrzyki druzyny (wiadomosc z kupna, patrz
+ * cheers.ts) - sam tekst i autor, bez mnoznikow i kwot. Stopka niesie Judges i
+ * "Share this fight" (X, link do plakatu pary).
  */
 
 /** Intro "FIGHT!" gra raz na starcie strony, nie przy kazdym wejsciu w zakladke. */
 const introPlayed = new Set<string>();
+
+const CHEERS_POLL_MS = 60_000;
+
+/**
+ * Okrzyki dla wszystkich starc naraz: jedno zapytanie o do 40 tokenow (trasa trzyma
+ * jeden skan w cache, wiec to nic nie kosztuje ponad to, co juz robi zakladka). Klucz
+ * to same adresy - odswiezenie starc co 30 s nie wywoluje nowego fetcha, dopiero nowy
+ * token. Blad albo pusta odpowiedz zostawiaja to, co juz jest (na starcie: nic).
+ */
+function useCheers(clashes: Clash[] | null): Record<string, Cheer[]> {
+  const [cheers, setCheers] = useState<Record<string, Cheer[]>>({});
+  const key = useMemo(() => cheerTokens(clashes).join(','), [clashes]);
+
+  useEffect(() => {
+    if (!key) return;
+    let cancelled = false;
+    const load = () => {
+      if (document.hidden) return;
+      fetch(`/api/launchpad/calls?tokens=${key}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((body: { calls?: unknown } | null) => {
+          if (!cancelled && body) setCheers(cheersFromCalls(body.calls, key.split(',')));
+        })
+        .catch(() => {});
+    };
+    load();
+    const timer = window.setInterval(load, CHEERS_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [key]);
+
+  return cheers;
+}
 
 /** Logo strony: Blob (profil), potem obrazek z `metadataURI` (starty sprzed 14.10). */
 function sideLogo(token: ClashToken | null, logos: Record<string, string>): string | undefined {
@@ -36,6 +77,7 @@ function sideLogo(token: ClashToken | null, logos: Record<string, string>): stri
 
 export default function ClashSection({ embedded = false, focusId = null }: { embedded?: boolean; focusId?: string | null }) {
   const clashes = useClashes();
+  const cheers = useCheers(clashes);
   const [logos, setLogos] = useState<Record<string, string>>({});
   const [launching, setLaunching] = useState<null | 'bullbear' | 'clash'>(null);
 
@@ -98,7 +140,7 @@ export default function ClashSection({ embedded = false, focusId = null }: { emb
       ) : (
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           {clashes.map((c) => (
-            <ClashCard key={c.id} clash={c} logos={logos} highlight={focusId === c.id} />
+            <ClashCard key={c.id} clash={c} logos={logos} highlight={focusId === c.id} cheers={cheers} share />
           ))}
         </div>
       )}
@@ -229,14 +271,99 @@ function Judges({ clash, bullBear }: { clash: Clash; bullBear: boolean }) {
       );
   }
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]" title={hint}>
+    <div className="flex flex-wrap items-center gap-1.5 text-[11px]" title={hint}>
       <span className="font-extrabold uppercase tracking-[0.06em] text-sp-shade/45">Judges</span>
       {body}
     </div>
   );
 }
 
-export function ClashCard({ clash, logos, highlight = false }: { clash: Clash; logos: Record<string, string>; highlight?: boolean }) {
+/** Krawedz okrzyku w kolorze strony (te same barwy co lina i plakietki). */
+const CHEER_EDGE: Record<ClashSide, string> = { a: 'border-soft-primary/50', b: 'border-amber-500/60' };
+
+/**
+ * Okrzyki druzyn: dwie kolumny pod stronami, kazda pod swoja. Tylko tekst (React go
+ * escapuje, a cheers.ts wycina linki i adresy), autor skrocony, plakietka Coinbase.
+ * Zadnego mnoznika ani kwoty - to glos, nie wynik.
+ */
+function CheerColumn({ side, list, word }: { side: ClashSide; list: Cheer[]; word: string }) {
+  // Puste miejsce trzyma druga kolumne pod jej strona.
+  if (list.length === 0) return <div className="min-w-0 flex-1" />;
+  return (
+    <ul className="m-0 min-w-0 flex-1 list-none space-y-1 p-0" aria-label={`Team ${word} cheers`}>
+      {list.map((cheer) => (
+        <li key={cheer.id} className={`min-w-0 rounded-[8px] border-l-2 bg-sp-sunken px-2 py-1 ${CHEER_EDGE[side]}`}>
+          <p className="line-clamp-2 break-words text-[11.5px] leading-[1.35] text-sp-ink">{cheer.text}</p>
+          {(cheer.who || cheer.verified) && (
+            <p className="mt-0.5 flex items-center gap-1 text-[10px] text-sp-shade/60">
+              {cheer.who}
+              {cheer.verified && (
+                <span className="inline-flex items-center text-sp-up" title="Coinbase verified">
+                  <BadgeCheck className="h-3 w-3" aria-hidden="true" />
+                  <span className="sr-only">Coinbase verified</span>
+                </span>
+              )}
+            </p>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function Cheers({ a, b, wordA, wordB }: { a: Cheer[]; b: Cheer[]; wordA: string; wordB: string }) {
+  if (a.length === 0 && b.length === 0) return null;
+  return (
+    <div className="mt-2.5">
+      <div className="mb-1 text-[10.5px] font-extrabold uppercase tracking-[0.06em] text-sp-shade/45">Cheers</div>
+      <div className="flex gap-2.5">
+        <CheerColumn side="a" list={a} word={wordA} />
+        <CheerColumn side="b" list={b} word={wordB} />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * "Share this fight": okno X z krotkim zdaniem i linkiem do plakatu pary. Link niesie
+ * numer doby UTC (`?r=`), zeby X nie trzymal w nieskonczonosc pierwszej wersji karty.
+ * Liczone przy renderze: karta pojawia sie dopiero po fetchu w przegladarce, wiec nie
+ * ma serwerowego HTML-a, z ktorym doba mogla by sie rozjechac.
+ */
+function ShareFight({ clash, bullBear }: { clash: Clash; bullBear: boolean }) {
+  if (!clash.a || !clash.b) return null;
+  const href = shareIntentUrl('x', {
+    text: buildClashShareText({ ticker: clash.ticker, sideA: sideWord(clash.a.perpSymbol, bullBear), sideB: sideWord(clash.b.perpSymbol, bullBear) }),
+    url: buildClashUrl(clash.a.address, clash.b.address, dayRound()),
+  });
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      title="Post this fight on X"
+      className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full border border-sp-shade/15 px-2.5 py-1 text-[11px] font-extrabold text-sp-ink transition-colors hover:border-soft-primary hover:text-soft-primary-deep"
+    >
+      <Share2 className="h-3 w-3" aria-hidden="true" /> Share this fight
+    </a>
+  );
+}
+
+export function ClashCard({
+  clash,
+  logos,
+  highlight = false,
+  cheers,
+  share = false,
+}: {
+  clash: Clash;
+  logos: Record<string, string>;
+  highlight?: boolean;
+  /** Okrzyki wg adresu tokena (male litery). Brak = wiersz sie nie pojawia (plakat nie ma tego zapytania). */
+  cheers?: Record<string, Cheer[]>;
+  /** Przycisk "Share this fight" w stopce. Domyslnie wylaczony: plakat pary ma wlasne przyciski. */
+  share?: boolean;
+}) {
   const phase = clashPhase(clash);
   const koWinner = clashKoWinner(clash);
   const verdict = clashVerdict(clash);
@@ -250,6 +377,8 @@ export function ClashCard({ clash, logos, highlight = false }: { clash: Clash; l
   const logoB = sideLogo(clash.b, logos);
   const headLogo = logoA ?? logoB ?? clash.image ?? undefined;
   const banner = bannerOf(clash, bullBear, aShare);
+  const cheersA = (clash.a && cheers?.[clash.a.address.toLowerCase()]) || [];
+  const cheersB = (clash.b && cheers?.[clash.b.address.toLowerCase()]) || [];
 
   // Intro FIGHT! (raz na klip) i powtorka po stuknieciu VS.
   const [intro, setIntro] = useState(() => !introPlayed.has(clash.id));
@@ -328,7 +457,12 @@ export function ClashCard({ clash, logos, highlight = false }: { clash: Clash; l
         <Side token={clash.b} side="b" leading={crown === 'b'} bullBear={bullBear} hit={hit?.side === 'b' ? hit.text : null} logo={logoB} />
       </div>
 
-      <Judges clash={clash} bullBear={bullBear} />
+      <Cheers a={cheersA} b={cheersB} wordA={aBase} wordB={bBase} />
+
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <Judges clash={clash} bullBear={bullBear} />
+        {share && <ShareFight clash={clash} bullBear={bullBear} />}
+      </div>
     </div>
   );
 }

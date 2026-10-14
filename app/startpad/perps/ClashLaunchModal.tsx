@@ -5,9 +5,11 @@ import Link from 'next/link';
 import { decodeEventLog, parseEther, type Address, type Hex } from 'viem';
 import { base } from 'viem/chains';
 import { useAccount, useChainId, usePublicClient, useSwitchChain, useWalletClient } from 'wagmi';
-import { Swords, X } from 'lucide-react';
+import { Share2, Swords, X } from 'lucide-react';
 import { LAUNCHPAD_NETWORKS, launchpadAbi, quoteLaunchpadAbi } from '../config';
 import { clashSymbol, cleanClashTicker, isBullBear, newClashId, sideWord, type ClashSide } from '../duel';
+import { buildClashShareText, buildClashUrl, shareIntentUrl } from '../shareText';
+import { dayRound } from './cheers';
 import { resizeImageFile } from '../logoUpload';
 import { browserStorage, clearPendingProfile, postProfileWithRetry, savePendingProfile, sendTokenProfile } from '../profileSync';
 import useSiweAuth from '../../utils/auth/useSiweAuth';
@@ -177,6 +179,19 @@ export default function ClashLaunchModal({ onClose, preset }: { onClose: () => v
   };
 
   const both = done.a && done.b;
+  // Okno X z plakatem pary (te same adresy i slowa stron co przycisk na karcie). Liczone tylko
+  // na ekranie sukcesu, gdy oba tokeny istnieja; `?r=` = doba UTC, zeby X odswiezyl karte.
+  const shareHref =
+    done.a && done.b
+      ? shareIntentUrl('x', {
+          text: buildClashShareText({
+            ticker: clean,
+            sideA: sideWord(marketOf('a')?.quote.symbol ?? '', bullBear),
+            sideB: sideWord(marketOf('b')?.quote.symbol ?? '', bullBear),
+          }),
+          url: buildClashUrl(done.a, done.b, dayRound()),
+        })
+      : '';
   const picker = (value: string, onChange: (v: string) => void, other: string) => (
     <select value={value} onChange={(e) => onChange(e.target.value)} disabled={locked} className={`${FIELD} mt-1.5 cursor-pointer`}>
       {markets.map((m) => (
@@ -276,9 +291,19 @@ export default function ClashLaunchModal({ onClose, preset }: { onClose: () => v
         {error && <p className="mt-2 text-[12px] font-bold text-sp-down-deep">{error}</p>}
 
         {both ? (
-          <a href={`/perps/?tab=clash&clash=${clashId}`} onClick={onClose} className="mt-4 block rounded-xl bg-soft-primary px-4 py-3 text-center text-[13px] font-extrabold text-sp-on-brand">
-            See the clash →
-          </a>
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+            <a href={`/perps/?tab=clash&clash=${clashId}`} onClick={onClose} className="block flex-1 rounded-xl bg-soft-primary px-4 py-3 text-center text-[13px] font-extrabold text-sp-on-brand">
+              See the clash →
+            </a>
+            <a
+              href={shareHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-sp-shade/15 px-4 py-3 text-[13px] font-extrabold text-sp-ink transition-colors hover:border-soft-primary"
+            >
+              <Share2 className="h-4 w-4" aria-hidden="true" /> Share the fight
+            </a>
+          </div>
         ) : (
           <button
             type="button"
