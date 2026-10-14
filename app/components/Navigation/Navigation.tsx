@@ -36,7 +36,7 @@ type NavLink = {
 const MOBILE_MENU_ID = 'mobile-nav-menu';
 
 /** Strony przemalowane na "tablice zlecen" (patrz .board w globals.css). */
-function usesBoardTheme(pathname: string | null): boolean {
+export function usesBoardTheme(pathname: string | null): boolean {
   if (!pathname) return false;
   return (
     pathname === '/asks' ||
