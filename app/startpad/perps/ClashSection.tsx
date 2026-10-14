@@ -1,57 +1,41 @@
 'use client';
 
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import Link from 'next/link';
 import { Swords } from 'lucide-react';
-import { clashLeader, isBullBear, sideWord, type Clash, type ClashSide, type ClashToken } from '../duel';
+import { clashKoWinner, clashPhase, clashSharePct, clashVerdict, isBullBear, sideWord, type Clash, type ClashSide, type ClashToken } from '../duel';
 import { formatUsd } from '../useEthUsd';
 import { fetchLogos } from '../logos';
 import { DEFAULT_LAUNCHPAD_CHAIN_ID } from '../config';
-import PerpAvatar from './PerpAvatar';
 import ClashLaunchModal from './ClashLaunchModal';
+import { ClashBar, MemeAvatar, TONE } from './ClashBar';
+import { useClashes } from './useClashes';
 
 /**
  * Asset Clash / Bull vs Bear na /perps: jeden mem na dwoch perpach, podany jak
- * ekran bijatyki. Karta: przeciaganie liny z plakietka VS na styku (przesuwa sie
- * z udzialem w kapitalizacji), korona i poswiata prowadzacego, banner "X LEADS",
- * a strona, ktorej perp dzis spada, obrywa - drga i leci nad nia liczba obrazen.
- * Ruch jest w globals.css (.clash-*) i znika przy prefers-reduced-motion; liczby
- * zostaja te same.
+ * ekran bijatyki. Karta: lina z plakietka VS na styku (jedzie z udzialem), korona
+ * i poswiata prowadzacego, banner fazy, a strona, ktorej perp dzis spada, obrywa -
+ * drga i leci nad nia liczba obrazen. Ruch jest w globals.css (.clash-*) i znika
+ * przy prefers-reduced-motion; liczby zostaja te same.
+ *
+ * Uczciwosc wyniku (patrz `clashPhase` w duel.ts): kapitalizacja w USD to cena w
+ * perpie razy NAV perpa, wiec przed pierwszymi zakupami po obu stronach lina stoi
+ * na 50/50 i banner mowi "waiting for the first blow" - zamiast "BEAR LEADS" z
+ * samej roznicy NAV. Potem dwaj sedziowie (kapitalizacja i handel) i KO, gdy
+ * jedna strona pierwsza zapelni krzywa.
  */
-const TONE: Record<ClashSide, { bar: string; ring: string; text: string; glow: string; banner: string }> = {
-  a: {
-    bar: 'bg-soft-primary',
-    ring: 'border-soft-primary/60 bg-sp-brand-soft',
-    text: 'text-soft-primary-deep',
-    glow: '124 107 218',
-    banner: 'bg-soft-primary text-sp-on-brand',
-  },
-  b: {
-    bar: 'bg-amber-500',
-    ring: 'border-amber-500/60 bg-amber-500/[0.08]',
-    text: 'text-amber-600',
-    glow: '245 158 11',
-    banner: 'bg-amber-500 text-black/85',
-  },
-};
-
-/** Iskry na styku liny: kat i zasieg (px). Kilka bialych, reszta zlotych. */
-const SPARKS: Array<{ a: number; d: number; delay: number; white?: boolean }> = [
-  { a: -75, d: 24, delay: 0 },
-  { a: -40, d: 30, delay: 0.25, white: true },
-  { a: -10, d: 22, delay: 0.5 },
-  { a: 25, d: 28, delay: 0.1, white: true },
-  { a: 60, d: 24, delay: 0.7 },
-  { a: 105, d: 26, delay: 0.35 },
-  { a: 150, d: 22, delay: 0.85, white: true },
-  { a: 200, d: 28, delay: 0.55 },
-];
 
 /** Intro "FIGHT!" gra raz na starcie strony, nie przy kazdym wejsciu w zakladke. */
 const introPlayed = new Set<string>();
 
-export default function ClashSection({ embedded = false }: { embedded?: boolean }) {
-  const [clashes, setClashes] = useState<Clash[] | null>(null);
+/** Logo strony: Blob (profil), potem obrazek z `metadataURI` (starty sprzed 14.10). */
+function sideLogo(token: ClashToken | null, logos: Record<string, string>): string | undefined {
+  if (!token) return undefined;
+  return logos[token.address.toLowerCase()] ?? token.image ?? undefined;
+}
+
+export default function ClashSection({ embedded = false, focusId = null }: { embedded?: boolean; focusId?: string | null }) {
+  const clashes = useClashes();
   const [logos, setLogos] = useState<Record<string, string>>({});
   const [launching, setLaunching] = useState<null | 'bullbear' | 'clash'>(null);
 
@@ -59,24 +43,16 @@ export default function ClashSection({ embedded = false }: { embedded?: boolean 
     void fetchLogos(DEFAULT_LAUNCHPAD_CHAIN_ID).then(setLogos).catch(() => {});
   }, []);
 
+  // Link ze startu / z posta (?clash=<id>): przewin do karty, gdy dane dojda.
+  const focused = useRef<string | null>(null);
   useEffect(() => {
-    let cancelled = false;
-    const load = () =>
-      fetch('/api/launchpad/clashes')
-        .then((r) => (r.ok ? r.json() : null))
-        .then((body: { clashes?: Clash[] } | null) => {
-          if (!cancelled) setClashes(body?.clashes ?? []);
-        })
-        .catch(() => {
-          if (!cancelled) setClashes((c) => c ?? []);
-        });
-    void load();
-    const timer = window.setInterval(load, 30_000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, []);
+    if (!focusId || !clashes || focused.current === focusId) return;
+    const node = document.getElementById(`clash-${focusId}`);
+    if (!node) return;
+    focused.current = focusId;
+    const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    node.scrollIntoView({ block: 'center', behavior: calm ? 'auto' : 'smooth' });
+  }, [focusId, clashes]);
 
   return (
     <section
@@ -122,19 +98,13 @@ export default function ClashSection({ embedded = false }: { embedded?: boolean 
       ) : (
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           {clashes.map((c) => (
-            <ClashCard key={c.id} clash={c} logo={logos[c.a?.address.toLowerCase() ?? ''] ?? logos[c.b?.address.toLowerCase() ?? '']} />
+            <ClashCard key={c.id} clash={c} logos={logos} highlight={focusId === c.id} />
           ))}
         </div>
       )}
       {launching && <ClashLaunchModal preset={launching === 'bullbear' ? 'bullbear' : undefined} onClose={() => setLaunching(null)} />}
     </section>
   );
-}
-
-/** Wartosc perpa w USD wyliczona z kapitalizacji i ceny w perpie (1e9 tokenow). */
-function navOf(token: ClashToken | null): number | null {
-  if (!token || token.mcapUsd === null || token.priceInPerp <= 0) return null;
-  return token.mcapUsd / (token.priceInPerp * 1e9);
 }
 
 function signed(n: number, digits = 2): string {
@@ -147,6 +117,7 @@ function Side({
   leading,
   bullBear,
   hit,
+  logo,
 }: {
   token: ClashToken | null;
   side: ClashSide;
@@ -154,6 +125,7 @@ function Side({
   bullBear: boolean;
   /** Obrazenia z ostatniego odswiezenia (przesuniecie szali) - liczba nad strona. */
   hit: string | null;
+  logo?: string;
 }) {
   const tone = TONE[side];
   if (!token) {
@@ -161,6 +133,9 @@ function Side({
   }
   const ch = token.perpChange24h;
   const hurt = ch !== null && ch < 0;
+  const word = sideWord(token.perpSymbol, bullBear);
+  // Krzywa zapelniona: ruch ceny w perpie stoi na maksimum - "since launch" nic by nie mowil.
+  const filled = token.state !== 'Curve';
   return (
     // Zewnetrzny div niesie ruch (cios, drganie), wewnetrzny link poswiate prowadzacego.
     <div className={`relative flex-1 ${hit ? 'clash-hit-once' : hurt ? 'clash-hurt' : ''}`}>
@@ -170,12 +145,13 @@ function Side({
         <span className="clash-dmg clash-hurt-dmg text-sp-down-deep">{ch.toFixed(1)}%</span>
       ) : null}
       <Link
-        href={`/startpad/${token.address.toLowerCase()}?m=${token.marketId}`}
+        // `msg` wypelnia pole "Say something" przy kupnie okrzykiem druzyny (do edycji, nic nie wysyla samo).
+        href={`/startpad/${token.address.toLowerCase()}?m=${token.marketId}&msg=${encodeURIComponent(`Team ${word}: `)}`}
         className={`block h-full rounded-[14px] border p-3 transition-colors ${leading ? `clash-leader ${tone.ring}` : 'border-sp-shade/10 bg-sp-surface hover:border-soft-primary/50'}`}
         style={{ '--glow': tone.glow } as CSSProperties}
       >
         <div className="flex items-center gap-2">
-          <PerpAvatar symbol={token.perpSymbol} size={26} change={ch} />
+          <MemeAvatar logo={logo} symbol={token.symbol} perpSymbol={token.perpSymbol} size={28} />
           <span className={`truncate text-[13.5px] font-extrabold ${tone.text}`}>${token.symbol}</span>
           {leading && (
             <span className="clash-crown ml-auto text-[14px]" aria-label="leading">
@@ -190,23 +166,90 @@ function Side({
             {bullBear ? token.perpSymbol : `${sideWord(token.perpSymbol, false)} 2x`} today {signed(ch)}
           </div>
         )}
-        <div className={`text-[11px] font-extrabold ${token.sinceLaunchPct >= 0 ? 'text-sp-up' : 'text-sp-down-deep'}`}>
-          meme since launch {signed(token.sinceLaunchPct, 1)}
-        </div>
-        <div className={`mt-2.5 rounded-full px-2 py-1 text-center text-[11.5px] font-extrabold text-white ${tone.bar}`}>Back {sideWord(token.perpSymbol, bullBear)}</div>
+        {filled ? (
+          <div className="text-[11px] font-extrabold text-soft-primary-deep">curve filled</div>
+        ) : (
+          <div className={`text-[11px] font-extrabold ${token.sinceLaunchPct >= 0 ? 'text-sp-up' : 'text-sp-down-deep'}`}>meme since launch {signed(token.sinceLaunchPct, 1)}</div>
+        )}
+        <div className={`mt-2.5 rounded-full px-2 py-1 text-center text-[11.5px] font-extrabold text-white ${tone.bar}`}>Back {word}</div>
       </Link>
     </div>
   );
 }
 
-function ClashCard({ clash, logo }: { clash: Clash; logo?: string }) {
-  const leader = clashLeader(clash);
-  const a = clash.a?.mcapUsd ?? 0;
-  const b = clash.b?.mcapUsd ?? 0;
-  const aShare = a + b > 0 ? (a / (a + b)) * 100 : 50;
+/** Tekst i ton bannera dla fazy starcia; zmiana klucza odgrywa wjazd od nowa. */
+export function bannerOf(clash: Clash, bullBear: boolean, share: number): { key: string; text: string; cls: string } {
+  const phase = clashPhase(clash);
+  const word = (s: ClashSide) => {
+    const t = s === 'a' ? clash.a : clash.b;
+    return t ? sideWord(t.perpSymbol, bullBear) : s.toUpperCase();
+  };
+  const icon = (s: ClashSide) => (bullBear ? (s === 'a' ? '🐂 ' : '🐻 ') : '');
+  if (phase === 'ko') {
+    const w = clashKoWinner(clash);
+    if (w) return { key: `ko-${w}`, text: `KO: ${word(w)} filled first`, cls: TONE[w].banner };
+  }
+  if (phase === 'warmup') return { key: 'warmup', text: 'Waiting for the first blow', cls: 'bg-sp-ink text-white' };
+  const verdict = clashVerdict(clash);
+  if (verdict.kind === 'unanimous' && verdict.cap) {
+    const pct = Math.round(verdict.cap === 'a' ? share : 100 - share);
+    return { key: `lead-${verdict.cap}`, text: `${icon(verdict.cap)}${word(verdict.cap)} leads ${pct}%`, cls: TONE[verdict.cap].banner };
+  }
+  if (verdict.kind === 'split') return { key: 'split', text: 'Split decision', cls: 'bg-sp-ink text-white' };
+  return { key: 'dead-heat', text: 'Dead heat', cls: 'bg-sp-ink text-white' };
+}
+
+/** Wiersz sedziow: kto wygrywa wg kapitalizacji, kto wg handlu; KO i warmup maja wlasny tekst. */
+function Judges({ clash, bullBear }: { clash: Clash; bullBear: boolean }) {
+  const phase = clashPhase(clash);
+  const word = (s: ClashSide) => {
+    const t = s === 'a' ? clash.a : clash.b;
+    return t ? sideWord(t.perpSymbol, bullBear) : s.toUpperCase();
+  };
+  const hint =
+    'Cap = USD market cap (meme price in perp units x the perp\'s own value). Trading = meme price move since launch in perp units, without the perp\'s value. Before both sides have traded the bar stays 50/50.';
+  let body: ReactNode;
+  if (phase === 'warmup') {
+    body = <span className="text-sp-shade/50">wait for a first buy on each side</span>;
+  } else if (phase === 'ko') {
+    const w = clashKoWinner(clash);
+    body = w ? <span className={`rounded-full px-2 py-0.5 font-extrabold ${TONE[w].chip}`}>curve filled first: {word(w)}</span> : null;
+  } else {
+    const v = clashVerdict(clash);
+    body =
+      v.kind === 'unanimous' && v.cap ? (
+        <span className={`rounded-full px-2 py-0.5 font-extrabold ${TONE[v.cap].chip}`}>both say {word(v.cap)}</span>
+      ) : v.cap && v.trading ? (
+        <>
+          <span className={`rounded-full px-2 py-0.5 font-extrabold ${TONE[v.cap].chip}`}>cap: {word(v.cap)}</span>
+          <span className={`rounded-full px-2 py-0.5 font-extrabold ${TONE[v.trading].chip}`}>trading: {word(v.trading)}</span>
+        </>
+      ) : (
+        <span className="text-sp-shade/50">too close to call</span>
+      );
+  }
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]" title={hint}>
+      <span className="font-extrabold uppercase tracking-[0.06em] text-sp-shade/45">Judges</span>
+      {body}
+    </div>
+  );
+}
+
+export function ClashCard({ clash, logos, highlight = false }: { clash: Clash; logos: Record<string, string>; highlight?: boolean }) {
+  const phase = clashPhase(clash);
+  const koWinner = clashKoWinner(clash);
+  const verdict = clashVerdict(clash);
+  // Korona: zwyciezca KO, a w bijatyce prowadzacy wg kapitalizacji; przed zakupami nikt.
+  const crown: ClashSide | null = phase === 'ko' ? koWinner : phase === 'brawl' ? verdict.cap ?? null : null;
+  const aShare = clashSharePct(clash);
   const bullBear = isBullBear(clash.a?.perpSymbol, clash.b?.perpSymbol);
   const aBase = clash.a ? sideWord(clash.a.perpSymbol, bullBear) : 'A';
   const bBase = clash.b ? sideWord(clash.b.perpSymbol, bullBear) : 'B';
+  const logoA = sideLogo(clash.a, logos);
+  const logoB = sideLogo(clash.b, logos);
+  const headLogo = logoA ?? logoB ?? clash.image ?? undefined;
+  const banner = bannerOf(clash, bullBear, aShare);
 
   // Intro FIGHT! (raz na klip) i powtorka po stuknieciu VS.
   const [intro, setIntro] = useState(() => !introPlayed.has(clash.id));
@@ -216,18 +259,19 @@ function ClashCard({ clash, logo }: { clash: Clash; logo?: string }) {
     introPlayed.add(clash.id);
   }, [clash.id]);
 
-  // Cios po kazdym odswiezeniu, ktore realnie przesunelo szale: obrywa strona, ktora stracila.
-  const prevShare = useRef<number | null>(null);
+  // Cios po kazdym odswiezeniu, ktore realnie przesunelo szale (i to w bijatyce, nie przy
+  // skoku z 50/50 po pierwszych zakupach): obrywa strona, ktora stracila.
+  const prev = useRef<{ share: number; phase: string } | null>(null);
   const [hit, setHit] = useState<{ side: ClashSide; text: string } | null>(null);
   useEffect(() => {
-    const prev = prevShare.current;
-    prevShare.current = aShare;
-    if (prev === null || Math.abs(aShare - prev) < 0.4) return;
-    const d = aShare - prev;
+    const before = prev.current;
+    prev.current = { share: aShare, phase };
+    if (!before || before.phase !== 'brawl' || phase !== 'brawl' || Math.abs(aShare - before.share) < 0.4) return;
+    const d = aShare - before.share;
     setHit({ side: d > 0 ? 'b' : 'a', text: `-${Math.abs(d).toFixed(1)}%` });
     const t = window.setTimeout(() => setHit(null), 2600);
     return () => window.clearTimeout(t);
-  }, [aShare]);
+  }, [aShare, phase]);
 
   useEffect(() => {
     if (!burst) return;
@@ -241,14 +285,11 @@ function ClashCard({ clash, logo }: { clash: Clash; logo?: string }) {
     setReplay((n) => n + 1);
   };
 
-  const navA = navOf(clash.a);
-  const navB = navOf(clash.b);
-  const vsLeft = Math.min(90, Math.max(10, aShare));
-  const leadWord = leader === 'a' ? aBase : leader === 'b' ? bBase : null;
-  const leadShare = Math.round(leader === 'b' ? 100 - aShare : aShare);
-
   return (
-    <div id={`clash-${clash.id}`} className="clash-arena rounded-[18px] border border-sp-shade/10 bg-sp-surface p-3.5">
+    <div
+      id={`clash-${clash.id}`}
+      className={`clash-arena rounded-[18px] border bg-sp-surface p-3.5 transition-shadow ${highlight ? 'border-soft-primary shadow-[0_0_0_3px_rgb(var(--soft-primary)/0.25)]' : 'border-sp-shade/10'}`}
+    >
       {intro && (
         <div key={replay} className="clash-fight" aria-hidden="true">
           FIGHT!
@@ -257,9 +298,9 @@ function ClashCard({ clash, logo }: { clash: Clash; logo?: string }) {
       {burst && <div key={`f${replay}`} className="clash-flash clash-flash-on" aria-hidden="true" />}
 
       <div className="flex items-center gap-2.5">
-        {logo ?? clash.image ? (
+        {headLogo ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={(logo ?? clash.image) as string} alt="" width={36} height={36} className="h-9 w-9 rounded-full object-cover" />
+          <img src={headLogo} alt="" width={36} height={36} className="h-9 w-9 rounded-full object-cover" />
         ) : (
           <span className="flex h-9 w-9 items-center justify-center rounded-full bg-sp-brand-soft text-[12px] font-extrabold text-soft-primary-deep">{clash.ticker.slice(0, 2)}</span>
         )}
@@ -269,55 +310,25 @@ function ClashCard({ clash, logo }: { clash: Clash; logo?: string }) {
           </div>
           {clash.description && <div className="truncate text-[11.5px] text-sp-shade/50">{clash.description}</div>}
         </div>
-        <div
-          key={leader ?? 'tie'}
-          className={`clash-ko shrink-0 rounded-[6px] px-2 py-1 text-[10.5px] font-black uppercase italic tracking-[0.04em] ${leader ? TONE[leader].banner : 'bg-sp-ink text-white'}`}
-        >
-          {leadWord ? `${bullBear ? (leader === 'a' ? '🐂 ' : '🐻 ') : ''}${leadWord} leads ${leadShare}%` : 'Dead heat'}
+        <div key={banner.key} className={`clash-ko shrink-0 rounded-[6px] px-2 py-1 text-[10.5px] font-black uppercase italic tracking-[0.04em] ${banner.cls}`}>
+          {banner.text}
         </div>
       </div>
 
-      <div className={`relative mb-1 mt-4 px-1 ${burst ? 'clash-shake' : ''}`}>
-        <div className="clash-track">
-          <div className="clash-fill" style={{ width: `${aShare}%` }} />
-          <div className={`clash-vs ${burst ? 'clash-burst' : ''}`} style={{ left: `${vsLeft}%` }}>
-            {SPARKS.map((s, i) => (
-              <span
-                key={i}
-                className="clash-spark"
-                style={{ '--a': `${s.a}deg`, '--d': `${s.d}px`, animationDelay: `${s.delay}s`, background: s.white ? '#fff' : undefined } as CSSProperties}
-                aria-hidden="true"
-              />
-            ))}
-            <button type="button" className="clash-vs-badge" onClick={replayFight} aria-label="Replay the fight intro" title="Tap to replay">
-              VS
-            </button>
-          </div>
-        </div>
+      <div className="mb-1 mt-4">
+        <ClashBar aShare={aShare} burst={burst} onVsClick={replayFight} />
       </div>
       <div className="flex justify-between text-[10.5px] font-extrabold">
-        <span className="text-soft-primary-deep">
-          {aShare.toFixed(0)}% {aBase}
-        </span>
-        <span className="text-amber-600">
-          {(100 - aShare).toFixed(0)}% {bBase}
-        </span>
+        <span className="text-soft-primary-deep">{phase === 'warmup' ? aBase : `${aShare.toFixed(0)}% ${aBase}`}</span>
+        <span className="text-amber-600">{phase === 'warmup' ? bBase : `${(100 - aShare).toFixed(0)}% ${bBase}`}</span>
       </div>
 
       <div className="mt-3 flex gap-2.5">
-        <Side token={clash.a} side="a" leading={leader === 'a'} bullBear={bullBear} hit={hit?.side === 'a' ? hit.text : null} />
-        <Side token={clash.b} side="b" leading={leader === 'b'} bullBear={bullBear} hit={hit?.side === 'b' ? hit.text : null} />
+        <Side token={clash.a} side="a" leading={crown === 'a'} bullBear={bullBear} hit={hit?.side === 'a' ? hit.text : null} logo={logoA} />
+        <Side token={clash.b} side="b" leading={crown === 'b'} bullBear={bullBear} hit={hit?.side === 'b' ? hit.text : null} logo={logoB} />
       </div>
 
-      {navA !== null && navB !== null && (
-        <details className="mt-2.5 text-[11px] leading-[1.5] text-sp-shade/55">
-          <summary className="cursor-pointer select-none font-bold text-sp-shade/60">Why are the caps different?</summary>
-          <p className="mt-1">
-            Both sides launch at the same price in perp units. Cap in USD is that price times the perp&apos;s own value: {clash.a?.perpSymbol} ${navA.toFixed(2)}, {clash.b?.perpSymbol} ${navB.toFixed(2)}. So the gap at the
-            start is only the two perps&apos; prices; from there trades and the market move it. &quot;Meme since launch&quot; shows the trading alone.
-          </p>
-        </details>
-      )}
+      <Judges clash={clash} bullBear={bullBear} />
     </div>
   );
 }

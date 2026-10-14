@@ -9,6 +9,8 @@ import { DEFAULT_LAUNCHPAD_CHAIN_ID, LAUNCH_STATE, LAUNCHPAD_NETWORKS, launchpad
 import { fetchBoardStatsFor } from '../boardStats';
 import { fetchLogos } from '../logos';
 import { pickTokenImage } from '../metadata';
+import { browserStorage, flushPendingProfiles, postProfileWithRetry, sendTokenProfile } from '../profileSync';
+import { clashPhase, clashSharePct } from '../duel';
 import { formatUsd } from '../useEthUsd';
 import { zapBuyWithEth } from '../perpZap';
 import { tradeErrorMessage } from '../[address]/detailShared';
@@ -16,6 +18,8 @@ import { CallCard, type Call } from '../calls/CallsBoard';
 import type { RaidView } from '../raid';
 import PerpAvatar, { PerpCornerBadge } from './PerpAvatar';
 import ClashSection from './ClashSection';
+import FightBanner from './FightBanner';
+import { useClashes } from './useClashes';
 
 /**
  * PERPS HUB - wszystkie rynki memow sparowanych z perpami Flash na jednej,
@@ -129,7 +133,9 @@ export default function PerpMemesBoard() {
   const [notice, setNotice] = useState<{ kind: 'ok' | 'err'; text: string; href?: string } | null>(null);
   const [calls, setCalls] = useState<Call[] | null>(null);
   const [raids, setRaids] = useState<RaidView[] | null>(null);
-  const [clashCount, setClashCount] = useState<number | null>(null);
+  const clashes = useClashes();
+  const clashCount = clashes ? clashes.length : null;
+  const [focusClash, setFocusClash] = useState<string | null>(null);
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
 
   // Stan z URL (link do konkretnego perpa / zakladki) i zapamietany preset.
@@ -138,6 +144,13 @@ export default function PerpMemesBoard() {
     const t = readParam('tab') as Tab | null;
     if (p) setSelected(p);
     if (t && ['memes', 'clash', 'calls', 'raids'].includes(t)) setTab(t);
+    // Link do konkretnego starcia: ?clash=<id> (nowy) albo #clash-<id> (stare linki) otwiera zakladke.
+    const hash = window.location.hash.match(/^#clash-([a-z0-9]+)$/i);
+    const clashId = readParam('clash') ?? (hash ? hash[1] : null);
+    if (clashId && /^[a-z0-9]{1,32}$/i.test(clashId)) {
+      setFocusClash(clashId);
+      setTab('clash');
+    }
     try {
       const saved = window.localStorage.getItem(PRESET_KEY);
       if (saved && (PRESETS as readonly string[]).includes(saved)) setPreset(saved);
@@ -154,7 +167,12 @@ export default function PerpMemesBoard() {
   };
   const pickTab = (t: Tab) => {
     setTab(t);
-    writeParams({ tab: t === 'memes' ? null : t });
+    writeParams({ tab: t === 'memes' ? null : t, clash: null });
+  };
+  const openClash = (id: string) => {
+    setFocusClash(id);
+    setTab('clash');
+    writeParams({ tab: 'clash', clash: id });
   };
   const pickPreset = (p: string) => {
     setPreset(p);
@@ -281,6 +299,20 @@ export default function PerpMemesBoard() {
     void loadMemes().catch(() => setLoading(false));
   }, [loadMemes]);
 
+  // Profil (logo) zapisany po starcie, ale niedokonczony (zamkniete okno podpisu, zla siec):
+  // kolejka czeka w localStorage i do tej pory odpalala sie tylko z /startpad. Bez sesji
+  // flush nic nie wysyla - wpisy po prostu czekaja dalej.
+  useEffect(() => {
+    void flushPendingProfiles(browserStorage(), CHAIN_ID, Date.now(), (entry) =>
+      postProfileWithRetry(() => sendTokenProfile(entry), { expectLogo: entry.logoUrl !== null, attempts: 2 })
+    )
+      .then(({ saved }) => {
+        if (saved === 0) return;
+        void fetchLogos(CHAIN_ID, { bust: true }).then(() => loadMemes());
+      })
+      .catch(() => {});
+  }, [loadMemes]);
+
   // Liczniki i dane zakladek (lekkie, raz na wejscie + co minute).
   useEffect(() => {
     let cancelled = false;
@@ -293,10 +325,6 @@ export default function PerpMemesBoard() {
         .then((r) => (r.ok ? r.json() : null))
         .then((b: { raids?: RaidView[] } | null) => !cancelled && setRaids(b?.raids ?? []))
         .catch(() => !cancelled && setRaids((r) => r ?? []));
-      fetch('/api/launchpad/clashes')
-        .then((r) => (r.ok ? r.json() : null))
-        .then((b: { clashes?: unknown[] } | null) => !cancelled && setClashCount(b?.clashes?.length ?? 0))
-        .catch(() => {});
     };
     load();
     const t = window.setInterval(load, 60_000);
@@ -321,6 +349,19 @@ export default function PerpMemesBoard() {
     return [...list].sort((a, b) => (usdOf(b, b.volume) ?? 0) - (usdOf(a, a.volume) ?? 0));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [memes, selected, stage, perps]);
+
+  // Token -> jego rywal w starciu (chip w wierszu): udzial w pasku dopiero po zakupach po obu stronach.
+  const duelOf = useMemo(() => {
+    const map = new Map<string, { rival: string; own: number | null }>();
+    for (const c of clashes ?? []) {
+      if (!c.a || !c.b) continue;
+      const live = clashPhase(c) !== 'warmup';
+      const a = clashSharePct(c);
+      map.set(c.a.address.toLowerCase(), { rival: c.b.symbol, own: live ? Math.round(a) : null });
+      map.set(c.b.address.toLowerCase(), { rival: c.a.symbol, own: live ? Math.round(100 - a) : null });
+    }
+    return map;
+  }, [clashes]);
 
   const perpLaunchpads = useMemo(() => new Set((NETWORK.markets ?? []).map((m) => m.launchpad.toLowerCase())), []);
   const scopedCalls = (calls ?? []).filter((c) => (selected === 'all' ? c.marketId !== null : c.marketId === selected));
@@ -451,6 +492,9 @@ export default function PerpMemesBoard() {
         <Stat label="Raised" value={loading ? '--' : formatUsd(raisedUsd)} />
       </div>
 
+      {/* WALKA DNIA - belka nad zakladkami, zeby Bull vs Bear nie siedzial tylko w czwartej zakladce */}
+      {tab !== 'clash' && clashes && clashes.length > 0 && <FightBanner clashes={clashes} onOpen={openClash} />}
+
       {/* ZAKLADKI */}
       <div className="mt-4 flex gap-1 overflow-x-auto border-b border-sp-shade/10" role="tablist" aria-label="Perp features">
         {tabs.map((t) => (
@@ -562,6 +606,7 @@ export default function PerpMemesBoard() {
                   busy={buying === m.address}
                   disabled={buying !== null}
                   onBuy={() => void quickBuy(m)}
+                  duel={duelOf.get(m.address.toLowerCase())}
                 />
               ))
             )}
@@ -575,7 +620,7 @@ export default function PerpMemesBoard() {
 
       {tab === 'clash' && (
         <div className="mt-3">
-          <ClashSection embedded />
+          <ClashSection embedded focusId={focusClash} />
         </div>
       )}
 
@@ -719,6 +764,7 @@ function MemeRow({
   busy,
   disabled,
   onBuy,
+  duel,
 }: {
   meme: Meme;
   perp: Perp | undefined;
@@ -728,6 +774,7 @@ function MemeRow({
   busy: boolean;
   disabled: boolean;
   onBuy: () => void;
+  duel?: { rival: string; own: number | null };
 }) {
   const href = `/startpad/${meme.address.toLowerCase()}?m=${encodeURIComponent(meme.perpId)}`;
   const progress = Math.max(0, Math.min(100, (meme.raised / meme.target) * 100));
@@ -750,6 +797,12 @@ function MemeRow({
           <span className="block truncate text-[11.5px] text-sp-shade/50">
             {meme.name} · on {perp?.symbol ?? meme.perpId}
           </span>
+          {duel && (
+            <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-soft-primary/10 px-1.5 py-0.5 text-[10.5px] font-extrabold text-soft-primary-deep">
+              <Swords className="h-3 w-3" aria-hidden="true" /> vs ${duel.rival}
+              {duel.own !== null && ` ${duel.own}/${100 - duel.own}`}
+            </span>
+          )}
         </span>
       </Link>
       <span className="hidden font-soft-display text-[15px] font-extrabold text-sp-ink md:block">{mcapUsd !== null ? formatUsd(mcapUsd) : '--'}</span>

@@ -53,7 +53,7 @@ import { quoteBuyLocal, quoteDrifts, quoteSellLocal } from './curveQuote';
 import { hasPool } from './poolPrice';
 import PoolTradeBox from './PoolTradeBox';
 import { canonicalPoolKey, NATIVE, V4_BY_CHAIN, v4QuoterAbi, v4QuoterPathAbi } from './v4Swap';
-import { buildMessageShareText, encodeTradeMessage, messageByteLength, TRADE_MESSAGE_MAX_BYTES } from './tradeMessage';
+import { buildMessageShareText, cleanTradeMessage, encodeTradeMessage, messageByteLength, TRADE_MESSAGE_MAX_BYTES } from './tradeMessage';
 import { buildShareUrl, safeSymbol, shareIntentUrl } from '../shareText';
 import { fetchPerpPoolKey, type ZapPoolKey } from '../perpZap';
 
@@ -71,6 +71,19 @@ function clampMessage(text: string): string {
   let chars = Array.from(text);
   while (chars.length > 0 && messageByteLength(chars.join('')) > TRADE_MESSAGE_MAX_BYTES) chars = chars.slice(0, -1);
   return chars.join('');
+}
+
+/**
+ * `?msg=` z linku "Back BEAR" na karcie starcia: okrzyk druzyny ("Team BEAR: ") wpisany do
+ * pola, do edycji. Nic nie wysyla sie samo - wiadomosc idzie on-chain dopiero z kupnem,
+ * ktore ktos sam zatwierdzi. Ten sam filtr co przy pisaniu, wiec obcy link nie wsunie
+ * niczego, czego pole by nie przyjelo.
+ */
+function prefillMessage(): string {
+  if (typeof window === 'undefined') return '';
+  const raw = new URLSearchParams(window.location.search).get('msg');
+  const base = raw ? clampMessage(cleanTradeMessage(raw)) : '';
+  return base ? `${base} ` : '';
 }
 
 /** Pole wiadomosci - to samo przy kupnie i przy sprzedazy, rozni sie tylko etykieta. */
@@ -139,7 +152,7 @@ export default function TradePanel({
   const [side, setSide] = useState<Side>('buy');
   const [buyAmount, setBuyAmount] = useState('0.05');
   // Jedno pole dla kupna i sprzedazy - przelaczenie strony nie kasuje tego, co ktos juz napisal.
-  const [tradeMessage, setTradeMessage] = useState('');
+  const [tradeMessage, setTradeMessage] = useState(prefillMessage);
   /** Ostatnia transakcja z wiadomoscia - do przycisku "Share on X" pod komunikatem. */
   const [shareable, setShareable] = useState<{ kind: 'buy' | 'sell'; text: string } | null>(null);
   const [sellAmount, setSellAmount] = useState('');

@@ -29,6 +29,8 @@ export type ClashToken = {
    * Obie strony startuja z tej samej ceny w perpie, wiec to uczciwa miara sily.
    */
   sinceLaunchPct: number;
+  /** Obrazek z `metadataURI` w lancuchu (starty sprzed 14.10 niosly go tam); nowe: null, logo idzie przez profil. */
+  image: string | null;
   /** Kapitalizacja w USD = cena w perpie * NAV perpa * 1e9 tokenow. */
   mcapUsd: number | null;
   /** Zmiana perpa z 24 h (Flash) - to ona przesuwa szale bez handlu. */
@@ -93,4 +95,89 @@ export function clashLeader(clash: Clash): ClashSide | null {
   const b = clash.b?.mcapUsd ?? null;
   if (a === null || b === null || a === b) return null;
   return a > b ? 'a' : 'b';
+}
+
+/**
+ * FAZY STARCIA. Kapitalizacja w USD to cena w perpie razy NAV perpa, wiec zanim
+ * ktokolwiek cos kupi, jedna strona "prowadzi" tylko dlatego, ze jej perp ma
+ * wyzszy NAV (ETH2xS $1.05 vs ETH2xL $0.84 dawalo "BEAR LEADS 56%" bez jednego
+ * zakupu). Dlatego:
+ *   warmup - ktoras strona nie dostala jeszcze zadnego zakupu: wynik nic nie mowi;
+ *   brawl  - obie strony mialy zakup: kapitalizacja i handel cos znacza;
+ *   ko     - dokladnie jedna strona zapelnila krzywa (Locked / Graduated).
+ */
+export type ClashPhase = 'warmup' | 'brawl' | 'ko';
+
+/** Ruch ceny mema (w %) uznawany za "ktos kupil" - nizej to zaokraglenie, nie handel. */
+export const TRADED_MIN_PCT = 0.005;
+
+export function sideTraded(token: ClashToken | null): boolean {
+  if (!token) return false;
+  if (token.state !== 'Curve') return true;
+  return token.raised > 0 && token.sinceLaunchPct >= TRADED_MIN_PCT;
+}
+
+export function clashPhase(clash: Clash): ClashPhase {
+  const { a, b } = clash;
+  if (!a || !b) return 'warmup';
+  if ((a.state !== 'Curve') !== (b.state !== 'Curve')) return 'ko';
+  return sideTraded(a) && sideTraded(b) ? 'brawl' : 'warmup';
+}
+
+/** Zwyciezca KO: strona, ktora pierwsza zapelnila krzywa (null poza faza 'ko'). */
+export function clashKoWinner(clash: Clash): ClashSide | null {
+  if (clashPhase(clash) !== 'ko') return null;
+  return clash.a && clash.a.state !== 'Curve' ? 'a' : 'b';
+}
+
+/**
+ * WERDYKT dwoch sedziow z pol, ktore juz mamy: kapitalizacja w USD (z NAV perpa)
+ * i handel (ruch ceny mema w perpie od startu - bez NAV). Zgodni = 'unanimous',
+ * rozne strony = 'split'. Poza fazą 'brawl' albo przy remisie handlu - 'early'.
+ */
+export type ClashVerdict = { kind: 'early' | 'unanimous' | 'split'; cap: ClashSide | null; trading: ClashSide | null };
+
+export function clashVerdict(clash: Clash): ClashVerdict {
+  const { a, b } = clash;
+  if (!a || !b || clashPhase(clash) !== 'brawl') return { kind: 'early', cap: null, trading: null };
+  const cap = clashLeader(clash);
+  const trading: ClashSide | null = Math.abs(a.sinceLaunchPct - b.sinceLaunchPct) < TRADED_MIN_PCT ? null : a.sinceLaunchPct > b.sinceLaunchPct ? 'a' : 'b';
+  if (!cap || !trading) return { kind: 'early', cap, trading };
+  return { kind: cap === trading ? 'unanimous' : 'split', cap, trading };
+}
+
+/**
+ * "Fight of the day" na hubie: spomiedzy starc z obiema stronami to w bijatyce,
+ * ktore jest najblizej 50/50; gdy zadne jeszcze nie ruszylo - najnowsze (API
+ * oddaje je od najnowszego).
+ */
+export function fightOfTheDay(clashes: Clash[]): Clash | null {
+  const full = clashes.filter((c) => c.a && c.b);
+  if (full.length === 0) return null;
+  const brawls = full.filter((c) => clashPhase(c) === 'brawl');
+  if (brawls.length === 0) return full[0];
+  return brawls.reduce((best, c) => (Math.abs(clashSharePct(c) - 50) < Math.abs(clashSharePct(best) - 50) ? c : best));
+}
+
+/** Para, do ktorej nalezy token: starcie i strona (null, gdy token nie jest w zadnym). */
+export function findClashOf(clashes: Clash[], token: string): { clash: Clash; side: ClashSide } | null {
+  const key = token.toLowerCase();
+  for (const clash of clashes) {
+    if (clash.a?.address.toLowerCase() === key) return { clash, side: 'a' };
+    if (clash.b?.address.toLowerCase() === key) return { clash, side: 'b' };
+  }
+  return null;
+}
+
+/**
+ * Udzial strony A w pasku (0-100). Przed pierwszymi zakupami po obu stronach albo
+ * bez wyceny jednej z nich pasek stoi na 50/50: inaczej rozpietosc NAV perpow
+ * udawalaby przewage.
+ */
+export function clashSharePct(clash: Clash): number {
+  const a = clash.a?.mcapUsd ?? null;
+  const b = clash.b?.mcapUsd ?? null;
+  if (a === null || b === null || a + b <= 0) return 50;
+  if (clashPhase(clash) === 'warmup') return 50;
+  return (a / (a + b)) * 100;
 }

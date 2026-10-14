@@ -276,7 +276,7 @@ export default function ClashLaunchModal({ onClose, preset }: { onClose: () => v
         {error && <p className="mt-2 text-[12px] font-bold text-sp-down-deep">{error}</p>}
 
         {both ? (
-          <a href={`/perps#clash-${clashId}`} onClick={onClose} className="mt-4 block rounded-xl bg-soft-primary px-4 py-3 text-center text-[13px] font-extrabold text-sp-on-brand">
+          <a href={`/perps/?tab=clash&clash=${clashId}`} onClick={onClose} className="mt-4 block rounded-xl bg-soft-primary px-4 py-3 text-center text-[13px] font-extrabold text-sp-on-brand">
             See the clash →
           </a>
         ) : (
