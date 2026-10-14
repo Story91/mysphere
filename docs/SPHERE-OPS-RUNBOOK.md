@@ -107,6 +107,52 @@ gdy spadnie ponizej 0.005.
 
 ---
 
+## 3b. Automat epoki (zadanie "SPHERE epoch") - luki i nadrabianie
+
+Zadanie odpala `scripts/sphere/epoch.ps1` codziennie o 05:10 z GLOWNEGO
+checkoutu (`npm run sphere:epoch` z `AUTO=tak PROPOSE=tak`). Jeden przebieg
+publikatora = jedna epoka:
+
+1. bierze NAJSTARSZA zamknieta epoke bez rozliczenia (nie "ostatnia
+   zamknieta") - rozliczona = finalny manifest (`closed`) i albo wpis
+   w `latest.json` (`proposedAt`), albo pusty root z flaga `auto`
+   (automat stwierdzil, ze nie bylo czego proponowac);
+2. kumulacje startowa bierze z OSTATNIEGO rozliczonego manifestu i
+   porownuje jej sume z `totalCumulative` dystrybutora - przy rozjezdzie
+   przerywa z komunikatem, zamiast proponowac root, ktory kontrakt odrzuci
+   (`ShrinkingTotal`) albo ktory zlamie monotonicznosc lisci;
+3. jesli nikt nie zarobil (pula pusta albo wszystkie sufity reguly 0 = 0),
+   NIE proponuje - pula przechodzi dalej, manifest to dokumentuje, a
+   `epoch.ps1` po markerze `NASTEPNA-EPOKA` od razu bierze kolejna epoke
+   (max 6 w jednym przebiegu);
+4. po `propose` petla sie zatrzymuje: kontrakt trzyma jeden pending root,
+   kolejny wchodzi dopiero po aktywacji (24 h weta + `activate()` przez
+   keepera). Luke N epok automat domyka wiec w ~N dni, bez recznych
+   `EPOCH=N`.
+
+Reczny dry-run (`EPOCH=N POOL_SPHERE=0 npm run sphere:epoch`, bez AUTO)
+pisze manifest shadow bez flagi `auto` - NIE zamyka epoki za automat.
+
+Co sie zepsulo 22.09-14.10.2026 (zeby nie wrocilo): laptop byl wylaczony
+(keeper: 0-3 przebiegi dziennie zamiast 24), a przebieg nadrabiajacy po
+starcie 14.10 zostal zabity z kodem 0xC000013A (zamkniete okno konsoli /
+Ctrl+C) zanim cokolwiek policzyl. Dziennik Harmonogramu
+(Microsoft-Windows-TaskScheduler/Operational) jest WYLACZONY, wiec po fakcie
+nie da sie sprawdzic, dlaczego starty z 30.09, 4.10 i 11.10 nie zostawily
+sladu. Zalecane (raz, PowerShell jako ten sam uzytkownik):
+
+```powershell
+# okno konsoli ukryte - przypadkowe zamkniecie nie zabija publikatora
+schtasks /Change /TN "SPHERE epoch" /TR "powershell -WindowStyle Hidden -ExecutionPolicy Bypass -File $PWD\scripts\sphere\epoch.ps1"
+schtasks /Change /TN "SPHERE keeper" /TR "powershell -WindowStyle Hidden -ExecutionPolicy Bypass -File $PWD\scripts\sphere\keeper.ps1"
+# dziennik Harmonogramu - zeby nastepnym razem bylo wiadomo, co zabilo przebieg
+wevtutil sl Microsoft-Windows-TaskScheduler/Operational /e:true
+```
+
+Kontrola: `scripts/output/epoch.log` ma miec znacznik z kazdego dnia,
+a po znaczniku tresc (sam znacznik = przebieg zabity). Dopoki laptop stoi
+wylaczony, nic sie nie rozlicza - to jest obecnie jedyny host automatu.
+
 ## 4. Co robi TYLKO Safe (decyzje, nie automat)
 
 | Decyzja | Jak | Kiedy |

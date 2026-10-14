@@ -1,5 +1,5 @@
 import { ethers } from "hardhat";
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from "fs";
+import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync } from "fs";
 import { dirname, join } from "path";
 
 /**
@@ -127,7 +127,6 @@ async function main() {
   // albo poprzedni root czeka na aktywacje, przebieg konczy sie od razu -
   // dlatego wolno go odpalac codziennie.
   const auto = process.env.AUTO === "tak";
-  const epochIdx = process.env.EPOCH ? Number(process.env.EPOCH) : auto ? currentIdx - 1 : currentIdx;
   const distributorAddr = process.env.DISTRIBUTOR ?? "0xc0b018161bB48383c808Aa47923f5501758D3E9D";
   const buybackAddr = process.env.BUYBACK ?? "0x98e51f42245Bf9A0b1e0005510aEE82C52bE8A7b";
   const publicDir = join(__dirname, "..", "..", "public", "sphere-epochs");
@@ -143,9 +142,49 @@ async function main() {
     ],
     ethers.provider
   );
+  // Epoka jest ROZLICZONA, gdy ma finalny manifest (closed) i albo nie bylo
+  // czego proponowac (root null - pusta pula), albo latest.json notuje jej
+  // propozycje (proposedAt). Manifest z rootem BEZ wpisu w latest.json to
+  // slad nieudanego propose - taka epoka wraca do kolejki, nie jest omijana.
+  const prevLatest = existsSync(latestPath) ? JSON.parse(readFileSync(latestPath, "utf8")) : null;
+  const settledEpochs: number[] = [];
+  for (const dir of [join(__dirname, "..", "output", "sphere-epochs"), publicDir]) {
+    if (!existsSync(dir)) continue;
+    for (const f of readdirSync(dir)) {
+      const m = /^epoch-(\d+)\.json$/.exec(f);
+      if (!m) continue;
+      const n = Number(m[1]);
+      try {
+        const mf = JSON.parse(readFileSync(join(dir, f), "utf8"));
+        const proposed = Boolean(prevLatest?.proposedAt) && Number(prevLatest.epoch) >= n;
+        // Pusty root zamyka epoke tylko, gdy stwierdzil to AUTOMAT (flaga auto
+        // w manifescie) - reczny dry-run EPOCH=N POOL_SPHERE=0 tez pisze
+        // manifest bez roota i nie moze przez to zamknac epoki za automat.
+        if (mf.closed && ((mf.root === null && mf.auto === true) || proposed) && !settledEpochs.includes(n)) settledEpochs.push(n);
+      } catch {
+        /* uszkodzony plik nie blokuje automatu */
+      }
+    }
+  }
+  settledEpochs.sort((a, b) => a - b);
+  // AUTO: NAJSTARSZA zamknieta epoka bez rozliczenia, nie "ostatnia zamknieta".
+  // Po przerwie w pracy automatu (laptop wylaczony 22.09-13.10.2026) wariant
+  // "ostatnia" przeskakiwalby luke: kumulacja startowalaby od zera, a
+  // propose() odrzucalby root (ShrinkingTotal) albo lamal monotonicznosc
+  // lisci juz wyplaconych tworcow. Jedna epoka na przebieg - kontrakt trzyma
+  // jeden pending root i wymaga epochId+1 po aktywacji - wiec luke nadrabia
+  // sie dzien po dniu, bez recznych EPOCH=N.
+  const oldestUnsettled = settledEpochs.length ? settledEpochs[settledEpochs.length - 1] + 1 : 0;
+  const epochIdx = process.env.EPOCH ? Number(process.env.EPOCH) : auto ? oldestUnsettled : currentIdx;
   if (auto) {
-    if (epochIdx < 0) throw new Error("Sezon jeszcze nie zamknal zadnej epoki.");
-    const prevLatest = existsSync(latestPath) ? JSON.parse(readFileSync(latestPath, "utf8")) : null;
+    if (currentIdx < 1) throw new Error("Sezon jeszcze nie zamknal zadnej epoki.");
+    if (epochIdx > currentIdx - 1) {
+      console.log(`AUTO: epoka ${currentIdx - 1} rozliczona - nic do zrobienia (biezaca ${currentIdx} w toku).`);
+      return;
+    }
+    if (epochIdx < currentIdx - 1) {
+      console.log(`AUTO: nadrabiam luke - epoka ${epochIdx} (zamknietych bez rozliczenia: ${currentIdx - epochIdx}); jedna epoka na przebieg.`);
+    }
     if (prevLatest && Number(prevLatest.epoch) >= epochIdx && prevLatest.proposedAt) {
       console.log(`AUTO: epoka ${epochIdx} juz zaproponowana (${prevLatest.proposedAt}) - nic do zrobienia.`);
       return;
@@ -255,10 +294,14 @@ async function main() {
     }
   }
   const outDir = join(__dirname, "..", "output", "sphere-epochs");
-  const prevPath = join(outDir, `epoch-${epochIdx - 1}.json`);
-  const prevCums: Record<string, string> = existsSync(prevPath)
-    ? JSON.parse(readFileSync(prevPath, "utf8")).cumulative ?? {}
-    : {};
+  // Poprzednia kumulacja = manifest OSTATNIEJ ROZLICZONEJ epoki przed ta, nie
+  // plik epoch-(N-1): po luce tamtego pliku nie ma i kumulacja startowalaby
+  // od zera. Kazdy manifest kopiuje kumulacje poprzednika, wiec ostatni
+  // rozliczony niesie pelna historie.
+  const prevEpoch = [...settledEpochs].reverse().find((n) => n < epochIdx) ?? epochIdx - 1;
+  const prevPath = [join(outDir, `epoch-${prevEpoch}.json`), join(publicDir, `epoch-${prevEpoch}.json`)].find((f) => existsSync(f));
+  const prevCums: Record<string, string> = prevPath ? JSON.parse(readFileSync(prevPath, "utf8")).cumulative ?? {} : {};
+  if (prevEpoch !== epochIdx - 1) console.log(`kumulacja startowa z epoki ${prevEpoch} (ostatnia rozliczona przed ${epochIdx})`);
 
   const cumulative: Record<string, string> = { ...prevCums };
   let leaves: { account: string; cumulative: string; prevCumulative: string; proof?: string[] }[] = [];
@@ -267,23 +310,46 @@ async function main() {
   if (poolSphere > 0n) {
     if (!closed) throw new Error("Wyplacalna epoka musi byc ZAMKNIETA (EPOCH < biezaca).");
     if (vwap === 0n) throw new Error("Podaj VWAP_SPHERE_PER_ETH do przeliczenia sufitu reguly 0.");
+    // Punkt startu musi byc tym, co kontrakt juz AKTYWOWAL: suma kumulacji
+    // poprzednika == totalCumulative dystrybutora. Inaczej root albo zostanie
+    // odrzucony (ShrinkingTotal), albo - gorzej - przejdzie i zlamie
+    // monotonicznosc lisci (tworca z claimed > cumulative nic nie odbierze).
+    const prevTotal = Object.values(prevCums).reduce((a, v) => a + BigInt(v), 0n);
+    const onchainTotal = BigInt(await distRead.totalCumulative());
+    if (prevTotal !== onchainTotal) {
+      throw new Error(
+        `Kumulacja z manifestu epoki ${prevEpoch} (${prevTotal}) != totalCumulative dystrybutora (${onchainTotal}). ` +
+          "Zly punkt startu - sprawdz, czy ostatni zaproponowany root zostal aktywowany (weto?) i ktory manifest jest aktywny."
+      );
+    }
+    let paidAnyone = false;
     for (const c of result.creators) {
       const share = (poolSphere * c.shareBps) / 10_000n;
       // Regula 0: sufit w ETH przeliczony na SPHERE po VWAP transz buybacku.
       const capSphere = (c.rewardCapEth * vwap) / 10n ** 18n;
       const reward = share < capSphere ? share : capSphere;
       if (reward === 0n) continue;
+      paidAnyone = true;
       const key = c.creator.toLowerCase();
       cumulative[key] = (BigInt(prevCums[key] ?? "0") + reward).toString();
+    }
+    if (auto && !paidAnyone) {
+      // Nikt nie przeszedl bramek (wiek, wolumen, sufit reguly 0) - root bez
+      // przyrostu kosztowalby propose + 24 h weta za nic (tak poszla epoka 4).
+      // Pula zostaje na nastepna epoke, manifest dokumentuje stan, a epoch.ps1
+      // po tym markerze od razu bierze kolejna epoke z luki.
+      console.log(`AUTO: nikt nie zarobil w epoce ${epochIdx} - pula ${ethers.formatEther(poolSphere)} SPHERE przechodzi dalej, bez propose. NASTEPNA-EPOKA`);
     }
     const leafData = Object.entries(cumulative).map(([account, cum]) => ({
       account,
       cumulative: cum,
       prevCumulative: prevCums[account] ?? "0",
     }));
-    const tree = buildTree(leafData.map((l) => leafOf(l.account, BigInt(l.cumulative), BigInt(l.prevCumulative))));
-    root = tree.root;
-    leaves = leafData.map((l) => ({ ...l, proof: tree.proofs[leafOf(l.account, BigInt(l.cumulative), BigInt(l.prevCumulative))] }));
+    if (!auto || paidAnyone) {
+      const tree = buildTree(leafData.map((l) => leafOf(l.account, BigInt(l.cumulative), BigInt(l.prevCumulative))));
+      root = tree.root;
+      leaves = leafData.map((l) => ({ ...l, proof: tree.proofs[leafOf(l.account, BigInt(l.cumulative), BigInt(l.prevCumulative))] }));
+    }
   }
 
   const algoSource = readFileSync(join(__dirname, "..", "..", "app", "startpad", "sphere", "season", "epochMath.ts"), "utf8");
@@ -308,6 +374,7 @@ async function main() {
     vwapSpherePerEth: vwap,
     cumulative,
     root,
+    auto,
   };
   const canon = canonical(manifestBody);
   const manifestHash = ethers.keccak256(ethers.toUtf8Bytes(canon));
@@ -348,7 +415,8 @@ async function main() {
   console.log(`manifestHash: ${manifestHash}`);
   const totalCumulative = Object.values(cumulative).reduce((a, v) => a + BigInt(v), 0n);
   if (!root) {
-    console.log("SHADOW: bez lisci (POOL_SPHERE=0). Udzialy i sufity w manifescie.");
+    if (poolSphere === 0n) console.log("SHADOW: bez lisci (POOL_SPHERE=0). Udzialy i sufity w manifescie.");
+    if (auto && poolSphere === 0n) console.log("NASTEPNA-EPOKA");
     return;
   }
   console.log(`root do propose(): ${root} (totalCumulative: ${totalCumulative})`);

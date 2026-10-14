@@ -26,9 +26,19 @@ $env:PROPOSE = 'tak'
 $stamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
 $log = Join-Path $repo 'scripts\output\epoch.log'
 "=== $stamp ===" | Out-File -FilePath $log -Append -Encoding utf8
-$out = npm run sphere:epoch 2>&1 | ForEach-Object { "$_" }
-$out | Out-File -FilePath $log -Append -Encoding utf8
-$out
+# Jeden przebieg publikatora = jedna epoka. Po przerwie (laptop wylaczony)
+# automat nadrabia luke od najstarszej epoki; epoki, w ktorych nikt nie
+# zarobil albo pula byla pusta, konczy markerem NASTEPNA-EPOKA bez propose -
+# wtedy od razu bierzemy kolejna, zamiast czekac dobe. Propose zatrzymuje
+# petle (kontrakt trzyma jeden pending root, nastepny po aktywacji).
+$out = @()
+for ($i = 0; $i -lt 6; $i++) {
+  $run = npm run sphere:epoch 2>&1 | ForEach-Object { "$_" }
+  $run | Out-File -FilePath $log -Append -Encoding utf8
+  $run
+  $out += $run
+  if (-not (($run | Out-String) -match 'NASTEPNA-EPOKA')) { break }
+}
 
 if (($out | Out-String) -match 'propose OK') {
   # Publikacja manifestu na master bez ruszania biezacej galezi.
