@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import WalletButton from '../wallet/WalletButton';
-import { useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 // @ts-ignore - config CommonJS wspoldzielony z next.config.js
 import { isRouteDisabled } from '@/config/routeStatus';
 import { NetworkSwitcher } from '../NetworkSwitcher';
@@ -15,198 +15,123 @@ import { NotificationsBell } from './NotificationsBell';
 
    Sam dropdown portfela mieszka w ../wallet/WalletButton - tutaj nie ma juz
    po nim niczego poza jednym wywolaniem komponentu.
+
+   REDESIGN 2026-10-14 ("tablica zlecen"): belka byla rzedem kolorowych pigulek
+   z gradientowymi obwodkami, siatka i rozbielonym tlem - dziesiec rzeczy
+   walczacych o uwage, zanim ktokolwiek dotarl do tresci. Teraz to zwykle
+   zakladki tekstowe: aktywna ma atrament i slizgajace sie podkreslenie, reszta
+   jest przygaszona. Kolory tras (fuksja, zielen, cyjan...) znikly - kolor
+   niosla tresc stron, nie belka.
+
+   Kolory biora sie z tokenow motywu (--soft-*), wiec motyw sieci (Arc,
+   Robinhood) dziala jak dotad. Na stronach Ask i $SPHERE belka dostaje tez
+   wrapper `.board`, zeby przycisk portfela i reszta miala ten sam kierunek co
+   strona pod nia.
 --------------------------------------------------------------------------- */
 type NavLink = {
   href: string;
   label: string;
 };
 
-/**
- * Kolor sufiksu per trasa. Obramowania per trasa zniknely wraz z ciemnym
- * szklem: w Soft Social pigulka nawigacji ma jedna, wspolna linie, a kolorem
- * rozni ja wylacznie nazwa. Siedem roznych ramek na jasnym tle czytalo sie
- * jak siedem osobnych komponentow.
- *
- * Odcienie sa POGLEBIONE wzgledem poprzednich (600 -> 700 itd.), bo pigulka
- * jest teraz biala na cala szerokosc etykiety. Poprzednie cyan-600 i #5B8CFF
- * na bieli nie mialy nawet 3:1.
- */
-const LINK_THEME: Record<string, { suffix: string }> = {
-  MySphere: { suffix: 'text-fuchsia-700' },
-  // Firmowy niebieski Base zostaje niezmieniony - to znak sieci, nie ozdobnik.
-  MyBase: { suffix: 'text-[#0052FF]' },
-  MyCamp: { suffix: 'text-soft-accent-deep' },
-  MyAgents: { suffix: 'text-cyan-700' },
-  MyClaw: { suffix: 'text-red-600' },
-  Startpad: { suffix: 'text-soft-primary-deep' },
-};
+const MOBILE_MENU_ID = 'mobile-nav-menu';
 
-/**
- * "My" zostaje neutralne, sufiks bierze kolor swojej trasy.
- *
- * Na pigulce aktywnej caly napis ma kolor --soft-on-primary (bialy na jasnym
- * motywie, ciemny na Arc i Robinhoodzie): kolor marki pod spodem zjada kazdy
- * z kolorow tras, a emerald czy cyan na fiolecie to juz nie jest zaden
- * kontrast.
- */
-function NavLinkLabel({ label, isActive }: { label: string; isActive: boolean }) {
-  if (!label.startsWith('My')) return <span>{label}</span>;
-  const suffix = label.slice(2);
+/** Strony przemalowane na "tablice zlecen" (patrz .board w globals.css). */
+function usesBoardTheme(pathname: string | null): boolean {
+  if (!pathname) return false;
   return (
-    <span className="inline-flex items-center gap-0.5">
-      <span className={isActive ? 'text-soft-on-primary' : 'text-soft-ink'}>My</span>
-      <span className={isActive ? 'text-soft-on-primary' : LINK_THEME[label]?.suffix ?? 'text-soft-ink-muted'}>
-        {suffix}
-      </span>
-    </span>
+    pathname === '/asks' ||
+    pathname.startsWith('/asks/') ||
+    pathname.startsWith('/ask/') ||
+    pathname.startsWith('/startpad/sphere')
   );
 }
 
 /**
- * Kolor obwodki per trasa.
+ * Zakladki desktopowe ze slizgajacym sie podkreslieniem.
  *
- * Belka ma siedem widocznych pozycji, wszystkie tej samej wielkosci i w tym
- * samym ksztalcie. Zanim to powstalo, jedyna roznica miedzy nimi byl napis -
- * a napis czyta sie dopiero po tym, jak wzrok juz gdzies wyladowal. Kolor
- * obwodki daje kazdej trasie staly znak rozpoznawczy, ktory dziala katem oka.
- *
- * JEDEN SYSTEM, NIE SIEDEM OZDOBNIKOW: gradient ma zawsze ten sam ksztalt -
- * atrament, kolor trasy, atrament. Zmienia sie wylacznie srodkowy odcien.
- * Dlatego siedem pigulek obok siebie czyta sie jako jeden pasek, a nie jako
- * siedem osobnych komponentow.
- *
- * WYPELNIENIE ZOSTAJE WSPOLNE: powierzchnia motywu w spoczynku, kolor marki
- * motywu na trasie aktywnej. Kolor trasy siedzi w obwodce i nigdzie indziej -
- * wypelnianie pigulki pomaranczem czy zielenia zabiloby kontrast napisu
- * (na #f5a73b bialy tekst ma 1,9:1, czyli jest nieczytelny).
- *
- * DLACZEGO ZMIENNE MOTYWU, A NIE "BIALE" I "FIOLETOWE" (16.09.2026): do tego
- * dnia wypelnienie bylo wpisane na sztywno jako rgb(255,255,255) i
- * rgb(124,107,218), a napis bral kolor z motywu. Na ciemnych motywach sieci
- * (Arc: granat, Robinhood: czern) --soft-ink jest prawie bialy, wiec jasny
- * napis ladowal na bialej pigulce i belka na Startpadzie Arc byla siedmioma
- * bialymi plamami bez tekstu. Teraz wypelnienie i napis pochodza z tego samego
- * motywu, wiec para (tlo, tekst) jest zawsze ta, ktora motyw juz sprawdzil
- * pod katem kontrastu: --soft-surface z --soft-ink, --soft-primary z
- * --soft-on-primary.
- *
- * Odcienie obwodek sa dobrane tak, zeby kreska byla widoczna na bialym tle -
- * kazdy ma wzgledem bieli co najmniej 2:1; na ciemnym tle sa jasniejsze od
- * niego z definicji.
+ * Pozycje i szerokosc wskaznika mierzymy z DOM (offsetLeft/offsetWidth aktywnego
+ * linku), a nie liczymy z indeksu: etykiety maja rozna dlugosc. Pomiar powtarza
+ * sie przy zmianie trasy, zmianie rozmiaru i po zaladowaniu fontow (zmiana kroju
+ * zmienia szerokosci). Pierwszy pomiar idzie bez przejscia - wskaznik nie ma
+ * wyjezdzac z lewego rogu przy wejsciu na strone.
  */
-const NAV_ACCENT: Record<string, string> = {
-  MySphere: '#a21caf',   // fuksja, ta sama co sufiks etykiety
-  Asks: '#0b9a51',       // zielen pieniedzy, ta sama co --sp-up
-  MyBase: '#0052ff',     // firmowy niebieski Base
-  MyCamp: '#c2410c',     // przypalony pomarancz, zeby nie mylil sie z CAMP
-  MyAgents: '#0e7490',
-  MyClaw: '#dc2626',
-  Startpad: '#5f4ec2',   // fiolet marki
-  '$SPHERE': '#8f45df',  // --sp-brand-strong
-  CAMP: '#f5a73b',       // pomarancz Camp Network
-  Perps: '#1f6fb2',      // --sp-info
-  How: '#64748b',        // najciszsza pozycja w belce i tak ma wygladac
-};
-
-/**
- * Oba konce gradientu obwodki: atrament motywu. Na jasnym motywie to
- * ciemny fiolet palety (#2e2a44), na ciemnym - jasny napis, czyli w obu
- * przypadkach kolor, ktorym motyw pisze tekst. Wczesniej stala #16141b
- * znikala na ciemnym tle i obwodka gubila oba konce.
- */
-const NAV_ACCENT_INK = 'rgb(var(--soft-ink))';
-
-const MOBILE_MENU_ID = 'mobile-nav-menu';
-
-/**
- * Jedyna roznica miedzy wierszem desktopowym a mobilnym: kierunek flexa,
- * odstep i cien stanu aktywnego. Cala reszta (motyw trasy, ikony, etykieta)
- * byla dotad skopiowana w dwoch miejscach i rozjezdzala sie przy kazdej zmianie.
- */
-const NAV_ITEM_VARIANT = {
-  desktop: {
-    layout: 'inline-flex gap-1.5',
-    active: 'shadow-chip',
-    idle: 'hover:bg-soft-sunken',
-  },
-  mobile: {
-    layout: 'flex gap-2',
-    active: 'shadow-chip',
-    idle: 'hover:bg-soft-sunken',
-  },
-} as const;
-
-function NavItem({
-  link,
+function DesktopTabs({
+  links,
   isActive,
-  variant,
-  onClick,
 }: {
-  link: NavLink;
-  isActive: boolean;
-  variant: keyof typeof NAV_ITEM_VARIANT;
-  onClick?: () => void;
+  links: NavLink[];
+  isActive: (href: string) => boolean;
 }) {
-  const style = NAV_ITEM_VARIANT[variant];
+  const listRef = useRef<HTMLUListElement>(null);
+  const [bar, setBar] = useState<{ x: number; w: number } | null>(null);
+  const [animate, setAnimate] = useState(false);
+  const activeHref = links.find((link) => isActive(link.href))?.href ?? null;
 
-  /**
-   * Obwodka w gradiencie: atrament -> kolor trasy -> atrament.
-   *
-   * TECHNIKA: dwa tla naraz. `padding-box` maluje wnetrze pigulki,
-   * `border-box` maluje obwodke, a `border: 2px solid transparent` sprawia,
-   * ze gradient widac WYLACZNIE w ramce. Dziala na `rounded-pill` bez
-   * dodatkowego elementu, wiec uklad flexa w belce i odstepy miedzy
-   * pigulkami zostaja nietkniete.
-   *
-   * Poswiata pod spodem to ten sam kolor przy 13% - tyle, zeby kreska nie
-   * wygladala jak doklejona do bialego tla. Zadnego migania: pigulka
-   * pulsujaca przy kazdym ekranie zamienia sie po minucie w szum, ktory mozg
-   * uczy sie omijac, a przy `prefers-reduced-motion` nie wolno jej ruszac.
-   */
-  const accent = NAV_ACCENT[link.label];
-  const fill = isActive ? 'rgb(var(--soft-primary))' : 'rgb(var(--soft-surface))';
-  const accentStyle = accent
-    ? {
-        border: '2px solid transparent',
-        background:
-          `linear-gradient(${fill}, ${fill}) padding-box, ` +
-          `linear-gradient(90deg, ${NAV_ACCENT_INK} 0%, ${accent} 50%, ${NAV_ACCENT_INK} 100%) border-box`,
-        boxShadow: `0 0 0 3px ${accent}21`,
-      }
-    : undefined;
+  const measure = useCallback(() => {
+    const list = listRef.current;
+    if (!list || !activeHref) {
+      setBar(null);
+      return;
+    }
+    const el = Array.from(list.querySelectorAll<HTMLAnchorElement>('a[data-href]')).find(
+      (node) => node.dataset.href === activeHref
+    );
+    if (!el) {
+      setBar(null);
+      return;
+    }
+    setBar({ x: el.offsetLeft, w: el.offsetWidth });
+  }, [activeHref]);
+
+  useLayoutEffect(() => {
+    measure();
+  }, [measure]);
+
+  useEffect(() => {
+    // Przejscie wlacza sie dopiero po pierwszym pomiarze.
+    const frame = requestAnimationFrame(() => setAnimate(true));
+    const onResize = () => measure();
+    window.addEventListener('resize', onResize);
+    void document.fonts?.ready.then(measure);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('resize', onResize);
+    };
+  }, [measure]);
 
   return (
-    <Link
-      href={link.href}
-      onClick={onClick}
-      style={accentStyle}
-      aria-current={isActive ? 'page' : undefined}
-      /* RUCH: zostaje samo nacisniecie. Nawigacja jest klikana dziesiatki razy
-         dziennie - podnoszenie pigulki na hover po dziesiatym razie juz nie
-         cieszy, tylko opoznia. */
-      className={`${style.layout} items-center px-4 py-2.5 rounded-pill font-soft-display text-sm font-bold border transition-[background-color,border-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface ${
-        accent
-          ? `${isActive ? 'text-soft-on-primary' : 'text-soft-ink'} ${isActive ? style.active : style.idle}`
-          : isActive
-          ? `bg-soft-primary border-soft-primary text-soft-on-primary ${style.active}`
-          : `bg-soft-surface border-soft-line text-soft-ink-muted ${style.idle}`
-      }`}
-    >
-      {/* Ikony sa dekoracja przy tekstowej etykiecie obok - czytnik ekranu ma
-          przeczytac "MyCamp", a nie "Camp MyCamp". */}
-      {link.label === 'CAMP' && (
-        <Image src="/Camp.png" alt="" width={14} height={14} className="rounded-sm flex-shrink-0" />
-      )}
-      {link.label === 'MyCamp' && (
-        /* brightness-110 bylo podbiciem pod ciemne szklo. Na bialej pigulce
-           rozjasnia logo Camp bez powodu. */
-        <Image src="/Camp.png" alt="" width={14} height={14} className="rounded-sm flex-shrink-0" />
-      )}
-      {link.label === 'MyClaw' && (
-        <span className="text-sm flex-shrink-0" aria-hidden="true">🦞</span>
-      )}
-      <NavLinkLabel label={link.label} isActive={isActive} />
-    </Link>
+    <nav aria-label="Main" className="hidden md:block">
+      <ul ref={listRef} className="relative flex items-center gap-0.5">
+        {links.map((link) => {
+          const active = link.href === activeHref;
+          return (
+            <li key={link.href}>
+              <Link
+                href={link.href}
+                data-href={link.href}
+                aria-current={active ? 'page' : undefined}
+                className={`relative inline-flex items-center rounded-lg px-3 py-2 font-soft-display text-[13.5px] font-semibold transition-colors [transition-duration:var(--dur-press)] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary ${
+                  active ? 'text-soft-ink' : 'text-soft-ink-muted hover:text-soft-ink'
+                }`}
+              >
+                {link.label}
+              </Link>
+            </li>
+          );
+        })}
+        <li
+          aria-hidden="true"
+          className={`pointer-events-none absolute bottom-0.5 left-0 h-[2px] list-none rounded-full bg-soft-ink ${
+            animate ? 'transition-[transform,width,opacity] [transition-duration:var(--dur-sheet)] ease-drawer' : ''
+          }`}
+          style={{
+            width: bar?.w ?? 0,
+            transform: `translateX(${bar?.x ?? 0}px)`,
+            opacity: bar ? 1 : 0,
+          }}
+        />
+      </ul>
+    </nav>
   );
 }
 
@@ -313,101 +238,88 @@ export default function Navigation() {
   const isActiveLink = (href: string) => {
     if (!pathname) return false;
     // Hub $SPHERE ma wlasny wpis w belce, wiec prefiksowe dopasowanie
-    // /startpad nie moze zapalac dwoch pigulek naraz na /startpad/sphere/*.
+    // /startpad nie moze zapalac dwoch wpisow naraz na /startpad/sphere/*.
     if (href === '/startpad' && pathname.startsWith('/startpad/sphere')) return false;
     return pathname === href || pathname.startsWith(href + '/');
   };
 
   return (
-    <div className="sticky top-0 z-50">
-    {/* Belka jest zwykla biala powierzchnia z jedna linia na dole. Byla tu
-        wersja chowana za gorna krawedzia z 12-px paskiem wysuwanym na hover -
-        wycofana na zadanie: pasek nie zapowiadal, ze cokolwiek sie wysunie,
-        wiec nawigacja wygladala na zepsuta. Belka stoi na stale. */}
-    <header className="w-full bg-soft-surface border-b border-soft-line">
-      {/* Obie nakladki zostaja - to ta sama siatka i to samo przyciemnienie,
-          przemalowane na lawende. Siatka schodzi do ledwie widocznego sladu
-          faktury, a czarny gradient staje sie miekkim zejsciem bieli w kolor
-          tla strony tuz nad linia. */}
-      <div aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(90deg,transparent_24%,rgba(124,107,218,0.05)_25%,rgba(124,107,218,0.05)_26%,transparent_27%,transparent_74%,rgba(124,107,218,0.05)_75%,rgba(124,107,218,0.05)_76%,transparent_77%,transparent),linear-gradient(0deg,transparent_24%,rgba(124,107,218,0.05)_25%,rgba(124,107,218,0.05)_26%,transparent_27%,transparent_74%,rgba(124,107,218,0.05)_75%,rgba(124,107,218,0.05)_76%,transparent_77%,transparent)] bg-[length:30px_30px] opacity-60"></div>
-      <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-b from-transparent to-soft-bg/70"></div>
+    <div className={`sticky top-0 z-50 ${usesBoardTheme(pathname) ? 'board' : ''}`}>
+      {/* Belka: polprzezroczysta powierzchnia z rozmyciem i jedna linia na dole. */}
+      <header className="w-full border-b border-soft-line bg-soft-surface/90 backdrop-blur-md">
+        <div className="mx-auto max-w-7xl px-4 py-2.5 sm:px-6">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-4">
+              <Link
+                href="/"
+                className="shrink-0 rounded-xl outline-none transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface"
+              >
+                <Image
+                  src="/android-chrome-192x192.png"
+                  alt="MySphere"
+                  width={32}
+                  height={32}
+                  className="rounded-xl"
+                  priority
+                />
+              </Link>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 relative z-10">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            <Link
-              href="/"
-              className="relative group mr-5 rounded-xl transition-transform [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface"
+              <DesktopTabs links={navLinks} isActive={isActiveLink} />
+
+              {/* Mobile Menu Button */}
+              <button
+                type="button"
+                onClick={() => setIsMobileMenuOpen((open) => !open)}
+                aria-expanded={isMobileMenuOpen}
+                aria-controls={MOBILE_MENU_ID}
+                aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
+                className="rounded-lg p-2 text-soft-ink-muted outline-none transition-[background-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong hover:bg-soft-sunken hover:text-soft-ink active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-soft-primary md:hidden"
+              >
+                <svg aria-hidden="true" className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  {isMobileMenuOpen ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  )}
+                </svg>
+              </button>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <NetworkSwitcher />
+              <NotificationsBell onNotificationsClick={handleNotificationsClick} />
+              <WalletButton />
+            </div>
+          </div>
+
+          {/* Mobile Navigation Menu: lista wierszy, nie kolumna pigulek. */}
+          {isMobileMenuOpen && (
+            <nav
+              id={MOBILE_MENU_ID}
+              aria-label="Mobile"
+              className="mt-3 flex flex-col rounded-card border border-soft-line bg-soft-surface p-1.5 shadow-float animate-in fade-in-0 slide-in-from-top-2 duration-200 ease-out-strong md:hidden"
             >
-              {/* Poswiata pod logo zostaje, tylko w fiolecie marki zamiast
-                  niebieskiego gradientu Base. 300 ms na hover bylo dwa razy
-                  dluzsze niz cokolwiek innego w belce. */}
-              <div aria-hidden="true" className="absolute -inset-2 bg-soft-primary opacity-0 group-hover:opacity-20 rounded-xl blur transition-opacity [transition-duration:var(--dur-press)] ease-out-strong"></div>
-              <Image
-                src="/android-chrome-192x192.png"
-                alt="MySphere"
-                width={32}
-                height={32}
-                className="rounded-xl relative"
-                priority
-              />
-            </Link>
-            
-            {/* Desktop Navigation */}
-            <nav aria-label="Main" className="hidden md:flex items-center gap-2 bg-soft-sunken border border-soft-line p-1.5 rounded-pill">
-              {navLinks.map((link) => (
-                <NavItem key={link.href} link={link} isActive={isActiveLink(link.href)} variant="desktop" />
-              ))}
+              {navLinks.map((link) => {
+                const active = isActiveLink(link.href);
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    aria-current={active ? 'page' : undefined}
+                    className={`flex items-center justify-between rounded-lg px-3 py-3 font-soft-display text-[15px] font-semibold outline-none transition-colors [transition-duration:var(--dur-press)] focus-visible:ring-2 focus-visible:ring-soft-primary ${
+                      active ? 'bg-soft-sunken text-soft-ink' : 'text-soft-ink-muted hover:bg-soft-sunken hover:text-soft-ink'
+                    }`}
+                  >
+                    {link.label}
+                    {active && <span className="h-1.5 w-1.5 rounded-full bg-soft-ink" aria-hidden="true" />}
+                  </Link>
+                );
+              })}
             </nav>
-
-            {/* Mobile Menu Button */}
-            <button
-              type="button"
-              onClick={() => setIsMobileMenuOpen((open) => !open)}
-              aria-expanded={isMobileMenuOpen}
-              aria-controls={MOBILE_MENU_ID}
-              aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
-              className="md:hidden p-2 rounded-pill text-soft-ink-muted hover:bg-soft-sunken hover:text-soft-ink transition-[background-color,color,transform] [transition-duration:var(--dur-press)] ease-out-strong active:scale-[0.97] outline-none focus-visible:ring-2 focus-visible:ring-soft-primary focus-visible:ring-offset-2 focus-visible:ring-offset-soft-surface"
-            >
-              <svg aria-hidden="true" className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                {isMobileMenuOpen ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                )}
-              </svg>
-            </button>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <NetworkSwitcher />
-            <NotificationsBell onNotificationsClick={handleNotificationsClick} />
-            <WalletButton />
-          </div>
+          )}
         </div>
-
-        {/* Mobile Navigation Menu */}
-        {isMobileMenuOpen && (
-          <nav
-            id={MOBILE_MENU_ID}
-            aria-label="Mobile"
-            /* Panel jest lawendowy, nie bialy: pigulki w srodku sa biale i na
-               bialym tle rozniloby je od panelu wylacznie obramowanie. */
-            className="md:hidden mt-3 bg-soft-sunken border border-soft-line p-1.5 rounded-card flex flex-col gap-1 shadow-float animate-in fade-in-0 slide-in-from-top-2 duration-200 ease-out-strong"
-          >
-            {navLinks.map((link) => (
-              <NavItem
-                key={link.href}
-                link={link}
-                isActive={isActiveLink(link.href)}
-                variant="mobile"
-                onClick={() => setIsMobileMenuOpen(false)}
-              />
-            ))}
-          </nav>
-        )}
-      </div>
-    </header>
+      </header>
     </div>
   );
 }
