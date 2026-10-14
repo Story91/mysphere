@@ -1,0 +1,40 @@
+{
+  "algorithmHash": "0x010748ac7a969be03103795a2a3ce7fb7a24251694a85eafaaafe588d6dcb2e2",
+  "auto": true,
+  "closed": true,
+  "cumulative": {
+    "0x502ce9fb1814cb03843967ec5e0d8f6aa3a3c2e1": "465939356087776066211",
+    "0x83e2de974fc6b866fdb78aefa5596d58fdc4142f": "8000000000000000000000000",
+    "0x9dde9b991753aeff62f5d869e873102861cfb5cd": "51333831798562994593827",
+    "0xa66de81a3ea3fe97cb6c9671c3fdc93d16c89998": "6415330294541088389483",
+    "0xb7ecf980a4732b75e57e2ec80903dee3964f2573": "44323560025652446909",
+    "0xe49fba906f3d2370cd1e7b4b4cff259ba98558c0": "3046082604953887580724"
+  },
+  "epoch": 5,
+  "fromBlock": "51355030",
+  "inputs": [
+    {
+      "creator": "0xe984986f4F1E067f697b548D5fe942813d03Da37",
+      "curveBuyNet": "0",
+      "curveSelfVolume": "0",
+      "curveSellGross": "0",
+      "hookEthFees": "148544762721415433",
+      "protocolFeeEth": "0",
+      "startedAt": "1788287897",
+      "token": "0xb200000000000000000000ba5edb84c678432476",
+      "traders": {},
+      "uniqueTraders": 0
+    }
+  ],
+  "poolSphere": "316077818474136129492817",
+  "result": {
+    "creators": [],
+    "totalExternalVolume": "0",
+    "totalProtocolEth": "0"
+  },
+  "root": null,
+  "toBlock": "51657429",
+  "vwapSpherePerEth": "45637273055782058357555000",
+  "manifestHash": "0xe312ad9fa1cd448262b18c6965e1143e3c5fe9b199b556a3e2aa253e38c92db5",
+  "leaves": []
+}

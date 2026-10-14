@@ -1,0 +1,130 @@
+{
+  "algorithmHash": "0x010748ac7a969be03103795a2a3ce7fb7a24251694a85eafaaafe588d6dcb2e2",
+  "auto": true,
+  "closed": true,
+  "cumulative": {
+    "0x502ce9fb1814cb03843967ec5e0d8f6aa3a3c2e1": "465939356087776066211",
+    "0x6fd3dfccfe8acdf6f3a1df4b47e54f4509f6b40f": "4038247820131408184674",
+    "0x83e2de974fc6b866fdb78aefa5596d58fdc4142f": "8000000000000000000000000",
+    "0x9dde9b991753aeff62f5d869e873102861cfb5cd": "51333831798562994593827",
+    "0xa66de81a3ea3fe97cb6c9671c3fdc93d16c89998": "6415330294541088389483",
+    "0xb7ecf980a4732b75e57e2ec80903dee3964f2573": "44323560025652446909",
+    "0xe49fba906f3d2370cd1e7b4b4cff259ba98558c0": "3046082604953887580724"
+  },
+  "epoch": 6,
+  "fromBlock": "51657430",
+  "inputs": [
+    {
+      "creator": "0x6FD3dFCcFE8aCdF6f3A1dF4b47e54F4509F6B40f",
+      "curveBuyNet": "54697604070550733",
+      "curveSelfVolume": "42636708536493063",
+      "curveSellGross": "0",
+      "hookEthFees": "0",
+      "protocolFeeEth": "294952462445590",
+      "startedAt": "1790410317",
+      "token": "0xb2000000000000000000008db528a6df8e637b90",
+      "traders": {},
+      "uniqueTraders": 1
+    },
+    {
+      "creator": "0xe984986f4F1E067f697b548D5fe942813d03Da37",
+      "curveBuyNet": "0",
+      "curveSelfVolume": "0",
+      "curveSellGross": "0",
+      "hookEthFees": "9510017796041202",
+      "protocolFeeEth": "0",
+      "startedAt": "1788287897",
+      "token": "0xb200000000000000000000ba5edb84c678432476",
+      "traders": {},
+      "uniqueTraders": 0
+    }
+  ],
+  "poolSphere": "316077818474136129492817",
+  "result": {
+    "creators": [
+      {
+        "creator": "0x6fd3dfccfe8acdf6f3a1df4b47e54f4509f6b40f",
+        "netProtocolEth": "294952462445590",
+        "rewardCapEth": "88485738733677",
+        "shareBps": "10000"
+      }
+    ],
+    "totalExternalVolume": "54697604070550733",
+    "totalProtocolEth": "294952462445590"
+  },
+  "root": "0x4354f2487b1f5f585d78b49b0be9290ebf690743ebfeddbd32abf0b2c1f57147",
+  "toBlock": "51959829",
+  "vwapSpherePerEth": "45637273055782058357555000",
+  "manifestHash": "0x1e0304da7a6672d625485e7e0f93f4d5b12de3b6719ba34306ce6511989453a1",
+  "leaves": [
+    {
+      "account": "0x502ce9fb1814cb03843967ec5e0d8f6aa3a3c2e1",
+      "cumulative": "465939356087776066211",
+      "prevCumulative": "465939356087776066211",
+      "proof": [
+        "0xa0e7bec279cbbd6b5a714134ee1adf72bb21f9e1c1ff672ea2188b3f5c9c16a9",
+        "0xf678db386f93fa8ba619790079d86a0ef83df2eaf30f535952f2e1aabab2a8da",
+        "0x7d533dc5eeb4192700d4dc66be7da01c7db99fd8708f6d88edda0621d88d4051"
+      ]
+    },
+    {
+      "account": "0x83e2de974fc6b866fdb78aefa5596d58fdc4142f",
+      "cumulative": "8000000000000000000000000",
+      "prevCumulative": "8000000000000000000000000",
+      "proof": [
+        "0xab289138300d6d0f5663f15fb19861aab8b5fcb0a5cface3a120a805e334c552",
+        "0xf678db386f93fa8ba619790079d86a0ef83df2eaf30f535952f2e1aabab2a8da",
+        "0x7d533dc5eeb4192700d4dc66be7da01c7db99fd8708f6d88edda0621d88d4051"
+      ]
+    },
+    {
+      "account": "0x9dde9b991753aeff62f5d869e873102861cfb5cd",
+      "cumulative": "51333831798562994593827",
+      "prevCumulative": "51333831798562994593827",
+      "proof": [
+        "0xe4a30ec7e97006e5677cf78bb0b5cc5a504909883fbb87545d32b815725546f6",
+        "0xe5b495ffa276af2aa5627d74c32693d901eca2976de78bd2fbd94f67b3650e3d",
+        "0x7d533dc5eeb4192700d4dc66be7da01c7db99fd8708f6d88edda0621d88d4051"
+      ]
+    },
+    {
+      "account": "0xa66de81a3ea3fe97cb6c9671c3fdc93d16c89998",
+      "cumulative": "6415330294541088389483",
+      "prevCumulative": "6415330294541088389483",
+      "proof": [
+        "0xf4f03b9112599e41dd568752e62e7e9ec21c3342f22193a48c901b04a3057802",
+        "0xf5b6b5928759e2a38746b9e5d94e3dd1cceb9fa683af82ebe09fb9b8fa3ca0df",
+        "0xa20f2c9e81058d34174c9a1087d3a7556dc2dfe8a48074f930b563accbd6b13e"
+      ]
+    },
+    {
+      "account": "0xb7ecf980a4732b75e57e2ec80903dee3964f2573",
+      "cumulative": "44323560025652446909",
+      "prevCumulative": "44323560025652446909",
+      "proof": [
+        "0xdf0cd1193e5c5c36bb6af896718bb11aeec0c8fb08bf2a3bc0ed17a23939ba6b",
+        "0xe5b495ffa276af2aa5627d74c32693d901eca2976de78bd2fbd94f67b3650e3d",
+        "0x7d533dc5eeb4192700d4dc66be7da01c7db99fd8708f6d88edda0621d88d4051"
+      ]
+    },
+    {
+      "account": "0xe49fba906f3d2370cd1e7b4b4cff259ba98558c0",
+      "cumulative": "3046082604953887580724",
+      "prevCumulative": "3046082604953887580724",
+      "proof": [
+        "0x5e788208e1693c4a12e4fe848266452ea444ec9099e439b89e48c8efd4253c82",
+        "0xa20f2c9e81058d34174c9a1087d3a7556dc2dfe8a48074f930b563accbd6b13e"
+      ]
+    },
+    {
+      "account": "0x6fd3dfccfe8acdf6f3a1df4b47e54f4509f6b40f",
+      "cumulative": "4038247820131408184674",
+      "prevCumulative": "0",
+      "proof": [
+        "0xe946140a61ede4aa4ed72dbf2eadc3831da7c05194b6d694f38eb2da88a524af",
+        "0xf5b6b5928759e2a38746b9e5d94e3dd1cceb9fa683af82ebe09fb9b8fa3ca0df",
+        "0xa20f2c9e81058d34174c9a1087d3a7556dc2dfe8a48074f930b563accbd6b13e"
+      ]
+    }
+  ]
+}
