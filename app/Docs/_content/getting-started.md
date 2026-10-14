@@ -9,8 +9,8 @@ Connecting a wallet opens the whole app. Your address becomes your profile. Your
 MySphere spans several networks, and each part of the app lives where it belongs:
 
 - Posting works on nine networks, and you pick one in the composer: Base, Camp, Linea, Celo, Ethereum, World Chain, Robinhood Chain, Arc (on Arc testnet) and Solana. Tips inside the app work on the eight EVM ones; Solana posts take tips in SOL from a link instead. Solana needs a second, Solana wallet next to the one you signed in with.
-- Asks (a question with a budget held in escrow) and your Money ledger live on Base mainnet.
-- Startpad, the bonding-curve launchpad, runs on Base mainnet with real ETH (the default network), on Base Sepolia (a testnet), and on Robinhood Chain.
+- Asks (a question with a budget, optionally locked in escrow on Base, or paid in SOL on Solana) and your Money ledger live on Base mainnet.
+- Startpad, the bonding-curve launchpad, runs on Base mainnet with real ETH (the default network), on Robinhood Chain, and on Arc mainnet. Testnets are hidden from its network switch. Perps (memes paired with 2x perp tokens) run on Base mainnet.
 
 ## The live map
 
@@ -18,7 +18,8 @@ MySphere spans several networks, and each part of the app lives where it belongs
 - [/asks](/asks) holds open Asks, sealed answers, resolving, and the curator record tab.
 - [/asks?tab=money](/asks?tab=money) is your own ledger; the Paid tab next to it is the public tape of settled tips.
 - [/startpad](/startpad) is the token launchpad; each token has its own page with a chart and trade panel.
-- [/b20](/b20) lists every B20 token on Base, and can create one straight against the network factory.
+- [/perps](/perps) pairs memes with 2x perp tokens on Base, with Clash, Calls and Raids; [/startpad/sphere](/startpad/sphere) is the hub of the $SPHERE token. Both are in the navbar's More menu or the main bar, and both are real-money.
+- [/b20](/b20) lists every B20 token on Base, and can create one straight against the network factory (it is not in the navbar, but the page works).
 - [/how](/how) lists every action you can take today, each with its price and what you sign.
 - [/how?tab=re-definition](/how?tab=re-definition) is the state of the product: what runs now and what is still being built.
 - [/Docs](/Docs) is this documentation.
@@ -31,7 +32,7 @@ Invite links land on `/join`, and every post, profile, in-app tip, and Ask has a
 2. Pick a wallet from the list. Options include Base Account (a smart wallet you create with a passkey, no extension needed), Coinbase Wallet, MetaMask, Gemini, Safe, WalletConnect (scan with your phone), or any browser wallet your device announces.
 3. Approve the connection in your wallet. Once connected, the button becomes your avatar and name; click it for balance, block explorer, bridge, and disconnect.
 4. To post or tip, open the feed and pick a network in the composer. To post on Solana, also connect a Solana wallet (Phantom, Solflare or Backpack) when the composer asks.
-5. To trade tokens on Startpad, the launchpad switches its own network (Base mainnet, Base Sepolia, or Robinhood) and reloads so every read and write happens on the right chain.
+5. To trade tokens on Startpad, the launchpad switches its own network (Base mainnet, Robinhood Chain or Arc mainnet) and reloads so every read and write happens on the right chain.
 
 ## How it flows
 
@@ -43,7 +44,7 @@ flowchart TD
     D --> E["Feed and tips: the network you pick in the composer"]
     E --> H["Solana posts: a second, Solana wallet signs and pays the fee"]
     D --> F["Asks and Money: Base mainnet"]
-    D --> G["Startpad: Base mainnet, Base Sepolia testnet, or Robinhood Chain"]
+    D --> G["Startpad: Base mainnet, Robinhood Chain or Arc mainnet"]
 ```
 
 ## Check it onchain

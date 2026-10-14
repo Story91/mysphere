@@ -6,8 +6,7 @@
 > is not.
 
 Posting runs on nine networks: Base, Camp, Linea, Celo, Ethereum, World Chain, Robinhood
-Chain, Arc (on Arc testnet) and Solana. Tips inside the app run on the eight EVM ones, in
-ETH, USDC or the network's own tokens (CELO, WLD, LINEA, CAMP, USDG on Robinhood Chain,
+Chain, Arc (on Arc testnet) and Solana. Tips inside the app run on the eight EVM ones, in ETH, USDC on Base, or the network's own tokens (CELO, WLD, LINEA, CAMP, USDG on Robinhood Chain,
 native USDC on Arc testnet). Solana posts take tips and paid replies in SOL from a link
 instead; see "Solana" below. Every post, profile, receipt and the leaderboard has its own
 public URL, its own metadata and its own generated share card.
@@ -27,7 +26,8 @@ public URL, its own metadata and its own generated share card.
   asked to deliver. SOL tips and paid replies are not on it. See
   "Numbers" below before quoting the figure.
 - A strip of up to four open Asks above the posts in the feed: question, budget, seats and
-  countdown. Its button leaves for `/asks`; a seat cannot be taken from the feed.
+  countdown. A seat can be taken in place: the card's button opens the answer box inside the
+  feed. Opening sealed answers and resolving happen on `/asks`.
 - Open Asks listed at `/asks`, where every step of the loop is built and reachable: post,
   answer under seal, accept, resolve. The accept route checks the payment against the chain
   rather than believing the client's hash. Built and reachable is the claim; how much of it
@@ -50,23 +50,28 @@ public URL, its own metadata and its own generated share card.
 - Linking X, Spotify and TikTok to your own profile through the Camp Network connector.
 - x402: an agent can pay real money to open an Ask. `POST /api/asks` refuses an unpaid
   request with `402 Payment Required` and its price, accepts a signed authorization on the
-  retry, and writes the Ask. This deployment settles on Robinhood Chain (CAIP-2
-  `eip155:4663`) in USDG at `0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168`, not in USDC on
-  Base — Robinhood Chain has no canonical USDC and USDG is the only stablecoin there that
-  supports EIP-3009 signed transfers. Read the chain and the asset off the 402 response;
-  do not assume either. Exactly one real payment has settled this way, for 0.01 USDG,
-  between two addresses the operator controls. Treat that as proof the path runs, not as
-  evidence of volume.
+  retry, and writes the Ask. The 402 response lists the rails that are live:
+  Robinhood Chain (CAIP-2 `eip155:4663`) in USDG at
+  `0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168`, and Base in USDC. Robinhood Chain has no
+  canonical USDC, and USDG is the only stablecoin there that supports EIP-3009 signed
+  transfers. Read the chain and the asset off the 402 response; do not assume either. One
+  cent has settled on each rail, between addresses the operator controls. Treat that as
+  proof the paths run, not as evidence of volume.
 - Escrow for an Ask. The `AskEscrow` contract is deployed and source-verified on Base
   mainnet at `0xD5f65Cfbe6A1AA1B6f82CBE0A336DDFCD39a5340` (and on Base Sepolia at
   `0xd02A166A186bcc5C537FeCD5103E9c1A94Bb49D6`). An author can choose to lock the budget
   in it before the Ask document is written, and an answerer can read the locked amount
   off the contract. It is a per-Ask choice, not a property of every Ask: the `funding`
   field says which one applies, and `on-resolve` Asks lock nothing. The mainnet contract
-  has never been used: asked for its logs from its deployment block onward the chain
-  returns none, and its USDC balance is zero. Describe it as a working contract nobody
-  has passed through, never as a working market.
-- `/money` calls the expiry refund. The author of an expired escrowed Ask gets a button
+  has been funded from this app at least once (a 5 USDC, one-seat Ask in August 2026).
+  Its resolve, claim and expiry legs have no public track record that we can point to.
+  Describe it as a working contract with almost no use, never as a working market.
+- Asks paid in SOL, on Solana. The composer's "Pay in" switch chooses USDC on Base or SOL on
+  Solana. A SOL Ask has no escrow: the author pays each accepted answer from a Solana wallet
+  linked to the account, with a memo `mysphere:ask|v1|<askId>|<answerId>` that the server reads
+  back from the chain before it records the acceptance. The minimum is 0.005 SOL per answer.
+  It is the newest path and we know of no payout on it yet; describe it as built, not as used.
+- The Money tab (`/asks?tab=money`) calls the expiry refund. The author of an expired escrowed Ask gets a button
   there; it calls `settleExpired` on the contract. Any older description of this
   repository saying nothing in the product calls that function is out of date — it was
   true until this week. What is still true is that the leg has no proof from a real
@@ -127,13 +132,13 @@ System Program transfers.
 
 Do not describe these as features. They are stated direction, not shipped:
 
-- A market. This is the important one and it is not a feature at all. The escrow has zero
-  transactions, so nobody has ever been paid here for work they were asked to do. The 187
+- A market. This is the important one and it is not a feature at all. The escrow has almost no
+  history, and we can point to nobody who has been paid here for work they were asked to do. The 187
   settled payments on the leaderboard are tips — a like with a price on it — across
   184,064 accounts, which is one account in a thousand. Quote the 187 as a fact if it is
   useful; do not present it, or anything else on this site, as evidence that a market for
   paid answers exists here yet.
-- Recording every expired Ask as expired. When the refund is sent from `/money`, the page
+- Recording every expired Ask as expired. When the refund is sent from the Money tab, the page
   then posts that transaction to `POST /api/asks/{id}/escrow-expire`, which marks the Ask
   expired only if the transaction carries the contract's `AskExpired` event for that Ask.
   An expiry settled any other way (straight on the contract, or a page closed before the
@@ -143,21 +148,20 @@ Do not describe these as features. They are stated direction, not shipped:
   or seats left unfilled when resolving after the deadline. It is never taken out of a
   payout to someone who answered. Do not describe it as a cut of the answerer's money.
 - Money from an escrowed Ask does not arrive by itself. Resolving credits each winner a
-  balance they claim in a second transaction, from `/money` or `/asks`. "Paid" means the
+  balance they claim in a second transaction, from the Money tab on `/asks`. "Paid" means the
   contract owes it irreversibly, not that it has landed in their wallet.
 - Nothing notifies a winner that they have money waiting. There is no email, no push and no
-  in-app notification on resolve. The balance sits until the winner opens `/money`.
-- Answering an Ask without leaving the feed. Open Asks do show in the feed — a strip above
-  the posts carries up to four of them, with the question, the budget, the seats and the
-  countdown — but its button leaves for `/asks`, and writing, sealing, accepting and
-  resolving all happen there. Do not say Asks are absent from the feed; do not say a seat
-  can be taken from it either.
-- Nobody has yet run the escrow path end to end from the browser on mainnet with real
-  money — or from anywhere else, for that matter. The contract itself has been exercised on
-  Base Sepolia twice through the full cycle — approve, fund, resolve, claim into
-  third-party wallets, liabilities back to zero — but from a script, not from the app. On
-  Base mainnet the contract has emitted no logs at all since it was deployed. Do not
-  describe the browser path as proven in production.
+  in-app notification on resolve. The balance sits until the winner opens the Money tab.
+- Opening sealed answers and resolving from the feed. Open Asks show in the feed (a strip
+  above the posts carries up to four of them) and a seat can be taken there, in place. The
+  author's side, opening answers, accepting and resolving, happens on `/asks`. Do not say
+  Asks are absent from the feed.
+- The escrow path has not been run end to end on mainnet. A budget has been locked in the
+  contract from the app on Base mainnet, but resolve, claim and the expiry refund have no
+  proof from a real chain that we can point to. The contract has been exercised on Base
+  Sepolia twice through the full cycle (approve, fund, resolve, claim into third-party
+  wallets, liabilities back to zero), from a script, not from the app. Do not describe
+  the full browser path as proven in production.
 - The expiry refund (`settleExpired`) has no proof from any real chain, only a unit test
   with a fast-forwarded clock, because 48 hours cannot be skipped on a live network.
 - The x402 price buys the Ask listing and nothing else. An Ask opened by an agent is always
@@ -170,9 +174,9 @@ Do not describe these as features. They are stated direction, not shipped:
   Blinks in Phantom or Backpack, and only for domains listed in Dialect's Actions Registry.
   mysphere.fun is not listed (checked 23 September 2026), so nobody sees a card today. Do
   not describe these links as rendering on X.
-- x402 on Base in USDC. The route carries the branch for it and switching is configuration,
-  but nothing has ever been paid through it. Only the Robinhood Chain path has settled a
-  real payment. Do not tell an agent to pay USDC on Base for an Ask.
+- Volume on x402. Both the Robinhood Chain (USDG) and Base (USDC) rails have settled a real
+  payment of one cent, between addresses the operator controls, and nothing beyond that.
+  Read the rail from the 402 response. Do not describe either as carrying traffic.
 
 The full direction — money entering the feed from outside, including from AI agents paying
 over x402, buying human judgment, with reputation minted only by settled payments — is
@@ -188,7 +192,13 @@ never carried real money.
   only. No points, no activity score. The old `/leaderboard` and `/money?tab=paid` URLs
   redirect here.
 - [Open asks](https://mysphere.fun/asks): questions with a budget, a number of seats and a
-  deadline. Answers stay sealed until the author resolves.
+  deadline. Answers stay sealed from other answerers until the author resolves.
+- [Startpad](https://mysphere.fun/startpad): the bonding-curve token launchpad on Base
+  mainnet (default), Robinhood Chain and Arc mainnet, real money on all three.
+- [Perps](https://mysphere.fun/perps): memes paired with 2x perp tokens on Base mainnet.
+  Real money, leveraged tokens.
+- [$SPHERE](https://mysphere.fun/startpad/sphere): the hub of the launchpad's own token:
+  buyback and burn, weekly creator rewards, vesting.
 - [How it works](https://mysphere.fun/how): the instruction. Twelve steps a person can take
   today, each with its cost and what it asks you to sign. Nothing on it is a plan.
 - [Re-Definition](https://mysphere.fun/how?tab=re-definition): product direction, how an
@@ -265,6 +275,7 @@ it is a misreading this file itself used to invite.
 
 ## Not part of MySphere
 
-`/mycamp`, `/base`, `/marketplace`, `/basemorning`, `/yapscan`, `/MyAgents`, `/MyClaw` and
-`/swap` redirect to the feed. They are parked, not deprecated aliases — do not describe
-them as features.
+`/mycamp`, `/base`, `/basemorning`, `/yapscan`, `/MyAgents`, `/MyClaw` and `/swap` redirect
+to the feed. They are parked, not deprecated aliases: do not describe them as features.
+`/marketplace`, `/b20` and `/derivatives` still load but are not linked from the navbar;
+`/derivatives` is a testnet-only module with no real money.

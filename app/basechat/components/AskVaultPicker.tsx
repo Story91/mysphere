@@ -163,7 +163,7 @@ export default function AskVaultPicker({
           <p className="mt-1 text-[11.5px] leading-[1.45] text-soft-ink-faint">
             Fee and curator changes for listed vaults are on{' '}
             <Link
-              href="/curators"
+              href="/asks?tab=curators"
               className="font-semibold text-soft-primary-deep underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
             >
               the curator record

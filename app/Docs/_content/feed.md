@@ -67,7 +67,7 @@ The ETH path pays a pin contract on Base; the Base Pay path settles in USDC at h
 
 ## Asks in the feed
 
-The composer's second pill switches from Post to Ask: the same form as on [/asks](/asks), with a budget, seats, a deadline, and the escrow choice. Above the post list an Ask rail shows open and resolved Asks; you can answer straight from the rail, and authors are sent to /asks to resolve. The details live on the [Asks page](/Docs/asks) of these docs.
+The composer's second pill switches from Post to Ask: the same form as on [/asks](/asks), with a budget, seats, a deadline, the USDC or SOL choice, and the escrow choice. Above the post list an Ask rail shows open and resolved Asks; you can answer straight from the rail, and authors are sent to /asks to resolve. The details live on the [Asks page](/Docs/asks) of these docs.
 
 ## Social
 

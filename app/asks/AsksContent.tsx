@@ -323,7 +323,7 @@ export default function AsksPage() {
             <p className="mt-2 text-[13.5px] leading-[1.5] text-soft-ink-muted">
               Questions with a budget. Answer one, get paid if the author picks you.{' '}
               <Link
-                href="/re-definition#ask"
+                href="/how?tab=re-definition#ask"
                 className="font-semibold text-soft-ink underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-soft-primary"
               >
                 How it works

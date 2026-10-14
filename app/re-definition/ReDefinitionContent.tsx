@@ -819,7 +819,7 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
   {
     name: 'Your money, in one place',
     status: 'live',
-    note: '/money answers four questions with one wallet connected: what the escrow contract owes you, what your own open Asks are holding, what people paid you, and what you spent. The claim button is there too, so money you are owed does not need a second page to collect.',
+    note: 'The Money tab (/asks?tab=money) answers four questions with one wallet connected: what the escrow contract owes you, what your own open Asks are holding, what people paid you, and what you spent. The claim button is there too, so money you are owed does not need a second page to collect.',
   },
   {
     name: 'Paid sections',
@@ -879,7 +879,7 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
   {
     name: 'Ask: expiry refund in the interface',
     status: 'live',
-    note: '/money shows every budget the contract still holds for you and which stage it is at: running, the 48 hours you have left to accept answers, or expired. Expired ones get a button. It states the 2.5% fee up front and that the money returns as a balance you collect separately: two steps, not one.',
+    note: 'The Money tab shows every budget the contract still holds for you and which stage it is at: running, the 48 hours you have left to accept answers, or expired. Expired ones get a button. It states the 2.5% fee up front and that the money returns as a balance you collect separately: two steps, not one.',
   },
   {
     name: 'Ask: a settled Ask that says it is settled',
@@ -889,7 +889,7 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
   {
     name: 'Being told you have been paid',
     status: 'live',
-    note: 'Resolving sends every winner a notification with the amount, and it says which of the two things happened: the contract is holding it for you and you collect it on /money, or it is already in your wallet. Those are different sentences because they are different situations. The amount comes from what the chain actually credited, not from what the Ask document says it should have.',
+    note: 'Resolving sends every winner a notification with the amount, and it says which of the two things happened: the contract is holding it for you and you collect it on the Money tab, or it is already in your wallet. Those are different sentences because they are different situations. The amount comes from what the chain actually credited, not from what the Ask document says it should have.',
   },
   {
     name: 'Ask: in the feed',
@@ -914,7 +914,7 @@ const CAPABILITIES: { name: string; status: Status; note: string }[] = [
   {
     name: 'Startpad: launch a token',
     status: 'live',
-    note: 'A bonding curve that closes at a fixed target (exactly 3.00 ETH on Base; each network sets its own) and graduates into a Uniswap v4 pool. The 1% trading fee splits up to 70% to the creator and never less than 30% to the protocol, and the floor is in the contract, not the form. Live with real money on Base mainnet (the default) and on Robinhood Chain, with Base Sepolia and Arc Testnet there for testing. The full path (launch, curve close, graduation, pool swaps, buyback and burn, claims) has run end to end on test networks, and on Base mainnet $SPHERE has now run it with real money: its curve closed, it graduated, and its Uniswap v4 pool is live. Most curves never fill, so a token still trading on its curve is the normal case.',
+    note: 'A bonding curve that closes at a fixed target (exactly 3.00 ETH on Base; each network sets its own) and graduates into a Uniswap v4 pool. The 1% trading fee splits up to 70% to the creator and never less than 30% to the protocol, and the floor is in the contract, not the form. Live with real money on Base mainnet (the default), on Robinhood Chain and on Arc mainnet (since 16 September 2026), with Base Sepolia and Arc Testnet kept for testing. The full path (launch, curve close, graduation, pool swaps, buyback and burn, claims) has run end to end on test networks, and on Base mainnet $SPHERE has now run it with real money: its curve closed, it graduated, and its Uniswap v4 pool is live. Most curves never fill, so a token still trading on its curve is the normal case.',
   },
   {
     name: 'Startpad on real money',
@@ -1085,7 +1085,7 @@ export default function ReDefinitionContent() {
                 },
                 {
                   t: 'Being built',
-                  d: 'A read ceiling above the product itself, so one hungry page cannot take the paid paths down. And the season machinery around $SPHERE: the token launched on 1 September 2026 and has since graduated, but rewards are still running in shadow mode while the epochs prove their numbers.',
+                  d: 'A read ceiling above the product itself, so one hungry page cannot take the paid paths down. And the season machinery around $SPHERE: the token launched on 1 September 2026 and has since graduated, and weekly creator rewards are now live: the distributor has paid out its first epochs.',
                 },
                 {
                   t: 'Direction',
@@ -1153,10 +1153,11 @@ export default function ReDefinitionContent() {
             anywhere.
           </P>
           <P>
-            Answers stay <Hi>sealed until you resolve</Hi>. Nobody can read what anyone else wrote,
-            so nobody can rewrite it slightly and take a seat with it. When you pick your answers,
+            Answers stay <Hi>sealed until you resolve</Hi>. Answerers cannot read each other&apos;s work,
+            so nobody can rewrite it slightly and take a seat with it (you, the author, read them as
+            they arrive). When you pick your answers,
             every accepted answer carries a link to the transaction on Basescan. Then all answers
-            open at once.
+            open to everyone at once.
           </P>
           <P>
             The sealing is not a curtain in the interface. Answer text does not sit inside the Ask.
@@ -1221,7 +1222,7 @@ export default function ReDefinitionContent() {
           </P>
           <P>
             Two things about that last path are not finished, and this page will not round them up.
-            The expiry refund has a button on /money, but{' '}
+            The expiry refund has a button on the Money tab, but{' '}
             <Hi>it is the least-travelled leg of the contract</Hi>: it needs 48 hours to have
             passed, and nothing on a live network lets you skip them. And money does not arrive on its own:
             resolving credits each winner a balance they then collect, and the refund credits the
@@ -1477,7 +1478,7 @@ export default function ReDefinitionContent() {
           <Marker amount="3.00 ETH" label="where the curve closes" />
           <H2>A launch whose terms nobody can change overnight</H2>
           <State tone="live">
-            Runs on /startpad. Real money on Base mainnet (default) and Robinhood Chain; Base Sepolia and Arc Testnet are there for testing
+            Runs on /startpad. Real money on Base mainnet (default), Robinhood Chain and Arc mainnet; Base Sepolia and Arc Testnet are there for testing
           </State>
           <P>
             <Hi>Startpad</Hi> launches a token on a bonding curve. When the curve has collected its
@@ -1491,9 +1492,9 @@ export default function ReDefinitionContent() {
             Every fee stream splits the same way: <Hi>up to 70% to the creator, never less than 30%
             to the protocol</Hi> (the same ratio PONS pays), and the floor sits in the contract,
             so it binds us and anyone calling the contract directly, not just users of our form.
-            Trading on the curve pays at most 1%; after graduation every swap in the pool pays 1%.
-            The creator&apos;s share can go to up to eight addresses, and it is paid in ETH, not in
-            the token.
+            Trading on the curve pays at most 1%; after graduation every swap in the pool pays 1.30%: 0.30% to the pool position and 1% to the hook.
+            The creator&apos;s share can go to up to eight addresses, and on the curve it is paid in ETH; after
+            graduation, pool fees can also accrue in the token itself.
           </P>
           <P>
             A creator can point a slider at their own share and burn with it. The{' '}

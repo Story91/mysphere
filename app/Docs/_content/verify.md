@@ -25,8 +25,9 @@ Most money events in MySphere carry a transaction hash you can open in a block e
 | Proof of Bags balance | The same transaction: a Memo v1 instruction starting `mysphere:bags` lists the tokens, and Token Balances shows the wallet's token account at posting (a zero balance, or no row at all, means it held none) |
 | SOL tip | `explorer.solana.com`: a transfer to the post's Solana wallet plus a memo starting `mysphere:tip` with the post id; MySphere keeps no record of it |
 | Paid reply | The "paid reply" badge links its transaction: a memo starting `mysphere:reply` with the post id and the reply text, plus a transfer of at least 0.001 SOL to the post's Solana wallet |
-| Ask funded / seat awarded / resolved / claimed | Ask escrow contract on Base (`AskFunded`, `SeatAwarded`, `AskResolved`, `Claimed` events) |
-| Startpad launch / buy / sell / graduation | Launchpad `0xCF541A7EcE881945833ff1680dFc067C5Dd4cE2D` on Base mainnet (`basescan.org`); `0x4Cc0ff50912400eeeC38db45ef5CEf00f5Ad1A48` on Base Sepolia (`sepolia.basescan.org`); `0x712E93401b455d226284BbA873cE13CC1492B22f` on Robinhood (Blockscout) |
+| Ask funded / seat awarded / resolved / claimed | Ask escrow contract on Base (`AskFunded`, `SeatAwarded`, `AskResolved`, `AskExpired`, `Claimed` events) |
+| SOL Ask payout | `explorer.solana.com`: one System Program transfer from the author's linked Solana wallet to the answerer's, with a memo `mysphere:ask|v1|<askId>|<answerId>` |
+| Startpad launch / buy / sell / graduation | Launchpad `0xb5C71DE0B6b2280A7b05ECDdd9F22a895A5E243e` on Base mainnet (`basescan.org`; the earlier `0xCF541A7EcE881945833ff1680dFc067C5Dd4cE2D` is legacy and only holds old curves); `0xD5f65Cfbe6A1AA1B6f82CBE0A336DDFCD39a5340` on Arc mainnet; `0x74aB8aD577fB49dc4930D8BBAD144c7a230143e6` on Base Sepolia (`sepolia.basescan.org`); `0x712E93401b455d226284BbA873cE13CC1492B22f` on Robinhood (Blockscout) |
 | B20 token supply cap / no admin roles | Read the token address on the explorer, total supply is fixed at launch |
 | Morpho curator change | Off-chain, dated reading of public Morpho data (no single MySphere hash) |
 
@@ -56,6 +57,6 @@ The fee rounds down, so the author's share is always the exact remainder. The tw
 ## Check it onchain
 
 - For the Ask escrow on Base (USDC), open the escrow address on `basescan.org`, call `escrowFor(author, askId)` to see the locked budget, seats and deadline, and `claimable(account)` to see a balance waiting to be collected. `FEE_RECIPIENT()` and the fee are immutable. It's also deployed on Base Sepolia (chainId 84532) for testing.
-- The Startpad launchpad addresses are in the table above, and the full per-network set (vault, hook, token factory) sits in the footer of [/startpad](/startpad) with explorer links. Startpad runs on Base mainnet (the default), Base Sepolia (a testnet), and Robinhood Chain (mainnet). Read a B20 token to confirm its fixed supply and that it exposes no owner/admin functions.
+- The Startpad launchpad addresses are in the table above, and the full per-network set (vault, hook, token factory) sits in the footer of [/startpad](/startpad) with explorer links. Startpad runs on Base mainnet (the default), Robinhood Chain and Arc mainnet; testnets are hidden from its switch. Read a B20 token to confirm its fixed supply and that it exposes no owner/admin functions.
 - For Solana, the exact memo formats and what each one proves are on [Solana: bags, tips & replies](/Docs/solana). MySphere deploys no program on Solana: posts and replies use Solana's Memo Program (v2 `MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr`, Proof of Bags v1 `Memo1UhkJRfHyvLMcVucJwxXeuD728EqVDDwQDxFMNo`) and tips use plain System Program transfers.
 - There's one honest limit. The Morpho curator record is verifiable only in the sense that you can read the same public Morpho data we did. It isn't a MySphere transaction, so treat its timestamp as a dated snapshot, not a hash.

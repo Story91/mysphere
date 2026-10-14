@@ -1,6 +1,6 @@
 # Money & Paid
 
-Two tabs, both about money that actually moved through MySphere, not a token-price portfolio. Money (`/asks?tab=money`) is your own ledger, built from your wallet address. Paid (`/asks?tab=paid`) is a public tape of tips that settled onchain.
+Two tabs, both about money that actually moved through MySphere, not a token-price portfolio. Money (`/asks?tab=money`) is your own ledger, built from your wallet address. Paid (`/asks?tab=paid`) is a public tape of tips that settled onchain. Payouts from Asks paid in SOL show up in your ledger too.
 
 ## What it does
 

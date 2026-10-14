@@ -47,7 +47,9 @@ Not all of that 200M reaches the pool — see "What happens at graduation" below
 | Base mainnet (default) | B20 | 0.75 ETH | 3 ETH | 18.75 ETH |
 | Base Sepolia (testnet) | B20 | 0.75 ETH | 3 ETH | 18.75 ETH |
 | Robinhood Chain | plain ERC-20 | 0.75 native | 3 native | 18.75 native |
+| Arc mainnet | plain ERC-20 | 1250 USDC | 5000 USDC | 31250 USDC |
 | Arc testnet | plain ERC-20 | 250 USDC | 1000 USDC | 6250 USDC |
+| Perp markets (Base mainnet) | B20 | 1875 perp units | 7500 perp units | 46875 perp units |
 
 Two notes on that table. Testnets get redeployed: a Base Sepolia launchpad deployed on 2026-08-31 runs $R_{virt} = 0.25$ ETH, i.e. a 1 ETH target, while the address the app points at today runs 0.75. And Arc's native unit is USDC, not ETH, so the same bytecode counts the same curve in dollars. Both are the same reason to read `R_VIRT()` rather than trust a number in prose.
 
@@ -76,8 +78,8 @@ Share is in the page header too. A shared token link previews as a card generate
 
 ## How to use it
 
-1. Open [/startpad](/startpad). It opens on Base mainnet by default; the header switcher also offers Base Sepolia, Robinhood Chain and Arc testnet. Switching network repaints the launchpad in that network's colours, so you can tell at a glance which market you are looking at.
-2. Connect a wallet funded for that network: real ETH on Base mainnet, test ETH on Base Sepolia, test USDC on Arc.
+1. Open [/startpad](/startpad). It opens on Base mainnet by default; the header switcher also offers Robinhood Chain and Arc mainnet, both with real money. Testnets (Base Sepolia, Arc testnet) are hidden from it. The same menu holds Perp memes, Calls and $SPHERE. Switching network repaints the launchpad in that network's colours, so you can tell at a glance which market you are looking at.
+2. Connect a wallet funded for that network: real ETH on Base mainnet, native funds on Robinhood Chain, USDC on Arc mainnet (test funds on the hidden testnets).
 3. Launch with a name, symbol, and logo (a launch does not go out without one). Quick launch uses defaults and takes an optional pre-buy. Creator setup additionally sets the trade fee (up to 1%), your share of it (up to 70%), up to 8 fee receivers, an auto-buyback slice, a per-wallet buy cap for the first 5 minutes, and on B20 networks an optional vanity token address you mine in your own browser. Everything chosen at launch is immutable afterwards.
 4. Trade by buying or selling against the curve. The quote you see (`quoteBuy` / `quoteSell`) is what the trade returns.
 5. Claim your fees. They are pull-based. Your earnings accrue in the network's native currency; call `claim()` to collect. Anyone can pay gas to deliver your balance to you, never to themselves.
@@ -180,12 +182,14 @@ Everything is verifiable on the network's block explorer. Launchpads:
 
 | Network | `CurveLaunchpad` | Explorer |
 | --- | --- | --- |
-| Base mainnet | `0xCF541A7EcE881945833ff1680dFc067C5Dd4cE2D` | [basescan.org](https://basescan.org) |
-| Base Sepolia | `0x4Cc0ff50912400eeeC38db45ef5CEf00f5Ad1A48` | [sepolia.basescan.org](https://sepolia.basescan.org) |
+| Base mainnet (v2, current) | `0xb5C71DE0B6b2280A7b05ECDdd9F22a895A5E243e` | [basescan.org](https://basescan.org) |
+| Base mainnet (v1, legacy: old curves and fee balances only, no new launches) | `0xCF541A7EcE881945833ff1680dFc067C5Dd4cE2D` | [basescan.org](https://basescan.org) |
+| Arc mainnet | `0xD5f65Cfbe6A1AA1B6f82CBE0A336DDFCD39a5340` | [arc-scan.org](https://arc-scan.org) |
+| Base Sepolia (v2) | `0x74aB8aD577fB49dc4930D8BBAD144c7a230143e6` | [sepolia.basescan.org](https://sepolia.basescan.org) |
 | Robinhood Chain | `0x712E93401b455d226284BbA873cE13CC1492B22f` | [robinhoodchain.blockscout.com](https://robinhoodchain.blockscout.com) |
 | Arc testnet | `0xe984986f4F1E067f697b548D5fe942813d03Da37` | [testnet.arcscan.app](https://testnet.arcscan.app) |
 
-The rest of the Base mainnet set: `LiquidityVault` `0x6108aDCb176D2A4A6283A06bb0Dd468b86A6AB63`, `B20LaunchHook` `0x71028Ea6999e2c415b46cc022ED0A9fDca2e2044`, `B20TokenFactory` `0xEC7db55Bc081289820097703B3A66003092844D1`, Uniswap v4 `PoolManager` `0x498581fF718922c3f8e6A244956aF099B2652b2b`, protocol fee recipient `0x83E2DE974FC6B866FDb78AEFa5596d58fDc4142F`. The full per-network address table sits in the footer of [/startpad](/startpad) itself, with explorer links.
+The rest of the current Base mainnet set (v2, live since 2026-10-11 after the Cobalt hard fork): `LiquidityVault` `0x019098A6e1377ABE2a40faF5643EE1cC5459AFF3`, `B20LaunchHook` `0xE0BCc49d92bF9e928F7010C1e5884E146bA92044`, `B20TokenFactoryV2` `0xF1DAd68f9B0b00A80E993286419AD03e9380e7B0`, and on Arc mainnet `LiquidityVault` `0x49FD3A54b23A0ee1d6A7720F493618F5CCF4681D`, hook `0x9669d2809710aD8218793e0CD55317Ccd984E044`, factory `0x04bdaD462B66B152689076975db1197766A69568`. The v1 set (vault `0x6108aDCb…`, hook `0x71028Ea6…`, factory `0xEC7db55B…`) stays readable but no longer starts tokens. Common to Base: Uniswap v4 `PoolManager` `0x498581fF718922c3f8e6A244956aF099B2652b2b`, protocol fee recipient `0x83E2DE974FC6B866FDb78AEFa5596d58fDc4142F`. The full per-network address table sits in the footer of [/startpad](/startpad) itself, with explorer links.
 
 - Read `R_VIRT()` on the launchpad to get the scale, and `MIN_LP_ETH()`, `MAX_BUY()` and `SQRT_PRICE_TERMINAL()` to confirm they follow from it.
 - Each launch emits a `Launched` event; every trade emits `Bought` / `Sold` with the reserves after.

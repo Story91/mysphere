@@ -53,7 +53,10 @@ const ARC_POSTS_ON_MAINNET = ARC_CHAIN_ID === arcMainnet.id;
  *                     settleExpiredAsk), ale ta noga nie przeszla na zadnej
  *                     prawdziwej sieci - wymaga terminu + 48h, czego nie da
  *                     sie przewinac. Jedyny dowod to test jednostkowy.
- *   krok 12 (perpsy)  Uzasadnienie stoi przy STEPS[11].
+ *   krok 12 (perpsy)  Memy sparowane z perpami Flash na Base mainnet (/perps).
+ *                     Uzasadnienie stoi przy STEPS[11]. Stary modul Arc Derivatives
+ *                     (testnet, /derivatives) zszedl z belki 2026-10-11 i zostal tu
+ *                     tylko jako jedno zdanie.
  *
  * Krok 09 (graduacja) z tej listy wypadl: $SPHERE graduowal na Base mainnet
  * i jego pula v4 dziala, wiec krok mowi teraz "to wyjatek", a nie "nikt".
@@ -139,7 +142,7 @@ export function generateMetadata({ searchParams }: { searchParams: SearchParams 
   return {
     // Marke doklada `title.template` z layoutu glownego.
     title: 'How it works',
-    description: `What you can do on MySphere today: post on nine networks, ${tipAndReply}, sell part of a post, ask a question with a budget, launch a token on the Startpad curve, collect what you are owed, and look up what a vault curator changed.`,
+    description: `What you can do on MySphere today: post on nine networks, ${tipAndReply}, sell part of a post, ask a question with a budget, launch a token on the Startpad curve, pair a meme with a 2x perp, collect what you are owed, and look up what a vault curator changed.`,
     // Twitter wpisany wprost: bez niego pasek na X dziedziczyl tytul strony
     // glownej (scalanie metadanych jest plytkie - patrz app/utils/pageMeta.ts).
     // "Every amount settles onchain with a hash" usuniete: dla napiwkow to
@@ -257,14 +260,14 @@ const STEPS: StepMeta[] = [
     id: 'launch',
     title: 'Launch a token on Startpad',
     cost: 'Gas only',
-    note: 'Base mainnet by default, with real ETH; Robinhood Chain and two testnets in the same switch',
+    note: 'Base mainnet by default, with real ETH; Robinhood Chain and Arc mainnet in the same switch',
   },
   {
     n: '09',
     id: 'trade',
     title: 'Trade a token on its curve',
-    cost: '1% per trade',
-    note: 'Taken on every buy and sell, in ETH on Base',
+    cost: 'Up to 1% per trade',
+    note: 'The creator sets it · Taken on every buy and sell, in ETH on Base',
   },
   {
     n: '10',
@@ -293,24 +296,24 @@ const STEPS: StepMeta[] = [
     note: 'No wallet and no signature',
   },
   /**
-   * === DWUNASTY KROK: DERYWATY NA ARC TESTNET ===
-   * Zero zaleznosci od poprzednich jedenastu, tak jak krok 11 - i podobnie
-   * jak Startpad (08-10), calosc modulu opisuje JEDEN krok zamiast trzech,
-   * bo nie ma tu osobnej "zaloz" / "handluj" / "odbierz" sciezki wartej
-   * osobnych numerow na TEJ liscie (maja swoje miejsce na /derivatives).
+   * === DWUNASTY KROK: MEMY SPAROWANE Z PERPAMI (zmienione 2026-10-14) ===
+   * Zero zaleznosci od poprzednich jedenastu, tak jak krok 11. Do 2026-10-14
+   * stal tu modul Arc Derivatives (vAMM na Arc TESTNET, bez prawdziwych
+   * pieniedzy). Od 2026-10-11 wpis "Perps" w belce prowadzi do /perps: memy
+   * sparowane z perpami Flash 2x na Base MAINNET, za prawdziwe ETH. Instrukcja
+   * opisuje wiec to, a stary modul zostal jednym zdaniem na koncu kroku -
+   * dziala dalej pod /derivatives, tylko nie ma go w belce.
    *
-   * Uczciwosc o "nikt jeszcze nie przeszedl" (patrz naglowek pliku) dotyczy
-   * TEGO wdrozenia: kontrakty przeszly wlasna automatyczna weryfikacje
-   * skryptu wdrozeniowego i maja 36 testow jednostkowych za soba, ale zadna
-   * pozycja nie zostala jeszcze otwarta ani zlikwidowana na tym konkretnym
-   * deploymencie w chwili pisania tego kroku.
+   * Fakty z kodu: app/startpad/config.ts (rynki, R_VIRT 1875 jednostek perpa),
+   * contracts/launchpad/quote/PerpBuyZap.sol (kupno za ETH w jednej
+   * transakcji), app/startpad/duel.ts (Bull vs Bear, Asset Clash).
    */
   {
     n: '12',
-    id: 'derivatives',
-    title: 'Open a perpetual position on Arc',
-    cost: 'Gas to trade',
-    note: 'Listing a new feed needs a 100 USDC bond · Arc testnet, not real money',
+    id: 'perps',
+    title: 'Pair a meme with a 2x perp',
+    cost: 'Gas to launch',
+    note: 'Base mainnet, real ETH · A perp token moves about twice as far as its asset, both ways',
   },
 ];
 
@@ -611,14 +614,15 @@ function HowContent() {
           <Step meta={STEPS[2]}>
             <P lead>
               A tip is the whole thesis in one button. It costs you something,
-              so it means something. And it lands with a hash that both of you
-              can open.
+              so it means something. It goes wallet to wallet, and when it
+              carries a transaction hash, both of you can open it.
             </P>
             <P>
-              Every tip that settles in the app, on the eight EVM networks,
-              shows up on <Hi>Paid</Hi>, a public timeline of money that moved
-              between two people. Names and faces on both ends, and a
-              transaction on every line.
+              Every tip that carries a transaction hash, on the eight EVM
+              networks, shows up on <Hi>Paid</Hi>, a public timeline of money
+              that moved between two people. Names and faces on both ends, and
+              a transaction on every line. Tips without a hash are counted in
+              the ranking but not listed there.
             </P>
             {/* SOL tylko na mainnecie - patrz naglowek pliku. Kwoty z kodu:
                 app/api/actions/tip/[postId]/route.ts (0.01/0.05/0.25, min 0.001)
@@ -723,11 +727,27 @@ function HowContent() {
               same split of the yield you did.
             </P>
             <P>
+              The limits: a question is up to <Hi>500 characters</Hi>, an Ask
+              has up to <Hi>20 seats</Hi>, and the deadline is 6 hours, 24
+              hours, 3 days or 7 days. A seat is worth at least $0.50 in USDC.
+            </P>
+            <P>
               You can lock the budget in an escrow contract on Base before the
               question exists. Then whoever answers can check, before writing a
               word, that the money is really there. The contract has no owner
-              and no off switch, so not even we can take it back out.
+              and no off switch, so not even we can take it back out. If the
+              Ask ends with seats unfilled, the leftover comes back to you
+              minus a <Hi>2.5% fee</Hi>; what goes to answerers carries none.
             </P>
+            {IS_SOLANA_MAINNET && (
+              <P>
+                You can also pay in <Hi>SOL</Hi>, on Solana: at least 0.005 SOL
+                a seat, and nothing is locked. You pay each answer you accept
+                yourself, from a Solana wallet you link to your account with
+                one free signature. It is the newest way to run an Ask, so we
+                have no payout on it to point you to yet.
+              </P>
+            )}
             <P>
               Worth knowing before you do it: <Hi>you would not be first</Hi>.
               A budget has already been locked through this contract from this
@@ -764,6 +784,13 @@ function HowContent() {
               you write anything.
             </P>
             <P>
+              An answer is up to <Hi>5,000 characters</Hi>, one per wallet. You
+              cannot answer your own Ask, and nobody can answer after the
+              deadline.
+              {IS_SOLANA_MAINNET &&
+                ' On a SOL Ask, link a Solana wallet before you expect to be paid: you can write without one, but the payment has nowhere to go.'}
+            </P>
+            <P>
               On an Ask without escrow, nothing is held and nothing forces the
               author to pay. A seat starts at fifty cents and not at fifty
               dollars for that reason.
@@ -780,7 +807,7 @@ function HowContent() {
             <P>
               When an author resolves an Ask you won, the contract credits you
               and you collect with one click. If your own Ask ran out of time,
-              the same page is where the budget comes back, minus the fee, and
+              the same page is where the budget comes back, minus the 2.5% fee, and
               in two steps, because the contract credits you first and moves the
               money when you ask it to.
             </P>
@@ -802,9 +829,9 @@ function HowContent() {
               transaction mints the whole billion-token supply straight onto
               the curve, and nobody (you included) gets any of it for free.
               It runs on <Hi>Base mainnet</Hi> by default, so the ETH you sign
-              with is real. A switch on the page holds three more networks:
-              Robinhood Chain, where the money is also real, and two testnets
-              for practice, Base Sepolia and Arc.
+              with is real. A switch on the page holds two more networks,
+              both with real money: Robinhood Chain and Arc. Testnets are
+              hidden from it.
             </P>
             <P>
               A <Hi>logo is required</Hi> before the launch button works.
@@ -813,18 +840,20 @@ function HowContent() {
             </P>
             <P>
               Want the first tokens? Add a <Hi>pre-buy</Hi> and it executes
-              inside the launch transaction itself: same curve, same 1% fee
+              inside the launch transaction itself: same curve, same fee
               as anyone after you, with no block in between where somebody
               else could buy first.
             </P>
             <P>
               Everything else is fixed at launch and has no setter afterwards:
-              your share of the 1% trading fee (anything up to <Hi>70%</Hi>,
+              your share of the trading fee (anything up to <Hi>70%</Hi>,
               paid to up to 8 addresses you name, with the contract keeping at
               least 30% for the protocol whatever the form says) and a{' '}
-              <Hi>buyback</Hi> slider, which takes part of your own share and
-              spends it on buying your token back and burning it. Changing any
-              of it later means launching a new token.
+              <Hi>buyback</Hi> slider, which takes part of your own share of
+              the fees on swaps after graduation and spends it on buying your
+              token back and burning it. The curve itself has no buyback, so a
+              token that never graduates never buys anything back. Changing
+              any of it later means launching a new token.
             </P>
             <P>
               <Hi>Sniper protection</Hi> is a per-wallet buy cap for the first
@@ -837,13 +866,17 @@ function HowContent() {
               everything else, it is fixed at launch.
             </P>
             <P>
-              One entry in that network switch is not a network.{' '}
+              Some entries in that menu are not networks. <Hi>⚡ Perp memes</Hi>{' '}
+              is step 12, and <Hi>📣 Calls</Hi> is a buy that carries a message.{' '}
               <Hi>✦ $SPHERE</Hi> opens the hub for a token called $SPHERE:
               its escrow, vesting and rewards contracts are deployed on Base
               mainnet, and the panels there read them straight from the chain.
               The token launched on 1 September 2026 and has since{' '}
               <Hi>graduated</Hi> on Base mainnet: its curve is closed and it
-              trades in its own Uniswap v4 pool.
+              trades in its own Uniswap v4 pool. Its swap fees buy it back and
+              burn it, and a weekly season pays creators whose tokens bring
+              real trading volume. Nothing burns by itself: someone has to
+              fire the buyback and pay the gas, and anyone can.
             </P>
             <Go href="/startpad">Open Startpad</Go>
           </Step>
@@ -853,9 +886,10 @@ function HowContent() {
             <P lead>
               Every token page has a candlestick chart built from onchain
               events and a buy-and-sell panel next to it. The preview shows
-              what you get before you sign, and each trade pays a 1% fee in
-              the coin the curve trades in, ETH on Base. Up to 70% of that
-              fee goes to the token&apos;s creator.
+              what you get before you sign, and each trade pays a fee of up
+              to 1% (the creator can set it lower) in the coin the curve
+              trades in, ETH on Base. Up to 70% of that fee goes to the
+              token&apos;s creator.
             </P>
             <P>
               The curve is the other side of every trade: a fixed formula with
@@ -866,14 +900,15 @@ function HowContent() {
             <P>
               The curve locks at a fixed target: on Base that is exactly{' '}
               <Hi>3.00 ETH</Hi> in the reserve. The target scales with the
-              network, so the Arc testnet counts its curve in USDC. Buys stop;{' '}
+              network, so Arc counts its curve in USDC (5,000 USDC on Arc mainnet). Buys stop;{' '}
               <Hi>selling keeps working</Hi>, so nobody is trapped at the top.
               From then on anyone may call <Hi>graduate()</Hi> (the caller
               earns 1.5% of the reserve for it, so 0.045 ETH on a full 3 ETH
               curve, less if people sold while it was locked) and the
               liquidity moves into a
               Uniswap v4 pool that opens at the exact price the curve closed
-              at, locked there forever.
+              at, locked there forever. A swap in that pool costs 1.30%:
+              0.30% to the pool position and 1% to the launch hook.
             </P>
             <P>
               The full path, launch to pool to payout, has run end to end on
@@ -889,19 +924,22 @@ function HowContent() {
             <P lead>
               <Hi>My tokens</Hi>, on the Startpad page, lists every token you
               launched and what its fees have credited you so far, counted to
-              the wei: up to 70% of the 1% on every curve trade, and after
-              graduation up to 70% of the 1% on every pool swap.
+              the wei: up to 70% of the fee on every curve trade, and after
+              graduation up to 70% of the 1% hook fee on every pool swap.
             </P>
             <P>
-              Claims are pull-based and paid in the curve&apos;s own currency
-              (<Hi>ETH</Hi> on Base), never in the token. Nothing is pushed
+              Claims are pull-based. Curve fees are paid in the curve&apos;s
+              own currency (<Hi>ETH</Hi> on Base); after graduation, pool fees
+              can also accrue in the token itself, and My tokens shows a
+              separate claim for that. Nothing is pushed
               and nothing can be withheld: the
               contracts have no owner, no pause and no setter, so nobody,
               including us, stands between the balance and your claim.
             </P>
             <P>
-              If you set a buyback at launch, that slice comes out of this
-              money. Your share, not the protocol&apos;s. Anyone may trigger
+              If you set a buyback at launch, that slice comes out of your
+              share of the pool-swap fees after graduation. Your share, not the
+              protocol&apos;s. Anyone may trigger
               the purchase, and the bought tokens go to the dead address,
               provably out of circulation.
             </P>
@@ -946,45 +984,41 @@ function HowContent() {
           {/* ---------------------------------------------------------- */}
           <Step meta={STEPS[11]}>
             <P lead>
-              <Hi>Arc Derivatives</Hi> is a small vAMM perps module: virtual
-              reserves set a mark price the same way a constant-product pool
-              would, and a funding payment between longs and shorts
-              continuously pulls that price toward an index feed so it
-              cannot drift too far from reality. Open one position per
-              market, long or short, up to 10x leverage, with at least{' '}
-              <Hi>10 USDC</Hi> margin.
+              <Hi>Perps</Hi> pairs a meme with a leveraged token. Instead of
+              trading against ETH, the meme&apos;s curve is quoted in a{' '}
+              <Hi>2x perp</Hi> on one asset, such as ETH, Bitcoin, Nvidia or
+              SpaceX. It runs on <Hi>Base mainnet</Hi>, so the ETH you sign with
+              is real.
             </P>
             <P>
-              Anyone can list a market. Post a USDC bond (<Hi>100
-              minimum</Hi>) to the price registry and you control that feed
-              as its publisher; a second transaction then deploys the actual
-              tradeable pool on top of it. The bond is what keeps a feed
-              honest: a successful price challenge slashes it and disables
-              the feed for good, and it directly sets how much open interest
-              the market can carry &mdash; 2x the bond on probation, 8x once
-              the feed turns <Hi>mature</Hi> after 7 clean days and 50
-              accepted prices with zero challenges.
+              A perp token is a leveraged position on its asset: it moves about
+              twice as far, up and down. A meme paired with it inherits that, so
+              the pair can move fast in both directions. That is the product,
+              and it is also the reason to start small.
             </P>
             <P>
-              A position becomes liquidatable once its margin ratio drops
-              under 6.25%, and anyone can call the liquidation and keep 1.25%
-              of the notional for doing it &mdash; there is no permissioned
-              keeper list. Any shortfall is covered by a shared{' '}
-              <Hi>insurance fund</Hi>; if that fund ever falls short of what
-              it is backing, new positions pause across every market at once
-              until someone tops it up.
+              You do not need to hold the perp to buy the meme. A buy with
+              plain ETH goes through one transaction that swaps into the perp
+              and then into the meme, so the preview before you sign shows the
+              whole path.
             </P>
             <P>
-              <Hi>This deployment is new.</Hi> The contracts are live on Arc
-              testnet (chainId 5042002) and passed every check the deploy
-              script runs automatically, and the underlying logic carries 36
-              unit tests. What has not happened yet, as of writing this: nobody
-              has opened, closed, or liquidated a real position on this
-              specific deployment. Addresses and the full mechanics &mdash;
-              challenges, funding, fees &mdash; are on the module&apos;s own
-              page.
+              The page has four views. <Hi>Memes</Hi> lists the markets and the
+              memes in them. <Hi>Clash</Hi> sets two memes against each other:
+              Bull vs Bear puts a long ETH meme against a short one, and Asset
+              Clash lets a creator pair two assets, ETH against Nvidia, say.{' '}
+              <Hi>Calls</Hi> is a buy that carries a message, saved onchain as a
+              prediction. <Hi>Raids</Hi> is a shared buy
+              that a group puts in together.
             </P>
-            <Go href="/derivatives">Open Arc Derivatives</Go>
+            <P>
+              This is a newer part of the product, and the leveraged tokens
+              behind it are not something to treat like a savings account. An
+              older module, Arc Derivatives, a perps test on Arc testnet with
+              no real money, still works at its own address, but it is no
+              longer in the menu.
+            </P>
+            <Go href="/perps">Open Perps</Go>
           </Step>
         </div>
 
