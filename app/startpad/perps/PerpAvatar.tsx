@@ -33,7 +33,7 @@ export default function PerpAvatar({
   glow?: boolean;
 }) {
   const lev = perpLeverage(symbol);
-  const tone = change === null ? 'rgba(124,92,255,0.45)' : change >= 0 ? 'rgba(22,163,74,0.5)' : 'rgba(220,38,38,0.5)';
+  const tone = change === null ? 'rgba(14,17,22,0.35)' : change >= 0 ? 'rgba(22,163,74,0.5)' : 'rgba(220,38,38,0.5)';
   const badge = Math.max(14, Math.round(size * 0.42));
   return (
     <span className="relative inline-flex shrink-0" style={{ width: size, height: size }}>

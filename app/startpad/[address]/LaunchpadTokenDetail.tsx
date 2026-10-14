@@ -549,7 +549,7 @@ export default function LaunchpadTokenDetail({ address }: { address: string }) {
   if (notFound) return <TokenNotFound address={address} />;
 
   return (
-    <main className="min-h-screen bg-sp-sunken px-4 pb-24 pt-5 font-soft sm:px-6 sm:pt-8">
+    <main className="board min-h-screen bg-sp-sunken px-4 pb-24 pt-5 font-soft sm:px-6 sm:pt-8">
       <div className="mx-auto w-full max-w-[1280px]">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link href="/startpad" className="inline-flex items-center gap-2 rounded-full border border-sp-shade/10 bg-sp-surface px-3.5 py-2 text-[12px] font-extrabold text-sp-ink hover:border-soft-primary">
@@ -1050,7 +1050,7 @@ function StatsCard({
 
 function TokenNotFound({ address }: { address: string }) {
   return (
-    <main className="min-h-screen bg-sp-sunken px-4 pb-24 pt-10 font-soft sm:px-6">
+    <main className="board min-h-screen bg-sp-sunken px-4 pb-24 pt-10 font-soft sm:px-6">
       <div className="mx-auto w-full max-w-[560px] rounded-[20px] border border-sp-shade/10 bg-sp-surface p-8 text-center">
         <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-sp-brand-soft">
           <SearchX className="h-6 w-6 text-soft-primary" aria-hidden="true" />

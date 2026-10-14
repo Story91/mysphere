@@ -72,8 +72,8 @@ const CHART =
     grid: 'rgba(0,0,0,0.05)',
     up: '#12a451',
     down: '#e0527f',
-    line: '#7c6bda',
-    lineFill: 'rgba(124,107,218,0.16)',
+    line: '#0d9488',
+    lineFill: 'rgba(13,148,136,0.16)',
   };
 
 // Tempo blokow bierzemy z konfiguracji sieci. Stalo tu wpisane "~2s", prawdziwe

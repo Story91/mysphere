@@ -140,46 +140,48 @@
    odpowiedzi, panel odbioru, kafle $SPHERE). Poza wrapperem nic sie nie
    zmienia - gorna belka i feed zostaja fioletowe.
    =========================================================================== */
+/* Kroje i powierzchnia strony - zawsze. Tokeny kolorow ponizej wlaczaja sie TYLKO
+   bez motywu sieci: Startpad ma ciemne motywy Arc i Robinhood (data-net-theme na
+   <html>), a wrapper z wlasnymi zmiennymi na elemencie zawsze wygrywa z <html>,
+   wiec bez tego warunku Startpad na Arc stalby jasny. */
 .board {
   --font-soft-display: var(--font-board-display);
   --font-soft-body: var(--font-board-body);
+  background: rgb(var(--soft-bg));
+  color: rgb(var(--soft-ink));
+  font-family: var(--font-board-body), system-ui, sans-serif;
+  font-feature-settings: 'tnum' 0;
+}
 
+html:not([data-net-theme]) .board {
   --soft-bg: 244 245 247; /* #f4f5f7 chlodny papier */
   --soft-surface: 255 255 255;
   --soft-surface-sunken: 235 237 241; /* #ebedf1 */
-
   --soft-ink: 14 17 22; /* #0e1116 */
   --soft-ink-muted: 84 91 104; /* #545b68 - 7:1 na bieli */
   --soft-ink-soft: 107 114 128; /* #6b7280 - 4.8:1 na bieli */
   --soft-ink-faint: 140 147 160; /* #8c93a0 - tylko ozdoba */
-
   /* Atrament jest kolorem akcji: przycisk, aktywna zakladka, pierscien focusu. */
   --soft-primary: 14 17 22;
   --soft-primary-deep: 14 17 22;
   --soft-on-primary: 255 255 255;
   --soft-line: 222 225 231; /* #dee1e7 */
   --soft-line-strong: 188 193 203;
-
   /* Bursztyn: tylko kwoty. `deep` 6:1 na bieli. */
   --soft-accent: 217 119 6;
   --soft-accent-soft: 254 243 214;
   --soft-accent-deep: 180 83 9; /* #b45309 - 4.7:1 na papierze, zywszy od poprzedniego brazu */
-
   --soft-info: 29 78 216;
   --soft-info-soft: 219 234 254;
-
   /* Sygnal: stan "zywe", pieczec, Ask. */
   --soft-ask: 13 148 136;
   --soft-ask-soft: 214 245 240;
   --soft-ask-deep: 15 118 110;
-
   --soft-shadow-card: 0 1px 2px rgba(14, 17, 22, 0.05);
   --soft-shadow-chip: 0 1px 2px rgba(14, 17, 22, 0.14);
   --soft-shadow-float: 0 16px 40px rgba(14, 17, 22, 0.16);
-
   --soft-radius-card: 14px;
   --soft-radius-pill: 10px;
-
   /* Paleta startpada (--sp-*) w tym samym kierunku: atrament zamiast fioletu,
      morski jako "wzrost / zywe", bursztyn dla spalania. Podmienia tez motyw
      sieci (data-net-theme) w obrebie wrappera - hub $SPHERE ma wygladac tak
@@ -204,11 +206,6 @@
   --sp-down-deep: 154 66 4;
   --sp-down-soft: 254 243 214;
   --sp-down-line: 243 197 138;
-
-  background: rgb(var(--soft-bg));
-  color: rgb(var(--soft-ink));
-  font-family: var(--font-board-body), system-ui, sans-serif;
-  font-feature-settings: 'tnum' 0;
 }
 
 /* Rozwijanie wiersza: animacja wysokosci przez grid 0fr -> 1fr, bez mierzenia

@@ -3606,7 +3606,7 @@ export default function LaunchpadBoard() {
   };
 
   return (
-    <main className="min-h-screen bg-sp-sunken px-4 pb-24 pt-0 font-soft sm:px-6">
+    <main className="board min-h-screen bg-sp-sunken px-4 pb-24 pt-0 font-soft sm:px-6">
       {/* Blysk kart zyje razem z tym widokiem - globals.css jest poza zakresem
           tego komponentu, a te trzy reguly nie przydadza sie nigdzie indziej.
           `forwards` zostawia nakladke przezroczysta po wygasnieciu, wiec nie

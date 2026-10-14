@@ -64,7 +64,10 @@ export function usesBoardTheme(pathname: string | null): boolean {
     pathname === '/asks' ||
     pathname.startsWith('/asks/') ||
     pathname.startsWith('/ask/') ||
-    pathname.startsWith('/startpad/sphere') ||
+    pathname === '/startpad' ||
+    pathname.startsWith('/startpad/') ||
+    pathname === '/perps' ||
+    pathname.startsWith('/perps/') ||
     pathname === '/basechat' ||
     pathname.startsWith('/basechat/') ||
     pathname === '/how' ||

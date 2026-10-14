@@ -7,5 +7,9 @@ export const metadata: Metadata = {
 };
 
 export default function CallsPage() {
-  return <CallsBoard />;
+  return (
+    <div className="board min-h-screen bg-sp-bg">
+      <CallsBoard />
+    </div>
+  );
 }

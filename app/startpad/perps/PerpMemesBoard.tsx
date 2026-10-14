@@ -436,7 +436,7 @@ export default function PerpMemesBoard() {
         <button
           type="button"
           onClick={() => (sel ? launchOn(sel.id) : setPicker(true))}
-          className="inline-flex shrink-0 items-center gap-2 rounded-full bg-soft-primary px-4 py-2.5 text-[13px] font-extrabold text-sp-on-brand shadow-[0_8px_24px_rgba(124,92,255,0.25)]"
+          className="inline-flex shrink-0 items-center gap-2 rounded-full bg-soft-primary px-4 py-2.5 text-[13px] font-extrabold text-sp-on-brand shadow-chip"
         >
           <Rocket className="h-4 w-4" aria-hidden="true" /> {sel ? `Launch on ${sel.symbol}` : 'Launch a meme'}
         </button>

@@ -16,5 +16,10 @@ export const metadata: Metadata = pageMeta({
 });
 
 export default function PerpsPage() {
-  return <PerpMemesBoard />;
+  // Wrapper .board: tokeny tablicy zlecen i bialy/papierowy ekran zamiast fioletu.
+  return (
+    <div className="board min-h-screen bg-sp-bg">
+      <PerpMemesBoard />
+    </div>
+  );
 }
