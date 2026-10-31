@@ -350,7 +350,21 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
     return { out: q[0] as bigint, fee: q[1] as bigint, refund: q[2] as bigint, rc };
   }
 
+  /**
+   * Sprzedaz w `Locked` otwiera sie po `LOCKED_SELL_DELAY` (atak FORA, 30.09.2026).
+   * Testy badajace rachunek sprzedazy w `Locked` przesuwaja zegar do tej chwili.
+   */
+  async function openLockedSells(token: string) {
+    const opensAt: bigint = await pad.lockedSellOpensAt(token);
+    if (opensAt === 0n) return;
+    const now = BigInt((await ethers.provider.getBlock('latest')).timestamp);
+    if (now >= opensAt) return;
+    await hre.network.provider.send('evm_setNextBlockTimestamp', [Number(opensAt)]);
+    await hre.network.provider.send('evm_mine');
+  }
+
   async function sellChecked(who: any, token: string, t: any, amount: bigint) {
+    await openLockedSells(token);
     const q = await pad.quoteSell(token, amount); // [ethOut, fee]
     const rc = await (
       await pad.connect(who).sell(token, amount, 1n, MAX_UINT)
@@ -552,6 +566,7 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
       expect((await pad.launchOf(token))[1]).to.equal(LOCKED);
       // Ilosc musi byc realna, a nie 1000 jednostek bazowych: tyle daje zero wei
       // po zaokragleniu w dol i krzywa slusznie odbija to jako `DustTrade`.
+      await openLockedSells(token);
       await pad.connect(creator).sell(token, await t.balanceOf(creator.address), 1n, MAX_UINT);
       expect(await t.balanceOf(creator.address)).to.equal(0n);
       // Alice tez moze, tak jak przedtem.
@@ -685,6 +700,7 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
           const numer = between(next, 1n, 100n);
           let amount = (bal * numer) / 100n;
           if (amount === 0n) amount = bal;
+          await openLockedSells(token);
           const q = await pad.quoteSell(token, amount);
           if (q[0] === 0n) {
             // net == 0: albo gross == 0 (DustTrade), albo cala kwota poszla na
@@ -957,6 +973,7 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
       // JEDNA: rezerwa zbita do zera, czyli `eLp == 0`. Zeby tam dojsc, obaj
       // posiadacze musza wyjsc do konca - i wlasnie to jest tresc tego testu:
       // w najgorszym osiagalnym stanie sprzedaz MUSI dzialac.
+      await openLockedSells(token);
       for (const kto of [alice, bob]) {
         const bal: bigint = await t.balanceOf(kto.address);
         if (bal > 0n) await pad.connect(kto).sell(token, bal, 1n, MAX_UINT);
@@ -1018,6 +1035,7 @@ describe('CurveLaunchpad - niezmienniki, fuzz i wyplacalnosc', function () {
   describe('prog i awans', function () {
     /** Sprowadza rezerwe ETH mozliwie blisko `target`, sprzedazami w stanie Locked. */
     async function sellDownTo(token: string, t: any, who: any, target: bigint) {
+      await openLockedSells(token);
       const l = await pad.launchOf(token);
       const eth = l[2] as bigint;
       if (eth <= target) return;

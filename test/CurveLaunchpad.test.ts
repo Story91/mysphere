@@ -609,7 +609,7 @@ describe('CurveLaunchpad', function () {
       expect(spent).to.be.lessThan(ethers.parseEther('3.04'));
     });
 
-    it('po zamknieciu krzywej kupno rewertuje, sprzedaz dziala', async function () {
+    it('po zamknieciu krzywej kupno rewertuje, sprzedaz dziala dopiero po dobie', async function () {
       await fillToThreshold(alice);
       await expect(
         pad.connect(bob).buy(token, 1, (await time()) + 600, { value: ethers.parseEther('0.1') })
@@ -617,12 +617,46 @@ describe('CurveLaunchpad', function () {
 
       await t.connect(alice).approve(await pad.getAddress(), MAX_UINT);
       const bal = await t.balanceOf(alice.address);
-      await pad.connect(alice).sell(token, bal / 10n, 1, (await time()) + 600);
+      await expect(pad.connect(alice).sell(token, bal / 10n, 1, (await time()) + 600)).to.be.revertedWithCustomError(
+        pad,
+        'CurveIsLocked'
+      );
+
+      const opensAt: bigint = await pad.lockedSellOpensAt(token);
+      expect(opensAt - BigInt(await time())).to.be.lessThanOrEqual(86_400n);
+      await hre.network.provider.send('evm_setNextBlockTimestamp', [Number(opensAt)]);
+      await pad.connect(alice).sell(token, bal / 10n, 1, Number(opensAt) + 600);
       const l = await pad.launchOf(token);
       expect(l[3]).to.be.greaterThan(T_MIN);
       // Sprzedaz podniosla rezerwe tokena, ale stan zostaje Locked - nie ma
       // powrotu do Curve, wiec nie da sie bujac wokol progu.
       expect(l[1]).to.equal(2n);
+    });
+
+    /**
+     * Atak z 30.09.2026 na FORA: kupno do progu, sprzedaz z powrotem w zamknieta
+     * krzywa i graduacja na resztkach - wszystko w jednej transakcji (flash loan).
+     */
+    it('kupno do progu, sprzedaz i graduacja w jednej transakcji rewertuje', async function () {
+      // Organiczna rezerwa, ktora atak wyciagal przez cienka pule.
+      await pad.connect(bob).buy(token, 1, (await time()) + 600, { value: ethers.parseEther('0.1') });
+
+      const Probe = await ethers.getContractFactory('GraduationSandwichProbe');
+      const probe = await Probe.deploy(await pad.getAddress());
+      await probe.waitForDeployment();
+
+      await expect(probe.attack(token, 1000, { value: ethers.parseEther('3') })).to.be.revertedWithCustomError(
+        pad,
+        'CurveIsLocked'
+      );
+      expect((await pad.launchOf(token))[1], 'atak wycofany w calosci').to.equal(1n);
+
+      // Uczciwa sciezka dalej dziala: kupno do progu i graduacja z pelna rezerwa.
+      await fillToThreshold(alice);
+      const reserve: bigint = (await pad.launchOf(token))[2];
+      await pad.connect(bob).graduate(token);
+      expect((await pad.launchOf(token))[1]).to.equal(3n);
+      expect(reserve).to.be.greaterThanOrEqual(ethers.parseEther('3'));
     });
 
     it('graduate przed progiem rewertuje', async function () {
@@ -787,6 +821,8 @@ describe('CurveLaunchpad', function () {
       // ktorej robi sie grozna - i progu nie ma. Test sprawdza obie polowy tej
       // zmiany: ze awans PRZECHODZI i ze oplata jest mala.
       await t.connect(alice).approve(await pad.getAddress(), MAX_UINT);
+      // Sprzedaz w Locked otwiera sie po LOCKED_SELL_DELAY (atak FORA, 30.09.2026).
+      await warp(86_400);
       const cel = ethers.parseEther('0.2');
       while (((await pad.launchOf(token))[2] as bigint) >= cel) {
         const bal: bigint = await t.balanceOf(alice.address);
@@ -816,6 +852,7 @@ describe('CurveLaunchpad', function () {
       // a `ReserveTooSmallToGraduate` jest o jedno wywolanie wczesniej i mowi,
       // o co chodzi. Krzywa zostaje w Locked ze sprzedaza otwarta.
       await t.connect(alice).approve(await pad.getAddress(), MAX_UINT);
+      await warp(86_400);
       while (((await pad.launchOf(token))[2] as bigint) > 0n) {
         const bal: bigint = await t.balanceOf(alice.address);
         if (bal === 0n) break;

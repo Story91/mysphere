@@ -321,6 +321,22 @@ contract CurveLaunchpad {
      */
     uint256 public immutable MAX_BUY;
 
+    /**
+     * SPRZEDAZ W `Locked` DOPIERO PO DOBIE.
+     *
+     * 30.09.2026 bot zgraduowal FORA jedna transakcja: flash loan 3 WETH ->
+     * kupno do progu (Locked) -> sprzedaz 616M tokenow z powrotem w krzywa ->
+     * `graduate()` z 0,163 ETH zamiast 3 ETH -> zrzut reszty w cienka pule.
+     * Krzywa oddala mu rezerwe, ktora przed chwila sam wplacil, a pula dostala
+     * resztki - z nich bot wyciagnal organiczne ETH kupujacych.
+     *
+     * Sprzedaz w `Locked` zostaje (inaczej nieudana graduacja zamykalaby
+     * posiadaczy na zawsze), ale dopiero po `LOCKED_SELL_DELAY`. Pozyczki
+     * blyskawicznej nie da sie przetrzymac przez dobe, a w tym czasie kazdy
+     * moze wywolac `graduate()` z pelna rezerwa i wziac za to 1,5%.
+     */
+    uint256 public constant LOCKED_SELL_DELAY = 1 days;
+
     uint256 public constant LAUNCH_WINDOW = 300;
     /**
      * DOMYSLNY limit na adres w oknie startowym: 2% podazy krzywej. Dotyczy
@@ -408,6 +424,7 @@ contract CurveLaunchpad {
         address creator; // 160
         State state; //   8
         uint40 startedAt; //  40
+        uint40 lockedAt; //  40 - ten sam slot; 0 = krzywa nie byla zamknieta
         uint128 ethReserve;
         uint128 tokenReserve;
         bytes32 launchId; // == salt uzyty przy tworzeniu tokena
@@ -693,6 +710,13 @@ contract CurveLaunchpad {
     {
         Launch memory l = _launches[token];
         return (l.creator, l.state, l.ethReserve, l.tokenReserve, l.startedAt, l.launchId);
+    }
+
+    /** Od kiedy w `Locked` mozna sprzedawac; 0 = krzywa nie jest zamknieta. */
+    function lockedSellOpensAt(address token) external view returns (uint256) {
+        Launch memory l = _launches[token];
+        if (l.state != State.Locked) return 0;
+        return uint256(l.lockedAt) + LOCKED_SELL_DELAY;
     }
 
     /**
@@ -1036,6 +1060,7 @@ contract CurveLaunchpad {
             creator: msg.sender,
             state: State.Curve,
             startedAt: startedAt,
+            lockedAt: 0,
             ethReserve: 0,
             tokenReserve: uint128(T0),
             launchId: launchId
@@ -1151,6 +1176,7 @@ contract CurveLaunchpad {
         // krzywa nie moze sie "odawansowac" i nie da sie bujac stanem wokol progu.
         if (tokenAfter == T_MIN) {
             l.state = State.Locked;
+            l.lockedAt = uint40(block.timestamp);
             emit CurveLocked(token, ethAfter, tokenAfter);
         }
 
@@ -1240,8 +1266,10 @@ contract CurveLaunchpad {
         if (state == State.None) revert UnknownToken();
         // Po awansie krzywej nie ma - jest pula. Sprzedaz idzie tam.
         if (state == State.Graduated) revert AlreadyGraduated();
-        // W stanie Locked sprzedaz DZIALA. To jedyna rzecz, ktora musi dzialac
-        // zawsze: alternatywa jest stanem zakladniczym.
+        // W stanie Locked sprzedaz DZIALA - ale dopiero po `LOCKED_SELL_DELAY`.
+        // Wyjscie musi istniec (inaczej nieudana graduacja to stan zakladniczy),
+        // tyle ze nie w tej samej transakcji, ktora krzywa zamknela.
+        if (state == State.Locked && block.timestamp < uint256(l.lockedAt) + LOCKED_SELL_DELAY) revert CurveIsLocked();
 
         if (tokensIn == 0) revert ZeroAmount();
         if (minEthOut == 0) revert SlippageRequired();

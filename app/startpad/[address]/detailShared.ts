@@ -530,7 +530,7 @@ export function tradeErrorMessage(cause: unknown): string {
     return 'This launch caps how much one wallet can buy in the first 5 minutes, and you have reached that cap. Buy a smaller amount, or wait for the window to close.';
   }
   if (/CurveIsLocked\(\)/.test(raw)) {
-    return 'The curve is full, so buying is closed. Selling still works, and anyone can open the Uniswap v4 pool.';
+    return 'The curve is full, so buying is closed. Anyone can graduate it into the Uniswap v4 pool now.';
   }
   if (/AlreadyGraduated\(\)/.test(raw)) {
     return 'This token has graduated. The curve is closed for good and trading now happens in its Uniswap v4 pool.';

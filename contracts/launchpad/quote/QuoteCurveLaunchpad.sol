@@ -66,6 +66,8 @@ contract QuoteCurveLaunchpad {
     uint16 public constant GRAD_FEE_BPS = 300;
     uint16 public constant MAX_GRAD_FEE_BPS = 500;
     uint256 public constant LAUNCH_WINDOW = 300;
+    /** Sprzedaz w `Locked` dopiero po dobie - pelne uzasadnienie w `CurveLaunchpad.LOCKED_SELL_DELAY`. */
+    uint256 public constant LOCKED_SELL_DELAY = 1 days;
     uint256 public constant WINDOW_ADDR_CAP = 16_000_000e18;
     uint24 public constant POOL_FEE = 3000;
     int24 public constant POOL_TICK_SPACING = 60;
@@ -111,6 +113,7 @@ contract QuoteCurveLaunchpad {
         address creator;
         State state;
         uint40 startedAt;
+        uint40 lockedAt;
         uint128 ethReserve;
         uint128 tokenReserve;
         bytes32 launchId;
@@ -311,6 +314,13 @@ contract QuoteCurveLaunchpad {
     {
         Launch memory l = _launches[token];
         return (l.creator, l.state, l.ethReserve, l.tokenReserve, l.startedAt, l.launchId);
+    }
+
+    /** Od kiedy w `Locked` mozna sprzedawac; 0 = krzywa nie jest zamknieta. */
+    function lockedSellOpensAt(address token) external view returns (uint256) {
+        Launch memory l = _launches[token];
+        if (l.state != State.Locked) return 0;
+        return uint256(l.lockedAt) + LOCKED_SELL_DELAY;
     }
 
     /** Klucz JEDYNEJ puli tego tokena. Kolejnosc walut z adresow - v4 wymaga currency0 < currency1. */
@@ -517,6 +527,7 @@ contract QuoteCurveLaunchpad {
             creator: msg.sender,
             state: State.Curve,
             startedAt: startedAt,
+            lockedAt: 0,
             ethReserve: 0,
             tokenReserve: uint128(T0),
             launchId: launchId
@@ -643,6 +654,7 @@ contract QuoteCurveLaunchpad {
 
         if (tokenAfter == T_MIN) {
             l.state = State.Locked;
+            l.lockedAt = uint40(block.timestamp);
             emit CurveLocked(token, ethAfter, tokenAfter);
         }
 
@@ -700,13 +712,14 @@ contract QuoteCurveLaunchpad {
         return _sell(token, tokensIn, minEthOut);
     }
 
-    /** 1:1 z `CurveLaunchpad._sell` - bez blokady tworcy, sprzedaz dziala takze w `Locked`. */
+    /** 1:1 z `CurveLaunchpad._sell` - bez blokady tworcy; w `Locked` dopiero po `LOCKED_SELL_DELAY`. */
     function _sell(address token, uint256 tokensIn, uint256 minEthOut) private returns (uint256 net) {
         Launch storage l = _launches[token];
         State state = l.state;
 
         if (state == State.None) revert UnknownToken();
         if (state == State.Graduated) revert AlreadyGraduated();
+        if (state == State.Locked && block.timestamp < uint256(l.lockedAt) + LOCKED_SELL_DELAY) revert CurveIsLocked();
         if (tokensIn == 0) revert ZeroAmount();
         if (minEthOut == 0) revert SlippageRequired();
 

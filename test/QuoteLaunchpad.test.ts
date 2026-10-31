@@ -343,11 +343,14 @@ for (const orientation of ['quote-currency0', 'quote-currency1'] as const) {
       await fillCurve(token);
       await solvent();
 
-      // Kupno w Locked odpada, sprzedaz dziala.
+      // Kupno w Locked odpada, sprzedaz dopiero po LOCKED_SELL_DELAY (atak FORA, 30.09.2026).
       await expect(pad.connect(bob).buy(tokenAddr, UNIT, 1n, await deadline())).to.be.revertedWithCustomError(pad, 'CurveIsLocked');
       const sellAmt = 1_000_000n * 10n ** 18n;
       await (await token.connect(alice).approve(await pad.getAddress(), sellAmt)).wait();
-      await (await pad.connect(alice).sell(tokenAddr, sellAmt, 1n, await deadline())).wait();
+      await expect(pad.connect(alice).sell(tokenAddr, sellAmt, 1n, await deadline())).to.be.revertedWithCustomError(pad, 'CurveIsLocked');
+      const opensAt = Number(await pad.lockedSellOpensAt(tokenAddr));
+      await ethers.provider.send('evm_setNextBlockTimestamp', [opensAt]);
+      await (await pad.connect(alice).sell(tokenAddr, sellAmt, 1n, opensAt + 3600)).wait();
       await solvent();
 
       const reserveBefore = (await pad.launchOf(tokenAddr)).ethReserve;
