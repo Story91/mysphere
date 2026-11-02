@@ -1,7 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { createPublicClient, formatEther, getAddress, http, parseAbi, type Address } from 'viem';
 import { base } from 'viem/chains';
-import { LAUNCHPAD_NETWORKS, LAUNCH_STATE } from '../../../startpad/config';
+import { LAUNCHPAD_NETWORKS, LAUNCH_STATE, marketDeploymentsOf } from '../../../startpad/config';
 import type { Clash, ClashSide, ClashToken } from '../../../startpad/duel';
 import { parseMetadataUri } from '../../../startpad/metadata';
 import { rpcCandidates } from '../historyRpc';
@@ -45,6 +45,8 @@ type Market = NonNullable<(typeof LAUNCHPAD_NETWORKS)[number]['markets']>[number
 type Entry = {
   token: Address;
   market: Market;
+  /** Wdrozenie rynku, w ktorym token wystartowal (v3 albo starsze). */
+  pad?: Address;
   creator?: Address;
   name?: string;
   symbol?: string;
@@ -122,13 +124,29 @@ async function refresh(): Promise<Clash[]> {
 
   const client = await pickClient();
 
+  // 1b) Wdrozenie kazdego tokena - rynek ma glowne v3 i starsze; raz ustalone zostaje.
+  const unplaced = [...entries.values()].filter((e) => !e.pad);
+  for (let i = 0; i < unplaced.length; i += META_CHUNK) {
+    const chunk = unplaced.slice(i, i + META_CHUNK);
+    const calls = chunk.flatMap((e) => marketDeploymentsOf(e.market).map((d) => ({ e, pad: d.launchpad as Address })));
+    const results = await client.multicall({
+      allowFailure: true,
+      contracts: calls.map((c) => ({ address: c.pad, abi: launchOfAbi, functionName: 'launchOf', args: [c.e.token] }) as const),
+    });
+    calls.forEach((c, j) => {
+      const r = results[j];
+      if (r?.status !== 'success') throw new Error('rpc');
+      if (!c.e.pad && Number(r.result[1]) !== 0) c.e.pad = c.pad;
+    });
+  }
+
   // 2) Metadane (duel) - tylko tokeny, ktorych jeszcze nie czytalismy.
   const unread = [...entries.values()].filter((e) => !e.metaRead);
   for (let i = 0; i < unread.length; i += META_CHUNK) {
     const chunk = unread.slice(i, i + META_CHUNK);
     const results = await client.multicall({
       allowFailure: true,
-      contracts: chunk.map((e) => ({ address: e.market.launchpad as Address, abi: metadataAbi, functionName: 'metadataURI', args: [e.token] }) as const),
+      contracts: chunk.map((e) => ({ address: e.pad ?? (e.market.launchpad as Address), abi: metadataAbi, functionName: 'metadataURI', args: [e.token] }) as const),
     });
     chunk.forEach((e, j) => {
       const r = results[j];
@@ -159,7 +177,7 @@ async function refresh(): Promise<Clash[]> {
   const states = tokens.length
     ? await client.multicall({
         allowFailure: true,
-        contracts: tokens.map((t) => ({ address: t.market.launchpad as Address, abi: launchOfAbi, functionName: 'launchOf', args: [t.token] }) as const),
+        contracts: tokens.map((t) => ({ address: t.pad ?? (t.market.launchpad as Address), abi: launchOfAbi, functionName: 'launchOf', args: [t.token] }) as const),
       })
     : [];
   // Czesciowy blad odczytu (RPC pod obciazeniem) nie moze wpasc do cache jako "ta strona nie
@@ -191,7 +209,7 @@ async function refresh(): Promise<Clash[]> {
       image: t.image ?? null,
       mcapUsd: f === null ? null : priceInPerp * f.nav * T0,
       perpChange24h: f?.change ?? null,
-      launchpad: m.launchpad as Address,
+      launchpad: t.pad ?? (m.launchpad as Address),
     });
   });
 

@@ -69,7 +69,27 @@ export type LaunchpadMarket = {
   hook: `0x${string}`;
   tokenFactory: `0x${string}`;
   deployBlock: bigint;
+  /** Wersja glownego wdrozenia rynku (pola wyzej). Brak = 1. */
+  version?: number;
+  /** Starsze wdrozenia tego rynku - odczyt i handel tokenami, ktore w nich wystartowaly. */
+  legacy?: LaunchpadDeployment[];
 };
+
+/** Wszystkie wdrozenia rynku, glowne PIERWSZE. */
+export function marketDeploymentsOf(market: LaunchpadMarket): LaunchpadDeployment[] {
+  const primary: LaunchpadDeployment = {
+    version: market.version ?? 1,
+    launchpad: market.launchpad,
+    vault: market.vault,
+    hook: market.hook,
+    tokenFactory: market.tokenFactory,
+    deployBlock: market.deployBlock,
+  };
+  const legacy = (market.legacy ?? [])
+    .filter((d) => d.launchpad.toLowerCase() !== primary.launchpad.toLowerCase())
+    .sort((a, b) => b.version - a.version);
+  return [primary, ...legacy];
+}
 
 export type LaunchpadNetwork = {
   chain: Chain;
@@ -211,8 +231,8 @@ export function networkForMarket(network: LaunchpadNetwork, marketId: string | n
     tokenFactory: market.tokenFactory,
     deployBlock: market.deployBlock,
     rVirt: market.rVirt,
-    version: 1,
-    legacy: [],
+    version: market.version ?? 1,
+    legacy: market.legacy ?? [],
     quote: market.quote,
     marketId: market.id,
   };
@@ -222,7 +242,7 @@ export function networkForMarket(network: LaunchpadNetwork, marketId: string | n
 export function allDeploymentsOfChain(network: LaunchpadNetwork): Array<LaunchpadDeployment & { marketId?: string }> {
   const out: Array<LaunchpadDeployment & { marketId?: string }> = [...deploymentsOf(network)];
   for (const m of network.markets ?? []) {
-    out.push({ version: 1, launchpad: m.launchpad, vault: m.vault, hook: m.hook, tokenFactory: m.tokenFactory, deployBlock: m.deployBlock, marketId: m.id });
+    for (const d of marketDeploymentsOf(m)) out.push({ ...d, marketId: m.id });
   }
   return out;
 }
@@ -253,44 +273,56 @@ const baseMainnetEntry: LaunchpadNetwork = {
         label: 'ETH2xL',
         quote: { address: '0xB200000000000000000000FfFF60CC8138cDf452', symbol: 'ETH2xL', decimals: 18, kind: 'perp' },
         rVirt: 1875,
-        launchpad: '0x86B7d672B0520A37A5f13788b9b2F821a9E9ff5d',
-        vault: '0x45f3ea7a6c68f4BB3a0d3B2cb8aA697D102674F8',
-        hook: '0xBd69E3b17FD25b33d965C4857569e8a800C32044',
+        // v3 (2026-11-02): sprzedaz w Locked po dobie. Stare wdrozenie w legacy.
+        version: 3,
+        launchpad: '0xC2C66222370e1c7Eec285549452df78a8c23259B',
+        vault: '0x7ddEe3BB4401F4E7db44C270172477DF9bD737F2',
+        hook: '0xDB0d14ff65f7C28a65DeE067F11D312dA7652044',
         tokenFactory: '0xF1DAd68f9B0b00A80E993286419AD03e9380e7B0',
-        deployBlock: 52475870n,
+        deployBlock: 53422775n,
+        legacy: [{ version: 1, launchpad: '0x86B7d672B0520A37A5f13788b9b2F821a9E9ff5d', vault: '0x45f3ea7a6c68f4BB3a0d3B2cb8aA697D102674F8', hook: '0xBd69E3b17FD25b33d965C4857569e8a800C32044', tokenFactory: '0xF1DAd68f9B0b00A80E993286419AD03e9380e7B0', deployBlock: 52475870n }],
       },
       {
         id: 'nvda2xl',
         label: 'NVDA2xL',
         quote: { address: '0xb200000000000000000000fFFfE13bBeCe8B183C', symbol: 'NVDA2xL', decimals: 18, kind: 'perp' },
         rVirt: 1875,
-        launchpad: '0x90C0213B96f5B279D68259D1E527B878e9eCc61D',
-        vault: '0x39e77AED2805316e05B381ea85fD8664793EF153',
-        hook: '0x1B32f340AFaA6Ba5c750f588CBf51e83f8516044',
+        // v3 (2026-11-02): sprzedaz w Locked po dobie. Stare wdrozenie w legacy.
+        version: 3,
+        launchpad: '0xD80D8126128d45F70E28675E9b27e1c5D86cE96c',
+        vault: '0x3fd058Cd5097EDB99E1d1746697A6Fc61420Db1f',
+        hook: '0xaf17f7D508c66e52fbC51fbEb67621f795fb6044',
         tokenFactory: '0xF1DAd68f9B0b00A80E993286419AD03e9380e7B0',
-        deployBlock: 52475877n,
+        deployBlock: 53422782n,
+        legacy: [{ version: 1, launchpad: '0x90C0213B96f5B279D68259D1E527B878e9eCc61D', vault: '0x39e77AED2805316e05B381ea85fD8664793EF153', hook: '0x1B32f340AFaA6Ba5c750f588CBf51e83f8516044', tokenFactory: '0xF1DAd68f9B0b00A80E993286419AD03e9380e7B0', deployBlock: 52475877n }],
       },
       {
         id: 'btc2xl',
         label: 'BTC2xL',
         quote: { address: '0xB200000000000000000000ffff4a0dA1092f5359', symbol: 'BTC2xL', decimals: 18, kind: 'perp' },
         rVirt: 1875,
-        launchpad: '0x1043e1e26256a0a66F05D649C88a637Fd15a8Dbc',
-        vault: '0x0459c8c89929668BC65163F804c77ECD69B66551',
-        hook: '0xcB1e55968dc91f68D5e3a7019F0a21ECA9F6e044',
+        // v3 (2026-11-02): sprzedaz w Locked po dobie. Stare wdrozenie w legacy.
+        version: 3,
+        launchpad: '0x571DfCd09EFb3046477cceeDaa0fDF36CE92BCB4',
+        vault: '0xcBE55031cEFB4Ef3D1E0e79Ac422f071C7b44167',
+        hook: '0x6BC4F86e4012416f6cDD56544e3D53757F3a2044',
         tokenFactory: '0xF1DAd68f9B0b00A80E993286419AD03e9380e7B0',
-        deployBlock: 52475886n,
+        deployBlock: 53422790n,
+        legacy: [{ version: 1, launchpad: '0x1043e1e26256a0a66F05D649C88a637Fd15a8Dbc', vault: '0x0459c8c89929668BC65163F804c77ECD69B66551', hook: '0xcB1e55968dc91f68D5e3a7019F0a21ECA9F6e044', tokenFactory: '0xF1DAd68f9B0b00A80E993286419AD03e9380e7B0', deployBlock: 52475886n }],
       },
       {
         id: 'spcx2xl',
         label: 'SPCX2xL',
         quote: { address: '0xB200000000000000000000ffFFDaEA025548eAe4', symbol: 'SPCX2xL', decimals: 18, kind: 'perp' },
         rVirt: 1875,
-        launchpad: '0x10eF2Edc204Dcc8060aBB03699a13eaB0c3c14eE',
-        vault: '0x8b2e0Cb173a73B6db857848c78e0ACa1F65E4ae0',
-        hook: '0x490DcE11B858B816E9153cF54deB3B32bd1F6044',
+        // v3 (2026-11-02): sprzedaz w Locked po dobie. Stare wdrozenie w legacy.
+        version: 3,
+        launchpad: '0x2e60DCDaD995449Ce543Efd55313BE1004d9E5aC',
+        vault: '0xaf7Cd752602914c63c1bD816ce68Ce79B26e0383',
+        hook: '0x45F318F32016cf867A83795bEd1d72F1974EE044',
         tokenFactory: '0xF1DAd68f9B0b00A80E993286419AD03e9380e7B0',
-        deployBlock: 52475894n,
+        deployBlock: 53422797n,
+        legacy: [{ version: 1, launchpad: '0x10eF2Edc204Dcc8060aBB03699a13eaB0c3c14eE', vault: '0x8b2e0Cb173a73B6db857848c78e0ACa1F65E4ae0', hook: '0x490DcE11B858B816E9153cF54deB3B32bd1F6044', tokenFactory: '0xF1DAd68f9B0b00A80E993286419AD03e9380e7B0', deployBlock: 52475894n }],
       },
       // Wdrozone 2026-10-12 (scripts/output/launchpad-q-{eth2xs,aapl2xl,meta2xl}-base.json).
       // ETH2xS schowany 13.10 rano (rynek short zbyt plytki), przywrocony 13.10 wieczorem:
@@ -300,33 +332,42 @@ const baseMainnetEntry: LaunchpadNetwork = {
         label: 'ETH2xS',
         quote: { address: '0xb200000000000000000000FFFfb1A72FA82A8694', symbol: 'ETH2xS', decimals: 18, kind: 'perp' },
         rVirt: 1875,
-        launchpad: '0x70ba3d1c7043164c8553433c2AA27207cd364018',
-        vault: '0x779d66625eF44b1bd081d1f1706e46D5e046E461',
-        hook: '0xAfa29A185F0D9653C7EB50568a7B62588aA4e044',
+        // v3 (2026-11-02): sprzedaz w Locked po dobie. Stare wdrozenie w legacy.
+        version: 3,
+        launchpad: '0x7fD597A25Fd318fF26D8e4515183A799EBe9202c',
+        vault: '0x2F4cFa201A344BfB14BA57B829112f4Db45f73dE',
+        hook: '0xc4E320ee807ac72C886D91710814c3803DAC6044',
         tokenFactory: '0xF1DAd68f9B0b00A80E993286419AD03e9380e7B0',
-        deployBlock: 52491530n,
+        deployBlock: 53422804n,
+        legacy: [{ version: 1, launchpad: '0x70ba3d1c7043164c8553433c2AA27207cd364018', vault: '0x779d66625eF44b1bd081d1f1706e46D5e046E461', hook: '0xAfa29A185F0D9653C7EB50568a7B62588aA4e044', tokenFactory: '0xF1DAd68f9B0b00A80E993286419AD03e9380e7B0', deployBlock: 52491530n }],
       },
       {
         id: 'aapl2xl',
         label: 'AAPL2xL',
         quote: { address: '0xB200000000000000000000fFFfF9f6975772A0e7', symbol: 'AAPL2xL', decimals: 18, kind: 'perp' },
         rVirt: 1875,
-        launchpad: '0xC06c321EC8F8e121B81Db00F7fB4835Fb5f980f5',
-        vault: '0xC6bC6D1c58bD1412502442D1003bb4411370e593',
-        hook: '0x0DBB00A4B262f582EffC02A78E397d3707cdA044',
+        // v3 (2026-11-02): sprzedaz w Locked po dobie. Stare wdrozenie w legacy.
+        version: 3,
+        launchpad: '0xfcb078Ae5FaA582f0A5b6B5723C04fCcb12E5DE5',
+        vault: '0x2cad9914D12e041d6548b27382De99ee22170AE7',
+        hook: '0xF6f156B10b2256a3D2D171Ec62C1Ae61f700e044',
         tokenFactory: '0xF1DAd68f9B0b00A80E993286419AD03e9380e7B0',
-        deployBlock: 52491537n,
+        deployBlock: 53422811n,
+        legacy: [{ version: 1, launchpad: '0xC06c321EC8F8e121B81Db00F7fB4835Fb5f980f5', vault: '0xC6bC6D1c58bD1412502442D1003bb4411370e593', hook: '0x0DBB00A4B262f582EffC02A78E397d3707cdA044', tokenFactory: '0xF1DAd68f9B0b00A80E993286419AD03e9380e7B0', deployBlock: 52491537n }],
       },
       {
         id: 'meta2xl',
         label: 'META2xL',
         quote: { address: '0xB200000000000000000000fFFf74E0ff4578626A', symbol: 'META2xL', decimals: 18, kind: 'perp' },
         rVirt: 1875,
-        launchpad: '0xc8480eD834e2C8D9361aa62DD1E64Fdc2bDCB31e',
-        vault: '0x85E4C7057603B6d4ac8248538288b12f76eef890',
-        hook: '0x393C2850dF9c706304ef42d8BD20ce47aa24E044',
+        // v3 (2026-11-02): sprzedaz w Locked po dobie. Stare wdrozenie w legacy.
+        version: 3,
+        launchpad: '0xa28DF49ca3AEbC281E1206f63380893CEF4841a1',
+        vault: '0x7B070e1e8d5d62e3BB7761f17c079eA8D1886063',
+        hook: '0x2B30fd848BAAA22eFb91412214F6ccE2B36FA044',
         tokenFactory: '0xF1DAd68f9B0b00A80E993286419AD03e9380e7B0',
-        deployBlock: 52491545n,
+        deployBlock: 53422819n,
+        legacy: [{ version: 1, launchpad: '0xc8480eD834e2C8D9361aa62DD1E64Fdc2bDCB31e', vault: '0x85E4C7057603B6d4ac8248538288b12f76eef890', hook: '0x393C2850dF9c706304ef42d8BD20ce47aa24E044', tokenFactory: '0xF1DAd68f9B0b00A80E993286419AD03e9380e7B0', deployBlock: 52491545n }],
       },
   ],
   // v3 (2026-11-02, blok 53 422 750): sprzedaz w Locked dopiero po dobie -

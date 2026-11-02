@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { formatEther, getAddress, parseEther, type Address } from 'viem';
 import { useAccount, useChainId, usePublicClient, useSwitchChain, useWalletClient } from 'wagmi';
 import { ArrowDownRight, ArrowUpRight, ChevronLeft, Megaphone, Rocket, Swords, Users, X, Zap } from 'lucide-react';
-import { DEFAULT_LAUNCHPAD_CHAIN_ID, LAUNCH_STATE, LAUNCHPAD_NETWORKS, launchpadAbi } from '../config';
+import { DEFAULT_LAUNCHPAD_CHAIN_ID, LAUNCH_STATE, LAUNCHPAD_NETWORKS, launchpadAbi, marketDeploymentsOf } from '../config';
 import { fetchBoardStatsFor } from '../boardStats';
 import { fetchLogos } from '../logos';
 import { pickTokenImage } from '../metadata';
@@ -237,9 +237,22 @@ export default function PerpMemesBoard() {
         }
         const addresses = [...meta.keys()].map((a) => getAddress(a) as Address);
         if (addresses.length === 0) return [] as Meme[];
-        const states = await client.multicall({
+        // Rynek moze miec kilka wdrozen (v3 + stare) - token zyje w tym, ktore go zna.
+        const pads = marketDeploymentsOf(m).map((d) => d.launchpad as Address);
+        const raw = await client.multicall({
           allowFailure: true,
-          contracts: addresses.map((token) => ({ address: m.launchpad as Address, abi: launchpadAbi, functionName: 'launchOf' as const, args: [token] as const })),
+          contracts: addresses.flatMap((token) => pads.map((pad) => ({ address: pad, abi: launchpadAbi, functionName: 'launchOf' as const, args: [token] as const }))),
+        });
+        const padOf = new Map<string, Address>();
+        const states = addresses.map((token, i) => {
+          for (let k = 0; k < pads.length; k++) {
+            const r = raw[i * pads.length + k];
+            if (r?.status === 'success' && Number((r.result as readonly unknown[])[1]) !== 0) {
+              padOf.set(token.toLowerCase(), pads[k]);
+              return r;
+            }
+          }
+          return raw[i * pads.length];
         });
         // Logo z lancucha dla tokenow bez wpisu w Blobie: start sprzed poprawki modalu niesie
         // obrazek w `metadataURI` (strona tokena go pokazuje przez pickTokenImage), a Blob go nie
@@ -250,7 +263,7 @@ export default function PerpMemesBoard() {
           const metas = await client
             .multicall({
               allowFailure: true,
-              contracts: needChain.map((token) => ({ address: m.launchpad as Address, abi: launchpadAbi, functionName: 'metadataURI' as const, args: [token] as const })),
+              contracts: needChain.map((token) => ({ address: padOf.get(token.toLowerCase()) ?? (m.launchpad as Address), abi: launchpadAbi, functionName: 'metadataURI' as const, args: [token] as const })),
             })
             .catch(() => []);
           needChain.forEach((t, i) => {
@@ -277,7 +290,7 @@ export default function PerpMemesBoard() {
             name: info.name,
             perpId: m.id,
             perpAddress: m.quote.address as Address,
-            launchpad: m.launchpad as Address,
+            launchpad: padOf.get(token.toLowerCase()) ?? (m.launchpad as Address),
             state,
             raised: state === 'Graduated' ? target : raised,
             target,
@@ -363,12 +376,17 @@ export default function PerpMemesBoard() {
     return map;
   }, [clashes]);
 
-  const perpLaunchpads = useMemo(() => new Set((NETWORK.markets ?? []).map((m) => m.launchpad.toLowerCase())), []);
+  // Kazde wdrozenie kazdego rynku (v3 + stare) -> id rynku.
+  const marketOfPad = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const m of NETWORK.markets ?? []) for (const d of marketDeploymentsOf(m)) map.set(d.launchpad.toLowerCase(), m.id);
+    return map;
+  }, []);
   const scopedCalls = (calls ?? []).filter((c) => (selected === 'all' ? c.marketId !== null : c.marketId === selected));
   const scopedRaids = (raids ?? []).filter((r) => {
-    if (!perpLaunchpads.has(r.launchpad.toLowerCase())) return false;
-    if (selected === 'all') return true;
-    return r.launchpad.toLowerCase() === perpById.get(selected)?.launchpad.toLowerCase();
+    const market = marketOfPad.get(r.launchpad.toLowerCase());
+    if (!market) return false;
+    return selected === 'all' || market === selected;
   });
   const openRaids = scopedRaids.filter((r) => r.status === 'Open' && now < r.expiresAt);
   const raisedUsd = inScope.reduce((sum, m) => sum + (usdOf(m, m.raised) ?? 0), 0);
