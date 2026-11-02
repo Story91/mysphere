@@ -182,14 +182,15 @@ Everything is verifiable on the network's block explorer. Launchpads:
 
 | Network | `CurveLaunchpad` | Explorer |
 | --- | --- | --- |
-| Base mainnet (v2, current) | `0xb5C71DE0B6b2280A7b05ECDdd9F22a895A5E243e` | [basescan.org](https://basescan.org) |
+| Base mainnet (v3, current) | `0x595dfbFE20bF587F5740C2C91A25702390A735c4` | [basescan.org](https://basescan.org) |
+| Base mainnet (v2, legacy: existing curves only) | `0xb5C71DE0B6b2280A7b05ECDdd9F22a895A5E243e` | [basescan.org](https://basescan.org) |
 | Base mainnet (v1, legacy: old curves and fee balances only, no new launches) | `0xCF541A7EcE881945833ff1680dFc067C5Dd4cE2D` | [basescan.org](https://basescan.org) |
 | Arc mainnet | `0xD5f65Cfbe6A1AA1B6f82CBE0A336DDFCD39a5340` | [arc-scan.org](https://arc-scan.org) |
 | Base Sepolia (v2) | `0x74aB8aD577fB49dc4930D8BBAD144c7a230143e6` | [sepolia.basescan.org](https://sepolia.basescan.org) |
 | Robinhood Chain | `0x712E93401b455d226284BbA873cE13CC1492B22f` | [robinhoodchain.blockscout.com](https://robinhoodchain.blockscout.com) |
 | Arc testnet | `0xe984986f4F1E067f697b548D5fe942813d03Da37` | [testnet.arcscan.app](https://testnet.arcscan.app) |
 
-The rest of the current Base mainnet set (v2, live since 2026-10-11 after the Cobalt hard fork): `LiquidityVault` `0x019098A6e1377ABE2a40faF5643EE1cC5459AFF3`, `B20LaunchHook` `0xE0BCc49d92bF9e928F7010C1e5884E146bA92044`, `B20TokenFactoryV2` `0xF1DAd68f9B0b00A80E993286419AD03e9380e7B0`, and on Arc mainnet `LiquidityVault` `0x49FD3A54b23A0ee1d6A7720F493618F5CCF4681D`, hook `0x9669d2809710aD8218793e0CD55317Ccd984E044`, factory `0x04bdaD462B66B152689076975db1197766A69568`. The v1 set (vault `0x6108aDCb…`, hook `0x71028Ea6…`, factory `0xEC7db55B…`) stays readable but no longer starts tokens. Common to Base: Uniswap v4 `PoolManager` `0x498581fF718922c3f8e6A244956aF099B2652b2b`, protocol fee recipient `0x83E2DE974FC6B866FDb78AEFa5596d58fDc4142F`. The full per-network address table sits in the footer of [/startpad](/startpad) itself, with explorer links.
+The rest of the current Base mainnet set (v3, live since 2026-11-02; selling back into a filled curve opens 24 hours after it locks): `LiquidityVault` `0x30EC94B6eB2440f0f5E5a16918069f35bf09818F`, `B20LaunchHook` `0x33e0922F47b903db05e060F17aB11249b45Fa044`, `B20TokenFactoryV2` `0xF1DAd68f9B0b00A80E993286419AD03e9380e7B0`, and on Arc mainnet `LiquidityVault` `0x49FD3A54b23A0ee1d6A7720F493618F5CCF4681D`, hook `0x9669d2809710aD8218793e0CD55317Ccd984E044`, factory `0x04bdaD462B66B152689076975db1197766A69568`. The v2 set (vault `0x019098A6…`, hook `0xE0BCc49d…`) and the v1 set (vault `0x6108aDCb…`, hook `0x71028Ea6…`, factory `0xEC7db55B…`) stay readable and tradable but no longer start tokens. Common to Base: Uniswap v4 `PoolManager` `0x498581fF718922c3f8e6A244956aF099B2652b2b`, protocol fee recipient `0x83E2DE974FC6B866FDb78AEFa5596d58fDc4142F`. The full per-network address table sits in the footer of [/startpad](/startpad) itself, with explorer links.
 
 - Read `R_VIRT()` on the launchpad to get the scale, and `MIN_LP_ETH()`, `MAX_BUY()` and `SQRT_PRICE_TERMINAL()` to confirm they follow from it.
 - Each launch emits a `Launched` event; every trade emits `Bought` / `Sold` with the reserves after.

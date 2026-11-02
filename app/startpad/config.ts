@@ -329,14 +329,25 @@ const baseMainnetEntry: LaunchpadNetwork = {
         deployBlock: 52491545n,
       },
   ],
-  version: 2,
-  launchpad: '0xb5C71DE0B6b2280A7b05ECDdd9F22a895A5E243e',
-  vault: '0x019098A6e1377ABE2a40faF5643EE1cC5459AFF3',
-  hook: '0xE0BCc49d92bF9e928F7010C1e5884E146bA92044',
+  // v3 (2026-11-02, blok 53 422 750): sprzedaz w Locked dopiero po dobie -
+  // poprawka po graduacji FORA flash loanem (30.09.2026). Parametry jak v2.
+  version: 3,
+  launchpad: '0x595dfbFE20bF587F5740C2C91A25702390A735c4',
+  vault: '0x30EC94B6eB2440f0f5E5a16918069f35bf09818F',
+  hook: '0x33e0922F47b903db05e060F17aB11249b45Fa044',
   tokenFactory: '0xF1DAd68f9B0b00A80E993286419AD03e9380e7B0',
   poolManager: '0x498581fF718922c3f8e6A244956aF099B2652b2b',
-  deployBlock: 52474833n,
+  deployBlock: 53422750n,
   legacy: [
+    {
+      // v2 z 2026-10-11 - podatny na graduacje flash loanem; tylko istniejace tokeny.
+      version: 2,
+      launchpad: '0xb5C71DE0B6b2280A7b05ECDdd9F22a895A5E243e',
+      vault: '0x019098A6e1377ABE2a40faF5643EE1cC5459AFF3',
+      hook: '0xE0BCc49d92bF9e928F7010C1e5884E146bA92044',
+      tokenFactory: '0xF1DAd68f9B0b00A80E993286419AD03e9380e7B0',
+      deployBlock: 52474833n,
+    },
     {
       // v1 z 2026-08-11 - krzywe, ktore nie awansowaly, i salda oplat zyja tu na zawsze.
       version: 1,
