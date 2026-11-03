@@ -1688,6 +1688,103 @@ export default function LaunchpadBoard() {
     setBoardError(null);
     try {
       /**
+       * LISTA TOKENOW NIE CZEKA NA SKAN.
+       *
+       * Indeks z bazy (`/api/launchpad/board`) byl pytany dopiero PO skanie
+       * logow, a przy zimnym starcie skan potrafi trwac minutami. Tak bylo
+       * 3 listopada 2026: po przepieciu Base na v3 serwerowy agregat liczyl sie
+       * od zera, kazda przegladarka skanowala lancuch sama i tablica stala
+       * pusta na "Reading Launchpad activity". Teraz indeks leci od razu, a gdy
+       * tablica nie ma jeszcze tresci, pokazujemy z niego tokeny ze stanem i
+       * rezerwa z `launchOf`. Wolumen, transakcje i wykresy dochodza ze skanu.
+       */
+      type BoardIndexBody = {
+        ok?: boolean;
+        tokens?: Array<{ address?: string; name?: string; symbol?: string; creator?: string; startedAt?: number }>;
+      };
+      const indexRequest: Promise<BoardIndexBody | null> = fetch(
+        `/api/launchpad/board?chainId=${ACTIVE_LAUNCHPAD_NETWORK.chain.id}${MARKET_QUERY}`
+      )
+        .then((response) => (response.ok ? (response.json() as Promise<BoardIndexBody>) : null))
+        .catch(() => null);
+      if (!boardHasContentRef.current) {
+        void indexRequest.then(async (body) => {
+          if (!body?.ok || !Array.isArray(body.tokens) || stale() || boardHasContentRef.current) return;
+          const entries = body.tokens.filter((entry) => /^0x[0-9a-fA-F]{40}$/.test(entry.address ?? ''));
+          if (entries.length === 0) return;
+          // Indeks nie zna wdrozenia tokena - pytamy wszystkie, jak nizej.
+          const probes = entries.flatMap((entry) =>
+            LAUNCHPAD_DEPLOYMENTS.map((dep) => ({ token: getAddress(entry.address as string) as Address, entry, dep }))
+          );
+          let results;
+          try {
+            results = await readClient.multicall({
+              allowFailure: true,
+              contracts: probes.map(({ token, dep }) => ({
+                address: dep.launchpad as Address,
+                abi: launchpadAbi,
+                functionName: 'launchOf' as const,
+                args: [token] as const,
+              })),
+            });
+          } catch {
+            return;
+          }
+          if (stale() || boardHasContentRef.current) return;
+          const remembered = recallLogos(ACTIVE_LAUNCHPAD_NETWORK.chain.id);
+          const seen = new Set<string>();
+          const rows: BoardToken[] = [];
+          probes.forEach(({ token, entry, dep }, index) => {
+            const result = results[index];
+            if (seen.has(token) || result?.status !== 'success') return;
+            const [creator, state, ethReserve, tokenReserve, startedAt] = result.result as readonly [
+              Address,
+              number,
+              bigint,
+              bigint,
+              number,
+              `0x${string}`,
+            ];
+            if (Number(state) === 0) return;
+            seen.add(token);
+            const graduated = LAUNCH_STATE[state] === 'Graduated';
+            rows.push({
+              id: token,
+              address: token,
+              launchpad: dep.launchpad,
+              version: dep.version,
+              name: entry.name ?? '',
+              symbol: entry.symbol ?? '',
+              creator,
+              state: LAUNCH_STATE[state] as LaunchpadToken['state'],
+              raised: graduated ? CURVE_TARGET_ETH : Number(formatEther(ethReserve)),
+              target: CURVE_TARGET_ETH,
+              holders: 0,
+              traders: 0,
+              holderCount: null,
+              volume: 0,
+              poolVolume: null,
+              trades: 0,
+              lastPrice: graduated ? 0 : spotPriceFromReserves(ethReserve, tokenReserve),
+              age: formatAge(Number(startedAt)),
+              accent: accentFor(token),
+              live: true,
+              startedAt: Number(startedAt),
+              prices: [],
+              creatorAccruedWei: 0n,
+              logoUrl: remembered[token.toLowerCase()],
+            });
+          });
+          if (rows.length === 0) return;
+          rows.sort((a, b) => b.raised - a.raised);
+          // Bez `boardHasContentRef`: spinner zostaje, bo skan wciaz liczy
+          // wolumen, a jego wynik i tak nadpisze te wiersze.
+          setTokens(rows);
+          setSelectedId((current) => current || rows[0].id);
+        });
+      }
+
+      /**
        * SKAN ZACZYNA SIE TAM, GDZIE SKONCZYL POPRZEDNI.
        *
        * Do 15 sierpnia 2026 kazde wejscie na tablice skanowalo lancuch od glowy
@@ -1884,12 +1981,9 @@ export default function LaunchpadBoard() {
       // Doklejamy WYLACZNIE brakujace: gdy skan zobaczyl `Launched`, jego dane
       // sa swiezsze i zostaja.
       try {
-        const response = await fetch(`/api/launchpad/board?chainId=${ACTIVE_LAUNCHPAD_NETWORK.chain.id}${MARKET_QUERY}`);
-        if (response.ok) {
-          const body = (await response.json()) as {
-            ok?: boolean;
-            tokens?: Array<{ address?: string; name?: string; symbol?: string; creator?: string; startedAt?: number }>;
-          };
+        // Ten sam indeks, ktory poszedl na starcie - bez drugiego zapytania.
+        const body = await indexRequest;
+        {
           if (body?.ok && Array.isArray(body.tokens)) {
             // Mapa jest kluczowana adresem Z LOGOW, czyli w checksumie
             // (`0xB200...`), a baza trzyma male litery. Porownanie wprost dawalo

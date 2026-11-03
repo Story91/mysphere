@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createPublicClient, formatEther, getAbiItem, http, type Address } from 'viem';
-import { hookAbi, hooksOf, LAUNCHPAD_NETWORKS, launchpadAbi, launchpadsOf, networkForMarket, scanFloorOf } from '../../../../startpad/config';
+import { deploymentsOf, hookAbi, hooksOf, LAUNCHPAD_NETWORKS, launchpadAbi, launchpadsOf, networkForMarket, scanFloorOf, type LaunchpadNetwork } from '../../../../startpad/config';
 import {
   emptyAggregate,
   mergeAggregates,
@@ -177,6 +177,90 @@ function fromStore(
   );
 }
 
+// Skala krzywej jest wlasnoscia SIECI - stad `net.rVirt`, a nie stala
+// modulowa. Ta sama arytmetyka, co `spotPriceFromReserves` na tablicy.
+function aggregateHelpers(net: LaunchpadNetwork) {
+  return {
+    ethOf: (wei: bigint) => Number(formatEther(wei)),
+    priceOf: (ethReserveAfter: bigint, tokenReserveAfter: bigint) => {
+      const tokens = Number(formatEther(tokenReserveAfter));
+      if (tokens <= 0) return 0;
+      return (net.rVirt + Number(formatEther(ethReserveAfter))) / tokens;
+    },
+  };
+}
+
+/**
+ * NOWE WDROZENIE PRZEJMUJE AGREGAT POPRZEDNIEGO, ZAMIAST LICZYC OD ZERA.
+ *
+ * Zapis jest kluczowany glownym launchpadem, wiec przepiecie sieci na nowy
+ * kontrakt zostawialo go PUSTYM. 3 listopada 2026 (Base na v3) agregat liczyl
+ * sie od bloku 49,8 mln po kawalku na zadanie, a do tego czasu kazda
+ * przegladarka skanowala lancuch sama i tablica stala pusta.
+ *
+ * Stary zapis jest poprawny dla adresow, ktore znal: wdrozen nie mlodszych od
+ * swojego. Brakuje w nim tylko zdarzen NOWSZYCH wdrozen miedzy ich blokiem
+ * wdrozenia a `lastBlock` starego zapisu - te doczytujemy i doklejamy. Zwykle to
+ * kilka okien, bo stary zapis zamarza w chwili przepiecia. Gdy dociag sie nie
+ * miesci albo padnie jakiekolwiek okno, nic nie zapisujemy i trasa liczy od
+ * zera jak dotad - dziura w sumie addytywnej bylaby gorsza niz wolny start.
+ */
+async function inheritPredecessor(
+  client: ReturnType<typeof createPublicClient>,
+  chainId: number,
+  net: LaunchpadNetwork,
+  head: bigint
+) {
+  const deployments = deploymentsOf(net);
+  for (const previous of deployments.slice(1)) {
+    const old = await readBoardStats(chainId, previous.launchpad);
+    if (!old) continue;
+    let base: BoardAggregate | null = null;
+    try {
+      base = parseAggregate(JSON.parse(old.payload));
+    } catch {
+      base = null;
+    }
+    if (!base || old.meta.lastBlock > head) return null;
+
+    const newer = deployments.filter((d) => d.deployBlock > previous.deployBlock);
+    const delta = emptyAggregate();
+    if (newer.length > 0) {
+      const from = newer.reduce((min, d) => (d.deployBlock < min ? d.deployBlock : min), newer[0].deployBlock);
+      const windows: Array<{ fromBlock: bigint; toBlock: bigint }> = [];
+      for (let cursor = from; cursor <= old.meta.lastBlock; cursor += net.scanWindow) {
+        const toBlock = cursor + net.scanWindow - 1n;
+        windows.push({ fromBlock: cursor, toBlock: toBlock > old.meta.lastBlock ? old.meta.lastBlock : toBlock });
+      }
+      if (windows.length > maxWindowsFor(net.maxScanWindows)) return null;
+      const addresses = newer.flatMap((d) => [d.launchpad, d.hook]) as Address[];
+      const helpers = aggregateHelpers(net);
+      for (let start = 0; start < windows.length; start += CONCURRENCY) {
+        const batch = windows.slice(start, start + CONCURRENCY);
+        const results = await Promise.all(
+          batch.map((window) =>
+            client
+              .getLogs({
+                address: addresses,
+                events: [LAUNCHED_EVENT, BOUGHT_EVENT, SOLD_EVENT, HOOK_FEE_SETTLED_EVENT, FEE_ACCRUED_EVENT],
+                fromBlock: window.fromBlock,
+                toBlock: window.toBlock,
+              })
+              .catch(() => null)
+          )
+        );
+        if (results.some((logs) => logs === null)) return null;
+        for (const logs of results) reduceBoardLogs(logs as unknown as BoardLog[], helpers, delta);
+      }
+    }
+
+    const payload = JSON.stringify(serializeAggregate(mergeAggregates(base, delta)));
+    const written = await writeBoardStats({ chainId, launchpad: net.launchpad, lastBlock: old.meta.lastBlock, caughtUp: false, payload });
+    return written ? readBoardStats(chainId, net.launchpad) : null;
+  }
+  return null;
+}
+
 export async function GET(request: NextRequest) {
   const asked = Number(request.nextUrl.searchParams.get('chainId'));
   // `m` = rynek Q: zapis kluczowany launchpadem rynku, wiec agregaty sie nie mieszaja.
@@ -192,7 +276,7 @@ export async function GET(request: NextRequest) {
   const deployFloor = scanFloorOf(net);
   const scanAddresses = [...launchpadsOf(net), ...hooksOf(net)] as Address[];
 
-  const stored = await readBoardStats(chainId, launchpad);
+  let stored = await readBoardStats(chainId, launchpad);
 
   // Swiezy = niedawno zapisany I DOGONIONY. Sam `updatedAt` nie wystarcza:
   // podczas nadrabiania zaleglosci kazde zadanie zapisuje postep, wiec nastepne
@@ -271,6 +355,12 @@ export async function GET(request: NextRequest) {
     return fromStore(chainId, launchpad, stored, noStore);
   }
 
+  // Nowe wdrozenie bez wlasnego zapisu dziedziczy agregat poprzedniego -
+  // patrz `inheritPredecessor`.
+  if (!stored) {
+    stored = await inheritPredecessor(client, chainId, net, head);
+  }
+
   // Zapamietany agregat czytamy NIEUFNIE: `parseAggregate` oddaje `null` przy
   // czymkolwiek, co nie pasuje do ksztaltu. Polowiczny agregat bylby gorszy niz
   // jego brak, bo dosumowalby sie do kolejnych i juz nigdy nie wrocil do prawdy.
@@ -334,16 +424,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Skala krzywej jest wlasnoscia SIECI - stad `net.rVirt`, a nie stala
-    // modulowa. Ta sama arytmetyka, co `spotPriceFromReserves` na tablicy.
-    const helpers = {
-      ethOf: (wei: bigint) => Number(formatEther(wei)),
-      priceOf: (ethReserveAfter: bigint, tokenReserveAfter: bigint) => {
-        const tokens = Number(formatEther(tokenReserveAfter));
-        if (tokens <= 0) return 0;
-        return (net.rVirt + Number(formatEther(ethReserveAfter))) / tokens;
-      },
-    };
+    const helpers = aggregateHelpers(net);
 
     const scanOne = async (window: { fromBlock: bigint; toBlock: bigint }) => {
       const once = () =>
