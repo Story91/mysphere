@@ -1,9 +1,9 @@
 {
-  "epoch": 10,
-  "onchainEpochId": "9",
-  "root": "0x953723bbd94aa843b545dce131ab8bcecd8a0173ed5bf20cd54ada11bd49d21a",
-  "manifestHash": "0x2a3e0164023f7f8ddafe73dfc2f75de3c3871c04ccd0f6b1cad1fbc45c08271f",
-  "totalCumulative": "8377350219842793850121736",
-  "poolSphere": "15455717214025962513113",
-  "proposedAt": "2026-10-29T04:14:02.442Z"
+  "epoch": 11,
+  "onchainEpochId": "10",
+  "root": "0xa029c80cdfec7e1960dcb33f210219d36f283e807b1c614ef747f29ce599f066",
+  "manifestHash": "0x8827c49c96663b700e3c5f19a0be6f850fa43f8971854782a2d048ae06af2fe8",
+  "totalCumulative": "8377383326088307528569971",
+  "poolSphere": "33106245513678448235",
+  "proposedAt": "2026-11-04T04:13:43.929Z"
 }
